@@ -23,7 +23,7 @@
 #      (log and frames/frame_meta.csv)                              -> wait-stale-ckpt
 #   5. otherwise: take the launch lock, re-check 1/3/4, back the checkpoint up
 #      to <ckpt>.bak and start
-#          CASE_OUT=... julia --project=julia case_realistic_2d.jl \
+#          CASE_OUT=... julia --project=. case_realistic_2d.jl \
 #              resume <ckpt>            (or freeze <ckpt> if amr_every=0)
 #      with setsid nohup, appending to the same log                  -> restart
 #
@@ -88,7 +88,7 @@ set -u
 PROJECT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 JULIA=${JULIA:-/home/szh/opt/julia-1.12.7/bin/julia}
 JULIA_PROJECT=${JULIA_PROJECT:-julia}
-CASE_SCRIPT=${CASE_SCRIPT:-julia/scripts/case_realistic_2d.jl}
+CASE_SCRIPT=${CASE_SCRIPT:-examples/case_realistic_2d.jl}
 PY=${PY:-/home/szh/dedalus-env/bin/python}
 
 INTERVAL=${INTERVAL:-120}
@@ -145,7 +145,7 @@ CASE_BASE=$(basename -- "$CASE_DIR")
 [ -f "$JULIA_PROJECT/Project.toml" ] || { echo "not a julia project: $JULIA_PROJECT" >&2; exit 2; }
 
 # h5py is used read-only, to get the checkpoint step (the HDF5 attribute written
-# by julia/src/semquad_checkpoint.jl) and its amr_every config entry.
+# by src/semquad_checkpoint.jl) and its amr_every config entry.
 if ! "$PY" -c 'import h5py' >/dev/null 2>&1; then
     if command -v python3 >/dev/null 2>&1 && python3 -c 'import h5py' >/dev/null 2>&1; then
         PY=python3

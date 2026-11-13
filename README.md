@@ -21,7 +21,7 @@ Julia 1.12.
 ```bash
 git clone git@github.com:edwardaud/QuaST.git
 cd QuaST
-julia --project=julia -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
 The instantiate step takes five to ten minutes and under 2 GB.
@@ -31,7 +31,7 @@ The instantiate step takes five to ten minutes and under 2 GB.
 Ten steps of the realistic card, about two minutes including compilation:
 
 ```bash
-CASE_OUT=/tmp/quast_smoke julia --project=julia julia/scripts/case_realistic_2d.jl smoke
+CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
 Set `CASE_OUT` every time. Without it the card writes into `out_julia/case_realistic`,
@@ -42,7 +42,7 @@ A production spin-up, about two hours on eight threads:
 ```bash
 mkdir -p out_julia/run1
 CASE_OUT=out_julia/run1 CASE_STEPS=2000 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl spinup
+  julia --project=. --threads=8 examples/case_realistic_2d.jl spinup
 ```
 
 Progress goes to `run.log`, per-step diagnostics accumulate in `history.csv`, and
@@ -86,8 +86,8 @@ validation are in [docs/validation.md](docs/validation.md).
 ## Tests
 
 ```bash
-julia --project=julia julia/test/runtests.jl                    # full suite, ~35 min
-julia --project=julia julia/test/run_gates.jl t_g229_default_balanced.jl   # one gate
+julia --project=. test/runtests.jl                    # full suite, ~35 min
+julia --project=. test/run_gates.jl t_g229_default_balanced.jl   # one gate
 ```
 
 The suite is about 220 gate files and 133 600 assertions, covering bitwise regression pins,

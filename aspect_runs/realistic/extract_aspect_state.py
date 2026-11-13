@@ -29,7 +29,7 @@ Output (HDF5, frame mode):
   attrs: time (s), d, kappa, frame, source, npatch, npoint, ncell
 Node order: n = 3*j + i at (x0 + i*hx/2, y0 + j*hy/2), i,j = 0,1,2.
 
-The diagnostics are the *same wall-functional family as MantleSEM*: the Q2
+The diagnostics are the *same wall-functional family as QuaST*: the Q2
 normal derivative at the wall, Nu = -<dT/dy>/dT for both walls (so the
 conductive state gives Nu_top = +6, Nu_bot = -4, as `semquad_nu_walls` does).
 ASPECT's own `statistics` reports the Gresho CBF family instead, which differs
@@ -180,7 +180,7 @@ def build_cells(P, T, U, C):
 def frame_diagnostics(cl):
     """Vectorised bulk + wall diagnostics of the exact Q2 field.
 
-    Nu uses the same family as MantleSEM: the Q2 normal derivative at the wall,
+    Nu uses the same family as QuaST: the Q2 normal derivative at the wall,
     Nu = -<dT/dy_nd>/dT (conductive state: Nu_top = +6, Nu_bot = -4).
     """
     n = len(cl["level"])

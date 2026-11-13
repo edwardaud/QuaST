@@ -27,7 +27,7 @@ ours   : `out_julia/case_realistic_E/frames/frame_NNNNN_T.bin` - 256x256
          `x in [0, 2.5]`, `y in [0, 1]` (both endpoints included), i.e.
          `numpy.fromfile(...).reshape(256, 256)` is `A[y, x]` and the file holds
          the *full* temperature `Tbar(y; H) + theta`, not theta
-         (`julia/scripts/case_realistic_2d.jl`, `write_frame!`).
+         (`examples/case_realistic_2d.jl`, `write_frame!`).
 
 Matched times are the exact ASPECT visualization times (from `solution.pvd`),
 so the ASPECT row is a snapshot and our side is linearly interpolated in time

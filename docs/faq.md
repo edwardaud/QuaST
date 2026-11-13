@@ -6,7 +6,7 @@ For a library run, set `Params(Ra=..., H=...)`: `Ra` is the Rayleigh number and 
 volumetric internal heating. The conductive base state is `Tbar(z) = (1 - z) + H/2 z(1 - z)`,
 so a conductive box has `Nu_top = 1 + H/2` and `Nu_bot = 1 - H/2` (6 and -4 at `H = 10`). For
 the realistic card, edit the literals `RA` and `HHEAT` at
-`julia/scripts/case_realistic_2d.jl:149-150`; there is no environment variable for either.
+`examples/case_realistic_2d.jl:149-150`; there is no environment variable for either.
 
 ## How do I add a phase transition?
 
@@ -15,7 +15,7 @@ vector as `phases=ph` to `run_semquad_simulation`; `z0` is height (0 bottom, 1 t
 `dz/dT`, and `B = drho/(rho0 alpha0 dT)`. For latent heat, set `latent_mode=:per_phase` and fill
 the coefficients with `per_phase_latent(pr, ph; rho_ref=..., cp=..., dT=..., g=..., d=...,
 T_surface=...)`. Copy the ready-made pair from `phases()` at
-`julia/scripts/case_realistic_2d.jl:313-321`.
+`examples/case_realistic_2d.jl:313-321`.
 
 ## How do I change the rheology law?
 
@@ -25,7 +25,7 @@ Pick `eta_law` on `Params`: `:expT` uses the ratio `deta_T`, `:expTz` uses the c
 `comp_Es`, `comp_n` and `comp_rule=:isostress`. For a law the card does not have, pass
 `eta_custom=(x, z) -> ...`, which overrides the temperature law in the Stokes assembly. The 2b
 law is `eta = exp(-9.70406 T + 4.15888 (1-z))`, and the realistic composite card is at
-`julia/scripts/case_realistic_2d.jl:323-340`.
+`examples/case_realistic_2d.jl:323-340`.
 
 ## Does it run in 3-D?
 
@@ -37,7 +37,7 @@ thresholds do not transfer.
 
 ## How many threads should I use?
 
-Use `julia --project=julia --threads=8` and leave `linear=:auto` (the default) or `linear=:mg`
+Use `julia --project=. --threads=8` and leave `linear=:auto` (the default) or `linear=:mg`
 alone; the matrix-free multigrid is the threaded path, and `:auto` sets `mg_threads =
 min(8, Threads.nthreads())` at the production size. The warm production Stokes solve is 1.36 s
 at eight threads against 3.37 s for the direct solve, the full solve gains 1.30 to 1.42x over
@@ -70,7 +70,7 @@ AMR, while `freeze` rewrites only `amr_every` to 0 and continues on the frozen m
 
 ```bash
 CASE_OUT=out_julia/demo CASE_STEPS=4000 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl resume \
+  julia --project=. --threads=8 examples/case_realistic_2d.jl resume \
   out_julia/demo/spinup.h5
 ```
 
@@ -87,7 +87,7 @@ section 5.1. Compare `Nu_top` first: it agrees to 0.005 to 0.9 percent over
 `t_nd = 1e-3 .. 5e-3`. Quote `Nu_bot` with its window, because the difference is -6.11 percent
 over `1e-6 .. 1e-3` and +6.05 percent over `1e-3 .. 5e-3`; an unwindowed mean is wrong in both
 size and sign. For a state-level check, import an ASPECT checkpoint with
-`julia/scripts/import_aspect_state.jl`; the two operators then agree to 0.003 percent at the
+`examples/import_aspect_state.jl`; the two operators then agree to 0.003 percent at the
 bottom wall.
 
 ## How do I cite it?

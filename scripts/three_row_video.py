@@ -202,7 +202,7 @@ def time_text(target, pick, src):
 
 # ------------------------------------------------------------------ our frames
 class OurSource:
-    """A MantleSEM run: frames/frame_NNNNN_*.bin|csv, metadata in frame_meta.csv."""
+    """A QuaST run: frames/frame_NNNNN_*.bin|csv, metadata in frame_meta.csv."""
 
     kind = "our"
 

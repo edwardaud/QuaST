@@ -1,6 +1,6 @@
 name: gates
 
-# The gate suite.  The full local suite (`julia/test/runtests.jl`) also contains
+# The gate suite.  The full local suite (`test/runtests.jl`) also contains
 # a few legacy gates and two known failures (`t_g64_h5_highra_plume.jl`), so CI
 # runs the gates that are expected to pass on a clean checkout.  Groups are
 # independent jobs so one failure does not hide the others.
@@ -95,12 +95,12 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.julia
-          key: julia-${{ runner.os }}-${{ hashFiles('julia/Manifest.toml') }}
+          key: julia-${{ runner.os }}-${{ hashFiles('Manifest.toml') }}
           restore-keys: |
             julia-${{ runner.os }}-
 
       - name: Instantiate project
-        run: julia --project=julia -e 'using Pkg; Pkg.instantiate()'
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
 
       - name: Run gates
-        run: julia --project=julia julia/test/run_gates.jl ${{ matrix.gates }}
+        run: julia --project=. test/run_gates.jl ${{ matrix.gates }}

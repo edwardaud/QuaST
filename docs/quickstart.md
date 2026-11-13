@@ -2,24 +2,24 @@
 
 From a clean checkout to a running mantle-convection case: install Julia, run the
 ten-step smoke test, start a 2 000-step spin-up, watch it, stop it, resume it. The
-case is `julia/scripts/case_realistic_2d.jl`, a 2.5 x 1 box with free-slip walls,
+case is `examples/case_realistic_2d.jl`, a 2.5 x 1 box with free-slip walls,
 internal heating, composite diffusion-dislocation rheology, two phase transitions
 and latent heat. `docs/guide.md` has the physics, the method and every knob.
 
 ## 1. Install
 
-You need Julia 1.12. The compat bound in `julia/Project.toml` is `julia = "1.10"`,
+You need Julia 1.12. The compat bound in `Project.toml` is `julia = "1.10"`,
 so any 1.10 or later release resolves; 1.12 is what the card is run with.
 
 ```bash
 cd /path/to/QuaST
 julia --version                      # expect 1.12.x
-julia --project=julia -e 'using Pkg; Pkg.instantiate()'
-julia --project=julia -e 'using MantleSEM; println("ok")'
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using QuaST; println("ok")'
 ```
 
-`--project=julia` points every command on this page at the project in `julia/`.
-`Pkg.instantiate()` installs the versions pinned in `julia/Manifest.toml` and
+`--project=.` points every command on this page at the project in this directory.
+`Pkg.instantiate()` installs the versions pinned in `Manifest.toml` and
 downloads the HDF5 artifacts. The last line compiles the solver once and prints
 `ok`; later calls return immediately.
 
@@ -30,7 +30,7 @@ precompile cache.
 ## 2. The ten-step smoke
 
 ```bash
-CASE_OUT=/tmp/quast_smoke julia --project=julia julia/scripts/case_realistic_2d.jl smoke
+CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
 The first run takes about two minutes, most of it compilation; a second run takes
@@ -73,7 +73,7 @@ A 2 000-step spin-up with the default card, on eight threads:
 ```bash
 mkdir -p "$HOME/quast/run1"
 CASE_OUT="$HOME/quast/run1" CASE_STEPS=2000 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl spinup \
+  julia --project=. --threads=8 examples/case_realistic_2d.jl spinup \
   > "$HOME/quast/run1/run.log" 2>&1
 ```
 
@@ -127,7 +127,7 @@ the last checkpoint, because the card checkpoints every 200.
 
 ```bash
 CASE_OUT="$HOME/quast/run1" CASE_STEPS=4000 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl resume \
+  julia --project=. --threads=8 examples/case_realistic_2d.jl resume \
   "$HOME/quast/run1/spinup.h5" >> "$HOME/quast/run1/run.log" 2>&1
 ```
 
@@ -191,7 +191,7 @@ symbols as `x` or `none`. Repeat the whole set the checkpoint was written with, 
 read it back with
 
 ```bash
-julia --project=julia -e 'using HDF5; h5open(ARGS[1]) do f; println(HDF5.attrs(f)["config"]); end' \
+julia --project=. -e 'using HDF5; h5open(ARGS[1]) do f; println(HDF5.attrs(f)["config"]); end' \
   "$HOME/quast/run1/spinup.h5"
 ```
 

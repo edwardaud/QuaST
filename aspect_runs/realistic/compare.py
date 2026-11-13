@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Compare the ASPECT realistic-case run with MantleSEM's A run.
+"""Compare the ASPECT realistic-case run with QuaST's A run.
 
 Reads
   * ASPECT's `statistics` file (one row per time step), and
-  * MantleSEM's `out_julia/case_realistic/run.log` (one `step` line per step),
+  * QuaST's `out_julia/case_realistic/run.log` (one `step` line per step),
 
-converts the ASPECT diagnostics to the nondimensional units of the MantleSEM
+converts the ASPECT diagnostics to the nondimensional units of the QuaST
 case and writes a table at matched nondimensional times.
 
 Conversions (docs/dev/VALIDATION.md, section 2):
@@ -16,7 +16,7 @@ Conversions (docs/dev/VALIDATION.md, section 2):
   Nu_bot    = -Q_bot * d / (Lx * k * dT)
 
 The heat-flux postprocessor reports the *outward* flux in W (in 2-D: W per unit
-length), so the bottom flux enters with a minus sign to match MantleSEM's
+length), so the bottom flux enters with a minus sign to match QuaST's
 Nu_bot = -dT/dz|_bot.
 
 Usage:

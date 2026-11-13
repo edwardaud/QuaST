@@ -1,10 +1,10 @@
 # Guide: the realistic 2-D mantle-convection card
 
-This document describes the case that `julia/scripts/case_realistic_2d.jl` sets
+This document describes the case that `examples/case_realistic_2d.jl` sets
 up: the physics, the numerical method, every knob, every output file, restarting,
 and the thread and memory behaviour. Every card value here is a literal in that
 script or a default of `run_semquad_simulation` in
-`julia/src/semquadconvection.jl`. Section 7 points to the engineering record.
+`src/semquadconvection.jl`. Section 7 points to the engineering record.
 
 The case is a 2.5 x 1 box of incompressible fluid with free-slip walls,
 temperature 0 at the top and 1 at the bottom, internal heating `H = 10`, a nominal

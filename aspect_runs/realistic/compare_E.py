@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare the ASPECT `realistic_E` run with MantleSEM's `case_realistic_E` run.
+"""Compare the ASPECT `realistic_E` run with QuaST's `case_realistic_E` run.
 
 The two runs are the *same card*: 2.5 x 1 Boussinesq box, T_top = 0 / T_bot = 1,
 H = 10, Ra = 1e5, composite isostress diffusion+dislocation rheology with the

@@ -4,7 +4,7 @@ Four runs, each with the command, the physics, the measured runtime on eight thr
 number to check. Run everything from the repository root. The first command is needed once:
 
 ```bash
-julia --project=julia -e 'using Pkg; Pkg.instantiate()'
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
 The timings below are wall clock on eight Julia threads, not CPU time; the direct solver is
@@ -19,7 +19,7 @@ the joint viscosity law `eta = exp(-b T + c (1 - z))` with `b = ln 16384` and `c
 The reference values are `Nu = 6.9299` and `Vrms = 171.755` (Blankenbach et al. 1989, Table 9).
 
 ```bash
-julia --project=julia --threads=8 julia/scripts/run_2b.jl
+julia --project=. --threads=8 examples/run_2b.jl
 ```
 
 The arguments are `[nxe] [nze] [stage...]`; the defaults are 40 x 16, `p = 4`, and the four
@@ -60,7 +60,7 @@ theta0(x, z) = 0.12 exp(-((x - 0.5)/0.12)^2 - ((z - 0.35)/0.10)^2) sin(pi z)
 ```
 
 ```bash
-julia --project=julia --threads=8 julia/scripts/run_blob_kelly_1024.jl
+julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
 ```
 
 The producer runs 126 steps with `p = 4`, the direct solver, Kelly marking every 5 steps, a
@@ -80,8 +80,8 @@ FINAL policy=balanced frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a9
 `Tmax = 1.2531` at the same frame, the computed 1.264330 is **+0.9 percent**; the field-level
 difference was 2.87 percent for the classic arm and was not re-measured for the balanced arm,
 so do not quote 2.87 percent for this default. The classic arm is available with
-`BLOB_POLICY=classic BLOB_OUT=out_julia/blob_classic julia --project=julia --threads=8
-julia/scripts/run_blob_kelly_1024.jl`; its documented digest is
+`BLOB_POLICY=classic BLOB_OUT=out_julia/blob_classic julia --project=. --threads=8
+examples/run_blob_kelly_1024.jl`; its documented digest is
 `868a79d92a78bcfe89cfacd4774a0301c0eeb0a865284ab005155f6f458afe88` with `Tmax25=1.264427445`
 (project record, not re-run here). The digest is bitwise only on the pinned Julia, BLAS and
 thread stack; `Tmax25` is the platform-tolerant check.
@@ -98,7 +98,7 @@ The smoke is 10 steps with the full card:
 
 ```bash
 CASE_OUT=out_julia/demo_smoke CASE_STEPS=10 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl smoke
+  julia --project=. --threads=8 examples/case_realistic_2d.jl smoke
 ```
 
 It takes **108.5 s** on eight threads, most of it Julia compilation and the first Stokes
@@ -112,7 +112,7 @@ The 2000-step spin-up is the same card with AMR on:
 
 ```bash
 CASE_OUT=out_julia/demo CASE_STEPS=2000 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl spinup
+  julia --project=. --threads=8 examples/case_realistic_2d.jl spinup
 ```
 
 It grows the tree from 640 leaves to the 10000-leaf cap in the first 100 steps and writes
@@ -130,11 +130,11 @@ Freeze and resume are two ways to continue the same checkpoint. `resume` keeps A
 
 ```bash
 CASE_OUT=out_julia/demo_frozen CASE_STEPS=4000 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl freeze \
+  julia --project=. --threads=8 examples/case_realistic_2d.jl freeze \
   out_julia/demo/spinup.h5
 
 CASE_OUT=out_julia/demo_resume CASE_STEPS=4000 \
-  julia --project=julia --threads=8 julia/scripts/case_realistic_2d.jl resume \
+  julia --project=. --threads=8 examples/case_realistic_2d.jl resume \
   out_julia/demo/spinup.h5
 ```
 
@@ -151,7 +151,7 @@ passes `amr_every = 5`; continue that branch with `freeze` on `frozen.h5`.
 as `build_and_run.jl`; it is complete and prints one history row per step.
 
 ```julia
-using MantleSEM, Printf
+using QuaST, Printf
 
 # 1. The tree: a unit box on a 2 x 2 base grid, three uniform refinements
 #    (2*2*4^3 = 256 leaves, 2:1 balanced).
@@ -185,7 +185,7 @@ end
 ```
 
 ```bash
-julia --project=julia --threads=8 build_and_run.jl
+julia --project=. --threads=8 build_and_run.jl
 ```
 
 The first run takes **84 s** on eight threads, almost all of it Julia's first-call

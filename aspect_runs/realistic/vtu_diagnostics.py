@@ -12,7 +12,7 @@ itself:
 
 with a one-sided quadratic derivative through the three nodes normal to the
 boundary (arbitrary node spacing, so AMR meshes are handled), averaged over x.
-This is the same definition as MantleSEM's `nu_walls` (x-average of the wall
+This is the same definition as QuaST's `nu_walls` (x-average of the wall
 derivative), evaluated on the ASPECT field.
 
 All MPI pieces of a VTU output are read (`solution-NNNNN.*.vtu`).

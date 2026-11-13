@@ -4,7 +4,7 @@
 Reads
   * ASPECT's continuation diagnostics (`run_E_cont/statistics`, CBF family), and
     optionally the Q2-exact gradient-family series produced by
-    `extract_aspect_state.py --series` (the same wall functional as MantleSEM),
+    `extract_aspect_state.py --series` (the same wall functional as QuaST),
   * our run started from ASPECT's state (`case_realistic_E_aspimport`),
   * our natural from-t=0 trajectory (`case_realistic_E`, for reference),
 converts everything to t_nd / Nu / Vrms_nd with the section-2 scale set, and
