@@ -50,7 +50,7 @@ function main()
                                 linear=:direct,
                                 cfl=0.5, maxsteps=300000, verbose=false,
                                 ev=0.11, ev_cmax=0.052, callback=cb,
-                                checkpoint_path=joinpath(@__DIR__, "..", "..",
+                                checkpoint_path=joinpath(@__DIR__, "..",
                                                          "out_julia", "bb2b_stretch_ck.h5"),
                                 checkpoint_every=250)
     ss2 = make_semstokes(st.qt, 2)

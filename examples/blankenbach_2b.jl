@@ -44,7 +44,7 @@ function run2b(level::Int; tstop::Float64=0.1, ev::Float64=0.11,
                                cfl=0.5, maxsteps=200000, verbose=false,
                                ev=ev, ev_cmax=ev_cmax,
                                steady_tol=1.0e-5, steady_window=20, tmin=0.02,
-                               checkpoint_path=joinpath(@__DIR__, "..", "..", "out_julia", "bb2b_L4_ck.h5"),
+                               checkpoint_path=joinpath(@__DIR__, "..", "out_julia", "bb2b_L4_ck.h5"),
                                checkpoint_every=500,
                                callback=cb)
     catch err

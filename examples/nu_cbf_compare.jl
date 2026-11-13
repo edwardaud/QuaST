@@ -58,9 +58,9 @@
 # =============================================================================
 using QuaST, Printf, LinearAlgebra, HDF5
 
-const DEFAULT_CKPT = normpath(joinpath(@__DIR__, "..", "..", "out_julia",
+const DEFAULT_CKPT = normpath(joinpath(@__DIR__, "..", "out_julia",
                                        "case_realistic_B2", "spinup.h5"))
-const DEFAULT_SCRATCH = normpath(joinpath(@__DIR__, "..", "..", "out_julia",
+const DEFAULT_SCRATCH = normpath(joinpath(@__DIR__, "..", "out_julia",
                                           "nu_cbf_scratch"))
 const USAGE = """
 usage: julia --project=. examples/nu_cbf_compare.jl [options] [ckpt]

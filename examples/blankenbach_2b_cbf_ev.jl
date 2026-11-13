@@ -63,7 +63,7 @@ function main()
     for (i, (x, y)) in enumerate(ss.su.coords)
         (y <= 1.0e-12 || y >= 1.0 - 1.0e-12) && (th0[i] = 0.0)
     end
-    path = joinpath(@__DIR__, "..", "..", "out_julia",
+    path = joinpath(@__DIR__, "..", "out_julia",
                     "bb2b_L$(level)_cbf_ck.h5")
     @printf("# level %d  nodes=%d  running to t=%.2f (EV on, no AMR)\n",
             level, ss.su.N, tstop)

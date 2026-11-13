@@ -560,7 +560,7 @@ function main()
             push!(pos, a)
         end
     end
-    scratch = get(opts, "scratch", joinpath(@__DIR__, "..", "..", "out_julia",
+    scratch = get(opts, "scratch", joinpath(@__DIR__, "..", "out_julia",
                                             "nusselt_audit", "scratch"))
     nres = parse(Int, get(opts, "resume", "2"))
     detail = haskey(opts, "detail")

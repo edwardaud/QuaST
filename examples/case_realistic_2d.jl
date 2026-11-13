@@ -295,7 +295,7 @@ const STOKES_SCALING = Symbol(get(ENV, "CASE_STOKES_SCALING", "none"))
 const FRAME_STRIDE = 5
 
 const OUT = get(ENV, "CASE_OUT",
-                normpath(joinpath(@__DIR__, "..", "..", "out_julia",
+                normpath(joinpath(@__DIR__, "..", "out_julia",
                                   "case_realistic")))
 const THE_STEPS = parse(Int, get(ENV, "CASE_STEPS", "0"))   # 0 = mode default
 const FRAME_EVERY = parse(Int, get(ENV, "CASE_FRAME", "0")) # 0 = default

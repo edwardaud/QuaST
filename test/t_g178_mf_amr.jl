@@ -202,7 +202,7 @@ end
     # compare the nodal perturbation maximum, which is what both runs in this
     # gate see, and `out_julia/agent/compare_blob_mf.jl` does the production
     # comparison against frame_meta.csv.
-    ref = normpath(joinpath(@__DIR__, "..", "..", "out_julia",
+    ref = normpath(joinpath(@__DIR__, "..", "out_julia",
                             "fresh_blob_kelly_1024", "frame_meta.csv"))
     if isfile(ref)
         @info "G178 stored direct reference present" path = ref frames = length(bd.tmax)

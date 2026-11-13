@@ -28,7 +28,7 @@ const DT = 8.0e-11
 const MAXLEAVES = 1024
 const POLICY = Symbol(get(ENV, "BLOB_POLICY", "balanced"))
 const DIR = normpath(get(ENV, "BLOB_OUT",
-    joinpath(@__DIR__, "..", "..", "out_julia",
+    joinpath(@__DIR__, "..", "out_julia",
              "fresh_blob_kelly_1024_" * string(POLICY))))
 
 _hash(v) = bytes2hex(sha256(collect(reinterpret(UInt8, v))))
@@ -36,7 +36,17 @@ _hash(v) = bytes2hex(sha256(collect(reinterpret(UInt8, v))))
 function main()
     POLICY in (:classic, :balanced) ||
         error("BLOB_POLICY must be classic or balanced, got $POLICY")
-    rm(DIR; force=true, recursive=true); mkdir(DIR)
+    if isdir(DIR)
+        # Only ever clear a directory that holds nothing but this producer's own
+        # output: an unset BLOB_OUT used to be able to point outside the tree.
+        ours = Set(["frame_meta.csv", "frame_sha256.csv", "run_summary.csv"])
+        extra = setdiff(Set(readdir(DIR)), ours)
+        isempty(extra) ||
+            error("refusing to overwrite $(DIR): it holds files this script did not write: " *
+                  join(sort(collect(extra)), ", "))
+        rm(DIR; recursive=true, force=true)
+    end
+    mkdir(DIR)
     open(joinpath(DIR, "frame_meta.csv"), "w") do io
         println(io, "frame,t,N,leaves,Tmax,nlev")
     end
