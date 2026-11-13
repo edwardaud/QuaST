@@ -24,7 +24,7 @@
 #   * with BENCH_ASM=1: the instruction mix of the compiled kernel body.
 #
 # The width sweep of §16.2 is four runs of this script with
-# `SEMQUAD_KBLK` (src/semquadstokes.jl) set to 8 / 16 / 32 / 64 in an
+# `SEMQUAD_KBLK` (src/stokes/kop.jl) set to 8 / 16 / 32 / 64 in an
 # extracted tree (`git archive HEAD | tar -x -C /tmp/ms_blk16`, then
 # `REPO=/tmp/ms_blk16`); the scalar column is the in-run normaliser for the
 # session drift.

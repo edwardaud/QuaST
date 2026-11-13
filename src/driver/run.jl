@@ -972,7 +972,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             end
             if isfinite(stokes_tol) && LAST_SEMSTOKES_RESIDUAL[] > stokes_tol
                 # The direct path has already escalated its shift ladder and
-                # refined (src/semquadstokes.jl, docs/dev/CASE_REALISTIC.md
+                # refined (src/stokes/, docs/dev/CASE_REALISTIC.md
                 # §13); this error is the last resort, so report the numbers that
                 # identify the state.  Written to *stderr*, the same unbuffered
                 # stream as the error, so it is adjacent to it in a redirected

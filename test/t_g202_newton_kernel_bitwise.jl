@@ -25,7 +25,7 @@ _h202(v::SparseMatrixCSC) = _h202(v.colptr) * "/" * _h202(v.rowval) * "/" *
                             _h202(v.nzval)
 
 # --- pre-fix reference: the Kgeo accumulation, copied from the loop body -----
-# (src/semquadstokes.jl `_semquad_assemble_block!` before the fix).  The
+# (src/stokes/assembly_var.jl `_semquad_assemble_block!` before the fix).  The
 # only difference to the shipped kernel is that the coefficient arrives as a
 # `Function` argument instead of a struct field.
 function _g202_kgeo_ref(ss::SemStokes, eta_fun, geo_u::Vector{Float64},

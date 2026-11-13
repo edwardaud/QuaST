@@ -723,7 +723,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     elseif linear === :mg && !kfree
         # Pressure-block approximate inverse (mass / LSC / PCD / three-factor
         # w-BFBT); shared with the MG-accelerated Newton solver, see
-        # semquad_mg.jl.  `mg_pressure_precond` is the public selector
+        # mg/pressure.jl.  `mg_pressure_precond` is the public selector
         # (:bfbt | :mass | :scaled_mass | :pcd | :lsc); its default `:auto`
         # keeps the historical `mg_pressure_mode` resolution, which picks the
         # three-factor w-BFBT above 100x viscosity contrast -- the measured

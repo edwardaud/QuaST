@@ -1,5 +1,5 @@
 # Experimental AMR strategies, opt-in only.  The production path in
-# semquadconvection.jl remains unchanged; pass amr_strategy=:threshold to use
+# `src/driver/` remains unchanged; pass amr_strategy=:threshold to use
 # this file.  It replaces the fixed refine/coarsen fractions by thresholds
 # relative to the current maximum indicator, with a dead band
 # (coarsen_thresh < eta/eta_max < refine_thresh) that suppresses churn.

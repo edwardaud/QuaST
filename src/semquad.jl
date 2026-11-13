@@ -24,7 +24,7 @@ end
 
 # ---------------------------------------------------------------------------
 # S4 stage 1: helpers shared by the threaded leaf assembly loops (Stokes in
-# `semquadstokes.jl` and energy here).  The threaded paths split the leaves into
+# `stokes/assembly_var.jl` and energy here).  The threaded paths split the leaves into
 # fixed contiguous blocks and concatenate the per-block COO buffers in block
 # order, which keeps them deterministic run to run.
 # ---------------------------------------------------------------------------
