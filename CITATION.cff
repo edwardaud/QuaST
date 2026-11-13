@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "QuaST: a quadtree spectral-element solver for two-dimensional mantle convection"
+abstract: >-
+  QuaST solves the incompressible Boussinesq or anelastic Stokes and energy equations
+  with Taylor-Hood elements of degree p and p-1 on Gauss-Legendre-Lobatto nodes over a
+  quadtree kept 2:1 balanced, with hanging-node continuity enforced exactly and BDF2
+  time stepping. The Stokes saddle is solved either by a sparse direct factorisation or
+  by matrix-free geometric multigrid, chosen from the problem size and the viscosity
+  contrast, and the mesh adapts with a policy that trades error against a fixed leaf
+  budget.
+authors:
+  - family-names: edwardaud
+version: 0.1.0
+date-released: "2026-11-13"
+url: "https://github.com/edwardaud/QuaST"
+repository-code: "https://github.com/edwardaud/QuaST"
+license: MIT
+keywords:
+  - geodynamics
+  - mantle convection
+  - spectral element
+  - adaptive mesh refinement
+  - multigrid
+  - Julia

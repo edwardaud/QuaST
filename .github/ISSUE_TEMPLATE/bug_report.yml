@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a failure in a gate, an example, a benchmark, or the solver
+title: "[bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Include the exact command, so the failure can be reproduced.
+  - type: textarea
+    id: ran
+    attributes:
+      label: What you ran
+      description: The gate file, example or benchmark script, its mode or arguments, and the command.
+      placeholder: julia --project=. test/run_gates.jl t_g229_default_balanced.jl
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: The error, the failing assertion, or the number that disagrees.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: The value or behaviour you expected, and where it is documented.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Julia version, thread count, operating system, and commit.
+      placeholder: |
+        julia --version -> 1.12.7
+        --threads=8
+        Ubuntu 24.04
+        commit 02f9cd2
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The last lines of the log, or the testset summary and stack trace.
+      render: shell
+    validations:
+      required: true

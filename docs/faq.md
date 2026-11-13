@@ -92,9 +92,9 @@ bottom wall.
 
 ## How do I cite it?
 
-There is no DOI and no `CITATION` file in this checkout. Cite the repository URL you cloned
-and the code commit (`QuaST: a quadtree spectral-element solver for two-dimensional mantle
-convection`, commit `e7e1a5c`), plus the benchmark paper for the case you used: Blankenbach et
-al. (1989) for 2b, Tosi et al. (2015) for Cases 1 and 5a, and the ASPECT paper for the
-cross-code comparison. State the commit, the Julia version and the thread count with any
-number you quote; the bitwise pins are tied to those, while the benchmark tolerances are not.
+[`CITATION.cff`](../CITATION.cff) carries the release metadata: the repository URL, version
+0.1.0 and the MIT licence. There is no DOI. Cite the repository URL you cloned and the code
+commit, plus the benchmark paper for the case you used: Blankenbach et al. (1989) for 2b,
+Tosi et al. (2015) for Cases 1 and 5a, and the ASPECT paper for the cross-code comparison.
+State the commit, the Julia version and the thread count with any number you quote; the
+bitwise pins are tied to those, while the benchmark tolerances are not.
