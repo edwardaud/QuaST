@@ -189,7 +189,7 @@ const COARSEN_FRAC = parse(Float64, get(ENV, "CASE_COARSEN", "0.05"))
 const COARSEN_TOL  = parse(Float64, get(ENV, "CASE_THETATOL", "1.0e-2"))
 const EV_COEF      = parse(Float64, get(ENV, "CASE_EV", "0.11"))
 # Wall refinement (`refine_wall_to_min!` after every AMR cycle, src/
-# semquadconvection.jl:715/1403): force every leaf within `wall_strip` of the
+# src/driver/run.jl:401/1089): force every leaf within `wall_strip` of the
 # bottom/top wall, and the wall rows themselves, back to at least
 # `wall_min_level`.  The default is the production rule (5 / 0.1): without it
 # the top wall stays at level 3/4 while the interior is L5/6, and that
@@ -274,7 +274,7 @@ const EXTDIAG      = lowercase(strip(get(ENV, "CASE_EXTDIAG", "0"))) in
 const LIN_SOLVE    = Symbol(get(ENV, "CASE_LINEAR", "auto"))
 # Stokes acceptance gate of the driver: `run_semquad_simulation` forwards it as
 # both `auto_fallback_tol` (the auto-MG safety net) and `stokes_accept_tol` (the
-# direct shift ladder), and fails the step above it (semquadconvection.jl:1258).
+# direct shift ladder), and fails the step above it (src/driver/run.jl:944).
 const STOKES_TOL   = 1.0e-3
 # The MG outer tolerance, passed explicitly so a future change of the library
 # `mg_tol` default cannot silently over-solve the card (that default is
