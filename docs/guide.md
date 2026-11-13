@@ -2,9 +2,9 @@
 
 This document describes the case that `julia/scripts/case_realistic_2d.jl` sets
 up: the physics, the numerical method, every knob, every output file, restarting,
-and the thread and memory behaviour. Every number here is a literal in that script
-or a default of `run_semquad_simulation` in `julia/src/semquadconvection.jl`.
-Section 7 points to the engineering record.
+and the thread and memory behaviour. Every card value here is a literal in that
+script or a default of `run_semquad_simulation` in
+`julia/src/semquadconvection.jl`. Section 7 points to the engineering record.
 
 The case is a 2.5 x 1 box of incompressible fluid with free-slip walls,
 temperature 0 at the top and 1 at the bottom, internal heating `H = 10`, a nominal
@@ -13,7 +13,7 @@ phase transitions with latent heat. Yielding and strain weakening are off.
 
 ## 1. The physical problem
 
-### 1.1 Domain, walls, boundary conditions
+### 1.1 Domain and boundary conditions
 
 `[0, 2.5] x [0, 1]`, built from 5 x 2 base cells on a quadtree with square leaves.
 `x` is horizontal and `y` is height, `y = 0` at the bottom and `y = 1` at the top;
@@ -30,26 +30,24 @@ Nondimensional Boussinesq momentum, continuity and energy:
 -div(2 eta eps(u)) + grad(p) = f
 div(u) = 0
 dtheta/dt + u.grad(theta) = lap(theta) - u_y dTbar/dy
+f_y = Ra theta - Ra sum_i B_i [Gamma_i(y,T) - Gamma_i(y,Tbar)]
 ```
 
-with `u = (ux, uy)` the velocity, `p` the dynamic pressure, `eta` the viscosity,
+`u = (ux, uy)` is the velocity, `p` the dynamic pressure, `eta` the viscosity,
 `eps(u) = (grad u + grad u^T)/2` the strain rate, `theta = T - Tbar` the
-temperature anomaly, and the vertical body force
-
-```
-f_y = Ra theta - Ra sum_i B_i [Gamma_i(y,T) - Gamma_i(y,Tbar)].
-```
-
-The first term is thermal buoyancy: hot material rises. The second is the
-buoyancy of each phase transition, taken as the anomaly with respect to the base
-state so that a transition sitting in the reference profile drives no flow. `B_i`
-is positive when the phase is denser, so an excess phase fraction pushes material
-down.
+temperature anomaly, `Tbar(y)` the base state of 1.3, `Gamma_i` the phase fraction
+of 1.5, `B_i` its buoyancy number (positive for a dense phase, so an excess phase
+fraction pushes material down), and `Ra` the Rayleigh number: `Ra = 1e5`
+multiplies the thermal buoyancy, with the viscosity in units of the reference
+viscosity. The prefactors of 1.4 make `eta = 1` at `T = 0.5`, which sits in the
+cold lid, so the convecting interior runs at `T` near 1.3 with `eta` around `1e-3`
+to `1e-2` and an interior Rayleigh number of order `1e7` to `1e8`. An overturn
+time `1/Vrms` is about `1e-3`.
 
 ### 1.3 Base state, heating and Nusselt numbers
 
-`H` is the volumetric heating, `dT/dt + u.grad T = lap T + H`. The card evolves
-the anomaly about the steady conductive profile that carries it:
+`H` is the volumetric heating of `dT/dt + u.grad T = lap T + H`. The card evolves
+the anomaly about the conductive profile that carries it:
 
 ```
 Tbar(y) = (1 - y) + (H/2) y (1 - y),   lap(Tbar) = -H,
@@ -59,9 +57,8 @@ dTbar/dy = -1 + (H/2)(1 - 2y).
 Substituting `T = Tbar + theta` cancels the source and leaves the `-u_y dTbar/dy`
 term, so the assembly carries no explicit heating term. With `H = 10`:
 `Tbar(0.5) = 1.75`, the volume mean of the base state is `0.5 + H/12 = 1.3333`,
-and the conductive wall gradients are `-6` at the top and `+4` at the bottom.
-
-The two Nusselt numbers use those gradients as their reference:
+and the conductive wall gradients are `-6` at the top and `+4` at the bottom. The
+two Nusselt numbers use those gradients as their reference,
 
 ```
 Nu_top = (1 + H/2) - <dtheta/dy>_top,   Nu_bot = (1 - H/2) - <dtheta/dy>_bot,
@@ -69,20 +66,9 @@ Nu_top = (1 + H/2) - <dtheta/dy>_top,   Nu_bot = (1 - H/2) - <dtheta/dy>_bot,
 
 where the brackets are the x-average of the one-sided wall derivative. At the
 conductive state they read 6 and -4. A steady convecting state satisfies
-`Nu_top - Nu_bot = H`; the departure from that identity is the `closure` column
-(4.2).
+`Nu_top - Nu_bot = H`; the departure from that identity is `closure` (4.2).
 
-### 1.4 The Rayleigh number
-
-`Ra = 1e5` multiplies the thermal buoyancy, and the viscosity unit is the
-reference viscosity of the scaling. The prefactors are calibrated so that
-`eta = 1` at `T = 0.5`, which sits in the cold lid; the convecting interior runs
-at `T` near 1.3 with `eta` around `1e-3` to `1e-2`. The nominal `Ra = 1e5`
-therefore describes the reference viscosity, and the interior Rayleigh number is
-of order `1e7` to `1e8`. The flow is fast (`Vrms` of order `1e3`), the step is
-CFL-limited to a few times `1e-7`, and an overturn time `1/Vrms` is about `1e-3`.
-
-### 1.5 Rheology
+### 1.4 Rheology
 
 `eta_law = :composite` with `comp_rule = :isostress`, the partition ASPECT uses.
 Two mechanisms deform the material; in inverse form their viscosities at
@@ -93,7 +79,7 @@ inv_diff = A_d exp(-(E_d + V_d (1 - y)) / T_nd)
 inv_disl = A_s exp(-(E_s + V_s (1 - y)) / (n T_nd)) edot^((n-1)/n)
 ```
 
-with `T_nd = T + eta_T0` the absolute temperature in units of the temperature drop
+`T_nd = T + eta_T0` is the absolute temperature in units of the temperature drop
 (`eta_T0 = 0.5`, so the surface sits at half a drop), `n` the dislocation stress
 exponent, `A_d`, `A_s` the prefactors, `E_d`, `E_s` the activation energies
 divided by `R dT`, `V_d`, `V_s` the activation volumes (both zero here), and
@@ -114,12 +100,12 @@ is about `1e7`.
 
 The constants are `A_d = 1.6240183119e5`, `A_s = 2.6796419238e-1`, `E_d = 12`,
 `E_s = 17`, `n = 3`, `eta_T0 = 0.5`. They solve two conditions at `y = 0.5`:
-`eta(T = 0.5, edot_ref) = 1`, which fixes the common scale, and
-`eta(T = 0.1) / eta(T = 0.9) = 1e4` at `edot_ref`, which fixes the branch ratio.
-The reference strain rate `edot_ref = 1.65e3` is measured on a constant-viscosity
-precursor of the same case.
+`eta(T = 0.5, edot_ref) = 1`, fixing the common scale, and
+`eta(T = 0.1) / eta(T = 0.9) = 1e4` at `edot_ref`, fixing the branch ratio. The
+reference strain rate `edot_ref = 1.65e3` comes from a constant-viscosity precursor
+of the same case.
 
-### 1.6 The two phase transitions
+### 1.5 The two phase transitions
 
 With `depth = 1 - y`, the phase fraction of transition `i` is
 
@@ -142,13 +128,13 @@ positive slope and upward at a negative one.
 | `B` | 1.8182 | 3.0303 |
 
 `B = drho / (rho0 alpha0 dT)` is the nondimensional buoyancy number of the density
-jump, with `rho0 = 3300 kg/m^3`, `alpha0 = 3e-5 1/K` and `dT = 1000 K`. With
-these signs an upwelling gains buoyancy at the 410 and loses it at the 660, the
-behaviour of an exothermic and an endothermic transition.
+jump, with `rho0 = 3300 kg/m^3`, `alpha0 = 3e-5 1/K` and `dT = 1000 K`. An
+upwelling gains buoyancy at the 410 and loses it at the 660, the behaviour of an
+exothermic and an endothermic transition.
 
-### 1.7 Latent heat
+### 1.6 Latent heat
 
-Each coefficient is derived from its own transition, not fitted:
+Each coefficient is derived from its own transition:
 
 ```
 gamma  = slope rho0 g d / dT          (Clapeyron slope in Pa/K)
@@ -156,10 +142,10 @@ dS_A   = gamma drho / rho0^2          (entropy change, J/(kg K))
 latent = -T_nd dS_A / cp
 ```
 
-with `cp = 1000 J/(kg K)`, `g = 9.81 m/s^2`, `d = 2.9e6 m` the box depth, and
-`T_nd` the absolute base-state temperature at the transition in units of `dT`,
-offset by `T_surface = 0.5`. The minus sign is this code's convention: it writes
-the term as `-latent DGamma/Dt` where ASPECT writes `+T dS_A DGamma/Dt`.
+`cp = 1000 J/(kg K)`, `g = 9.81 m/s^2`, `d = 2.9e6 m` is the box depth, and `T_nd`
+is the absolute base-state temperature at the transition in units of `dT`, offset
+by `T_surface = 0.5`. The minus sign is this code's convention: it writes the term
+as `-latent DGamma/Dt` where ASPECT writes `+T dS_A DGamma/Dt`.
 
 | | `dS_A` | `latent` | reading |
 |---|---|---|---|
@@ -174,7 +160,7 @@ The energy equation carries them as an apparent heat capacity,
 `latent_L = 0.11` for both transitions; that value has the wrong sign at the 410
 and is a replay switch.
 
-### 1.8 Initial condition and what is off
+### 1.7 Initial condition
 
 ```
 theta0(x, y) = 0.05 sin(pi y) cos(2 pi x / Lx) + 0.02 sin(2 pi y) cos(4 pi x / Lx)
@@ -182,14 +168,12 @@ theta0(x, y) = 0.05 sin(pi y) cos(2 pi x / Lx) + 0.02 sin(2 pi y) cos(4 pi x / L
 
 It vanishes on the top and bottom walls, as an anomaly must, and is symmetric
 about `x = Lx/2`. There are no random numbers: the card, the seed and a fixed step
-count make a run deterministic.
-
-The card switches off yielding and strain weakening (`yield_c = yield_taumax =
-Inf`, `yield_phi = 0`, `weak_eps_ref = 0`), density-weighted heating and heat
-capacity (`rho_heating = rho_cp = false`), the dissipation and adiabatic heating
-numbers (`Di = 0`), the equation-of-state reference state (`refstate = nothing`,
-so the base state is the conductive profile), the deviatoric projection
-(`deviatoric = false`) and the anelastic mass form (`mass_form = :boussinesq`).
+count make a run deterministic. Yielding and strain weakening are off
+(`yield_c = yield_taumax = Inf`, `yield_phi = 0`, `weak_eps_ref = 0`), as are
+density-weighted heating (`rho_heating = rho_cp = false`), dissipation and
+adiabatic heating (`Di = 0`), the reference state (`refstate = nothing`), the
+deviatoric projection (`deviatoric = false`) and the anelastic mass form
+(`mass_form = :boussinesq`).
 
 ## 2. The numerical method
 
@@ -203,16 +187,16 @@ leaf is `1/256` of the box height, and the leaf count at `max_leaves = 10000`.
 The indicator is the gradient jump `(h/2) int_face [du.n]^2 ds` over interior
 faces plus a one-sided term on the top and bottom walls. Marking is
 `:error_fraction`, that is Dörfler marking: `refine_frac = 0.2` is the share of the
-total indicator to resolve, not a share of the cells. The production policy
+total indicator to resolve, so the number of cells it takes follows from the
+indicator field. The production policy
 (`amr_policy = :balanced`) coarsens from below with the relative threshold
 `coarsen_frac * total` on a complete quartet, pays for refinement by merging the
 lowest-error eligible quartet (budget exchange), and holds a hysteresis cooldown
-so a quartet that was just merged is not re-split. `amr_coarsen_gate` is a 2:1
-pre-check that refuses a merge it would have to undo. The wall rule forces every
-leaf within `wall_strip = 0.1` of the top or bottom wall, and the wall rows
-themselves, back to at least `wall_min_level = 5` after every cycle, then enforces
-the leaf budget. Fields are transferred between meshes by nodal interpolation
-(`transfer_mode = :nodal`).
+so a quartet that was just merged is not re-split; `amr_coarsen_gate` refuses a
+merge it would have to undo. The wall rule forces every leaf within
+`wall_strip = 0.1` of the top or bottom wall, and the wall rows themselves, back to
+at least `wall_min_level = 5` after every cycle, then enforces the leaf budget.
+Fields move between meshes by nodal interpolation (`transfer_mode = :nodal`).
 
 ### 2.2 Spaces and hanging nodes
 
@@ -237,9 +221,9 @@ viscosity is lagged: the single flow solve of a step uses the start-of-step
 temperature, so the step is first order in the viscosity coupling and
 deterministic.
 
-The step follows the CFL condition `dt = cfl h_min / |u|_max` with `cfl = 0.5`,
-`h_min` the smallest leaf height. It grows by at most 5% per step, shrinks by at
-most 5% per step unless the hard CFL cut fires, and is clamped to
+The step follows `dt = cfl h_min / |u|_max` with `cfl = 0.5` and `h_min` the
+smallest leaf height. It grows by at most 5% per step, shrinks by at most 5% per
+step unless the hard CFL cut fires, and is clamped to
 `[dtmin, dtmax] = [1e-9, 5e-5]`; the first step starts from `dt0 = 1e-6` and is
 cut to the CFL value.
 
@@ -249,29 +233,28 @@ Oscillations are controlled by an elementwise entropy viscosity added to the
 energy operator, one value per leaf:
 
 ```
-nu_e   = ev h^2 R / entropy_variation
+nu_e   = ev h_e^2 R / entropy_variation
 nu_max = ev_cmax |u| h_e
 nu     = min(nu_max, nu_e)
 ```
 
-where `R` is the residual of the theta equation, `h` the leaf size,
-`h_e = sqrt(2) h`, and `entropy_variation` the global spread of the entropy
-residual. The card sets `ev = 0.11` and `ev_cmax = 0.052`. The viscosity is zero
-on the wall rows and is recomputed every step; it is stored in the checkpoint
-because the last step's energy operator cannot be reconstructed without it.
+`R` is the residual of the theta equation, `h` the leaf size, `h_e = sqrt(2) h`,
+and `entropy_variation` the global spread of the entropy residual. The card sets
+`ev = 0.11` and `ev_cmax = 0.052`. The viscosity is zero on the wall rows and is
+recomputed every step; it is stored in the checkpoint because the last step's
+energy operator cannot be reconstructed without it.
 
 ### 2.5 The two linear solvers, and `:auto`
 
 The direct path forms the reduced saddle `[Kred Bt; Bs 0]` (velocity and pressure
 after the constraint and boundary elimination), factorises it with UMFPACK and
-checks the true reduced residual. A wall-refined free-slip tree makes the
-unshifted factorisation unstable, so the path runs a shift ladder: a relative
-diagonal shift of `1e-12`, then `1e-10`, then `1e-8`, and a few iterative
-refinement steps against the unshifted operator as the last rung. With
-`stokes_scaling = :equilibrated` it first tries the symmetric equilibration
-`S -> D S D`, which lifts the near-null pressure modes above the round-off floor
-and engages only on a solve that would otherwise enter the ladder. The direct path
-is the only bitwise reproducible one.
+checks the true reduced residual. A wall-refined free-slip tree makes the unshifted
+factorisation unstable, so the path runs a shift ladder: a relative diagonal shift
+of `1e-12`, then `1e-10`, then `1e-8`, and a few iterative refinement steps against
+the unshifted operator as the last rung. With `stokes_scaling = :equilibrated` it
+first tries the symmetric equilibration `S -> D S D`, which lifts the near-null
+pressure modes above the round-off floor and engages only on a solve that would
+otherwise enter the ladder. The direct path is the only bitwise reproducible one.
 
 The multigrid path is a block-triangular preconditioner for flexible GMRES: a
 geometric V-cycle for the velocity block (h-coarsening by at least 1.5 per level,
@@ -284,8 +267,7 @@ orders below its `stokes_tol = 1e-3`; the library default is `1e-10`.
 `linear = :auto` resolves the path before the assembly, from two properties of the
 current saddle:
 
-1. `saddle_dofs = 2*Nu + Np >= 20 000` selects the multigrid, at any viscosity
-   contrast.
+1. `saddle_dofs = 2*Nu + Np >= 20 000` selects the multigrid, at any contrast.
 2. Otherwise, a sampled viscosity contrast at most 100 together with
    `saddle_dofs >= 2 000` selects the multigrid.
 3. Everything else selects the direct path, which is also the bitwise path, so
@@ -297,17 +279,16 @@ uses. An `:auto` decision for the multigrid also forces `mg_operator =
 `stokes_tol`, or throws, the same solve is redone on the direct path and counted
 in `LAST_AUTO_FALLBACK`; the run continues and the count is printed as
 `auto_fallbacks` at the end. An explicit `linear = :mg` has no such safety net and
-fails loudly.
-
-At the card's states the saddle is 78 720 dofs at 8 188 leaves and 95 308 at
-10 000 leaves, both above the 20 000 rule, so a new run resolves to the multigrid.
+fails loudly. At the card's states the saddle is 78 720 dofs at 8 188 leaves and
+95 308 at 10 000 leaves, both above the 20 000 rule, so a new run resolves to the
+multigrid.
 
 ## 3. Parameter reference
 
 ### 3.1 Environment variables of the card
 
-Every knob is a `CASE_*` environment variable read when the script starts. The
-default column is the card's value.
+Every knob is a `CASE_*` environment variable read when the script starts, with
+the card's default in the second column.
 
 | variable | default | allowed | effect |
 |---|---|---|---|
@@ -319,7 +300,7 @@ default column is the card's value.
 | `CASE_AMR` | `balanced` | `balanced`, `classic` | AMR policy. `balanced` is the production policy of 2.1; `classic` is the historical fraction-plus-protect policy. |
 | `CASE_AMR_GATE` | 1 | 0, 1 | The 2:1 coarsening pre-check of the balanced policy. 0 turns it off. |
 | `CASE_HYST` | 1 | integer | Hysteresis length in AMR cycles: the cooldown, and the deadband multiplier of the balanced policy. |
-| `CASE_COARSEN` | 0.05 | float | Coarsening share: the relative threshold and the per-cycle cell cap under `balanced`, the error fraction under `classic`. |
+| `CASE_COARSEN` | 0.05 | float | Coarsening share: relative threshold and per-cycle cell cap under `balanced`, error fraction under `classic`. |
 | `CASE_THETATOL` | 1e-2 | float | Absolute per-leaf theta-range protect tolerance. Only `classic` reads it, but it is stored and compared on restart. |
 | `CASE_WALLMIN` | 5 | integer | Minimum level inside the wall strip and on the wall rows. 0 turns the wall rule off. |
 | `CASE_WALLSTRIP` | 0.1 | float in (0, 0.5) | Width of the wall strip, as a fraction of the box height from each wall. |
@@ -331,13 +312,12 @@ default column is the card's value.
 | `CASE_EXTDIAG` | 0 | 0, 1 | Append the exact energy-identity residual `resid_A` to `history.csv`. It changes the column count, so it is accepted only in a new output directory. |
 
 `main()` rejects an unknown `CASE_AMR`, `CASE_AMR_GATE`, `CASE_SYMMETRY` or
-`CASE_STOKES_SCALING` before it does any work.
-
-Settings that are literals, not knobs: `Ra = 1e5`, `H = 10`, `p = 2`,
-`stokes_tol = 1e-3`, `mg_tol = 1e-8`, `amr_every = 5`, `refine_frac = 0.2`,
-`dt0 = 1e-6`, `dtmax = 5e-5`, `dtmin = 1e-9`, `cfl = 0.5`, `dt_growth = 1.05`,
-`maxpic = 1`, `pic_tol = 1e-6`, `ev_cmax = 0.052`, `ev_alpha = 2`,
-`checkpoint_every = 200`, and the 256 x 256 frame grid.
+`CASE_STOKES_SCALING` before it does any work. Settings that are literals, not
+knobs: `Ra = 1e5`, `H = 10`, `p = 2`, `stokes_tol = 1e-3`, `mg_tol = 1e-8`,
+`amr_every = 5`, `refine_frac = 0.2`, `dt0 = 1e-6`, `dtmax = 5e-5`,
+`dtmin = 1e-9`, `cfl = 0.5`, `dt_growth = 1.05`, `maxpic = 1`, `pic_tol = 1e-6`,
+`ev_cmax = 0.052`, `ev_alpha = 2`, `checkpoint_every = 200`, and the 256 x 256
+frame grid.
 
 The seven modes are `smoke`, `short`, `spinup`, `freeze <ckpt>`, `wallrefine
 <ckpt>`, `resume <ckpt>` and `symseed <ckpt>`. The three seed modes copy a
@@ -354,48 +334,36 @@ The defaults are the library defaults; the card column is the value
 | `p` | 2 | 2 | Polynomial order: velocity `Q_p`, pressure `Q_{p-1}`. |
 | `maxsteps` | 10000 | `CASE_STEPS` | Absolute step number to stop at. |
 | `tstop` | 1e-3 | `Inf` | Stop at this nondimensional time. |
-| `dt0` | 1e-4 | 1e-6 | First step. |
+| `dt0`, `dtmax`, `dtmin`, `dt_growth` | 1e-4, `Inf`, 1e-14, 1.05 | 1e-6, 5e-5, 1e-9, 1.05 | Step size and its bounds. |
 | `cfl` | 0 | 0.5 | CFL number of the step update; 0 freezes `dt` at `dt0`. |
-| `dtmax`, `dtmin` | `Inf`, 1e-14 | 5e-5, 1e-9 | Step bounds. |
-| `dt_growth` | 1.05 | 1.05 | Maximum step growth per step. |
 | `amr_every` | 0 | 5 | Steps between AMR cycles; 0 freezes the mesh. |
-| `amr_policy` | `:balanced` | `:balanced` | `:balanced` or `:classic`. |
-| `amr_hysteresis` | 1 | `CASE_HYST` | Hysteresis length in cycles. |
-| `amr_coarsen_gate` | true | `CASE_AMR_GATE == 1` | The 2:1 coarsening pre-check. |
+| `amr_policy`, `amr_hysteresis`, `amr_coarsen_gate` | `:balanced`, 1, true | `:balanced`, `CASE_HYST`, `CASE_AMR_GATE == 1` | Policy, hysteresis length and the 2:1 gate. |
 | `marking` | `:global` | `:error_fraction` | `:global`, `:level` or Dörfler `:error_fraction`. |
-| `refine_frac` | 0.2 | 0.2 | Share of the total indicator to resolve, or fraction of leaves. |
-| `coarsen_frac` | 0.0 | `CASE_COARSEN` | Coarsening share, as in 3.1. |
-| `coarsen_theta_tol` | `Inf` | `CASE_THETATOL` | Absolute protect tolerance, `:classic` only. |
+| `refine_frac`, `coarsen_frac`, `coarsen_theta_tol` | 0.2, 0.0, `Inf` | 0.2, `CASE_COARSEN`, `CASE_THETATOL` | Marking shares and the `:classic` protect tolerance. |
 | `max_level`, `max_leaves` | no cap | 7, 10000 | Depth cap and hard leaf budget. |
 | `wall_min_level`, `wall_strip` | 0, 0.1 | 5, 0.1 | The wall rule; 0 turns it off. |
-| `symmetry` | `:none` | `CASE_SYMMETRY` | x-mirror closure. |
-| `transfer_mode` | `:nodal` | `:nodal` | `:nodal` or `:l2` transfer across an AMR cycle. |
+| `symmetry`, `transfer_mode` | `:none`, `:nodal` | `CASE_SYMMETRY`, `:nodal` | Mirror closure and the AMR transfer. |
 | `advection` | `:galerkin` | `:skew` | Advection form of the energy equation. |
 | `ev`, `ev_cmax`, `ev_alpha` | 0, 0.052, 2 | 0.11, 0.052, 2 | Entropy viscosity, as in 2.4; `ev = 0` switches it off. |
-| `maxpic` | 1 | 1 | Picard sweeps per step; 1 is the lagged viscosity. |
-| `pic_tol`, `pic_relax` | 1e-6, 1.0 | 1e-6, 1.0 | Picard tolerance and under-relaxation. |
-| `pic_mode` | `:picard` | `:picard` | `:picard` or `:newton`; Newton requires `linear=:direct`. |
+| `maxpic`, `pic_tol`, `pic_relax`, `pic_mode` | 1, 1e-6, 1.0, `:picard` | same | Nonlinear iteration inside a step; Newton requires `linear=:direct`. |
 | `linear` | `:auto` | `CASE_LINEAR` | Linear solver, as in 2.5. |
 | `stokes_tol` | `Inf` | 1e-3 | Abort the step above this true residual; also the `:auto` fallback and the direct path's acceptance tolerance. |
-| `mg_tol` | 1e-10 | 1e-8 | Outer tolerance of the multigrid; inert elsewhere. |
-| `mg_threads` | 1 | 1 (`auto`: `min(8, nthreads)`) | Threads of the matrix-free V-cycle. |
-| `mg_pressure_eta_tol` | 1.0 | 1.0 | Viscosity drift that rebuilds the cached pressure block. |
+| `mg_tol`, `mg_threads` | 1e-10, 1 | 1e-8, 1 (`auto`: `min(8, nthreads)`) | Outer tolerance and threads of the multigrid. |
+| `mg_operator`, `mg_pressure_eta_tol` | `:matrixfree`, 1.0 | same | MG geometry and the rebuild threshold of the cached pressure block. |
 | `stokes_scaling` | `:none` | `CASE_STOKES_SCALING` | `:none` or `:equilibrated`, direct path only. |
 | `mass_form` | `:anelastic` | `:boussinesq` | Mass conservation form. |
-| `phases` | `[]` | two transitions | Phase transitions (1.6). |
-| `latent_scheme` | `:implicit` | `:implicit` | `:implicit` or `:lagged`; identical when `maxpic = 1`. |
+| `phases`, `latent_scheme` | `[]`, `:implicit` | two transitions, `:implicit` | Phase transitions and the latent coupling; the two schemes agree when `maxpic = 1`. |
 | `restart_from` | `""` | mode dependent | Checkpoint to restart from. |
 | `checkpoint_path`, `checkpoint_every` | `""`, 0 | `$CASE_OUT/spinup.h5`, 200 | Where and how often to checkpoint. |
-| `callback` | `nothing` | frame writer | Called after every step with the state. |
-| `verbose` | false | true | Per-step lines on stdout. |
+| `callback`, `verbose`, `profile_steps` | `nothing`, false, false | frame writer, true, false | Step hook, per-step lines, and the per-step time profile. |
 | `extdiag` | false | `CASE_EXTDIAG` | Add the `resid_A` history column. |
 | `initial_refine` | 0 | 0 | AMR cycles on the initial condition before the first step. |
 | `tavg_start`, `steady_tol`, `cfl_tol` | `Inf` | `Inf` | Time-average window, steady-state stop, and CFL abort guard. |
 
-The function returns a named tuple: `theta`, `t`, `steps`, `history`,
-`history_extra`, `qt`, `ss`, `ux`, `uz`, `pv`, `avg`, `steady`, `weak`, `chi`,
-`chi_prev`. `history` holds one row per step actually run, with the columns of
-4.2, and `history_extra` names the columns appended after the fixed 18.
+The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`,
+`ss`, `ux`, `uz`, `pv`, `avg`, `steady`, `weak`, `chi`, `chi_prev`. `history`
+holds one row per step actually run, with the columns of 4.2, and
+`history_extra` names the columns appended after the fixed 18.
 
 ## 4. Output formats
 
@@ -438,13 +406,11 @@ This card appends one more column because its latent terms are active.
 | `N` | Number of scalar-space nodes on the mesh. |
 | `leaves` | Number of quadtree leaves. |
 | `div_max` | Maximum pointwise `|div u|` at the GLL nodes. |
-| `hmin` | Smallest leaf height. |
-| `umax` | Maximum velocity magnitude. |
+| `hmin`, `umax` | Smallest leaf height and maximum velocity magnitude. |
 | `cfl` | `umax * dt / hmin`, the CFL number of the step. |
-| `closure` | `Nu_top - Nu_bot - (H - Ibase)` plus the latent time derivative over the area, with `Ibase = int u_y dTbar/dy`. It vanishes at a steady state and is the enthalpy storage rate plus bookkeeping terms at a transient one. |
+| `closure` | `Nu_top - Nu_bot - (H - Ibase)` plus the latent time derivative over the area, with `Ibase = int u_y dTbar/dy`. It goes to zero at a steady state and is the enthalpy storage rate plus bookkeeping terms at a transient one. |
 | `usrms_surf`, `umax_surf` | RMS and maximum velocity magnitude on the top wall. |
-| `W` | Volume mean of the buoyancy work `int rho T u_y`. |
-| `U` | Volume mean of the viscous dissipation `int 2 eta edot:edot`. |
+| `W`, `U` | Volume means of the buoyancy work `int rho T u_y` and the viscous dissipation `int 2 eta edot:edot`. |
 | `balance` | `(Ra W - U) / max(|Ra W|, |U|)`, the relative residual of the mechanical balance. |
 | `closure_nolatent` | `closure` without the latent term. Present because this card has latent heat; a run without phases writes 18 columns. |
 
@@ -501,10 +467,9 @@ stored velocity is a diagnostic re-solve, and a restart zeroes it.
 
 `restart_from` replaces the mesh, `p` and the initial state with the checkpoint
 contents before the first step, and `checkpoint_path` writes the continued run to
-its own file. `maxsteps` and `tstop` stay absolute.
-
-The guard compares the checkpoint's stored `config` with the settings of the live
-call, key by key, and refuses to start on any difference:
+its own file. `maxsteps` and `tstop` stay absolute. The guard compares the
+checkpoint's stored `config` with the settings of the live call, key by key, and
+refuses to start on any difference:
 
 ```
 ArgumentError: restart configuration mismatch in /path/resume.h5:
@@ -512,24 +477,25 @@ ArgumentError: restart configuration mismatch in /path/resume.h5:
   wall_min_level: checkpoint=0.0, current=5.0
 ```
 
-The compared keys are the trajectory-affecting ones: the AMR cadence, marking,
-fractions, thresholds, leaf budget, level cap, wall rule, symmetry, transfer mode,
-policy, hysteresis and gate; advection and the entropy-viscosity coefficients; the
-Picard and time-step controls (`maxpic`, `pic_tol`, `pic_relax`, `pic_mode`,
-`pic_reject`, `cfl`, `dtmax`, `dtmin`); `mass_form` and `deviatoric`; the heating
-flags and `H`; the rheology parameters of the active law (`comp_*` and `eta_*` for
-this card, the `tosi_*` block for that law); the yield and weakening parameters;
-`latent_L`, `latent_mode`, `latent_scheme` and the phase list; the reference
-state; and `stokes_scaling`. The comparison iterates over the checkpoint's keys,
-so a key that postdates a checkpoint is not compared. `stokes_scaling` has a
-defined default: a file without it is read as `none`, and switching the option on
-for such a chain is refused.
+The compared keys are the trajectory-affecting ones: the AMR cadence, strategy,
+passes, marking, fractions, thresholds, leaf budget, level cap, wall rule, hotspot
+and top-wall rules, symmetry, transfer mode, policy, hysteresis and gate;
+advection and the entropy-viscosity coefficients; the Picard and time-step
+controls (`maxpic`, `pic_tol`, `pic_relax`, `pic_mode`, `pic_reject`, `cfl`,
+`dtmax`, `dtmin`); `mass_form` and `deviatoric`; the heating flags and `H`; the
+rheology parameters of the active law (`comp_*` and `eta_*` for this card, the
+`tosi_*` block for that law); the yield and weakening parameters; `latent_L`,
+`latent_mode`, `latent_scheme` and the phase list; the reference state; and
+`stokes_scaling`. The comparison iterates over the checkpoint's keys, so a key
+that postdates a checkpoint is not compared. `stokes_scaling` has a defined
+default: a file without it is read as `none`, and switching the option on for such
+a chain is refused.
 
-Not part of the guard, because it is state rather than configuration: `p` and the
-mesh are restored from the file, and the `:balanced` cooldown is restored with
-them. `dt0`, `dt_growth`, `initial_refine`, `linear`, `mg_tol`, `mg_threads` and
-the solver's other settings are not stored and not compared, so the same
-trajectory can be continued with a different linear path or checkpoint cadence.
+State rather than configuration, and therefore not compared: `p` and the mesh are
+restored from the file, and the `:balanced` cooldown is restored with them.
+`dt0`, `dt_growth`, `initial_refine`, `linear`, `mg_tol`, `mg_threads` and the
+solver's other settings are not stored and not compared, so the same trajectory
+can be continued with a different linear path or checkpoint cadence.
 
 When a resume is refused, repeat the stored values, or use a seed mode, which
 copies the checkpoint and rewrites exactly the conflicting strings: `freeze` sets
@@ -538,19 +504,18 @@ the wall, `symseed` sets `symmetry`. The source file is never modified.
 
 ## 6. Threads and memory
 
-Start Julia with `--threads=N`. The only part of this card that uses more than one
-thread is the matrix-free V-cycle that `linear = :auto` selects, and it is capped
-at eight threads (`mg_threads = min(8, Threads.nthreads())`), so more than eight
-adds nothing on the auto path. With one thread the auto path warns once and runs
-serial. An explicit `linear = :mg` keeps `mg_threads = 1` unless the caller sets
-it, and the direct factorisation is serial in every case.
+Start Julia with `--threads=N`. The only part of this card that uses the Julia
+thread pool is the matrix-free V-cycle that `linear = :auto` selects, and it is
+capped at eight threads (`mg_threads = min(8, Threads.nthreads())`), so more than
+eight adds nothing on the auto path. With one thread the auto path warns once and
+runs serial. An explicit `linear = :mg` keeps `mg_threads = 1` unless the caller
+sets it, and the direct factorisation is serial in every case.
 
 The measured memory of the production state is a peak resident set of about 1.3 GB
 with the multigrid path at eight threads and about 2.4 GB with the direct
-factorisation, at the 10 000-leaf budget. Both figures include roughly 1.3 GB of
-Julia runtime and checkpoint baseline, so the solver's own share is the smaller
-part of the multigrid number and the larger part of the direct one. Budget 2 GB of
-free memory for a default run and 3 GB with the direct path.
+factorisation, at the 10 000-leaf budget. Both figures are process peaks, so they
+include the Julia runtime and the loaded state. Budget 2 GB of free memory for a
+default run and 3 GB with the direct path.
 
 Disk is dominated by the frames: about 0.8 MB per frame (a 512 KB `T.bin` plus a
 mesh CSV of a few hundred kB), so a 20 000-step run at stride 5 costs about 3 GB,
@@ -560,4 +525,4 @@ and a checkpoint is about 2 MB.
 
 The measurements behind the defaults, the defects found on the way, the
 optimisation campaign and the validation against benchmarks and ASPECT are kept in
-`docs/dev/`.
+[docs/dev/](dev/), the engineering record.

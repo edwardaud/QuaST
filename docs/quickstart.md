@@ -20,7 +20,7 @@ julia --project=julia -e 'using MantleSEM; println("ok")'
 
 `--project=julia` points every command on this page at the project in `julia/`.
 `Pkg.instantiate()` installs the versions pinned in `julia/Manifest.toml` and
-downloads the HDF5 artifacts. The third line compiles the solver once and prints
+downloads the HDF5 artifacts. The last line compiles the solver once and prints
 `ok`; later calls return immediately.
 
 Budget 5 to 10 minutes and under 2 GB of disk: about 1 GB for Julia itself and
@@ -44,7 +44,7 @@ mesh cycle, and two closing lines:
 [case] comp_Ad=1.6240183119e+05 comp_As=2.6796419238e-01 Ed=12.0 Es=17.0 n=3.0 T0=0.50 ...
 [case] latent coefficients: 410 -0.059364 660 +0.130596 (negative = heats a downwelling)
   step    1 t=... dt=... Nu=.../... Vrms=... N=... leaves=... closure=...
-    AMR: N=... leaves=... maxjump=1 refined=... coarsened=... merged=...
+    AMR: N=... leaves=... maxjump=<j> refined=... coarsened=... merged=...
 [case] DONE mode=smoke steps=10 t=... wall=... s (... s/step) linear=auto scaled=0 auto_fallbacks=0
 [case] final: Nu_top=... Nu_bot=... Vrms=... meanT=... closure=... leaves=... N=...
 ```
@@ -105,9 +105,13 @@ rising `auto_fallbacks` count is not an error: each fallback redoes one Stokes
 solve on the direct path and the run continues.
 
 `frames/frame_meta.csv` is the second live view, flushed after every frame, so it
-advances every 5 steps. It holds one row per frame: `frame,step,t,dt,N,leaves,
-nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,eta_max,eta_clip_frac,wall_s,
-ng`, where `wall_s` is the seconds since the frame writer started. `history.csv`
+advances every 5 steps. It holds one row per frame with the columns
+
+```
+frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,eta_max,eta_clip_frac,wall_s,ng
+```
+
+where `wall_s` is the seconds since the frame writer started. `history.csv`
 is written once, after the last step, when the run returns: it does not exist
 while the run is in progress. Its columns are `t, dt, Nu_top, Nu_bot, Vrms, meanT,
 N, leaves, div_max, hmin, umax, cfl, closure, usrms_surf, umax_surf, W, U, balance,
