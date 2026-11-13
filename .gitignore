@@ -1,0 +1,32 @@
+# run outputs and checkpoints
+out_julia/
+*.h5
+*.hdf5
+*.xdmf
+*.pvtu
+*.vtu
+*.vtu.*
+*.pvd
+
+# frames and rendered videos
+frames/
+*.mp4
+*.gif
+*.png
+!docs/figures/*.png
+
+# Julia
+*.cov
+*.jl.cov
+*.jl.mem
+Manifest.toml.bak
+
+# editors and OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# python
+__pycache__/
+*.pyc

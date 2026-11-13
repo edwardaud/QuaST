@@ -1,0 +1,31 @@
+# Control B: same as test2 (level 5, no AMR) but with both phase transitions
+# removed (no phase buoyancy, no latent heat) -- isolates their total effect.
+include realistic.prm
+
+set Additional shared libraries = build/librealistic_composite.debug.so
+set End time          = 2.4e14
+set Maximum time step = 2e13
+set Output directory  = output-control-nophase
+
+subsection Heating model
+  set List of model names = constant heating
+end
+
+subsection Material model
+  subsection Diffusion dislocation
+    set Phase transition density jumps = 0, 0
+  end
+end
+
+subsection Mesh refinement
+  set Initial global refinement   = 5
+  set Initial adaptive refinement = 0
+  set Minimum refinement level    = 5
+  set Time steps between mesh refinement = 0
+end
+
+subsection Postprocess
+  subsection Visualization
+    set Time between graphical output = 2e13
+  end
+end

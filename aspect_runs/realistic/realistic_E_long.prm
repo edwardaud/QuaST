@@ -1,0 +1,205 @@
+# ---------------------------------------------------------------------------
+# ASPECT counterpart of the MantleSEM "realistic 2-D case", LONG run:
+# the independent control for the from-scratch Julia run
+# `out_julia/case_realistic_E` (production card).
+#
+# Identical to `realistic.prm` (geometry, BCs, heating, material model and
+# plugin, phase transitions, AMR, solver settings) except for the end time,
+# the output directory and the output/checkpoint cadence:
+#
+#   End time         2.4e14 s  ->  8.41e15 s
+#   t_nd             2.854e-5  ->  1.0e-3
+#   Output dir       output-realistic -> run_E
+#   VTU every        2e13 s    ->  5e14 s      (17 frames instead of 12)
+#   checkpoints      none      ->  every 1800 s of wall time (resumable)
+#
+# Time mapping (docs/ASPECT_REALISTIC_COMPARE.md section 2.1):
+#   t0 = d^2/kappa = (2.9e6)^2/1e-6 = 8.41e18 s
+#   t_nd = t_dim/t0  =>  t_dim = 1.0e-3 * 8.41e18 s = 8.41e15 s
+#   (the earlier run's own conversion, 2.854e-5 * 8.41e18 = 2.4e14 s, gives
+#    exactly the same factor 8.41e18 s; note that d^2/kappa is 8.41e18, not
+#    8.41e12, which is d^2 alone)
+#
+#   box 2.5 x 1, four free-slip walls, T_top = 0 / T_bot = 1 (nondimensional),
+#   H = 10 internal heating, nominal Ra = 1e5, Boussinesq,
+#   composite (diffusion + dislocation, isostress) rheology with
+#       comp_Ad = 1.6240183119e5, comp_As = 2.6796419238e-1,
+#       comp_Ed = 12, comp_Es = 17, comp_n = 3, eta_T0 = 0.5, V_d = V_s = 0,
+#       eta in [1e-4, 1e4] (code units), eta(T=0.5, z=0.5) = 1 at edot_ref,
+#   two phase transitions at z = 0.87 (slope +0.032, B = 1.8182) and
+#   z = 0.78 (slope -0.032, B = 3.0303), latent heat per transition,
+#   initial T = (1-y) + 0.05 sin(pi y) cos(2 pi x / 2.5)
+#                        + 0.02 sin(2 pi y) cos(4 pi x / 2.5).
+#
+# Dimensional scale set (docs/ASPECT_REALISTIC_COMPARE.md, section 2):
+#   d      = 2.9e6 m        kappa = 1e-6 m^2/s     dT = 1000 K
+#   rho0   = 3300 kg/m^3    g     = 9.81 m/s^2     alpha = 3e-5 1/K
+#   cp     = 1000 J/kg/K    eta0  = rho0 g alpha dT d^3 / (Ra kappa)
+#                                 = 2.368635e23 Pa s
+#   H_r    = H cp kappa dT / d^2  = 1.189061e-12 W/kg
+#   T_top  = 500 K, T_bot = 1500 K, T_ASPECT = dT * (T_nd + 0.5)
+#
+# The rheology is ASPECT's `diffusion dislocation` model (used verbatim
+# through the `realistic composite` plugin, which only adds the phase
+# transitions); the phase parameters are those of ASPECT's `latent heat`
+# material model.  See docs/ASPECT_REALISTIC_COMPARE.md for the derivation
+# of every number below.
+# ---------------------------------------------------------------------------
+
+set Dimension                              = 2
+set Use years in output instead of seconds = false
+set End time                               = 4.205e16
+set CFL number                             = 0.5
+set Maximum time step                      = 4.2e14
+set Output directory                       = run_E_long
+set Pressure normalization                 = surface
+set Surface pressure                       = 0
+set Additional shared libraries            = build/librealistic_composite.so
+set Nonlinear solver scheme                = single Advection, single Stokes
+set Resume computation                     = auto
+
+subsection Geometry model
+  set Model name = box
+  subsection Box
+    set X extent = 7.25e6
+    set Y extent = 2.9e6
+  end
+end
+
+subsection Initial temperature model
+  set Model name = function
+  subsection Function
+    set Variable names      = x,z
+    set Function constants  = d=2.9e6, dT=1000, pi=3.14159265358979, H=10, A1=0.05, A2=0.02, Lx=7.25e6
+    set Function expression = 500 + dT*((1-z/d) + 0.5*H*(z/d)*(1-z/d) + A1*sin(pi*z/d)*cos(2*pi*x/Lx) + A2*sin(2*pi*z/d)*cos(4*pi*x/Lx))
+  end
+end
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = bottom, top
+  set List of model names = box
+  subsection Box
+    set Bottom temperature = 1500
+    set Top temperature    = 500
+  end
+end
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = left, right, bottom, top
+end
+
+subsection Gravity model
+  set Model name = vertical
+  subsection Vertical
+    set Magnitude = 9.81
+  end
+end
+
+# Constant adiabatic temperature (the Boussinesq reference), hydrostatic
+# pressure of the constant reference density, and the constant reference
+# density itself.  Only the density enters the Boussinesq equations (through
+# the rho*cp factor of the reference-density-profile energy equation); the
+# temperature is the reference for the material models.
+set Adiabatic surface temperature = 500
+subsection Adiabatic conditions model
+  set Model name = function
+  subsection Function
+    set Variable names      = depth
+    set Function constants  = rho=3300, g=9.81, T0=500
+    set Function expression = T0; rho*g*depth; rho
+  end
+end
+
+subsection Material model
+  set Model name = realistic composite
+  subsection Diffusion dislocation
+    # --- equation of state (Boussinesq) ---
+    set Reference temperature         = 500
+    set Thermal diffusivity           = 1e-6
+    set Heat capacity                 = 1000
+    set Densities                     = 3300
+    set Thermal expansivities         = 3e-5
+
+    # --- composite rheology, mapped from comp_* (section 2 of the doc) ---
+    set Prefactors for diffusion creep        = 3.428173e-28
+    set Stress exponents for diffusion creep  = 1
+    set Grain size exponents for diffusion creep = 3
+    set Activation energies for diffusion creep = 99773.5452
+    set Activation volumes for diffusion creep  = 0
+
+    set Prefactors for dislocation creep        = 1.280082e-35
+    set Stress exponents for dislocation creep  = 3
+    set Activation energies for dislocation creep = 141345.8557
+    set Activation volumes for dislocation creep  = 0
+
+    set Grain size = 1e-3
+
+    # our eps_min = 1e-12 code units is 1.19e-31 1/s, below ASPECT's absolute
+    # Newton tolerance (1e-22 1/s); 1.4e-20 is ASPECT's default, still 1e4
+    # below the run's strain rates (~1e-16 1/s), and only regularises the
+    # zero-velocity initial evaluation.
+    set Minimum strain rate = 1.4e-20
+    set Minimum viscosity   = 2.368635e19
+    set Maximum viscosity   = 2.368635e27
+
+    # ASPECT's fallback fixpoint needs the larger cap when both branches are
+    # clamped at the first, zero-velocity evaluation (docs/RHEOLOGY.md 14.4f).
+    set Maximum strain rate ratio iterations = 400
+
+    # --- phase transitions (ASPECT `latent heat` parameter names) ---
+    set Define transition by depth instead of pressure = true
+    set Phase transition depths              = background: 377000|638000
+    set Phase transition widths              = background: 72500|72500
+    set Phase transition temperatures        = background: 1000|1000
+    set Phase transition Clapeyron slopes    = background: 3.004214e6|-3.004214e6
+    set Phase transition density jumps       = 180.0018, 299.9997
+  end
+end
+
+subsection Heating model
+  set List of model names = constant heating, latent heat
+  subsection Constant heating
+    set Radiogenic heating rate = 1.189061e-12
+  end
+end
+
+subsection Formulation
+  set Formulation = Boussinesq approximation
+end
+
+subsection Mesh refinement
+  set Initial global refinement          = 5
+  set Initial adaptive refinement        = 2
+  set Time steps between mesh refinement = 5
+  set Strategy                           = temperature
+  set Refinement fraction                = 0.2
+  set Coarsening fraction                = 0.005
+  set Minimum refinement level           = 5
+end
+
+subsection Postprocess
+  set List of postprocessors = velocity statistics, temperature statistics, heat flux statistics, visualization
+  subsection Visualization
+    # 8.41e15 s / 5e14 s = 17 frames over the whole run (the short run had 12
+    # frames at 2e13 s over 2.4e14 s); keeps the VTU volume bounded.
+    set Time between graphical output = 5e13
+    set List of output variables = material properties
+    subsection Material properties
+      set List of material properties = viscosity, density
+    end
+  end
+end
+
+# Wall-time checkpoints into run_E/restart.*, so a machine/Docker restart can
+# continue with the same command (Resume computation = auto).  Physics and
+# numerics are untouched.
+subsection Checkpointing
+  set Time between checkpoint = 1800
+end
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Linear solver tolerance = 1e-7
+  end
+  set Temperature solver tolerance = 1e-9
+end

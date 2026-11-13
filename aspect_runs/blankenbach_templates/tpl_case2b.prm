@@ -1,0 +1,92 @@
+set End time                               = 0.1
+set Use years in output instead of seconds = false
+set CFL number                             = 0.25
+set Output directory                       = output-tpl-2b
+set Timing output frequency                = 100
+
+subsection Geometry model
+  set Model name = box
+  subsection Box
+    set X extent = 2.5
+    set Y extent = 1
+  end
+end
+
+subsection Gravity model
+  set Model name = vertical
+  subsection Vertical
+    set Magnitude = 1
+  end
+end
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = left, right, bottom, top
+end
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = bottom, top
+  set List of model names = box
+  subsection Box
+    set Bottom temperature = 1
+    set Top temperature    = 0
+  end
+end
+
+subsection Initial temperature model
+  set Model name = function
+  subsection Function
+    set Variable names = x,z
+    set Function expression = if(z<0.102367,0.5+0.5*(0.102367-z)/0.102367,if(z>0.897633,0.5*(1-z)/(1-0.897633),0.5)) + 0.1*cos(2.5*x*3.14159265359/2.5)*sin(z*3.14159265359)
+  end
+end
+
+subsection Adiabatic conditions model
+  set Model name = function
+  subsection Function
+    set Function expression = 0; 0; 1
+    set Variable names = depth
+  end
+end
+
+subsection Material model
+  set Model name = nondimensional
+  subsection Nondimensional model
+    set Ra                            = 1e4
+    set Di                            = 0.0
+    set gamma                         = 1.0
+    set Reference density             = 1.0
+    set Reference specific heat       = 1.0
+    set Viscosity temperature prefactor = log(16384.0)
+    set Viscosity depth prefactor       = log(64.0)
+    set Use TALA                        = false
+  end
+end
+
+subsection Formulation
+  set Formulation          = custom
+  set Mass conservation    = incompressible
+  set Temperature equation = reference density profile
+end
+
+subsection Heating model
+  set List of model names = constant heating
+  subsection Constant heating
+    set Radiogenic heating rate = 0
+  end
+end
+
+subsection Mesh refinement
+  set Initial global refinement          = 2
+  set Initial adaptive refinement        = 3
+  set Time steps between mesh refinement = 1
+  set Refinement fraction                = 0.2
+  set Coarsening fraction                = 0.05
+  set Strategy                           = temperature
+end
+
+subsection Postprocess
+  set List of postprocessors = visualization, velocity statistics, temperature statistics, heat flux statistics
+  subsection Visualization
+    set Time between graphical output = 0.02
+  end
+end

@@ -1,0 +1,21 @@
+# Level-5 check of realistic.prm: no adaptivity, 5 steps, to inspect the
+# heat-flux postprocessor and the timing at the production base resolution.
+include realistic.prm
+
+set Additional shared libraries = build/librealistic_composite.so
+set End time          = 1e14
+set Maximum time step = 2e13
+set Output directory  = output-test2
+
+subsection Mesh refinement
+  set Initial global refinement   = 5
+  set Initial adaptive refinement = 0
+  set Minimum refinement level    = 5
+  set Time steps between mesh refinement = 0
+end
+
+subsection Postprocess
+  subsection Visualization
+    set Time between graphical output = 2e13
+  end
+end

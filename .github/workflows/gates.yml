@@ -1,0 +1,106 @@
+name: gates
+
+# The gate suite.  The full local suite (`julia/test/runtests.jl`) also contains
+# a few legacy gates and two known failures (`t_g64_h5_highra_plume.jl`), so CI
+# runs the gates that are expected to pass on a clean checkout.  Groups are
+# independent jobs so one failure does not hide the others.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: vtk-cbf-phase
+            gates: >-
+              t_g135_vtk.jl
+              t_g136_box_aspect.jl
+              t_g137_cbf.jl
+              t_g138_flux_bc.jl
+              t_g139_phase.jl
+              t_g140_latent.jl
+          - name: drivers-checkpoint
+            gates: >-
+              t_g141_picard_adapt.jl
+              t_g142_picard_stiff.jl
+              t_g143_saturation.jl
+              t_g145_newton.jl
+              t_g147_wall_refine.jl
+              t_g148_checkpoint.jl
+              t_g149_ev_cbf.jl
+              t_g150_regression_snapshot.jl
+              t_g151_p_convergence.jl
+              t_g152_semquad_mg.jl
+              t_g153_nonuniform_mg.jl
+              t_g154_mms.jl
+              t_g155_newton_tangent.jl
+              t_g156_tosi_geo.jl
+              t_g159_mg_bfbt_2b.jl
+              t_g160_newton_mg.jl
+              t_g161_tosi_newton.jl
+              t_g162_dp_deta_p.jl
+              t_g163_dp_kp.jl
+              t_g164_direct_regularized.jl
+              t_g165_tosi_linear_tangent.jl
+              t_g166_ev_tangent.jl
+              t_g167_tosi_maxpic_guard.jl t_g168_dp_newton.jl t_g169_coupled_newton.jl t_g170_plastic_damper.jl t_g171_ptc.jl t_g172_steady_entry.jl t_g173_leaf_budget.jl t_g174_lagged.jl t_g175_matrixfree.jl t_g176_mg_matrixfree.jl t_g177_mf_cg.jl t_g178_mf_amr.jl t_g179_pressure_cache.jl t_g180_blocked_kernel.jl t_g181_assembly_threads.jl t_g182_pressure_precond.jl t_g183_mg_coarsening.jl t_g184_mg_smoothing_plumbing.jl t_g185_energy_kernel.jl t_g186_balance_worklist.jl t_g187_loop_guard.jl t_g188_kernel_specialisation.jl t_g189_pressure_threshold.jl t_g190_mg_threads.jl t_g191_auto_path.jl t_g192_composite_rheology.jl t_g193_step_globalization.jl t_g200_constitutive_card.jl t_g201_isostress.jl t_g194_latent_heat.jl t_g197_tala_consistency.jl t_g198_eos_refstate.jl t_g199_latent_order.jl t_g202_newton_kernel_bitwise.jl t_g203_loop_guards.jl t_g204_mirror_cellsx.jl t_g205_auto_fallback.jl t_g206_latent_sign.jl t_g207_direct_shift_ladder.jl t_g208_mirror_invariant.jl t_g209_pressure_gauge.jl t_g210_amr_balanced.jl t_g211_coarsen_allowed.jl t_g212_tiny_fallback.jl t_g213_cooldown_checkpoint.jl t_g214_pressure_equilibration.jl t_g215_amr_hotpath.jl t_g216_flat_faces.jl t_g217_assembly_alloc.jl t_g218_mf_diag_constrained.jl t_g219_mg_defaults.jl t_g220_mg_reduced_assembly.jl t_g221_mg_level_cache.jl t_g222_mg_kernel_variants.jl t_g223_mg_region_vcycle.jl t_g225_mg_eta_lanes.jl t_g226_bfbt_leafdiag.jl t_g228_card_mg_tol.jl t_g229_default_balanced.jl t_g230_default_auto.jl
+          - name: stokes-schur
+            gates: >-
+              t_g27_semstokes.jl
+              t_g28_semstokes_conv.jl
+              t_g33_semstokes_var.jl
+              t_g39_semquad_convection.jl
+              t_g44_semstokes_schur.jl
+              t_g50_semstokes_schur_wall.jl
+              t_g92_stokes_system.jl
+              t_g97_assemble_only.jl
+          - name: ala-amr-dwr
+            gates: >-
+              t_g32_semquad_amr.jl
+              t_g107_poisson_dwr_cell.jl
+              t_g108_poisson_dwr_face.jl
+              t_g111_dwr_effectivity.jl
+              t_g129_Bquad.jl
+              t_g130_tala_mass.jl
+              t_g132_compress_block.jl
+              t_g133_compress_wired.jl
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+
+      # NB: julia-actions/cache builds its key from the job + the matrix
+      # parameters, and the drivers-checkpoint matrix entry carries the whole
+      # gate list (>512 characters), which GitHub rejects with
+      # "Key Validation Error: julia-cache;... cannot be larger than 512
+      # characters".  Use an explicit short key instead; the Julia depot is the
+      # only thing worth caching here.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.julia
+          key: julia-${{ runner.os }}-${{ hashFiles('julia/Manifest.toml') }}
+          restore-keys: |
+            julia-${{ runner.os }}-
+
+      - name: Instantiate project
+        run: julia --project=julia -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run gates
+        run: julia --project=julia julia/test/run_gates.jl ${{ matrix.gates }}
