@@ -1,6 +1,6 @@
 # G201: the **default** `comp_rule = :isostress` composite law.
 #
-# Since 2026-11-08 (docs/RHEOLOGY.md §14.8) `eta_law = :composite` solves
+# Since 2026-11-08 (docs/dev/PHYSICS.md §14.8) `eta_law = :composite` solves
 # ASPECT's isostress partition at every quadrature point:
 #
 #     edot = tau/(2 eta_diff) + A_s exp(-(E_s+V_s(1-z))/(R T)) tau^n   ->  tau

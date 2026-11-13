@@ -66,7 +66,7 @@
 #     CASE_STOKES_SCALING               solver-side equilibration of the direct
 #                                       saddle: `none` (default, the historical
 #                                       path bit for bit) or `equilibrated`
-#                                       (docs/PRESSURE_EQUILIBRATION.md; engages
+#                                       (docs/dev/BUG_LEDGER.md; engages
 #                                       only on a solve whose unscaled unshifted
 #                                       answer fails its health check).  It is
 #                                       part of `run_config` and compared on
@@ -122,7 +122,7 @@
 #   otherwise never refines the top wall, it sat at level 3/4
 #   (h = 1/16..1/32) while the interior is L5/6, and the pointwise Nu_top there
 #   differs from the wall-refined value by 1.2 % while the consistent boundary
-#   flux differs by 9.6 % (docs/dev/CASE_REALISTIC.md §7.2, docs/RHEOLOGY.md
+#   flux differs by 9.6 % (docs/dev/CASE_REALISTIC.md §7.2, docs/dev/PHYSICS.md
 #   §7.3.5).  CASE_WALLMIN=0 turns it off).
 #   eta in [1e-4, 1e4]: the calibration needs eta(0.5)=1 with a 1e4 drop over
 #   [0.1,0.9], so the cold lid would be eta ~ 2.2e3 at T=0 and eta_max = 1e6
@@ -164,7 +164,7 @@ const B410         = 180.0 / (3300.0 * 3.0e-5 * 1000.0)   # 1.818
 const B660         = 300.0 / (3300.0 * 3.0e-5 * 1000.0)   # 3.030
 const LATENT_L     = 0.11
 # Latent heat: `per_phase` (default) derives one coefficient per transition from
-# its Clapeyron slope and density jump (docs/RHEOLOGY.md §7.8), which is the
+# its Clapeyron slope and density jump (docs/dev/PHYSICS.md §7.8), which is the
 # physics: ASPECT's `+T dS_A DGamma/Dt` with `dS_A = gamma drho/rho^2`, i.e.
 #   latent_410 = -0.059364 (negative: the 410 HEATS a downwelling),
 #   latent_660 = +0.130596 (positive: the 660 COOLS it).
@@ -194,7 +194,7 @@ const EV_COEF      = parse(Float64, get(ENV, "CASE_EV", "0.11"))
 # `wall_min_level`.  The default is the production rule (5 / 0.1): without it
 # the top wall stays at level 3/4 while the interior is L5/6, and that
 # under-resolved wall is what puts the consistent boundary flux 14 % above the
-# pointwise Nu_top (docs/dev/CASE_REALISTIC.md §7.2, §14; docs/RHEOLOGY.md §7.3.5).
+# pointwise Nu_top (docs/dev/CASE_REALISTIC.md §7.2, §14; docs/dev/PHYSICS.md §7.3.5).
 # `CASE_WALLMIN=0` turns it off for a historical-arm replay; the wall keys are
 # part of `run_config`, so an existing checkpoint written with the old default
 # needs the same explicit value (or a `wallrefine` seed).
@@ -223,7 +223,7 @@ const AMR_HYST     = parse(Int, get(ENV, "CASE_HYST", "1"))
 # over an `x` checkpoint starts from a `symseed` copy -- the same mechanism the
 # wall keys use in `wall_checkpoint`.
 const SYMMETRY     = Symbol(get(ENV, "CASE_SYMMETRY", "none"))
-# Coarsening pre-check (`coarsening_allowed`, docs/AMR_COARSEN_ALLOWED_REFERENCE.md,
+# Coarsening pre-check (`coarsening_allowed`, docs/dev/AMR.md,
 # docs/dev/AMR.md §4).  Only `:balanced` uses it.  The default is ON (1), the
 # production card: the gate is what stops the merge/refine recirculation
 # (docs/dev/BUG_LEDGER.md §5.7), and a new arm should have it.  It is part of
@@ -284,7 +284,7 @@ const STOKES_TOL   = 1.0e-3
 # |dp|/|p| <= 8.8e-7; docs/dev/CASE_REALISTIC.md §1.6).
 const MG_TOL       = 1.0e-8
 
-# Solver-side equilibration of the direct saddle (docs/PRESSURE_EQUILIBRATION.md).
+# Solver-side equilibration of the direct saddle (docs/dev/BUG_LEDGER.md).
 # `none` is the historical path bit for bit (and the default here, so every
 # existing card is unchanged); `equilibrated` forwards
 # `run_semquad_simulation(stokes_scaling=:equilibrated)`, which engages only on
@@ -314,7 +314,7 @@ function phases()
     ph = [PhaseTransition(0.87, WIDTH_PT, SLOPE410, 0.5, 180.0, B410),
           PhaseTransition(0.78, WIDTH_PT, SLOPE660, 0.5, 300.0, B660)]
     # `per_phase`: fill `latent` from the slope/drho of each transition at its
-    # own reference temperature (docs/RHEOLOGY.md §7.8).  `global` leaves the
+    # own reference temperature (docs/dev/PHYSICS.md §7.8).  `global` leaves the
     # coefficients unset; `Params.latent_mode` then selects `latent_L`.
     return LATENT_MODE === :per_phase ?
            per_phase_latent(Params(Ra=RA, H=HHEAT), ph; LATENT_SCALE...) : ph
@@ -502,9 +502,9 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
                       qt=res.qt), pr)
     close(fw.meta)
     # Column 13 `closure` is the **historical** formula, not a flux error: by
-    # `(DEC)` of docs/NUSSELT_AUDIT.md §4 it equals `-dH/dt` plus three
+    # `(DEC)` of docs/dev/VALIDATION.md §4 it equals `-dH/dt` plus three
     # bookkeeping terms at a transient state and does not close for any Nu
-    # definition (docs/NUSSELT_AUDIT.md §3).  Column 19 `closure_nolatent` is
+    # definition (docs/dev/VALIDATION.md §3).  Column 19 `closure_nolatent` is
     # its latent-free form.  The opt-in `resid_A` (CASE_EXTDIAG=1) is the exact
     # residual of the quoted pointwise pair against the scheme's identity
     # (`(ID1)`, NUSSELT_AUDIT §2.3/§3.2).  The extra columns are named by the

@@ -4,7 +4,7 @@ using Test, MantleSEM, LinearAlgebra
 #
 # `run_semquad_simulation` used to forward only `mg_operator`/`mg_vel_solver`, so
 # there was no way to roll the tapered V-cycle schedule back from a production
-# driver (docs/S3_DESIGN.md §14.9).  This gate pins the new keyword pass-through
+# driver (docs/dev/SOLVER.md §14.9).  This gate pins the new keyword pass-through
 # and its two invariants:
 #
 #   (a) the values actually reach the hierarchy builder -- `make_semquad_mg`

@@ -84,7 +84,7 @@ const SEMSTOKES_K_ASSEMBLIES = Ref(0)
 # are calibrated against a same-session A/B of the two paths on the states the
 # previous table named, re-measured at `c7e0f55` after the optimisation
 # campaign of docs/dev/MG.md§16 (that campaign's endpoint is a 2.3-2.6x
-# faster warm MG solve than the one the previous table -- docs/S3_DESIGN.md
+# faster warm MG solve than the one the previous table -- docs/dev/SOLVER.md
 # §18.3/§19.2 -- was calibrated on, while the direct path is untouched).  The
 # A/B and every row: `julia/scripts/bench_auto_crossover.jl`, one process per
 # state, both paths on the same tree and closures, `BLAS=1`, direct
@@ -147,7 +147,7 @@ const SEMQUAD_AUTO_CONTRAST_MID = 100.0
 # [0,Lx]x[0,1].  Measured on the production blob eta field, 32 intervals
 # recovers the full quadrature contrast to -3%/-9% on the 1024/4096-leaf trees
 # at ~23 us/1 089 evaluations, while the <=256 strided velocity-node sample
-# misses by up to 5x (docs/S3_DESIGN.md §20).  Fixed cost, independent of N.
+# misses by up to 5x (docs/dev/SOLVER.md §20).  Fixed cost, independent of N.
 const SEMQUAD_AUTO_CONTRAST_GRID = 32
 const SEMQUAD_AUTO_MG_MAX_THREADS = 8
 
@@ -243,7 +243,7 @@ const _SEMQUAD_AUTO_SERIAL_WARNED = Ref(false)
     semquad_auto_mg_threads() -> Int
 
 Thread count used by `linear=:auto` when it picks the matrix-free MG:
-`min(8, Threads.nthreads())`.  Measured (docs/S3_DESIGN.md §19.2), the threaded
+`min(8, Threads.nthreads())`.  Measured (docs/dev/SOLVER.md §19.2), the threaded
 V-cycle is 1.5x faster at 1024 leaves and 2.2x at 4096 leaves; 2 threads are
 not worth it on this machine, 4/8 are.  A single-threaded process falls back to
 1 and warns once.  This never applies to an explicit `linear=:mg` call, whose
@@ -419,7 +419,7 @@ const SEMSTOKES_TINY_SHIFTS = (1.0e-14, 1.0e-13)
 # docs/dev/CASE_REALISTIC.md §17.3-§17.4).
 const SEMSTOKES_LOST_TOL = 1.0
 # Allowed `stokes_scaling` values of the direct path
-# (docs/PRESSURE_EQUILIBRATION.md): `:none` is the historical unscaled saddle,
+# (docs/dev/BUG_LEDGER.md): `:none` is the historical unscaled saddle,
 # bit for bit; `:equilibrated` is the symmetric congruence below.  No other
 # value changes an existing path.
 const SEMSTOKES_SCALINGS = (:none, :equilibrated)
@@ -428,18 +428,18 @@ const SEMSTOKES_SCALINGS = (:none, :equilibrated)
     _semquad_stokes_equil_diag(Kred, Bt, Bs) -> Vector{Float64}
 
 Symmetric equilibration diagonal `d = [d_u; d_p]` for the reduced saddle
-`S = [Kred Bt; Bs 0]` (docs/PRESSURE_EQUILIBRATION.md):
+`S = [Kred Bt; Bs 0]` (docs/dev/BUG_LEDGER.md):
 
 * `d_u = 1/sqrt(diag Kred)` removes the viscosity scale from the momentum block
   (the lid's `eta = 1e4` against the interior's `1e-3` is the whole reason the
   wall checkerboard is weak: `beta ~ 0.696/sqrt(eta_lid)`,
-  docs/PRESSURE_NULLSPACE_DIAGNOSIS.md §7);
+  docs/dev/BUG_LEDGER.md §7);
 * `d_p = 2 max|Kred| / max(|Bt|, |Bs|)` is a single scalar that balances the
   constraint block against the momentum block: it makes `d_p |B|` comparable to
   `|K|`.  This is the max-norm equilibration of the two blocks, i.e. the
   matrix-derived form of the `eta/h` pressure scale, with a factor 2 of margin
   (the measured plateau starts at ~0.3 of `max|K|/max|B|` and extends over four
-  decades, docs/PRESSURE_EQUILIBRATION.md §2.1).
+  decades, docs/dev/BUG_LEDGER.md §2.1).
 
 The congruence `S -> D S D`, `rhs -> D rhs` has the exact same solution
 (`x = D y`); it changes only the arithmetic of the factorisation.  In the
@@ -741,7 +741,7 @@ the Taylor–Hood Schur complement (Elman, Silvester & Wathen 2014, §4.2): use
 integrates to the domain area with `weight=nothing`.
 
 `nq = 0` keeps the historical `p+2` Gauss points; the strain-weakening assembly
-(docs/RHEOLOGY.md §9) passes the energy quadrature explicitly so that its
+(docs/dev/PHYSICS.md §9) passes the energy quadrature explicitly so that its
 weighted mass matrix uses the same rule as the energy mass matrix.
 """
 function assemble_semquad_pressure_mass(sp::SemQuad;
@@ -2235,7 +2235,7 @@ end
 
 Jacobi diagonal of the matrix-free *reduced* level operator `Cu' * K * Cu`.
 
-`mode=:constrained` (the default, and the fix of docs/MG_REALISTIC_DIAGNOSIS.md
+`mode=:constrained` (the default, and the fix of docs/dev/MG.md
 §5.2) is the **exact** reduced diagonal `diag(Cu' K Cu)`, computed without ever
 forming `K` or the product: for every leaf, the constraint rows of its local
 dofs give a dense `m x ncol` matrix `W` (`m = 2 n^2` local dofs, `ncol` the
@@ -2821,7 +2821,7 @@ end
 # data without paying for the operator the caller never stores or forms.
 #
 # `geo_coef`/`dp_coef` are **type parameters**, not `Union{Nothing,Function}`
-# fields.  A function *field* is not specialised (docs/S3_DESIGN.md §17: the
+# fields.  A function *field* is not specialised (docs/dev/SOLVER.md §17: the
 # `semquad_rho` bug), so `geo_coef(x,y,edot)` inferred as `Any` and the Kgeo
 # accumulation `Kgloc[k,l] += gc * Tux_k * Dux_l * w` was a boxed multiplication
 # inside the innermost `(k,l)` loop: measured 13.0 of the 15.0 ms of the Kgeo
@@ -3257,7 +3257,7 @@ the per-rung residual history in `LAST_SEMSTOKES_LADDER`, and the two saddle
 blocks separately in `LAST_SEMSTOKES_RESID_SPLIT` (docs/dev/CASE_REALISTIC.md §13).
 `stokes_scaling` (default `:none`) selects the symmetric equilibration of the
 reduced saddle used by the direct branch (`:equilibrated`;
-docs/PRESSURE_EQUILIBRATION.md).  The scaling is an exact congruence
+docs/dev/BUG_LEDGER.md).  The scaling is an exact congruence
 `S -> D*S*D`, `rhs -> D*rhs` with
 `D = diag(1/sqrt(diag Kred), 2 max|Kred| / max(|Bt|,|Bs|))` and `x = D*y`: it
 removes the viscosity and element-size scales from the operator, so the
@@ -3276,7 +3276,7 @@ never applied to the `:mg`/`:lagged`/`:schur_cg` paths.  The number of solves
 answered by the scaled path is counted in `LAST_SEMSTOKES_SCALED[]` (cumulative;
 not reset by a solve).  `run_semquad_simulation` exposes the keyword as
 `stokes_scaling`, forwards it to every solve and stores it in the checkpoint's
-`run_config` (docs/PRESSURE_EQUILIBRATION.md).
+`run_config` (docs/dev/BUG_LEDGER.md).
 `mg_pressure_mode` selects the Schur approximation: `:auto` (default) uses the
 1/eta-weighted pressure mass for contrast <= 100 and the three-factor w-BFBT
 above it; `:mass`, `:stiffness`, `:lsc` and `:bfbt` force one.
@@ -3289,16 +3289,16 @@ advection term in the momentum equation `C_p = 0`, so it reduces to the mass
 inverse at three times the cost) and `:lsc` the least-squares commutator.  On
 the 1024-leaf blob tree (16384x contrast) the measured outer iteration counts
 are 39 (`:bfbt`) / 68 (`:scaled_mass`) / 239 (`:lsc`) / not converged
-(`:mass`, `:pcd`), which is why `:auto` keeps BFBT there (docs/S3_DESIGN.md §13).
+(`:mass`, `:pcd`), which is why `:auto` keeps BFBT there (docs/dev/SOLVER.md §13).
 `mg_pressure_scale=0` means the mode's default (1 for mass, 0.1 for LSC,
-0.4 for BFBT; measured scale curve in docs/S3_DESIGN.md §13).  `mg_restart`/`mg_maxit` control GMRES (default 100/500).  The outer loop is
+0.4 for BFBT; measured scale curve in docs/dev/SOLVER.md §13).  `mg_restart`/`mg_maxit` control GMRES (default 100/500).  The outer loop is
 **flexible** GMRES (FGMRES, `fgmres_restarted`) and stops on the **true**
 reduced-saddle residual, never on the preconditioned one.
 `mg_pressure_cache=true` (S3 stage A) caches the pressure-block factors across
 Stokes solves, keyed by the tree fingerprint and invalidated when the sampled
 viscosity moves by more than `mg_pressure_eta_tol` (default **1.0** since
 S5-1; S3 used 1e-2 and then 0.5).  The BFBT build costs ~0.2-1.1 s on the
-1024-leaf blob tree, and on the measured threshold curve (docs/S3_DESIGN.md
+1024-leaf blob tree, and on the measured threshold curve (docs/dev/SOLVER.md
 §13.3) the outer iteration count is flat from 1e-12 to `Inf` (39.7 -> 39.9),
 so the threshold only trades build time against staleness: at **1.0** every
 tree block is built exactly once (25 builds instead of 41 in the 25-frame blob
@@ -3371,7 +3371,7 @@ serial `mul!`); a request larger than `Threads.nthreads()` is clamped with a
 warning and a single-threaded process warns once and stays serial.  Measured on
 uniform 4096-leaf (132k velocity dof) trees: 2.6x V-cycle and 1.9x whole-solve
 speedup at 8 threads; at 1024 leaves the V-cycle gain is smaller (1.6x) and the
-whole solve does not improve (docs/S3_DESIGN.md §19.2).
+whole solve does not improve (docs/dev/SOLVER.md §19.2).
 
 `assemble_threads=1` (default) assembles the Stokes leaves serially, exactly as
 before (bitwise).  `assemble_threads=N>1` cuts the leaf list into `N` fixed
@@ -3652,7 +3652,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # S6: resolve `linear=:auto` **before** the assembly, so an MG decision
     # never pays for or stores the sparse velocity operator.  The decision uses
     # only O(1) node counts and the fixed 33x33-grid eta sample (measured cost
-    # in docs/S3_DESIGN.md §20); an explicit `:direct`/`:mg` call skips this
+    # in docs/dev/SOLVER.md §20); an explicit `:direct`/`:mg` call skips this
     # block entirely and runs exactly as before (bitwise for `:direct`).
     if linear === :auto
         auto_choice, auto_threads = _semquad_resolve_auto(ss, eta_fun;
@@ -3775,7 +3775,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # the reference density enters the buoyancy only, not the mass conservation
     # (ASPECT's `truncated anelastic liquid approximation`).  It is the
     # apples-to-apples TALA counterpart of the ALA form for the same reference
-    # state, which is what docs/RHEOLOGY.md §10.3 measures; it is off unless
+    # state, which is what docs/dev/PHYSICS.md §10.3 measures; it is off unless
     # requested, so the default path is unchanged.
     Bm = Bref
     Bc = Bref
@@ -3908,7 +3908,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # (:bfbt | :mass | :scaled_mass | :pcd | :lsc); its default `:auto`
         # keeps the historical `mg_pressure_mode` resolution, which picks the
         # three-factor w-BFBT above 100x viscosity contrast -- the measured
-        # winner on the blob tree (docs/S3_DESIGN.md §13).  Not built for the
+        # winner on the blob tree (docs/dev/SOLVER.md §13).  Not built for the
         # reduced `assemble_only=:mg` geometry call, which never uses it.
         pmode_arg = mg_pressure_mode
         pweight_arg = mg_pressure_weight
@@ -4094,7 +4094,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
             return max(rv, rd)
         end
         if stokes_scaling === :equilibrated
-            # docs/PRESSURE_EQUILIBRATION.md: solver-side symmetric equilibration
+            # docs/dev/BUG_LEDGER.md: solver-side symmetric equilibration
             # of the same saddle.  First the historical unscaled unshifted solve,
             # exactly the ladder's rule 1: a solve that is healthy there is
             # returned untouched, so healthy paths stay bitwise identical even

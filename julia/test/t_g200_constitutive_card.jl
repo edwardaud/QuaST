@@ -7,7 +7,7 @@
 #   include/aspect/global.h (gas_constant)
 # as shipped in the image gassmoeller/aspect:latest (ASPECT 2.5.0-pre, commit
 # 340c0d018d9f2dbb71deda800f038229e7653f00, deal.II 9.4.0).  The equations are
-# quoted in docs/RHEOLOGY.md section 14.  Nothing here calls the solver; our
+# quoted in docs/dev/PHYSICS.md section 14.  Nothing here calls the solver; our
 # side calls `eta_composite_at` only.
 #
 # What is pinned:
@@ -19,7 +19,7 @@
 #       isostress partition.  The measured offsets are pinned below (stage-2
 #       ASPECT run: 1.281705x at T=1500 K, edot=1e-6 1/s; the analytic values at
 #       r=1 are 1.410639x for n=3.5, 1.364656x for n=3 -- NOT the maximum, see
-#       the 2026-11-08 correction in docs/RHEOLOGY.md 14.4b).  The default was
+#       the 2026-11-08 correction in docs/dev/PHYSICS.md 14.4b).  The default was
 #       switched to `:isostress` on 2026-11-08; this card compares the branch
 #       laws with the *same* (legacy) combination rule on both sides, and
 #       `t_g201` pins the new default against the same ASPECT numbers;
@@ -184,7 +184,7 @@ using Test, MantleSEM
     par2 = eta_parallel(1500.0, 0.0, 1e-6, s2)
     @test ours2 ≈ 2.3076923076923075e20 rtol = 1e-6
     # ASPECT 2.5.0-pre, measured (mean of the "viscosity" field of the
-    # controlled simple-shear run, docs/RHEOLOGY.md section 14.5)
+    # controlled simple-shear run, docs/dev/PHYSICS.md section 14.5)
     measured2 = 2.957782e20
     @test par2 ≈ measured2 rtol = 1e-4
     @test measured2 / ours2 ≈ 1.2817057 rtol = 1e-4
@@ -205,7 +205,7 @@ using Test, MantleSEM
 
     # balanced state (r = 1, eta_d = eta_disl = 1e21 Pa s): the analytic
     # maximum.  ASPECT 2.5.0-pre measured 7.053197e20 Pa s in the same
-    # controlled simple-shear setup (docs/RHEOLOGY.md section 14.5).
+    # controlled simple-shear setup (docs/dev/PHYSICS.md section 14.5).
     s2b = aspect_set(A_d=5.719734e-18, E_d=375e3, V_d=0.0, A_s=7.985007e-42,
                      E_s=530e3, V_s=0.0, n=3.5, minrate=1e-30)
     eta_db, eta_sb = branches(1500.0, 0.0, 1e-6, s2b)

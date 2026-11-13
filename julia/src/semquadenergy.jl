@@ -25,7 +25,7 @@ the per-step Newton (`semquad_step_newton`) uses for its residual and its
 `d r_E / d theta` block.  The default path is unchanged.
 
 `phases` switches on the latent heat of the phase transitions as an apparent
-heat capacity (docs/RHEOLOGY.md §7): `M` and `C` carry the factor
+heat capacity (docs/dev/PHYSICS.md §7): `M` and `C` carry the factor
 `(1 + latent_L*Gamma_T)` and `F` the advective source `-latent_L*Gamma_z*u_z`.
 `latent_theta` selects the temperature at which those two coefficients are
 evaluated; the driver passes the current nonlinear iterate so the capacity is

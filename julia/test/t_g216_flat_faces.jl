@@ -1,7 +1,7 @@
 using Test, MantleSEM, Random, Printf
 
 # G216: the flat face-neighbour table (`QuadFaceTable`, stage A of
-# docs/AMR_HOTPATH_AUDIT.md §9) and the local 2:1 rebalance that uses it
+# docs/dev/AMR.md §9) and the local 2:1 rebalance that uses it
 # (`rebalance_local!`, stage B, §10).
 #
 # The AMR pass used to answer every `neighbors(qt, leaf, dir)` with a fresh
@@ -13,7 +13,7 @@ using Test, MantleSEM, Random, Printf
 # reads arrays between mutations instead of re-querying the tree.  The hard
 # budget pass then replaces its per-merge full `balance!` with a work-queue
 # rebalance seeded at the merged parent
-# (`docs/AMR_LOCAL_BALANCE_REFERENCE.md`).
+# (`docs/dev/AMR.md`).
 #
 # This gate pins:
 #   1. **Exact equivalence with the historical scan**: `neighbors` returns the
@@ -399,7 +399,7 @@ end
 
         # the documented counterexample: without the 2:1 entry precondition the
         # local pass cannot see a violation that is not in the merged parent's
-        # neighbourhood (docs/AMR_LOCAL_BALANCE_REFERENCE.md §4.1)
+        # neighbourhood (docs/dev/AMR.md §4.1)
         qb = Quadtree(5)
         for _ in 1:2, lf in collect(qb.leaves)
             refine!(qb, lf)

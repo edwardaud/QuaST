@@ -62,7 +62,7 @@ eta_s_unit(T) = exp((ES / NEXP) * (1.0 / Tnd(T) - 1.0 / TNDC))
 
 Isostress effective viscosity of two branches with `eta_d = eta_d_unit(T)` and
 `eta_s = eta_d_unit(T)/r`, using the code's scalar equation `k x + x^n = 1` with
-`k = inv_diff/inv_disl` and `eta = x/inv_disl = x*eta_s` (docs/RHEOLOGY.md
+`k = inv_diff/inv_disl` and `eta = x/inv_disl = x*eta_s` (docs/dev/PHYSICS.md
 §14.8.1).  `r` is the diffusion-to-dislocation branch ratio at the calibration
 point.
 """

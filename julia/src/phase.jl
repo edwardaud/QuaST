@@ -13,7 +13,7 @@ ASPECT's `Phase transition density jumps` takes) and `B` the dimensionless
 phase-buoyancy number (`drho / (rho0 alpha0 DeltaT)`).
 
 `latent` is the optional **per-transition latent-heat coefficient** in the
-nondimensional units of the energy equation (docs/RHEOLOGY.md §7.8).  It is the
+nondimensional units of the energy equation (docs/dev/PHYSICS.md §7.8).  It is the
 coefficient of `-DGamma/Dt` in
 
     rho cp DT/Dt = ... - latent * DGamma/Dt          (our operator, eq. 1005)
@@ -74,7 +74,7 @@ coefficient of `+DGamma/Dt` is `L_A = T dS_A/(cp dT)`.  Our operator
     latent = -L_A = -T_abs * gamma * drho / (rho_ref^2 cp)
            = -T_abs * slope * drho * g * d / (rho_ref * cp * dT)
 
-(the second form uses `gamma = slope * rho_ref * g * d / dT`, docs/RHEOLOGY.md
+(the second form uses `gamma = slope * rho_ref * g * d / dT`, docs/dev/PHYSICS.md
 §2.4: `slope = dz/dT` is the Clapeyron slope in code units; note that `dT`
 cancels between `gamma` and the `1/(cp dT)` of the nondimensionalisation, so the
 coefficient carries it only once, through `gamma`).  Equivalently
@@ -87,7 +87,7 @@ of the temperature axis (`Params.eta_T0` for the exponential-rheology cases, 0
 when `T = 0` is the surface).  It is evaluated once at the phase depth (the
 reference temperature), not at the local quadrature-point temperature.
 
-`rho_ref, cp, dT, g, d` are the ASPECT scale set of docs/RHEOLOGY.md §14.2; all
+`rho_ref, cp, dT, g, d` are the ASPECT scale set of docs/dev/PHYSICS.md §14.2; all
 default to 1, which *is* the code's nondimensional unit system (then `drho`
 must be given in units of `rho0`).  `rho_ref` cancels when `drho` is in units
 of `rho_ref` (`latent = -T_abs*slope*drho_nd/(cp*dT)`).
@@ -122,7 +122,7 @@ A copy of `phases` in which every `latent` coefficient is filled in from
 [`phase_latent_coefficient`](@ref), evaluated at each transition's own
 reference temperature `semquad_base_T(pr, pt.z0) + T_surface`.  Use with
 `Params.latent_mode = :per_phase`.  The scale-set keywords are the ones of
-`phase_latent_coefficient` (`docs/RHEOLOGY.md` §14.2).
+`phase_latent_coefficient` (`docs/dev/PHYSICS.md` §14.2).
 """
 function per_phase_latent(pr::Params, phases::Vector{PhaseTransition};
                           T_surface::Float64=0.0,

@@ -87,7 +87,7 @@ not validated.  `ev` is the elementwise entropy-viscosity field used by the last
 energy assembly, aligned with `sort(collect(qt.leaves))`; when omitted, no EV
 dataset is written (an EV-free run, or an old checkpoint).  `weak`/`weak_prev`
 are the strain-weakening field at the two BDF2 levels of the next step
-(docs/RHEOLOGY.md §9); both are optional so an old checkpoint still loads.
+(docs/dev/PHYSICS.md §9); both are optional so an old checkpoint still loads.
 
 `cooldown` is the `AmrCooldown` hysteresis state of `amr_policy=:balanced`
 (`julia/src/amr_balanced.jl`, docs/dev/AMR.md §3.5).  When supplied it is

@@ -7,7 +7,7 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays
 # replaces the `Union{Nothing,Function}` / `Union{Nothing,Vector}` field accesses
 # in the element loop with `::Float64`-asserted locals, because inference was
 # joining their values with `Any` and boxing the nv x nv loop (328M allocations,
-# 5 GiB per energy assembly on the 1024-leaf blob tree; docs/S3_DESIGN.md §15).
+# 5 GiB per energy assembly on the 1024-leaf blob tree; docs/dev/SOLVER.md §15).
 # Three things must hold:
 #
 #   (a) supplying an identity callable explicitly is bitwise the same as leaving

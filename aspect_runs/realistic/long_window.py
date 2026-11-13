@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Long-time-average cross-code comparison of Nu_bot / Nu_top / Vrms / Tmax
-(docs/ASPECT_REALISTIC_COMPARE.md section 17).
+(docs/dev/VALIDATION.md section 17).
 
 Why this exists: section 16 showed that the -6.11 % (CBF) / -8.44 % (gradient)
 *whole-window* Nu_bot gap over t_nd = [1e-6, 1e-3] is a slow drift along the

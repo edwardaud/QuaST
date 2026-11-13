@@ -5,7 +5,7 @@
 # the "before" side, so every 0-B assertion has a positive control next to it
 # (the G215 pattern, not a re-recorded number).
 #
-# Measured context (docs/ASSEMBLY_ALLOC_AUDIT.md): `--track-allocation=user`
+# Measured context (docs/dev/PERFORMANCE.md): `--track-allocation=user`
 # over 4 AMR cycles of out_julia/s340/ab_none/resume.h5 (10 000 leaves, p=2)
 # went 282.47 MB -> 44.22 MB total, gll.jl 166.02 MB -> 0.004 MB and
 # semquad.jl 97.60 MB -> 25.37 MB, with the leaf/theta FNVs unchanged.

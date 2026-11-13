@@ -9,7 +9,7 @@
 #            mg_vel_solver=:vcycle, mg_smoothing=:auto, w-BFBT pressure block,
 #            mg_threads = min(8, Threads.nthreads()) as `:auto` sets it)
 #
-# on the seven states the stale selector table names (docs/S3_DESIGN.md
+# on the seven states the stale selector table names (docs/dev/SOLVER.md
 # §18.3/§19.2): uniform L4/L5/L6 (p=4, constant eta) and the blob frame-19
 # trees (real eta, 16 384x bounds), plus the 25-frame blob trajectory and the
 # two production checkpoints.

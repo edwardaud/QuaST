@@ -1,7 +1,7 @@
 using Test, MantleSEM, Random, Printf
 
 # G215: the S15/S16 hot-path audit of the `:balanced` AMR code
-# (docs/AMR_HOTPATH_AUDIT.md, docs/AMR_HOTPATH_REFERENCE.md).
+# (docs/dev/AMR.md, docs/dev/AMR.md).
 #
 # The audit changed allocation behaviour and loop guards in
 # `julia/src/amr_balanced.jl`, `julia/src/dgquad.jl` and `julia/src/quadtree.jl`.

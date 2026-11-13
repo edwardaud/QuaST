@@ -711,7 +711,7 @@ historical full scan -- the first leaf of a quartet in set order -- at a quarter
 of the lookups.
 
 The last four fields are the local rebalance (`rebalance_local!`,
-`docs/AMR_HOTPATH_AUDIT.md` §10): `splits` the leaves the 2:1 rebalance split
+`docs/dev/AMR.md` §10): `splits` the leaves the 2:1 rebalance split
 over the whole pass, `tests` the queue pops it needed, `local_capped` whether
 the structural test cap fired, `entry_21` whether the tree was already 2:1 at
 pass entry (see `rebalance_local!`: the equivalence with the global `balance!`
@@ -742,7 +742,7 @@ end
     _rebalance_after_merge!(qt, st, parent, mparent, symmetry, entry21)
 
 The budget pass's per-merge 2:1 step: a **local** rebalance seeded at the merged
-parent (`docs/AMR_LOCAL_BALANCE_REFERENCE.md` §3(a), `docs/AMR_HOTPATH_AUDIT.md`
+parent (`docs/dev/AMR.md` §3(a), `docs/dev/AMR.md`
 §10).  `parent` and `mparent` are the merged parents (equal without `:x`), which
 are exactly the leaves a merge can make non-2:1 (Lemma 1); `rebalance_local!`
 adds their face neighbours and, when `entry21 == false` (the tree was not 2:1 at
@@ -778,7 +778,7 @@ always makes progress; a quartet whose merge is undone by the 2:1 rebalance is
 protected and never retried.
 
 The rebalance after each merge is **local** (`rebalance_local!`,
-`docs/AMR_LOCAL_BALANCE_REFERENCE.md`, `docs/AMR_HOTPATH_AUDIT.md` §10): the
+`docs/dev/AMR.md`, `docs/dev/AMR.md` §10): the
 merge is the only event that can create a 2:1 violation (Lemma 1), so the queue
 starts at the new parent and its face neighbours instead of re-scanning the
 10 000-leaf tree.  The result is the same leaf set the global `balance!` would
@@ -789,7 +789,7 @@ first rebalance seed every violator, which is the same closure again.
 
 Every parent the rebalance splits goes into `blocked`, not just the merge's own:
 a split re-forms the quartet one level down, and re-merging it would spin
-(`docs/AMR_LOCAL_BALANCE_REFERENCE.md` §3(e), §5.2).
+(`docs/dev/AMR.md` §3(e), §5.2).
 
 With `symmetry=:x` the merge is **atomic over the mirror pair**: the candidate is
 only eligible when the mirror quartet is complete and unprotected too, and both
@@ -900,7 +900,7 @@ function semquad_enforce_leaf_budget!(qt::Quadtree, eta::Dict{NTuple{3,Int},Floa
             # merged parent (`parent` is pushed separately) -- but such a key is
             # a real quartet parent one level down, so they block the quartet
             # that a re-merge would form there.  They are load-bearing for the
-            # bitwise trajectory (`docs/AMR_HOTPATH_AUDIT.md` §10.4); removing
+            # bitwise trajectory (`docs/dev/AMR.md` §10.4); removing
             # them makes the pass merge more (see the 6/60 counterexample class
             # in the same section).  Every cascade parent the rebalance splits
             # has an incomplete quartet, so it needs no entry here (the linear

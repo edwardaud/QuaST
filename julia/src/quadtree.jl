@@ -23,7 +23,7 @@ const FACE_DIRS = (:xplus, :xminus, :yplus, :yminus)
 end
 
 # ---------------------------------------------------------------------------
-# Flat face-neighbour table (docs/AMR_HOTPATH_AUDIT.md §9, stage A)
+# Flat face-neighbour table (docs/dev/AMR.md §9, stage A)
 # ---------------------------------------------------------------------------
 #
 # deal.II keeps `TriaLevel::neighbors`, a flat table rebuilt once by
@@ -34,7 +34,7 @@ end
 # `neighbors` used to allocate a fresh `Vector` and refill it through a
 # recursive descent from the base cells on *every* query: 223.9 MB
 # (`_collect_face!`) + 74.6 MB (`neighbors`) per 4 AMR cycles, 42 % of the whole
-# pass (`docs/AMR_HOTPATH_AUDIT.md` §4).
+# pass (`docs/dev/AMR.md` §4).
 #
 # The table here is maintained **incrementally** instead of being rebuilt per
 # tree version: `balance!` mutates the tree between the queries of one wave, and
@@ -554,7 +554,7 @@ Historical face-collection kernel: descend the node `(l, ix, iy)` and push every
 leaf whose box touches the face segment `coord` inside `[lo, hi]`.  Kept as the
 **reference oracle** of the flat table (`_neighbors_scan` below): it is the
 implementation the table replaced, and G216 requires the two to agree leaf by
-leaf on random trees (`docs/AMR_HOTPATH_AUDIT.md` §9).  It allocates nothing
+leaf on random trees (`docs/dev/AMR.md` §9).  It allocates nothing
 itself but pushes into `out` for every hit, and it re-descends from the base
 cells on every query -- that is the 223.9 MB of the audit.
 """
@@ -627,7 +627,7 @@ fresh `Vector` per call (the historical contract: callers may keep or mutate it)
 and is meant for code that iterates the vector.  The hot loops read the table
 directly (`_table_leaf_id!` / `_face_slot` / `_leaf_nbs!` / `_leaf21`), which
 allocates nothing per query -- one `Vector` per `(leaf, dir)` was 74.6 MB per 4
-AMR cycles (`docs/AMR_HOTPATH_AUDIT.md` §4).  A key that is not a leaf of the
+AMR cycles (`docs/dev/AMR.md` §4).  A key that is not a leaf of the
 tree is answered by the historical `_neighbors_scan`.
 """
 function neighbors(qt::Quadtree, leaf::NTuple{3,Int}, dir::Symbol)
@@ -921,7 +921,7 @@ function balance!(qt::Quadtree; maxiter::Int=1000, symmetry::Symbol=:none)
         end
         wave = sort(collect(next))
         # Fixed-point guard (same bug class as the step-95 leaf-budget spin,
-        # docs/S3_DESIGN.md §16): the next wave is a pure function of the leaf
+        # docs/dev/SOLVER.md §16): the next wave is a pure function of the leaf
         # set and of `refine!`'s success, so `wave == prev` means *no* leaf was
         # split this pass and the following pass would repeat this one exactly.
         # A leaf that `refine!` refuses (it is at `maxlevel`) used to be
@@ -962,7 +962,7 @@ end
 # parent usually survives.
 #
 # The 2:1 condition is local, and the reference
-# (`docs/AMR_LOCAL_BALANCE_REFERENCE.md`, verified there) makes the replacement
+# (`docs/dev/AMR.md`, verified there) makes the replacement
 # exact:
 #
 #   **Lemma 1.** If `T` is 2:1 and `T'` replaces one complete quartet by its
@@ -972,7 +972,7 @@ end
 #   **Theorem.** With those seeds the queue closes at exactly `balance!`'s leaf
 #   set (the least 2:1 refinement), *provided the tree is 2:1 at entry*;
 #   without that precondition there is an explicit counterexample
-#   (`docs/AMR_LOCAL_BALANCE_REFERENCE.md` §4.1).
+#   (`docs/dev/AMR.md` §4.1).
 #
 # So the pass keeps a FIFO of leaf ids (`queued` dedups, cleared on pop so a
 # leaf tested clean can be re-tested after its neighbour changes), splits only
@@ -1075,7 +1075,7 @@ the new children and the old neighbours of every split, until the queue is
 empty.  Returns the number of splits and `ok = !capped && unsplittable == 0`.
 
 The result is the leaf set of `balance!(qt)` **provided `qt` was 2:1 before the
-mutation that produced the seeds** (`docs/AMR_LOCAL_BALANCE_REFERENCE.md` §4.1:
+mutation that produced the seeds** (`docs/dev/AMR.md` §4.1:
 Lemmas 1-2 make the queue closed under the only two events that create a
 violation, and the closure is the unique least 2:1 refinement).  For a tree that
 is not 2:1 (a legacy checkpoint, a hand-built test tree) pass
@@ -1089,7 +1089,7 @@ silently -- the repair path for a damaged tree remains `mirror_close!`.
 
 `st.parents` lists the parents of every leaf the pass split (per pass): the
 budget pass blocks all of them, so a quartet the rebalance undid is never
-re-merged (the S16 spin of `docs/AMR_LOCAL_BALANCE_REFERENCE.md` §3(e)).
+re-merged (the S16 spin of `docs/dev/AMR.md` §3(e)).
 """
 function rebalance_local!(qt::Quadtree, st::LocalBalance=LOCAL_BALANCE;
                           seeds::Tuple=(), symmetry::Symbol=:none,

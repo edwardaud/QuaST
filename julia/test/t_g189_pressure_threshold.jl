@@ -1,7 +1,7 @@
 using Test, MantleSEM, LinearAlgebra, Random
 
 # G189 / S5-1: the *threshold semantics* of the pressure-block cache
-# (docs/S3_DESIGN.md §19.1).
+# (docs/dev/SOLVER.md §19.1).
 #
 # §13.3 measured the outer iteration count of the `linear=:mg` saddle solve to
 # be flat in the cache tolerance (39.7 at 1e-12 ... 39.9 at Inf) while the

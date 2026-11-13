@@ -46,7 +46,7 @@
 #        an explicit cycle cooldown (`AmrCooldown`) so a quartet that was just
 #        merged is not re-refined and a leaf that was just created by a split is
 #        not immediately merged again.  Both are **our** choices: ASPECT has no
-#        hysteresis (docs/AMR_POLICY_REFERENCE.md §1.7) and no cell budget.
+#        hysteresis (docs/dev/AMR.md §1.7) and no cell budget.
 #
 # The coarsen *supply* is demand-driven: `deficit = n0 + 6*#candidates -
 # max_leaves` leaves have to disappear to fit the Dörfler refinement set, capped
@@ -134,7 +134,7 @@ end
     _coarsening_allowed(qt, kids, will_refine, granted) -> Bool
 
 deal.II's `coarsening_allowed()` (`source/grid/tria.cc:10935-10996`, v9.4.0;
-`docs/AMR_COARSEN_ALLOWED_REFERENCE.md` §1.3) for one quartet: iterate the
+`docs/dev/AMR.md` §1.3) for one quartet: iterate the
 quartet's **external** faces and deny the merge when a face neighbour would end
 the pass more than one level finer than the merged parent (level
 `kids[1][1] - 1`).
@@ -153,7 +153,7 @@ only quartets whose parent is already 2:1-legal *after* the whole pass.
 The neighbour lists come from the flat [`QuadFaceTable`](@ref) (`_face_slot`),
 so the eight queries per quartet are array reads: this predicate runs once per
 candidate quartet in every plan sweep and once per live-funded merge
-(`docs/AMR_HOTPATH_AUDIT.md` §9).
+(`docs/dev/AMR.md` §9).
 """
 function _coarsening_allowed(qt::Quadtree, kids::NTuple{4,NTuple{3,Int}},
                              will_refine::Set{NTuple{3,Int}},
@@ -222,7 +222,7 @@ end
 """
     MAX_PLAN_SWEEPS, MAX_PLAN_ROUNDS
 
-Structural caps of the plan walk (`docs/AMR_HOTPATH_REFERENCE.md` §4).  Neither
+Structural caps of the plan walk (`docs/dev/AMR.md` §4).  Neither
 is reached by a tree whose legal supply is at least `need` (measured on the
 operating state: 2-4 sweeps and 1-2 rounds); they exist so a tree that cannot
 supply the merge budget stops after a bounded amount of work and reports
@@ -243,7 +243,7 @@ are in the tree, so no `granted` set is needed) and merge the first one found.
 
 Top-level rather than a closure over the cycle: as a closure it captured (and
 therefore boxed) `nc`, `gate_extended` and `tau_r`, so every read inside the scan
-was an `Any` load (`docs/AMR_HOTPATH_REFERENCE.md` §4).  `granted` is the caller's
+was an `Any` load (`docs/dev/AMR.md` §4).  `granted` is the caller's
 reusable empty set.  Returns `(merged_quartets, extended, leaf)`, where `leaf` is
 the quartet representative that was merged (the caller records it); `(0, false,
 nothing)` when no legal quartet is left.
@@ -304,7 +304,7 @@ representatives to merge (all legal together, in summed-indicator order),
 `refused` the deadband quartets the 2:1 gate rejected, `extended` the granted
 quartets taken from above `tau_h`, `sweeps`/`rounds` the fixed-point sweeps and
 extension rounds the walk used, and `capped` whether it stopped on one of the two
-structural caps instead of converging (`docs/AMR_HOTPATH_REFERENCE.md` §4: a
+structural caps instead of converging (`docs/dev/AMR.md` §4: a
 monotone measure plus a recorded cap, not an unbounded `while true`).
 
 `asc` is the cycle's already-sorted leaf list (`(eta, leaf)` ascending); passing
@@ -480,7 +480,7 @@ pass and after the refinement pass, i.e. before the post-merge balancing, so
 `recirc == 0` means every merge survived the balance exactly as merged; with
 `coarsen_gate=true` the gate promises it.
 
-Loop/guard counters (docs/AMR_HOTPATH_REFERENCE.md §4, docs/AMR_HOTPATH_AUDIT.md):
+Loop/guard counters (docs/dev/AMR.md §4, docs/dev/AMR.md):
 `plan_sweeps`/`plan_rounds` the fixed-point sweeps and extension rounds the
 coarsening plan used, `plan_capped` whether it stopped on `MAX_PLAN_SWEEPS`/
 `MAX_PLAN_ROUNDS` instead of converging, `fund_calls`/`fund_hits` how often the
@@ -512,7 +512,7 @@ Returns `(refined, coarsened, exchanged)` in leaves (the same units as
 [`LAST_AMR_BALANCED`](@ref).
 
 The thresholds are cumulative error fractions, computed exactly by sorting
-(deal.II bisects the same quantity, docs/AMR_POLICY_REFERENCE.md §1.3):
+(deal.II bisects the same quantity, docs/dev/AMR.md §1.3):
 
     tau_r = eta value at the refine_frac * total point from above
     tau_c = eta value at the coarsen_frac * total point from below
@@ -526,7 +526,7 @@ and the mirror quartet (`symmetry=:x`) passes the same test.  `coarsen_cells`
 caps the leaves dropped per cycle (default `round(coarsen_frac * n)`).
 
 `coarsen_gate` (default `true`) adds deal.II's `coarsening_allowed()` pre-check
-(`docs/AMR_COARSEN_ALLOWED_REFERENCE.md`, `docs/dev/AMR.md` §4): a
+(`docs/dev/AMR.md`, `docs/dev/AMR.md` §4): a
 quartet is merged only when its parent's external faces keep the 2:1 rule after
 the whole pass, counting the rest of the merge plan (`-1` level) and the refine
 plan (`+1`).  The post-merge `balance!` then has nothing to split in the merged

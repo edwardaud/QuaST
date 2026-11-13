@@ -1,5 +1,5 @@
 # G206: the SIGN of the latent heat of a phase transition, per transition
-# (docs/RHEOLOGY.md §7.8).
+# (docs/dev/PHYSICS.md §7.8).
 #
 # The energy equation carries `-sum_i latent_i DGamma_i/Dt`, i.e. an apparent
 # heat capacity `1 + sum_i latent_i Gamma_T,i` and an advective source
@@ -30,7 +30,7 @@
 #       negative apparent heat capacity, and the `:global` default.
 using Test, MantleSEM, LinearAlgebra, Printf
 
-# ASPECT scale set of docs/ASPECT_REALISTIC_COMPARE.md §2.1 (the realistic case)
+# ASPECT scale set of docs/dev/VALIDATION.md §2.1 (the realistic case)
 const G206_RHO0 = 3300.0
 const G206_CP = 1000.0
 const G206_DT = 1000.0
@@ -175,7 +175,7 @@ end
         pr = g206_params()
         ph = per_phase_latent(pr, g206_realistic_phases(); g206_scale_kwargs()...)
         L410, L660 = ph[1].latent, ph[2].latent
-        # ASPECT's numbers (docs/ASPECT_REALISTIC_COMPARE.md §2.5): its
+        # ASPECT's numbers (docs/dev/VALIDATION.md §2.5): its
         # coefficient L_A = T dS_A/(cp dT) is +0.060 / -0.131; ours is -L_A.
         @test L410 < 0.0 && L660 > 0.0
         @test L410 ≈ -0.060 rtol = 2.0e-2        # -0.059364 (T = 1195.5 K)

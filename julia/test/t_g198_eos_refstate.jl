@@ -1,6 +1,6 @@
 using Test, MantleSEM, LinearAlgebra, SparseArrays
 
-# G198 -- EOS-integrated reference state (docs/RHEOLOGY.md section 11).
+# G198 -- EOS-integrated reference state (docs/dev/PHYSICS.md section 11).
 #
 #   dT/dy   = -Lambda(y) T,       Lambda = alpha(y) g / cp(y)
 #   drho/dy = -rho g / phi(y),    phi = K_S/rho

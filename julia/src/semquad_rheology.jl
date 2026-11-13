@@ -16,7 +16,7 @@
 # approximation; the hydrostatic part is a function of depth only and is
 # deliberately not included here (route C has no reference state yet, see P3).
 #
-# Depth dependence (docs/RHEOLOGY.md §8): with the depth d = 1-y the cohesion
+# Depth dependence (docs/dev/PHYSICS.md §8): with the depth d = 1-y the cohesion
 # and the friction coefficient are linear profiles,
 #
 #     c(d)  = yield_c + yield_c_grad*d
@@ -44,7 +44,7 @@ end
 """
     weak_active(pr)
 
-True when the strain-weakening field of docs/RHEOLOGY.md §9 is switched on: a
+True when the strain-weakening field of docs/dev/PHYSICS.md §9 is switched on: a
 positive reference plastic strain, a residual weakening factor below one, and an
 active Drucker-Prager yield surface (weakening only scales the yield stress).
 """
@@ -159,7 +159,7 @@ end
 Viscosity at absolute temperature `T` (height `y`, depth `d = 1-y`) with the
 plastic branch: `min(eta_visc, tau_y/(2 edot))`, then the `eta_min/eta_max`
 clip.  With `pr.yield_damper > 0` the plastic branch is first blended by
-`_damper_blend`.  `chi` is the weakening field (docs/RHEOLOGY.md §9); the
+`_damper_blend`.  `chi` is the weakening field (docs/dev/PHYSICS.md §9); the
 4-argument method is the first weakening level and is bit-identical to the
 historical constant-coefficient law when the depth gradients are zero.
 """
@@ -270,7 +270,7 @@ end
     semquad_eta_at(sq, theta, edot_field, pv, sp, chi, x, y, pr, leaves)
 
 The two yielding methods above with the strain-weakening field `chi`
-(docs/RHEOLOGY.md §9).  `chi === nothing` is exactly the corresponding
+(docs/dev/PHYSICS.md §9).  `chi === nothing` is exactly the corresponding
 weakening-off method (bit for bit), so the driver can pass `nothing` when
 `weak_active(pr)` is false and every old call site keeps its behaviour.
 """
@@ -350,7 +350,7 @@ Derivative of the visco-plastic viscosity with respect to the weakening field,
 when the plastic branch is active, the weakened yield stress is below
 `tau_max`, the viscosity is not clipped, and `weak_active(pr)`; zero otherwise.
 This is the derivative that couples the weakening equation to the momentum
-equation in the per-step Newton (docs/RHEOLOGY.md §9.4).  Note `tau_raw` may be
+equation in the per-step Newton (docs/dev/PHYSICS.md §9.4).  Note `tau_raw` may be
 negative (a strongly negative dynamic pressure), so the sign is not hard-wired.
 """
 function semquad_deta_chi(T::Float64, y::Float64, edot::Float64, p::Float64,

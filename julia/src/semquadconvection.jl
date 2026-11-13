@@ -403,7 +403,7 @@ is bitwise identical to the explicit `:direct` path (G191).  `linear=:direct`
 and `linear=:mg` remain selectable; `:direct` is the only bitwise-reproducible
 path (G150), so a bitwise reference must pin it explicitly, and
 `pic_mode=:newton` requires it explicitly.  The decision and its reason are
-exposed as `LAST_SEMSTOKES_AUTO_CHOICE` for logging (docs/S3_DESIGN.md §20).
+exposed as `LAST_SEMSTOKES_AUTO_CHOICE` for logging (docs/dev/SOLVER.md §20).
 `mg_pressure_eta_tol` (default
 `SEMQUAD_PRESSURE_DEFAULT_ETA_TOL` = 1.0) is the pressure-block cache
 threshold of §13.3/§19.1: the factors are rebuilt when the tree changes or the
@@ -411,11 +411,11 @@ sampled viscosity drifts by more than that relative amount (`Inf` = only on a
 tree change; only for smoothly evolving viscosity, no phase change / no yield
 onset).  `mg_threads > 1` forwards the S5-2 threaded matrix-free V-cycle
 (`solve_semquad_stokes_var`'s `mg_threads`; bitwise identical to the serial
-V-cycle, docs/S3_DESIGN.md §19.2).  The MG and solver keyword defaults
+V-cycle, docs/dev/SOLVER.md §19.2).  The MG and solver keyword defaults
 reproduce the previous behaviour exactly; only the `linear` default moved (to
 `:auto`).
 `stokes_scaling` (default `:none`) forwards the direct-path symmetric
-equilibration of docs/PRESSURE_EQUILIBRATION.md to every Stokes solve
+equilibration of docs/dev/BUG_LEDGER.md to every Stokes solve
 (`:equilibrated` enables it; it engages only when the historical unscaled
 unshifted solve fails its health check, so a healthy solve stays bitwise
 identical).  It is stored in the checkpoint's `run_config` and compared on
@@ -440,7 +440,7 @@ controls, cfl, dtmax/dtmin) are stored with the state; a restart raises
 `ArgumentError` listing every setting that differs from the live run, so a
 resumed run cannot silently continue with another configuration.  The cooldown
 is state, not configuration, and is not part of that comparison.
-`phases` adds the phase-transition buoyancy and the latent heat (docs/RHEOLOGY.md
+`phases` adds the phase-transition buoyancy and the latent heat (docs/dev/PHYSICS.md
 §7).  The latent coefficients come from `Params.latent_mode`: `:global` (the
 default) applies `pr.latent_L` to every transition — the historical behaviour,
 bit for bit — and `:per_phase` uses each `PhaseTransition.latent` (signed, see
@@ -454,9 +454,9 @@ iterate, so both settings give the same single lagged sweep (bitwise identical,
 G199), which is first order in the latent coupling.  `maxpic > 1` and
 `pic_mode = :newton` make the step (and with it the latent coupling) implicit
 and second order; the measured orders, cost and the benchmark/production
-recommendation are in docs/RHEOLOGY.md §13.  `weak_chi0` is the initial value of
+recommendation are in docs/dev/PHYSICS.md §13.  `weak_chi0` is the initial value of
 the strain-weakening field
-(docs/RHEOLOGY.md §9; the field is active only when the `Params` weakening
+(docs/dev/PHYSICS.md §9; the field is active only when the `Params` weakening
 parameters are set); it is clamped to [0,1] and the field is checkpointed with
 the state.
 `profile_steps=true` fills `SEMQUAD_STEP_PROFILE` with one named tuple per step
@@ -466,10 +466,10 @@ existing sections and changes nothing numerically.
 `extdiag=false` (the default) keeps every output byte-identical.  `extdiag=true`
 adds one history column, `resid_A` = `R/A`, the exact residual of the quoted
 pointwise Nusselt pair against the scheme's own identity `(ID1)`
-(`semquad_exact_residual`, docs/NUSSELT_AUDIT.md §2.3/§3.2).  The historical
+(`semquad_exact_residual`, docs/dev/VALIDATION.md §2.3/§3.2).  The historical
 `closure`/`closure_nolatent` columns are **not** changed by it: they are the
 historical formula, which equals `-dH/dt` plus three bookkeeping terms at a
-transient state and is not a flux error (docs/NUSSELT_AUDIT.md §4).  The extra
+transient state and is not a flux error (docs/dev/VALIDATION.md §4).  The extra
 column changes `history.csv`'s layout, so
 `julia/scripts/case_realistic_2d.jl` only accepts `CASE_EXTDIAG=1` in a new
 output directory.
@@ -628,7 +628,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # weakening-dependent viscosity, the phase-transition buoyancy and the
         # latent heat (apparent heat capacity + advective source).  The
         # Drucker-Prager plastic branch is supported through its `Kp` pressure
-        # block and the `deta/dchi` weakening block (docs/RHEOLOGY.md §8, §9);
+        # block and the `deta/dchi` weakening block (docs/dev/PHYSICS.md §8, §9);
         # the TALA/ALA reference state (weighted buoyancy), compressible
         # momentum and the CBF diagnostics still add terms it does not
         # linearise, so they are rejected instead of silently degrading the
@@ -740,7 +740,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         run_config["comp_Tcut"] = pr.comp_Tcut
         run_config["comp_eps_min"] = pr.comp_eps_min
         # The combination rule changes the rheology (isostress vs isostrain,
-        # docs/RHEOLOGY.md §14), so a restart must not switch it.  Old
+        # docs/dev/PHYSICS.md §14), so a restart must not switch it.  Old
         # checkpoints predate this key and skip the comparison, as with every
         # other key added after them.
         run_config["comp_rule"] = pr.comp_rule
@@ -756,7 +756,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     run_config["rho_cp"] = pr.rho_cp
     run_config["H"] = pr.H
     # Drucker-Prager yield surface, including the depth-dependent profiles
-    # (`yield_c_grad`, `yield_mu_grad`, docs/RHEOLOGY.md §8) and the
+    # (`yield_c_grad`, `yield_mu_grad`, docs/dev/PHYSICS.md §8) and the
     # strain-weakening parameters (§9).  They change the trajectory exactly like
     # the viscosity law, so a restart must not silently continue with another
     # yield surface.  They are stored unconditionally; old checkpoints without
@@ -768,7 +768,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     run_config["yield_damper"] = pr.yield_damper
     run_config["yield_c_grad"] = pr.yield_c_grad
     run_config["yield_mu_grad"] = pr.yield_mu_grad
-    # Strain-weakening parameters (docs/RHEOLOGY.md §9) and the initial value
+    # Strain-weakening parameters (docs/dev/PHYSICS.md §9) and the initial value
     # of the field.  A checkpoint also stores the field itself (`weak`), so a
     # restart continues the same weakening state; these keys guard the physics.
     run_config["weak_f"] = pr.weak_f
@@ -971,7 +971,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     yielding = yield_active(pr)
     tosi = pr.eta_law === :tosi
     composite = pr.eta_law === :composite
-    # Strain-weakening field chi (docs/RHEOLOGY.md §9); `nothing` when
+    # Strain-weakening field chi (docs/dev/PHYSICS.md §9); `nothing` when
     # `weak_active(pr)` is false, in which case every weakening code path is
     # skipped and the run is bit-identical to the pre-weakening behaviour.
     # `chi` is the start-of-step level chi^n, `chi_prev` is chi^(n-1) and
@@ -1165,7 +1165,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # `(eta_fun, deta_T_fun, deta_eps_fun)` evaluated at that state, plus the
     # optional Drucker-Prager entries `deta_dp_fun(x,y,edot,p)` (4th) and
     # `deta_dchi_fun(x,y,edot,p)` (5th) when a plastic branch / weakening field
-    # is active (docs/RHEOLOGY.md §8.4, §9.4).  This is the only
+    # is active (docs/dev/PHYSICS.md §8.4, §9.4).  This is the only
     # rheology-dependent part of the per-step Newton (`semquad_step_newton`),
     # so the solver itself is rheology-agnostic.
     # `deta_eps_fun(x, y, edot)` receives the strain rate that the assembler
@@ -1430,7 +1430,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             # `pic_reject` can undo this sweep; the chi iterate of the state the
             # flow was solved with must then be restored too.
             chi_iter_saved = weak ? copy(chi_iter) : nothing
-            # Strain weakening (docs/RHEOLOGY.md §9.3): one implicit BDF2
+            # Strain weakening (docs/dev/PHYSICS.md §9.3): one implicit BDF2
             # transport with the velocity of this sweep and the *start-of-step*
             # levels chi^n/chi^(n-1); the yielding indicator sees the current
             # iterate chi_iter (the field the flow was solved with).  The update
@@ -1543,20 +1543,20 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # (plus `latent_dgdt/A` when latent heat is on), i.e. the *steady*
         # flux balance evaluated at a transient state.  They are **not** a flux
         # error and do not close for any Nu definition: by `(DEC)` of
-        # docs/NUSSELT_AUDIT.md §4 the number equals `-dH/dt` plus three
+        # docs/dev/VALIDATION.md §4 the number equals `-dH/dt` plus three
         # bookkeeping terms (the skew-vs-PDE latent/advection difference, the
         # CBF's `O(h)` wall functional and the solver's constraint residual),
         # divided by `A`.  Read it as the enthalpy-rate residual of the
         # historical formula, never as "the budget misses X".  The exact
         # residual of the quoted pointwise Nu pair is the opt-in `resid_A`
-        # column below (`extdiag=true`, docs/NUSSELT_AUDIT.md §3.2), which is
+        # column below (`extdiag=true`, docs/dev/VALIDATION.md §3.2), which is
         # zero for the time-step CBF and `O(h)` for the pointwise family.
         #
         # The latent bookkeeping of the historical formula: the assembled
         # energy equation carries the apparent capacity `1 + sum_i L_i
         # Gamma_T,i` and the source `-sum_i L_i Gamma_z,i u_z`, so the
         # volume-integrated *steady* balance has two extra terms
-        # (docs/RHEOLOGY.md §7.3):
+        # (docs/dev/PHYSICS.md §7.3):
         #   int L_i Gamma_z,i u_z dV        (latent source)
         #   int L_i Gamma_T,i u.grad theta  (capacity's advective correction)
         # `latent_int` (the latent enthalpy) is NOT one of them: its time
@@ -1573,7 +1573,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         #   R/A = (F_pt - (dH/dt + sum(C theta) + Ibase + latent_src)) / A
         # with the operator rebuilt from this step's stored EV field and its
         # apparent-capacity temperature (`semquad_exact_residual`,
-        # docs/NUSSELT_AUDIT.md §2.3/§3.2).  Default off: no column, no extra
+        # docs/dev/VALIDATION.md §2.3/§3.2).  Default off: no column, no extra
         # assembly, and every existing history row stays byte-identical.
         resid_A = NaN
         if extdiag
@@ -1619,7 +1619,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         end
         if extdiag
             # exact residual of the pointwise pair (appended only when
-            # requested; see the block above and docs/NUSSELT_AUDIT.md §3.2)
+            # requested; see the block above and docs/dev/VALIDATION.md §3.2)
             push!(row, resid_A)
         end
         push!(hist, row)
@@ -1820,7 +1820,7 @@ mass_rho_fun(pr) = pr.refstate === nothing ? nothing :
     (pr.refstate.prof !== nothing ? (y -> semquad_rho(pr.refstate, y)) :
      (pr.refstate.rho_fun === nothing ? nothing :
       (y -> semquad_rho(pr.refstate, y))))
-# EOS reference state (docs/RHEOLOGY.md §11): the anelastic mass form uses the
+# EOS reference state (docs/dev/PHYSICS.md §11): the anelastic mass form uses the
 # *integrated* drho/dz instead of the finite difference of a user `rho_fun`.
 # `nothing` for every other path, which then stays bit for bit the old code.
 mass_drho_fun(pr) = (pr.refstate === nothing ||

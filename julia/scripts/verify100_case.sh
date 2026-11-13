@@ -44,7 +44,7 @@ if pgrep -f "case_realistic_2d.jl spinup" >/dev/null 2>&1; then
 fi
 
 # The production G card.  CASE_STOKES_SCALING=equilibrated is the documented
-# solver-side saddle equilibration (docs/PRESSURE_EQUILIBRATION.md); it only
+# solver-side saddle equilibration (docs/dev/BUG_LEDGER.md); it only
 # engages on a direct solve whose unscaled health check fails, so it is a
 # no-op on the solves that pass and is set for both arms so that the only
 # difference between them is CASE_LINEAR.  Every AMR knob is written out

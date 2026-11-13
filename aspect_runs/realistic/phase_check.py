@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Is the cross-code Nu_bot difference a *phase* difference in the internal-heating
 transient, or a structural difference in the bottom boundary layer?
-(docs/ASPECT_REALISTIC_COMPARE.md section 17.6)
+(docs/dev/VALIDATION.md section 17.6)
 
 Four measurements, all on data the two runs already wrote:
 

@@ -8,7 +8,7 @@ Reads
 converts the ASPECT diagnostics to the nondimensional units of the MantleSEM
 case and writes a table at matched nondimensional times.
 
-Conversions (docs/ASPECT_REALISTIC_COMPARE.md, section 2):
+Conversions (docs/dev/VALIDATION.md, section 2):
   t_nd      = t_ASPECT * kappa / d^2
   Vrms_nd   = Vrms_ASPECT * d / kappa
   T_nd      = T_ASPECT / dT - eta_T0          (eta_T0 = 0.5)

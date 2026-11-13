@@ -1,7 +1,7 @@
 using Test, MantleSEM, Random, Printf
 
 # G211: the coarsening pre-check `coarsening_allowed` (docs/dev/AMR.md §4,
-# docs/AMR_COARSEN_ALLOWED_REFERENCE.md).
+# docs/dev/AMR.md).
 #
 # `docs/dev/AMR.md` §4.1 measured the churn: at the operating point (10000 leaves)
 # every quartet the coarsening criterion selects is 2:1-illegal and every merge
@@ -60,7 +60,7 @@ end
 @testset "G211 coarsening_allowed" begin
     # ---- 1. the predicate ------------------------------------------------
     @testset "predicate: illegal next to a finer leaf, legal otherwise" begin
-        # docs/AMR_COARSEN_ALLOWED_REFERENCE.md §2's minimal repro: 16 leaves at
+        # docs/dev/AMR.md §2's minimal repro: 16 leaves at
         # L2, refine (2,1,3) -> 19.  The quartet of (2,2,3) has (2,1,2) and the
         # three L3 children of (2,1,3) on its xminus face.
         qt = g211_tree(5, 2, (2, 1, 3))
@@ -217,7 +217,7 @@ end
 
         # random cycles on both bases, gate on: invariants hold, the
         # recirculation is a small fraction of the merges (a refinement outside
-        # the plan can still undo one; docs/AMR_COARSEN_ALLOWED_REFERENCE.md §4.7)
+        # the plan can still undo one; docs/dev/AMR.md §4.7)
         for (cx, cy) in ((1, 1), (5, 2))
             rng = MersenneTwister(20261110)
             qq = Quadtree(7; cells_x=cx, cells_y=cy, Lx=cx / cy)

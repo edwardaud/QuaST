@@ -356,7 +356,7 @@ quadrature the energy assembly uses (Gauss for the volumes, the wall GLL rule of
 `h = theta + sum_i latent_i*(Gamma_i(y,T) - Gamma_i(y,Tbar))` (the sensible +
 latent anomaly relative to the conductive base state; `latent_i` is
 `pr.latent_L` in `:global` mode or `PhaseTransition.latent` in `:per_phase`
-mode, docs/RHEOLOGY.md §7.8), the semi-discrete energy equation integrated over
+mode, docs/dev/PHYSICS.md §7.8), the semi-discrete energy equation integrated over
 the box is
 
     d/dt int h = Q + S,        Q = int_wall dtheta/dn ds,
@@ -569,7 +569,7 @@ end
                            eta_fun=nothing)
 
 The **exact** residual of the quoted pointwise Nusselt pair against the scheme's
-own discrete identity (docs/NUSSELT_AUDIT.md §2.3, eq. `(ID1)`):
+own discrete identity (docs/dev/VALIDATION.md §2.3, eq. `(ID1)`):
 
     R = F_pt - (dH/dt + sum(C theta) + Ibase + latent_src)
     F_pt = flux_top - flux_bot,   dH/dt = 1'(ca M theta - cb M theta_n + cc M theta_nm1)
@@ -580,7 +580,7 @@ elementwise EV field and the same apparent-capacity temperature) and
 It vanishes (to the linear solver's floor) for the time-step CBF and is `O(h)`
 for the pointwise pair, so a non-zero `R/A` at a transient state is a property
 of the pointwise family, **not** an error of the run
-(docs/NUSSELT_AUDIT.md §3.2); the historical `closure` column is a different
+(docs/dev/VALIDATION.md §3.2); the historical `closure` column is a different
 quantity and does not close for any definition (NUSSELT_AUDIT §4).
 
 `theta_n`/`theta_nm1` are the two previous BDF2 levels of the step that produced

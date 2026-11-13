@@ -133,7 +133,7 @@ end
     Nj = sqj.N
     leaves_j = Set(qj.leaves)
     thj = [0.05 * sinpi(x) * sinpi(z) for (x, z) in sqj.coords]
-    # Mechanical update (docs/RHEOLOGY.md §8.4): the `make_eta` contract gained
+    # Mechanical update (docs/dev/PHYSICS.md §8.4): the `make_eta` contract gained
     # the pressure argument for the Drucker-Prager yield stress; this gate's
     # composite law does not use it.
     make_eta_j = function (theta, ufull, _pfull=nothing)
@@ -235,7 +235,7 @@ end
                                         linear=:schur_cg)
     # The Drucker-Prager plastic branch used to be rejected here; it is now
     # linearised exactly (Kp block and the d eta/d chi block,
-    # docs/RHEOLOGY.md §8.4/§9.4) and covered by t_g195/t_g196.  The guard
+    # docs/dev/PHYSICS.md §8.4/§9.4) and covered by t_g195/t_g196.  The guard
     # checked here is the CBF one, which the Newton still does not linearise.
     @test_throws ArgumentError g193_run(pr, th0; pic_mode=:newton, nu_cbf=true)
     @test_throws ArgumentError g193_run(pr, th0; pic_mode=:bogus)

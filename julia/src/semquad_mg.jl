@@ -32,7 +32,7 @@ const _SEMQUAD_MG_CLAMP_WARNED = Ref(false)
 # Resolve the requested `mg_threads` against the actual Julia thread pool: 1 is
 # the serial (bitwise, historical) path, a request larger than the pool falls
 # back to the pool size and a single-threaded process warns once and stays
-# serial.  Same policy as `_semquad_asm_thread_count` (docs/S3_DESIGN.md §12).
+# serial.  Same policy as `_semquad_asm_thread_count` (docs/dev/SOLVER.md §12).
 function _semquad_mg_thread_count(mg_threads::Int)
     mg_threads >= 1 || throw(ArgumentError("mg_threads must be >= 1"))
     mg_threads == 1 && return 1
@@ -163,7 +163,7 @@ Per-level smoothing-sweep vectors of `make_semquad_mg`, **coarse first**
 * `:taper` -- `1, 2, 2, 4, 4, 8, 8, ...` sweeps from the fine level down.  A
   smoothing sweep on the next coarser level costs ~1/1.7-4 of the finer one, so
   this spends the smoothing budget where it is cheapest.  See
-  docs/S3_DESIGN.md §14 for the measurement.
+  docs/dev/SOLVER.md §14 for the measurement.
 """
 function _mg_smoothing_schedule(schedule::Symbol, nlev::Int, pre::Int,
                                 post::Int)
@@ -846,7 +846,7 @@ the exact `diag(Cu' K Cu)`, computed leaf-locally without forming `K`;
 `:lumped` is the historical `Cu' diag(K)` (only for A/B -- on hanging rows the
 negative interpolation weights cancel, so it is not the reduced diagonal and its
 positivity clip can make a row a `1e12` smoother amplifier; see
-docs/MG_REALISTIC_DIAGNOSIS.md §5.2).  The sparse operator path always uses
+docs/dev/MG.md §5.2).  The sparse operator path always uses
 `diag(A[k])` and is unaffected.
 
 `mg_threads=1` (default) is the serial, bitwise V-cycle.  `mg_threads=n>1`
@@ -855,7 +855,7 @@ damped-Jacobi sweeps and the residual evaluation -- over `n` fixed contiguous
 leaf blocks (`Threads.@threads :static`), with one `SemQuadKScratch` per block
 and a per-leaf element buffer merged **serially in leaf order**, so the result
 is bitwise identical to the serial V-cycle (G190; measured 2.5-3.1x V-cycle
-speedup on 4096-leaf trees, docs/S3_DESIGN.md §19.2).  Only the matrix-free
+speedup on 4096-leaf trees, docs/dev/SOLVER.md §19.2).  Only the matrix-free
 operator path is threaded (the sparse `A[k]` path keeps its serial `mul!`); a
 request larger than `Threads.nthreads()` is clamped with a warning, and a
 single-threaded process warns once and stays serial.
@@ -1568,14 +1568,14 @@ const SEMQUAD_PRESSURE_CACHE = Ref{Union{Nothing,SemQuadPressureCache}}(nothing)
 # Default cache threshold of the pressure block (S3-press A3, retuned in S5-1).
 # The blob's viscosity moves 5.7-8.9% per *step* (25-37% between stored frames),
 # so the old 1e-2 threshold almost never hit.  The measured threshold curve
-# (docs/S3_DESIGN.md §13.3) shows the outer iteration count is *flat* (39.7 at
+# (docs/dev/SOLVER.md §13.3) shows the outer iteration count is *flat* (39.7 at
 # 1e-12, 39.9 even at Inf), so the threshold only trades build time against
 # staleness; the AMR tree changes every 5 steps and forces a rebuild anyway, so
 # 1.0 buys one build per tree block (21 builds instead of 41 in the 25-frame
 # blob run, §19.1).  `Inf` is a *supported but not default* value: it never
 # rebuilds on eta drift (the tree fingerprint still wins) and is only safe for
 # smoothly evolving viscosity -- no phase change and no yield onset inside a
-# tree block (docs/S3_DESIGN.md §19.1).
+# tree block (docs/dev/SOLVER.md §19.1).
 const SEMQUAD_PRESSURE_DEFAULT_ETA_TOL = 1.0
 # Diagnostics for gates/probes: cumulative builds and reuses, and what the last
 # call did.
@@ -1604,7 +1604,7 @@ factor builder:
 
 `:mass` is the *unweighted* pressure mass matrix on purpose: it is the variant
 the spectral-equivalence theory names, and keeping it distinct from
-`:scaled_mass` makes the two measurable side by side (docs/S3_DESIGN.md §13).
+`:scaled_mass` makes the two measurable side by side (docs/dev/SOLVER.md §13).
 """
 function _semquad_pressure_precond_mode(pre::Symbol, weight::Symbol)
     pre === :bfbt && return (:bfbt, weight)
@@ -1655,7 +1655,7 @@ pressure-cache metric (`_semquad_eta_sample`): measured on the production blob
 frame-19 eta field, the node sample under-estimates the full quadrature-field
 contrast by up to 5x (985x vs 4 926x on the 1024-leaf tree, 995x vs 5 299x on
 the 4096-leaf tree), while 33x33 grid points give 5 087x (-3% / -9% vs the two
-trees) with the same value on every tree (docs/S3_DESIGN.md §20).  Sampling a
+trees) with the same value on every tree (docs/dev/SOLVER.md §20).  Sampling a
 strided *subset of leaves* is worse still (808-892x on the refined trees) for
 the same reason: the viscosity extrema are spatially localised.  The grid cost
 is fixed and independent of the tree: measured ~20 us on the production blob
@@ -1665,7 +1665,7 @@ nothing), vs 0.7-2.6 ms for a full O(N) quadrature-field pass on the
 
 The grid sample can still miss a sub-grid-scale extremum, but the selector's
 contrast cut-offs are 10x/100x and the measured fields sit at 1x and ~5 000x;
-grid resolution is reported in docs/S3_DESIGN.md §20.
+grid resolution is reported in docs/dev/SOLVER.md §20.
 """
 function semquad_eta_contrast(su::SemQuad, eta_fun::Function;
                               npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
@@ -1729,7 +1729,7 @@ has moved by at most `eta_tol` (relative, max norm).  Otherwise they are
 rebuilt.  `key=nothing` disables the cache, which keeps the Newton path (one
 factorisation per nonlinear solve) bit-identical to before.
 
-`eta_tol` semantics (S5-1 retune, docs/S3_DESIGN.md §19.1):
+`eta_tol` semantics (S5-1 retune, docs/dev/SOLVER.md §19.1):
 
 | `eta_tol` | rebuilds when |
 |---|---|
@@ -1876,7 +1876,7 @@ function _semquad_build_pressure_precond(ss::SemStokes, Cu, Cp, Bs, Bt, Kred,
         # the iteration count equals that of `mg_pressure_precond=:mass`.  The
         # mode is kept (and wired) because the measurement is the point: on the
         # 1024-leaf blob tree it costs 2.7x more per apply than `:mass` for the
-        # same outer iteration count (docs/S3_DESIGN.md §13).
+        # same outer iteration count (docs/dev/SOLVER.md §13).
         Ap = assemble_semquad_pressure_stiffness(sp;
                                                  weight=(x, y) -> eta_fun(x, y))
         Mp = assemble_semquad_pressure_mass(sp)

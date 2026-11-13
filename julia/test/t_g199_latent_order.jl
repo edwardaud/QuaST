@@ -1,10 +1,10 @@
-# G199 -- time accuracy of the latent-heat coupling (docs/RHEOLOGY.md §12).
+# G199 -- time accuracy of the latent-heat coupling (docs/dev/PHYSICS.md §12).
 #
 # The apparent-heat-capacity latent term is evaluated either at the current
 # iterate of the step (`latent_scheme=:implicit`) or at the start-of-step
 # temperature (`:lagged`).  With the default `maxpic = 1` there is no iterate, so
 # the step is a single lagged sweep.  This gate pins the measured convergence
-# orders on the 1-D conductive column of docs/RHEOLOGY.md §7, where the velocity
+# orders on the 1-D conductive column of docs/dev/PHYSICS.md §7, where the velocity
 # is exactly zero and the only coupling under test is the latent capacity:
 #
 #   (1) `latent_scheme=:implicit` with the iterated step (the G193 fixed

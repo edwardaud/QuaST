@@ -1,7 +1,7 @@
 # G192: composite diffusion + dislocation creep rheology (`eta_law=:composite`),
 # **legacy `comp_rule = :isostrain` law**.
 #
-# Since the 2026-11-08 model-form switch (docs/RHEOLOGY.md §14.8) the *default*
+# Since the 2026-11-08 model-form switch (docs/dev/PHYSICS.md §14.8) the *default*
 # combination rule is `:isostress` (ASPECT's law), and this gate pins the
 # **legacy** `:isostrain` rule explicitly: it is kept for bitwise reproducibility
 # of the pre-switch results and this file is their regression.  The

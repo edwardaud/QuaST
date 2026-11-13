@@ -1,4 +1,4 @@
-# G196: strain weakening (docs/RHEOLOGY.md §9).
+# G196: strain weakening (docs/dev/PHYSICS.md §9).
 #
 #     dchi/dt + u.grad chi = (1-chi)*eps_pl/eps_ref - chi/tau_heal   (:rate)
 #     dchi/dt + u.grad chi = eps_pl/eps_ref                          (:linear)

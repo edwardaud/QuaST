@@ -37,14 +37,14 @@ meaning**; mixing them up silently changes the viscosity by orders of magnitude)
   of the strain rate with the code's `sqrt(0.5 edot:edot)` convention.  The two
   rules agree exactly in the one-mechanism limits and differ by up to 41%
   (n = 3.5) where both mechanisms contribute; ASPECT 2.5.0-pre solves
-  `:isostress` (measured, docs/RHEOLOGY.md section 14).  The `eta_min/eta_max`
+  `:isostress` (measured, docs/dev/PHYSICS.md section 14).  The `eta_min/eta_max`
   bounds of `_clip_eta` apply to `eta_eff` (clip once, after the combination),
   and `comp_eps_min` floors the strain rate of the dislocation branch (so that
   `eps_II -> 0` is the diffusion limit with a finite viscosity instead of
   `eta_disl = Inf` and an infinite derivative).  `comp_n` is ASPECT's "Stress
   exponent for dislocation creep" (n = 3 in the mantle); `comp_Ad`/`comp_As`
   are ASPECT's prefactors in units of `1/eta0` of the code's
-  nondimensionalisation (see docs/RHEOLOGY.md for the exact ASPECT mapping,
+  nondimensionalisation (see docs/dev/PHYSICS.md for the exact ASPECT mapping,
   including the factor 2 that ASPECT's `eta = stress/edot/2` convention puts
   into the prefactors).
 """
@@ -96,7 +96,7 @@ struct Params
     comp_Tcut::Float64    # floor on T_nd in the Arrhenius exponent; 0 = off
     comp_eps_min::Float64 # strain-rate floor of the dislocation branch
     comp_rule::Symbol     # :isostress (ASPECT, default) or :isostrain (legacy)
-    # Depth-dependent Drucker-Prager yield (docs/RHEOLOGY.md §8): with depth
+    # Depth-dependent Drucker-Prager yield (docs/dev/PHYSICS.md §8): with depth
     # d = 1-y the cohesion and the friction coefficient are linear,
     #   c(d)  = yield_c + yield_c_grad*d
     #   mu(d) = sin(yield_phi) + yield_mu_grad*d
@@ -105,7 +105,7 @@ struct Params
     # surface bit for bit.
     yield_c_grad::Float64   # d(cohesion)/d(depth)
     yield_mu_grad::Float64  # d(mu)/d(depth), mu = pressure coefficient
-    # Strain weakening (docs/RHEOLOGY.md §9): a scalar field chi in [0,1] with
+    # Strain weakening (docs/dev/PHYSICS.md §9): a scalar field chi in [0,1] with
     #   f(chi) = 1 - (1-weak_f)*chi,   tau_y <- f(chi)*tau_y
     weak_f::Float64         # residual weakening factor f_weak in [0,1]; 1 = off
     weak_eps_ref::Float64   # reference (end) plastic strain; <= 0 = off
@@ -200,7 +200,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, eta_law::Symbol=:const,
     latent_L >= 0 ||
         throw(ArgumentError("latent_L must be >= 0 (it is L/(cp dT) of the " *
                             "phase transitions)"))
-    # Latent heat per transition (docs/RHEOLOGY.md §7.8): `:global` is the
+    # Latent heat per transition (docs/dev/PHYSICS.md §7.8): `:global` is the
     # historical single `latent_L` for every transition (bitwise unchanged),
     # `:per_phase` uses each `PhaseTransition.latent` and may be negative.
     latent_mode in (:global, :per_phase) ||
@@ -547,7 +547,7 @@ Limits handled in closed form (no iteration, and identical to the
 combination rules coincide).  The two combination rules also agree in the
 one-mechanism limits of the *physics* (one branch overwhelming the other), but
 not in between: the isostress viscosity is larger by up to 41% for `n = 3.5`
-(docs/RHEOLOGY.md section 14.4b).
+(docs/dev/PHYSICS.md section 14.4b).
 """
 @inline function composite_isostress_state(T::Float64, edot::Float64,
                                            z::Float64, pr::Params)
@@ -644,7 +644,7 @@ needs the strain rate.
 In the code's nondimensionalisation the viscosity unit is the reference
 viscosity `eta0` of the Boussinesq scaling (`dimensionless` ASPECT), so
 `comp_Ad`/`comp_As` are `A_i * eta0^(...)`-style prefactors in units of
-`1/eta0`; docs/RHEOLOGY.md gives the exact ASPECT mapping (including the
+`1/eta0`; docs/dev/PHYSICS.md gives the exact ASPECT mapping (including the
 factor 2 of ASPECT's `eta = stress/edot/2` convention, which is absorbed into
 the prefactors here).
 """

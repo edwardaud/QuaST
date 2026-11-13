@@ -1,4 +1,4 @@
-# G195: depth-dependent Drucker-Prager friction and cohesion (docs/RHEOLOGY.md §8).
+# G195: depth-dependent Drucker-Prager friction and cohesion (docs/dev/PHYSICS.md §8).
 #
 # The yield surface is
 #

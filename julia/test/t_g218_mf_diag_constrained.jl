@@ -6,7 +6,7 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays, Random
 # only on a conforming tree.  On a hanging-node tree the Lagrange interpolation
 # weights are negative, a hanging row can cancel to <= 0, and the `1e-12*dmax`
 # positivity clip turns that row into a 1e12 amplifier per Jacobi sweep (the
-# production failure in docs/MG_REALISTIC_DIAGNOSIS.md §5.2: one V-cycle maps
+# production failure in docs/dev/MG.md §5.2: one V-cycle maps
 # ||b|| = 1e3 to ||z|| = 1.6e170 and `:cg` throws `SingularException`).
 #
 # This gate pins the fix on a small hanging-node tree:

@@ -93,7 +93,7 @@ facechildren(dir::Symbol, kids::Matrix{NTuple{3,Int}}) =
 External face neighbours of the would-be parent that are two levels finer than
 it, i.e. the 2:1 violations a merge would create: `[(dir, child_level,
 neighbour_leaf), ...]`.  Empty means `coarsening_allowed()` holds.  This is the
-deal.II `fix_coarsen_flags` neighbour test of docs/AMR_POLICY_REFERENCE.md §2.2.
+deal.II `fix_coarsen_flags` neighbour test of docs/dev/AMR.md §2.2.
 """
 function gate_offenders(qt::Quadtree, kids::Matrix{NTuple{3,Int}})
     l = kids[1][1]

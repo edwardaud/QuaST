@@ -34,7 +34,7 @@ normal derivative at the wall, Nu = -<dT/dy>/dT for both walls (so the
 conductive state gives Nu_top = +6, Nu_bot = -4, as `semquad_nu_walls` does).
 ASPECT's own `statistics` reports the Gresho CBF family instead, which differs
 from this one by <= 0.7 % per frame after t_nd > 3e-4
-(docs/ASPECT_REALISTIC_COMPARE.md section 13.4); the CBF values stay in the
+(docs/dev/VALIDATION.md section 13.4); the CBF values stay in the
 statistics file and both are quoted in section 16.
 
 Usage:

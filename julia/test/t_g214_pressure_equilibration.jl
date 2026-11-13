@@ -1,7 +1,7 @@
 using Test, MantleSEM, LinearAlgebra, SparseArrays
 
 # G214: solver-side symmetric equilibration of the direct saddle
-# (docs/PRESSURE_EQUILIBRATION.md).
+# (docs/dev/BUG_LEDGER.md).
 #
 # The wall-strip near-null pressure cluster of the level-5 lid makes the
 # *unshifted* sparse LU of the reduced saddle unusable (G step 7641: residual

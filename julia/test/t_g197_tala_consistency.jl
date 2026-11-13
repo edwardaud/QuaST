@@ -1,7 +1,7 @@
 using Test, MantleSEM, LinearAlgebra, SparseArrays
 
 # G197 -- TALA self-consistency of the route-C (semquad) path
-# (docs/RHEOLOGY.md section 10).
+# (docs/dev/PHYSICS.md section 10).
 #
 # The formulation that is verified here is the one the code implements:
 #   momentum   -div(2 eta eps(u)) + grad p = Ra rho(y) alpha(y) theta   (anomaly)

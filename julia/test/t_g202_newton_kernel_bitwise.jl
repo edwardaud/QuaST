@@ -2,7 +2,7 @@
 # carries `geo_coef`/`dp_coef` as type parameters (they were `Union{Nothing,
 # Function}` fields, and a function *field* is not specialised, so `gc` in the
 # Kgeo accumulation was `Any` and every `Kgloc[...] += gc*...*w` boxed;
-# docs/NEWTON_AUDIT.md).
+# docs/dev/BUG_LEDGER.md).
 #
 # The gate pins
 #   (a) `sys.Kgeo` against a verbatim pre-fix reference loop (same expression
