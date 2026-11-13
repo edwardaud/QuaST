@@ -27,14 +27,37 @@ include("dg1d.jl")
 include("dg2d.jl")
 include("quadtree.jl")
 include("dgquad.jl")
-# Before `semquadconvection.jl`: `semquad_amr_passes!`/`run_semquad_simulation`
+# Before the `driver/` chunks: `semquad_amr_passes!`/`run_semquad_simulation`
 # type their `amr_cooldown` keyword with `AmrCooldown`, which is defined in
 # `amr_balanced.jl`.
 include("amr_advanced.jl")
 include("amr_balanced.jl")
 include("semquad.jl")
-include("semquadstokes.jl")
-include("semquad_mg.jl")
+# `semquadstokes.jl` is now the `src/stokes/` chunk tree.  Joined in the order
+# below, the chunks are byte-identical to the former single file, and that
+# order *is* the original statement order (the `SemStokes` state first, then
+# the selectors and direct solver, then the operator kernels, then the two
+# solves), so it must not be reordered.
+include("stokes/state.jl")
+include("stokes/selector.jl")
+include("stokes/direct.jl")
+include("stokes/assembly.jl")
+include("stokes/kop.jl")
+include("stokes/apply.jl")
+include("stokes/solve.jl")
+include("stokes/assembly_var.jl")
+include("stokes/solve_var.jl")
+include("stokes/operators.jl")
+# Same contract for `semquad_mg.jl`, now `src/mg/`: byte-identical chunks in
+# the original order (hierarchy cache -> build -> V-cycle -> pressure blocks ->
+# BFBT -> saddle solver).
+include("mg/hierarchy.jl")
+include("mg/levelcache.jl")
+include("mg/build.jl")
+include("mg/vcycle.jl")
+include("mg/pressure.jl")
+include("mg/bfbt.jl")
+include("mg/saddle.jl")
 include("semquad_s1solve.jl")
 include("semquadenergy.jl")
 include("semquaddiagnostics.jl")
@@ -47,7 +70,11 @@ include("semquad_tosi_steady.jl")
 include("semquad_dp_steady.jl")
 include("semquad_coupled.jl")
 include("semquad_steady_entry.jl")
-include("semquadconvection.jl")
+# `semquadconvection.jl` is now the `src/driver/` chunk tree; same byte-identity
+# and original-order contract as the stokes and mg chunks above.
+include("driver/amr_hooks.jl")
+include("driver/run.jl")
+include("driver/mass.jl")
 include("semquad_checkpoint.jl")
 include("semquad_vtk.jl")
 include("semquad_flux.jl")
