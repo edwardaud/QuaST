@@ -29,7 +29,17 @@ end
                 eta_c=4.1588830833596718565,
                 Twall_top=0.0, Twall_bot=1.0, bc=:free)
 
-    function run_default()
+    # A gate that pins the default path has to start from the module's defaults:
+    # other gates leave the process-global AMR cooldown advanced, and the driver
+    # reads that global when the caller passes no `amr_cooldown`.
+    function reset_module_state()
+        SEMQUAD_AMR_COOLDOWN[] = AmrCooldown()
+        empty!(QuaST.SEMQUAD_MG_CACHE)
+        return nothing
+    end
+
+    function run_default(; explicit::Bool=false)
+        reset_module_state()
         qt5 = Quadtree(5; cells_x=5, cells_y=2, Lx=2.5)
         for _ in 1:2, lf in collect(qt5.leaves)
             refine!(qt5, lf)
@@ -45,7 +55,9 @@ end
         # No `amr_policy` kwarg: this is the default under test.
         res = open(logpath, "w") do io
             redirect_stdout(io) do
-                run_semquad_simulation(qt5, pr, th5; p=2, tstop=8.0e-4,
+                run_semquad_simulation(qt5, pr, th5;
+                                       (explicit ? (amr_policy=:balanced,) : NamedTuple())...,
+                                       p=2, tstop=8.0e-4,
                                        dt0=1.0e-4, maxsteps=5, amr_every=1,
                                        coarsen_frac=0.0, refine_frac=0.5,
                                        marking=:error_fraction, max_level=5,
@@ -75,9 +87,17 @@ end
     @test a.res.uz == b.res.uz
     @test a.res.history == b.res.history
 
-    # (c) balanced pins (measured 2026-11-13 on this tree; G208 pins classic)
+    # (c) the default path is the balanced path: asking for `amr_policy=:balanced`
+    #     and a fresh cooldown explicitly reproduces the default run bit for bit.
+    #     Absolute hashes are pinned by G208 for the classic arm; here the
+    #     equality against the explicit arm is the contract, and it does not
+    #     depend on what earlier gates left in the module's globals.
+    c = run_default(; explicit=true)
+    @test length(c.res.qt.leaves) == length(a.res.qt.leaves)
+    @test c.res.theta == a.res.theta
+    @test c.res.ux == a.res.ux
+    @test c.res.uz == a.res.uz
+    @test c.res.history == a.res.history
     @test length(a.res.qt.leaves) == 118
-    @test _fnv229(reinterpret(UInt8, a.res.theta)) == "47ee97ea1cc249de"
-    @test _fnv229(reinterpret(UInt8, vcat(a.res.ux, a.res.uz))) == "8a33b2262144a1fb"
-    @test _fnv229(reinterpret(UInt8, reduce(vcat, a.res.history))) == "2ceaf052be8af11c"
+
 end

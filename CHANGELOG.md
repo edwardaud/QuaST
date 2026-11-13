@@ -53,3 +53,10 @@ public release: earlier development happened in a private repository.
   0.04), and the pre-`266a656` level-3 rows are kept as a labelled historical row.
 - Source comments that named note files by old paths were repointed at the volumes in
   `docs/dev/` that absorbed them.
+
+### Removed
+
+- Eight files that no longer had a consumer: `dg2d.jl`, `interp.jl`, `newton.jl`,
+  `production.jl`, `semquad_coupled.jl`, `semquad_saturation.jl`, `semquad_vtk.jl`
+  and `trust_region.jl`, with the eight gates that pinned only them. None was on
+  the solver path; the development repository keeps their history.

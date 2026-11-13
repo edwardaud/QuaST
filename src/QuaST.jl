@@ -24,7 +24,6 @@ include("phase.jl")
 include("rheology.jl")
 include("io.jl")
 include("dg1d.jl")
-include("dg2d.jl")
 include("quadtree.jl")
 include("dgquad.jl")
 # Before the `driver/` chunks: `semquad_amr_passes!`/`run_semquad_simulation`
@@ -68,7 +67,6 @@ include("semquad_newton.jl")
 include("semquad_step_newton.jl")
 include("semquad_tosi_steady.jl")
 include("semquad_dp_steady.jl")
-include("semquad_coupled.jl")
 include("semquad_steady_entry.jl")
 # `semquadconvection.jl` is now the `src/driver/` chunk tree; same byte-identity
 # and original-order contract as the stokes and mg chunks above.
@@ -76,14 +74,10 @@ include("driver/amr_hooks.jl")
 include("driver/run.jl")
 include("driver/mass.jl")
 include("semquad_checkpoint.jl")
-include("semquad_vtk.jl")
 include("semquad_flux.jl")
 include("semquad_phase.jl")
-include("semquad_saturation.jl")
-include("newton.jl")
 include("amr_dwr.jl")
 include("bcs.jl")
-include("interp.jl")
 include("streamfunction.jl")
 include("rt.jl")
 include("rt1.jl")
@@ -92,10 +86,8 @@ include("projection.jl")
 include("direct.jl")
 include("timestep.jl")
 include("newton_solver.jl")
-include("trust_region.jl")
 include("gmres.jl")
 include("mg.jl")
-include("production.jl")
 include("cbf.jl")
 include("psi_stokes.jl")
 
@@ -123,7 +115,7 @@ export RheologyModel, CreepParams, YieldParams, eta_dislocation, yield_stress, e
 export TemperatureGrid, read_temperature_ascii, interp_temperature,
        theta_from_ascii
 export DG1D, make_dg1d, assemble_dg1d_poisson, solve_dg1d_poisson, dg1d_l2_error,
-       DG2D, make_dg2d, assemble_dg2d_advection, assemble_dg2d_poisson, dg2d_eval,
+       
        Quadtree, refine!, coarsen!, neighbors, balance!, rebalance_local!, LocalBalance, LOCAL_BALANCE, refine_where!, max_face_level_jump, leaf_box, total_area, face_pairs, wall_graded_tree,
        mirror_defect, mirror_close!, LAST_MIRROR_CLOSE,
        DGQuad, make_dgquad, assemble_dgquad_poisson, dgquad_eval, is_uniform,
@@ -150,16 +142,16 @@ export DG1D, make_dg1d, assemble_dg1d_poisson, solve_dg1d_poisson, dg1d_l2_error
        semquad_base_T, semquad_base_laplacian,
        SemRefProfile, semquad_rho, semquad_alpha, semquad_cp, semquad_drho_dz,
        mass_drho_fun,
-       write_semquad_vtk, semquad_depth_average,
+       
        semquad_cbf_theta_flux, semquad_nu_cbf, semquad_phase_buoyancy,
-       semquad_saturation, SEMQUAD_SAT_COLUMNS, newton_solve, jfnk_solve,
+       
        semquad_newton_steady, semquad_steady_step, semquad_steady_jv,
        semquad_steady_parts, semquad_ev_field, semquad_tosi_newton, semquad_tosi_inner,
        semquad_step_newton,
        semquad_tosi_steady_step, semquad_tosi_steady_jv,
        semquad_dp_inner, semquad_dp_steady_step, semquad_dp_steady_jv, semquad_dp_stokes_newton,
        semquad_dp_newton, semquad_dp_deta_T,
-       semquad_coupled_newton, semquad_steady_newton,
+       semquad_steady_newton,
        yield_active, semquad_yield_stress, semquad_strain_rate_at,
        weak_active, semquad_weak_factor, semquad_yield_cohesion,
        semquad_yield_friction, semquad_plastic_strain_rate,
@@ -171,7 +163,7 @@ export DG1D, make_dg1d, assemble_dg1d_poisson, solve_dg1d_poisson, dg1d_l2_error
        picard_diverging, picard_adapt_relax, amr_cycle_hysteresis!, amr_cycle_balanced!, AmrCooldown, SEMQUAD_AMR_COOLDOWN, LAST_AMR_BALANCED, goal_upper_half, dwr_leaf_indicator, solve_stokes_adjoint_system, stokes_residual, stokes_reduced_residual, assemble_semquad_velocity_mass, velocity_goal_rhs, hierarchical_stokes_residual, interpolate_semquad, dual_weights_semquad, poisson_dwr_cell_term, poisson_dwr_face_terms, poisson_dwr_estimate, restrict_indicator_to_tree, aggregate_indicator_to_level, stokes_dwr_indicator,
        solve_semquad_poisson, semquad_eval,
        DofMap, ThetaMap, make_dofmap, make_theta_map, gather_reduced, cfl_length, cfl_local_dt,
-       scatter_reduced, interpolate_theta
+       scatter_reduced
 export assemble_stokes, assemble_B, assemble_energy, assemble_body_force,
        bilinear_stokes, solve_stokes, solve_stokes_general, solve_energy,
        cbf_wall_flux,
@@ -181,7 +173,7 @@ export assemble_stokes, assemble_B, assemble_energy, assemble_body_force,
        potential_projection, LinearResidualError, solve_stokes_uzawa,
        solve_stokes_gmres, solve_stokes_schur, solve_stokes_schur_cg
 export StepResult, StokesSolution, SimulationResult, seed_theta,
-       run_simulation, run_steady, run_production, LAST_ENERGY_RESIDUAL, LAST_STOKES_RESIDUAL,
+       run_simulation, run_steady, LAST_ENERGY_RESIDUAL, LAST_STOKES_RESIDUAL,
        LAST_SEMSTOKES_RESIDUAL, LAST_SEMSTOKES_SCHUR_ITERS,
        LAST_SEMSTOKES_VEL_CG_ITERS,
        LAST_SEMSTOKES_REGULARIZED, QUAD_DIAG,

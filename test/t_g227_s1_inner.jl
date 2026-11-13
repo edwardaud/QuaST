@@ -34,10 +34,10 @@ end
 qt = _g227_tree()
 p = 4
 ss = make_semstokes(qt, p)
-Z2 = (x, y) -> 0.0
+_G227_Z2 = (x, y) -> 0.0
 eta_fun = (x, y) -> 1.0 + 4.0 * (x + y)
 fz = (x, y) -> 1.0
-sys = solve_semquad_stokes_var(ss, qt, eta_fun, Z2, fz, Z2, Z2;
+sys = solve_semquad_stokes_var(ss, qt, eta_fun, _G227_Z2, fz, _G227_Z2, _G227_Z2;
                                bc=:free, deviatoric=false,
                                mass_form=:boussinesq, linear=:mg,
                                mg_operator=:matrixfree, assemble_only=:mg)
