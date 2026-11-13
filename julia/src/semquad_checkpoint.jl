@@ -143,6 +143,10 @@ function save_semquad_state(path::AbstractString, qt::Quadtree,
     for (k, lf) in enumerate(leaves)
         L[1, k] = Int32(lf[1]); L[2, k] = Int32(lf[2]); L[3, k] = Int32(lf[3])
     end
+    # A caller that passes a path under a directory that does not exist yet should
+    # get the directory created, not an HDF5 error halfway through a run.
+    md = dirname(abspath(path))
+    isdir(md) || mkpath(md)
     h5open(path, "w") do f
         f["leaves"] = L
         f["theta"] = collect(Float64, theta)
