@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # =============================================================================
 # bench_mg_forks.jl -- fork/join accounting and before/after of the S6
-# consolidated V-cycle (docs/MG.md).
+# consolidated V-cycle (docs/dev/MG.md).
 #
 #   BENCH_CASE=F BENCH_THR=8 julia --project=julia --threads=8 \
 #       julia/scripts/bench_mg_forks.jl
@@ -52,8 +52,8 @@ const DOSOLVE = get(ENV, "BENCH_SOLVE", "1") != "0"
 # Measurement modes: `(label, region, transfer, cu, lanes)`, where `region` is
 # `SEMQUAD_MG_REGION`, `transfer` `SEMQUAD_MG_REGION_TRANSFER`, `cu`
 # `SEMQUAD_MG_REGION_CU` and `lanes` `SEMQUAD_MG_ETA_LANES` (the eta lane
-# pre-gather of docs/MG.md).  The default is the S6 A/B of
-# docs/MG.md; `BENCH_MODES=region,region_tr,region_cu,region_both`
+# pre-gather of docs/dev/MG.md).  The default is the S6 A/B of
+# docs/dev/MG.md; `BENCH_MODES=region,region_tr,region_cu,region_both`
 # adds the §13 phases, and a `_gather` suffix turns the lane table off for the
 # §15 A/B (`region_both_gather` is the same configuration reading eta through
 # the per-lane gather).
@@ -303,7 +303,7 @@ for k in 1:nlev
     @printf(" %8.2f(%d) %8.2f(%d)\n", t_sub / 1e3, fsub, t_jac / 1e3, fjac)
 end
 # ---------------------------------------------------------------------------
-# per-level apply and leaf kernel, every mode alternating (docs/MG.md
+# per-level apply and leaf kernel, every mode alternating (docs/dev/MG.md
 # §15): the eta-lane A/B at the finest level *and* at level 5, both layout
 # settings interleaved in the same process, with the bitwise check per level
 # ---------------------------------------------------------------------------
@@ -472,7 +472,7 @@ else
 end
 
 # ---------------------------------------------------------------------------
-# in-place per-op breakdown of one V-cycle (docs/MG.md)
+# in-place per-op breakdown of one V-cycle (docs/dev/MG.md)
 #
 # A replica of `_semquad_mg_vcycle!` / `_semquad_mg_vcycle_region!` that times
 # every op in place, with the same region boundaries as the production path
@@ -662,7 +662,7 @@ if DOSOLVE
 end
 
 # ---------------------------------------------------------------------------
-# instruction mix of the two eta indexings (docs/MG.md): the same
+# instruction mix of the two eta indexings (docs/dev/MG.md): the same
 # `_semquad_kn_blk_body!` compiled for the lane table (unit stride, `Val{true}`)
 # and for the leaf-major gather (`Val{false}`), p=2, serial (STORE=false) and
 # element-buffer (STORE=true) forms

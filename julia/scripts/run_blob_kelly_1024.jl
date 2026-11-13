@@ -1,9 +1,9 @@
 using MantleSEM, Printf, SHA
 
-# Produce the 25-frame blob baseline of docs/VALIDATION.md §2.3.
+# Produce the 25-frame blob baseline of docs/dev/VALIDATION.md §2.3.
 #
 # Promoted 2026-11-13 from the untracked out_julia/agent/run_blob_kelly_1024.jl
-# (docs/AMR.md): a clean checkout could not regenerate
+# (docs/dev/AMR.md): a clean checkout could not regenerate
 # the 25-frame digest.  The protocol is unchanged -- same Params, tree seed,
 # fixed dt, Kelly marking every 5 steps, p=4, direct solve and 256^2 frames --
 # and the only additions are the per-frame SHA-256 rows and the policy pin.
@@ -18,7 +18,7 @@ using MantleSEM, Printf, SHA
 #   julia --project=julia julia/scripts/run_blob_kelly_1024.jl   # balanced
 #
 # `FINAL theta_sha256=...` and `FINAL Tmax25=...` are printed for the digest
-# quoted in docs/VALIDATION.md; frame_sha256.csv holds all 25 per-frame digests.
+# quoted in docs/dev/VALIDATION.md; frame_sha256.csv holds all 25 per-frame digests.
 
 const PR = Params(Ra=1.0e8, H=5.0, eta_law=:expTz,
                   eta_b=log(16384.0), eta_c=log(64.0), bc=:free)
@@ -95,7 +95,7 @@ function main()
                                  stokes_tol=1.0e-6, callback=cb, verbose=false)
     @printf("done t=%.3e steps=%d leaves=%d N=%d frames=%d in %.1f s\n",
             res.t, res.steps, length(res.qt.leaves), res.ss.su.N, knot[], time() - t0)
-    # The digest quoted in docs/VALIDATION.md is the *end-of-run* field (step
+    # The digest quoted in docs/dev/VALIDATION.md is the *end-of-run* field (step
     # 126), which is what bench_blob_production_ab.jl printed as "theta sha";
     # frame 25's field is one step earlier and is in frame_sha256.csv.
     end_th = _hash(res.theta)

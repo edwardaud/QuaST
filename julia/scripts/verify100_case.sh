@@ -13,7 +13,7 @@
 #   bash julia/scripts/verify100_case.sh direct  [steps]  -> out_julia/verify100_direct
 #
 # The log is out_julia/verify100_<arm>.log.  `CASE_OUT` is always set
-# explicitly (docs/CASE_REALISTIC.md section 5), and the arm refuses to reuse
+# explicitly (docs/dev/CASE_REALISTIC.md section 5), and the arm refuses to reuse
 # an existing output directory.  `VERIFY100_FOREGROUND=1` runs Julia in the
 # foreground (used under a supervisor that keeps the WSL session alive);
 # otherwise the process is detached with setsid.
@@ -35,7 +35,7 @@ LOG="out_julia/${RUN_ID}_$ARM.log"
 
 if [ -e "$OUT" ]; then
     echo "verify100_case.sh: refusing, $OUT already exists" >&2
-    echo "  (CASE_OUT is always explicit: docs/CASE_REALISTIC.md section 5)" >&2
+    echo "  (CASE_OUT is always explicit: docs/dev/CASE_REALISTIC.md section 5)" >&2
     exit 3
 fi
 if pgrep -f "case_realistic_2d.jl spinup" >/dev/null 2>&1; then

@@ -1,7 +1,7 @@
 using Test, MantleSEM, LinearAlgebra, HDF5, Printf
 
 # G213: persist the `:balanced` AMR cooldown in the checkpoint, and prove that a
-# resume is bitwise identical (docs/BUG_LEDGER.md §10.5).
+# resume is bitwise identical (docs/dev/BUG_LEDGER.md §10.5).
 #
 # The four parts:
 #   1. save/load round trip of a non-trivial `AmrCooldown` (mirror halves of
@@ -307,7 +307,7 @@ end
                 got[].row, got[].leaves, got[].N,
                 fnv(reinterpret(UInt8, b.theta)))
         # The pre-change binary's numbers on this fixture (measured with a
-        # `git archive HEAD` worktree, docs/BUG_LEDGER.md §10.5): empty
+        # `git archive HEAD` worktree, docs/dev/BUG_LEDGER.md §10.5): empty
         # cooldown + stale dt_prev -> 46/46/46, 640 leaves, N=2853 and this hash.
         @test got[].row == (46, 46, 46, 0)
         @test got[].leaves == 640

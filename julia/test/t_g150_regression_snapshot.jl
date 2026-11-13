@@ -22,7 +22,7 @@ using Test, MantleSEM, LinearAlgebra
 #
 # Both driver calls pin `linear=:direct`: this gate records direct-path numbers,
 # and case C is a 256-leaf / 2 467-dof tree, above the selector's 2 000-dof
-# threshold, so the `:auto` default would resolve to `:mg` (docs/SOLVER.md §4.4).
+# threshold, so the `:auto` default would resolve to `:mg` (docs/dev/SOLVER.md §4.4).
 
 function _snapshot_l2_true(sq, qt, u, uex; nq::Int=30)
     xq, wq = gauss_legendre(nq)

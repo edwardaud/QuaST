@@ -1,4 +1,4 @@
-# AMR policy probe for the realistic card (docs/AMR.md §3-§5).
+# AMR policy probe for the realistic card (docs/dev/AMR.md §3-§5).
 #
 #   julia --project=julia julia/scripts/amr_policy_probe.jl quantify <ckpt.h5>
 #   julia --project=julia julia/scripts/amr_policy_probe.jl cycles   <ckpt.h5>
@@ -6,10 +6,10 @@
 #
 # `quantify` is the stage-1 measurement: it reproduces, on one checkpoint tree,
 # every quantity the classic AMR policy compares, and the three mechanisms that
-# freeze the production mesh (docs/BUG_LEDGER.md §5.2-§5.5).  `cycles` replays
+# freeze the production mesh (docs/dev/BUG_LEDGER.md §5.2-§5.5).  `cycles` replays
 # `semquad_amr_passes!` on the same tree with `amr_policy=:classic|:balanced` and
 # prints the per-cycle ledger; `CASE_SYMMETRY=none` (default `x`) replays it with
-# the x-mirror pair-strict rule off (`docs/AMR.md` §3.6).  `compare` reads two run
+# the x-mirror pair-strict rule off (`docs/dev/AMR.md` §3.6).  `compare` reads two run
 # directories (log + frames) and prints the stage-3 A/B table.
 #
 # Nothing here writes into the run directories; pass a *copy* of a checkpoint of
@@ -29,9 +29,9 @@ const WALLMIN = envint("CASE_WALLMIN", 5)
 const WALLSTRIP = envflt("CASE_WALLSTRIP", 0.1)
 const POLICY = Symbol(get(ENV, "POLICY", "balanced"))
 # x-mirror closure used by the `cycles` replay (default `x`, the value every
-# earlier measurement used -- `docs/AMR.md` §3.6).  `CASE_SYMMETRY=none`
+# earlier measurement used -- `docs/dev/AMR.md` §3.6).  `CASE_SYMMETRY=none`
 # replays the same tree/indicator/policy with the pair-strict rule off, which is
-# how `docs/AMR.md` §3.6 isolates what the mirror constraint costs the supply.
+# how `docs/dev/AMR.md` §3.6 isolates what the mirror constraint costs the supply.
 const SYMMETRY = Symbol(get(ENV, "CASE_SYMMETRY", "x"))
 const NCYC = envint("NCYC", 8)
 const HYST = envint("CASE_HYST", 1)

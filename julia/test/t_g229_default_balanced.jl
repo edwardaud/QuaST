@@ -1,7 +1,7 @@
 using Test, MantleSEM, Printf
 
 # G229: the library default of `run_semquad_simulation` is `amr_policy=:balanced`
-# since 2026-11-13 (docs/AMR.md, Stage 1).  G208 keeps the
+# since 2026-11-13 (docs/dev/AMR.md, Stage 1).  G208 keeps the
 # classic driver path pinned by passing `amr_policy=:classic` explicitly; this
 # gate is the one that exercises the *default*, so a future revert to `:classic`
 # fails here without touching G208 or G210.

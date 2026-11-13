@@ -10,7 +10,7 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays, Random
 #       hierarchy as 2.0, while `1.0` restores the historical 5 levels and `2.0`
 #       stays selectable;
 #   (b) the outer iteration count of that default is 21 (+/- 1) at 1e-8 --
-#       time is deliberately *not* gated (measured in docs/MG.md);
+#       time is deliberately *not* gated (measured in docs/dev/MG.md);
 #   (c) the `:auto` smoothing profile is uniform 2+2 on a non-top-heavy
 #       hierarchy and uniform 3+3 on a top-heavy one (the measured winner on
 #       P1: 65 outer iterations against 84 for 2+2 and 90 for the old taper);
@@ -23,7 +23,7 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays, Random
 # The Chebyshev smoother was tried in this pass and rejected: it converges on a
 # uniform low-contrast tree but diverges on F and P1 (the reduced operator has
 # near-null modes outside the polynomial window), so it is not shipped.  The
-# measurement is recorded in docs/MG.md
+# measurement is recorded in docs/dev/MG.md
 
 const _G219_Z2 = (x, y) -> 0.0
 const _G219_ONE = (x, y) -> 1.0

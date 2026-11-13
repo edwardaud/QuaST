@@ -1,9 +1,9 @@
 using Test, MantleSEM, Random, Printf
 
-# G211: the coarsening pre-check `coarsening_allowed` (docs/AMR.md §4,
+# G211: the coarsening pre-check `coarsening_allowed` (docs/dev/AMR.md §4,
 # docs/AMR_COARSEN_ALLOWED_REFERENCE.md).
 #
-# `docs/AMR.md` §4.1 measured the churn: at the operating point (10000 leaves)
+# `docs/dev/AMR.md` §4.1 measured the churn: at the operating point (10000 leaves)
 # every quartet the coarsening criterion selects is 2:1-illegal and every merge
 # is undone by the post-merge `balance!` -- 100 % of the merges, in the `:none`
 # arm and in the `:x` arm alike -- so the AMR pass did 4x the work for no
@@ -134,7 +134,7 @@ end
         # so the illegal quartet next to it cannot be legalised by merging the
         # neighbour ("or the neighbour itself will be coarsened in this pass"):
         # the gate has to refuse it, while the historical path merges it and the
-        # post-merge `balance!` immediately undoes that (the `docs/AMR.md` §4.1 churn).
+        # post-merge `balance!` immediately undoes that (the `docs/dev/AMR.md` §4.1 churn).
         function one_cycle(gate::Bool)
             qt = g211_tree(5, 2, (2, 1, 3))
             low = Set(g211_kids((2, 2, 3)))

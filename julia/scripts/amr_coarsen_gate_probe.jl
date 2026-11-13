@@ -1,4 +1,4 @@
-# Coarsening-gate probe for `amr_policy=:balanced` (docs/AMR.md §4.1).
+# Coarsening-gate probe for `amr_policy=:balanced` (docs/dev/AMR.md §4.1).
 #
 #   julia --project=julia julia/scripts/amr_coarsen_gate_probe.jl trace <ckpt.h5>
 #
@@ -27,7 +27,7 @@
 # Nothing here writes into a run directory; pass a *copy* of a checkpoint.
 #
 #   CASE_SYMMETRY=none|x   mirror rule of the replay (default none: the
-#                          production choice of `docs/AMR.md` §3.6; `x`
+#                          production choice of `docs/dev/AMR.md` §3.6; `x`
 #                          reproduces §3.6's arm)
 #   NCYC=12                cycles to replay
 #   CASE_MAXLEAVES=10000 CASE_COARSEN=0.05 CASE_REFINE=0.2

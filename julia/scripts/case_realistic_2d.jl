@@ -25,7 +25,7 @@
 #     CASE_STEPS step budget            (spinup default 10000; freeze 20000)
 #     CASE_FRAME stride in steps        (0 = the mode default)
 #     CASE_AMR / CASE_HYST              AMR policy: `balanced` (default, the
-#                                       production policy of docs/AMR.md §3,
+#                                       production policy of docs/dev/AMR.md §3,
 #                                       forward coarsening + budget exchange +
 #                                       hysteresis) or `classic` (the historical
 #                                       fraction+protect+hard-budget policy, the
@@ -33,7 +33,7 @@
 #                                       AMR cycles (default 1)
 #     CASE_AMR_GATE                     1 (default) = the 2:1 `coarsening_allowed`
 #                                       pre-check of the balanced policy
-#                                       (docs/AMR.md §4); 0 turns it off
+#                                       (docs/dev/AMR.md §4); 0 turns it off
 #     CASE_COARSEN / CASE_THETATOL      AMR coarsening: 0.05 / 1e-2 (default, the
 #                                       balanced policy's production values; the
 #                                       historical A/B pair is 0.005 / 1e-3)
@@ -48,7 +48,7 @@
 #                                       `none` (default, the production card:
 #                                       the pair-strict mirror rule off, the
 #                                       field is not mirror-symmetric,
-#                                       docs/BUG_LEDGER.md §5.6/§6) or `x` (the
+#                                       docs/dev/BUG_LEDGER.md §5.6/§6) or `x` (the
 #                                       historical card and the E arm).  The
 #                                       value is part of `run_config` and is
 #                                       compared on restart, so an `x` resume of
@@ -93,7 +93,7 @@
 # Rheology  eta_law = :composite, comp_rule = :isostress (ASPECT's partition),
 #   comp_n = 3, eta_T0 = 0.5, comp_Ed = 12, comp_Es = 17, comp_Vd = comp_Vs = 0,
 #   comp_eps_min = 1e-12, eta in [1e-4, 1e6].
-#   Prefactors calibrated (docs/CASE_REALISTIC.md §3, calib_realistic_2d.jl) at
+#   Prefactors calibrated (docs/dev/CASE_REALISTIC.md §3, calib_realistic_2d.jl) at
 #   z = 0.5, edot_ref = 1.65e3 (the RMS strain rate of the constant-viscosity
 #   precursor of this case) so that
 #       (i)  eta(T=0.5, z=0.5, edot_ref) = 1
@@ -112,17 +112,17 @@
 #   amr_policy = :balanced, amr_coarsen_gate = true, amr_hysteresis = 1,
 #   coarsen_frac = 0.05, coarsen_theta_tol = 1e-2, symmetry = :none
 #   (the balanced policy's production set, i.e. the G card of
-#   docs/CASE_REALISTIC.md §1.5; the library default is `amr_policy = :balanced`
+#   docs/dev/CASE_REALISTIC.md §1.5; the library default is `amr_policy = :balanced`
 #   since 2026-11-13, and `CASE_AMR=classic` with the historical
 #   coarsening pair reproduces the E trajectory),
 #   advection = :skew, ev = 0.11 / ev_cmax = 0.052, cfl = 0.5,
 #   pic_mode = :picard, maxpic = 1, linear = :auto, stokes_tol = 1e-3,
-#   mg_tol = 1e-8 (docs/CASE_REALISTIC.md §1.6),
+#   mg_tol = 1e-8 (docs/dev/CASE_REALISTIC.md §1.6),
 #   wall_min_level = 5, wall_strip = 0.1 (the production wall rule; the AMR
 #   otherwise never refines the top wall, it sat at level 3/4
 #   (h = 1/16..1/32) while the interior is L5/6, and the pointwise Nu_top there
 #   differs from the wall-refined value by 1.2 % while the consistent boundary
-#   flux differs by 9.6 % (docs/CASE_REALISTIC.md §7.2, docs/RHEOLOGY.md
+#   flux differs by 9.6 % (docs/dev/CASE_REALISTIC.md §7.2, docs/RHEOLOGY.md
 #   §7.3.5).  CASE_WALLMIN=0 turns it off).
 #   eta in [1e-4, 1e4]: the calibration needs eta(0.5)=1 with a 1e4 drop over
 #   [0.1,0.9], so the cold lid would be eta ~ 2.2e3 at T=0 and eta_max = 1e6
@@ -130,7 +130,7 @@
 #   round-off-limited at 4.1e-4 (measured, probe0.jl).  With eta_max = 1e4 the
 #   measured contrast is 1.0e7 and the residual 8.5e-10, so 1e4 is used and
 #   stokes_tol = 1e-3 only guards against a genuine failure.
-#   (docs/CASE_REALISTIC.md §2 records why p=2/max_level=7 rather than
+#   (docs/dev/CASE_REALISTIC.md §2 records why p=2/max_level=7 rather than
 #   p=4/max_level=6, and why the anelastic/EOS reference state of the brief is
 #   NOT expressible together with internal heating in this driver.)
 # No yielding (yield_c / yield_taumax = Inf, yield_phi = 0) and no strain
@@ -142,7 +142,7 @@ using MantleSEM, Printf, LinearAlgebra
 # ------------------------------------------------------------------ card ----
 const LX, CX, CY   = 2.5, 5, 2          # box [0,2.5]x[0,1], square leaves
 # max_level / max_leaves are overridable only so the resolution check of
-# docs/CASE_REALISTIC.md §7 is a one-line command; the defaults are the card.
+# docs/dev/CASE_REALISTIC.md §7 is a one-line command; the defaults are the card.
 const MAXLEV       = parse(Int, get(ENV, "CASE_MAXLEV", "7"))   # leaf 1/256
 const MAXLEAVES    = parse(Int, get(ENV, "CASE_MAXLEAVES", "10000"))
 const PORD         = 2
@@ -179,9 +179,9 @@ const LATENT_SCALE = (rho_ref=3300.0, cp=1000.0, dT=1000.0, g=9.81, d=2.9e6,
 const NG           = 256        # frame grid (x and y)
 const AMR_EVERY    = 5
 # Coarsening knobs of the card.  The defaults are the balanced policy's
-# production values (docs/CASE_REALISTIC.md §1.5): under `:balanced`,
+# production values (docs/dev/CASE_REALISTIC.md §1.5): under `:balanced`,
 # `coarsen_frac` is the per-cycle cell cap of the budget exchange
-# (`capcells = round(coarsen_frac*n0)`, docs/AMR.md §3.3) and the absolute
+# (`capcells = round(coarsen_frac*n0)`, docs/dev/AMR.md §3.3) and the absolute
 # per-leaf theta guard `coarsen_theta_tol` is only used by `:classic`.  The
 # historical A/B pair is `0.005 / 1e-3`; a `:classic` arm must also pin
 # `CASE_AMR=classic`.
@@ -194,13 +194,13 @@ const EV_COEF      = parse(Float64, get(ENV, "CASE_EV", "0.11"))
 # `wall_min_level`.  The default is the production rule (5 / 0.1): without it
 # the top wall stays at level 3/4 while the interior is L5/6, and that
 # under-resolved wall is what puts the consistent boundary flux 14 % above the
-# pointwise Nu_top (docs/CASE_REALISTIC.md §7.2, §14; docs/RHEOLOGY.md §7.3.5).
+# pointwise Nu_top (docs/dev/CASE_REALISTIC.md §7.2, §14; docs/RHEOLOGY.md §7.3.5).
 # `CASE_WALLMIN=0` turns it off for a historical-arm replay; the wall keys are
 # part of `run_config`, so an existing checkpoint written with the old default
 # needs the same explicit value (or a `wallrefine` seed).
 const WALL_MIN     = parse(Int, get(ENV, "CASE_WALLMIN", "5"))
 const WALL_STRIP   = parse(Float64, get(ENV, "CASE_WALLSTRIP", "0.1"))
-# AMR policy (docs/AMR.md §3-§4): `balanced` is the production policy and the
+# AMR policy (docs/dev/AMR.md §3-§4): `balanced` is the production policy and the
 # card's default, so a new run gets forward coarsening, budget exchange,
 # hysteresis and the 2:1 gate without any environment variable.  `classic` is
 # the historical fraction+protect+hard-budget policy; since 2026-11-13 the
@@ -211,12 +211,12 @@ const WALL_STRIP   = parse(Float64, get(ENV, "CASE_WALLSTRIP", "0.1"))
 const AMR_POLICY   = Symbol(get(ENV, "CASE_AMR", "balanced"))
 const AMR_HYST     = parse(Int, get(ENV, "CASE_HYST", "1"))
 # x-mirror closure of the AMR passes (`symmetry=:x`).  The default is `none`,
-# the production card (docs/CASE_REALISTIC.md §1.5): `none` switches the
+# the production card (docs/dev/CASE_REALISTIC.md §1.5): `none` switches the
 # pair-strict mirror rule off.  Under `:x` a quartet is merged only together
 # with its mirror quartet and a leaf is split only together with its mirror
 # partner, and the measured production field is not mirror-symmetric, so the
 # rule is what limits the coarsening supply -- 241 eligible quartets -> 4, a
-# 60x cap on the exchange (docs/BUG_LEDGER.md §5.6/§6).  `symmetry` is part of
+# 60x cap on the exchange (docs/dev/BUG_LEDGER.md §5.6/§6).  `symmetry` is part of
 # `run_config` and IS compared on restart (the guard exists so a resume cannot
 # silently change the AMR/mirror rule), so an `x` restart of a checkpoint
 # written under this default has to set `CASE_SYMMETRY=x`, and a `none` run
@@ -224,9 +224,9 @@ const AMR_HYST     = parse(Int, get(ENV, "CASE_HYST", "1"))
 # wall keys use in `wall_checkpoint`.
 const SYMMETRY     = Symbol(get(ENV, "CASE_SYMMETRY", "none"))
 # Coarsening pre-check (`coarsening_allowed`, docs/AMR_COARSEN_ALLOWED_REFERENCE.md,
-# docs/AMR.md §4).  Only `:balanced` uses it.  The default is ON (1), the
+# docs/dev/AMR.md §4).  Only `:balanced` uses it.  The default is ON (1), the
 # production card: the gate is what stops the merge/refine recirculation
-# (docs/BUG_LEDGER.md §5.7), and a new arm should have it.  It is part of
+# (docs/dev/BUG_LEDGER.md §5.7), and a new arm should have it.  It is part of
 # `run_config`, so resuming a checkpoint written *without* the gate needs
 # `CASE_AMR_GATE=0` explicitly: an old checkpoint does not carry the key, and
 # the guard iterates over the checkpoint's keys, so an absent key is not
@@ -251,7 +251,7 @@ const EXTDIAG      = lowercase(strip(get(ENV, "CASE_EXTDIAG", "0"))) in
 # events; warm 1.61 s and 2.68 s (best of three) against 3.47 s and 3.92 s for
 # `linear=:direct` with `stokes_scaling=:equilibrated`.  That tolerance sits
 # seven orders below the `1e-3` residual gate, so the card passes
-# `MG_TOL=1e-8` explicitly (docs/CASE_REALISTIC.md §1.6): F/P1/C take
+# `MG_TOL=1e-8` explicitly (docs/dev/CASE_REALISTIC.md §1.6): F/P1/C take
 # 81/91/67 iterations, true residual 8.6e-9/9.4e-9/7.0e-9 and 1.41/2.21/1.22 s
 # warm, and the fields move by at most 2.7e-8 (|du|/|u|) and 7.9e-9
 # (gauge-removed |dp|/|p|) against the 1e-10 run.  The benchmark's `mg_tol=1e-6`
@@ -281,7 +281,7 @@ const STOKES_TOL   = 1.0e-3
 # deliberately unchanged).  It is `stokes_tol/1e5` = 1e-8: five orders below the gate, and
 # the measured movement against the 1e-10 solve is <=2.7e-8, well inside the
 # documented MG accuracy class (|du|/|u| <= 2.1e-6, gauge-removed
-# |dp|/|p| <= 8.8e-7; docs/CASE_REALISTIC.md §1.6).
+# |dp|/|p| <= 8.8e-7; docs/dev/CASE_REALISTIC.md §1.6).
 const MG_TOL       = 1.0e-8
 
 # Solver-side equilibration of the direct saddle (docs/PRESSURE_EQUILIBRATION.md).
@@ -765,10 +765,10 @@ function main()
     if EXTDIAG
         # The extra `resid_A` column changes history.csv's layout, and every
         # reader of an existing directory (watchdog, live_render, the analysis
-        # snippets of docs/CASE_REALISTIC.md §7.2) indexes columns by name.  A
+        # snippets of docs/dev/CASE_REALISTIC.md §7.2) indexes columns by name.  A
         # mid-run layout change would make the new rows silently disagree with
         # the old ones, so the opt-in is only accepted in a *new* output
-        # directory (spelled out in docs/CASE_REALISTIC.md §7.2).
+        # directory (spelled out in docs/dev/CASE_REALISTIC.md §7.2).
         for marker in ("history.csv", "spinup.h5", "frozen.h5", "resume.h5",
                        "short.h5", "frames")
             p = joinpath(OUT, marker)

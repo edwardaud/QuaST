@@ -5,7 +5,7 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays, Random
 # The matrix-free apply used to read its viscosity one lane at a time,
 # `etav[kofs[b] + kq]`, which LLVM compiles to a `vgather` per quadrature point
 # (48 per 32-lane block at p = 2: 4 weighted-gradient loops x 4x4 Gauss points,
-# docs/MG.md).  §15 pre-gathers the field into a **lane-major
+# docs/dev/MG.md).  §15 pre-gathers the field into a **lane-major
 # table** built once per operator construction (`SemQuadEtaLane`, per level in
 # the MG hierarchy), so the kernel reads a contiguous lane vector instead:
 #

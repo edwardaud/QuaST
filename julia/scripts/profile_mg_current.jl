@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # =============================================================================
 # profile_mg_current.jl -- current-composition profile of ONE warm matrix-free
-# MG solve on a production state (docs/MG.md, "current composition").
+# MG solve on a production state (docs/dev/MG.md, "current composition").
 #
 #   MG_PROFILE_CASE=F  julia --project=julia --threads=8 \
 #       julia/scripts/profile_mg_current.jl

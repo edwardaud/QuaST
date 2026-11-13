@@ -129,7 +129,7 @@ const RTEMP    = phase_list("Phase transition temperatures")
 # eta0 = rho0 g alpha dT d^3 / (Ra kappa);  H = H_r d^2/(cp kappa dT)
 const ETA0 = RHO0 * GRAV * ALPHA0 * DT * D_PRM^3 / (RA * KAPPA)
 const H_FROM_PR = H_R * D_PRM^2 / (CP * KAPPA * DT)
-# branch-law mapping (docs/VALIDATION.md section 5.1)
+# branch-law mapping (docs/dev/VALIDATION.md section 5.1)
 const A_D_CARD = COMP_AD * 1.0e-9 / (2.0 * ETA0)          # d_grain = 1e-3 m
 const E_D_CARD = COMP_ED * R_GAS * DT
 const S_SCALE  = KAPPA / D_PRM^2
@@ -148,7 +148,7 @@ const B660 = DRHO660 / (RHO0 * ALPHA0 * DT)
 # dS_A = gamma drho/rho^2.  The card's `z0` is the transition's *height* y0
 # (the prm's depth is (1 - z0) d = 377/638 km), so the base state is Tbar(z0);
 # Tbar(0.87) = 0.6955 and Tbar(0.78) = 1.078, i.e. T_nd = 1.1955 / 1.578
-# (docs/CASE_REALISTIC.md section 1.3).
+# (docs/dev/CASE_REALISTIC.md section 1.3).
 dS(gamma, drho) = gamma * drho / RHO0^2
 lat410_card = -((Tbar(Z410) + ETA_T0) * dS(GAMMA410, DRHO410) / CP)
 lat660_card = -((Tbar(Z660) + ETA_T0) * dS(GAMMA660, DRHO660) / CP)

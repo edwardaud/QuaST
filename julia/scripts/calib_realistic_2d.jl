@@ -1,6 +1,6 @@
 #!/usr/bin/env julia
 # Calibration of the composite (diffusion + dislocation) prefactors for the
-# "realistic 2-D" statistical case (`case_realistic_2d.jl`, docs/CASE_REALISTIC.md
+# "realistic 2-D" statistical case (`case_realistic_2d.jl`, docs/dev/CASE_REALISTIC.md
 # §3).  This script is the *derivation*; the case script carries the resulting
 # numbers as literals, so the production run does not depend on it.
 #
@@ -138,7 +138,7 @@ function precursor_edot()
 end
 
 function main()
-    @printf("=== composite prefactor calibration (docs/CASE_REALISTIC.md §3) ===\n")
+    @printf("=== composite prefactor calibration (docs/dev/CASE_REALISTIC.md §3) ===\n")
     @printf("fixed: n=%.1f eta_T0=%.2f comp_Ed=%.2f comp_Es=%.2f Vd=Vs=0\n",
             NEXP, T0, ED, ES)
     edot_ref = precursor_edot()

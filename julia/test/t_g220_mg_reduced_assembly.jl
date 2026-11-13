@@ -22,7 +22,7 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays, Random
 #       rejected;
 #   (e) the saddle solve is bitwise between (c)'s two hierarchies.
 #
-# The measured setup drop is in docs/MG.md; time is not gated here.
+# The measured setup drop is in docs/dev/MG.md; time is not gated here.
 
 const _G220_Z2 = (x, y) -> 0.0
 const _G220_ONE = (x, y) -> 1.0

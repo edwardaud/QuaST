@@ -1,7 +1,7 @@
 using Test, MantleSEM, LinearAlgebra, SparseArrays
 
 # G212: the last-resort tiny-shift fallback of the direct path
-# (docs/CASE_REALISTIC.md §17.4-§17.7).
+# (docs/dev/CASE_REALISTIC.md §17.4-§17.7).
 #
 # `_shift_ladder_solve` used to run the tiny shifts (1e-14 then 1e-13) only
 # when the *unshifted* residual was above `SEMSTOKES_LOST_TOL = 1.0`.  The G run

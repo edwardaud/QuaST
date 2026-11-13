@@ -32,7 +32,7 @@ const LAST_SEMSTOKES_VEL_CG_ITERS = Ref(0)
 # regularization (wall trees with free-slip; see the direct branch below).
 const LAST_SEMSTOKES_REGULARIZED = Ref(false)
 
-# --- the direct path's shift ladder (docs/CASE_REALISTIC.md §13) -------------
+# --- the direct path's shift ladder (docs/dev/CASE_REALISTIC.md §13) -------------
 #
 # The two blocks of the reduced saddle are measured separately: `vel` is
 # `||Kred u + Bt p - fr|| / rden` (momentum rows) and `div` is
@@ -83,7 +83,7 @@ const SEMSTOKES_K_ASSEMBLIES = Ref(0)
 # contrast of the eta field actually passed to the solve.  The constants below
 # are calibrated against a same-session A/B of the two paths on the states the
 # previous table named, re-measured at `c7e0f55` after the optimisation
-# campaign of docs/MG.md§16 (that campaign's endpoint is a 2.3-2.6x
+# campaign of docs/dev/MG.md§16 (that campaign's endpoint is a 2.3-2.6x
 # faster warm MG solve than the one the previous table -- docs/S3_DESIGN.md
 # §18.3/§19.2 -- was calibrated on, while the direct path is untouched).  The
 # A/B and every row: `julia/scripts/bench_auto_crossover.jl`, one process per
@@ -92,7 +92,7 @@ const SEMSTOKES_K_ASSEMBLIES = Ref(0)
 # reference), MG `linear=:mg` with the shipped defaults and
 # `mg_tol = 1e-6` (the direct reference's accuracy), warm = best of three
 # in-tree solves after a cold build.  Ratio = t_direct / t_mg, so >1 means MG
-# faster (the convention of docs/SOLVER.md §4.2/§4.4, which carries the same
+# faster (the convention of docs/dev/SOLVER.md §4.2/§4.4, which carries the same
 # table plus the cold column):
 #
 # | state                                 | saddle dofs | contrast | 1thr | 8thr |
@@ -121,7 +121,7 @@ const SEMSTOKES_K_ASSEMBLIES = Ref(0)
 # The only contrast boundary left is 100, which is where the pressure block
 # switches from the mass inverse to w-BFBT -- a property of the *MG
 # configuration*, not a measured crossover.  Where each constant sits (cold
-# ratios are the conservative column; `docs/SOLVER.md` §4.2 lists them):
+# ratios are the conservative column; `docs/dev/SOLVER.md` §4.2 lists them):
 #
 #   * 20 000 -- every measured high-contrast state at or above it wins
 #     (19 413 dofs 1.24x at 8 threads, 28 135 dofs 1.32x cold / 2.01x warm,
@@ -384,7 +384,7 @@ function _lagged_solve!(S::SparseMatrixCSC, rhs::Vector{Float64}, key::UInt64;
 end
 
 # ---------------------------------------------------------------------------
-# The direct path's diagonal-shift ladder (docs/CASE_REALISTIC.md §13)
+# The direct path's diagonal-shift ladder (docs/dev/CASE_REALISTIC.md §13)
 # ---------------------------------------------------------------------------
 
 # Relative diagonal shifts tried, in order, by `_shift_ladder_solve`.  The first
@@ -396,7 +396,7 @@ end
 const SEMSTOKES_SHIFT_LADDER = (1.0e-12, 1.0e-10, 1.0e-8)
 
 # Relative diagonal shifts tried *before* the ladder when the unshifted LU has
-# lost the solution outright (docs/CASE_REALISTIC.md §13.10).  The wall-refined
+# lost the solution outright (docs/dev/CASE_REALISTIC.md §13.10).  The wall-refined
 # realistic tree carries a cluster of near-null pressure modes on its level-5
 # wall strips (a discrete inf-sup deficiency of that strip: measured smallest
 # |eigenvalue| 4.6e-10 against sigma_max 1.2e5, the three smallest singular
@@ -416,7 +416,7 @@ const SEMSTOKES_TINY_SHIFTS = (1.0e-14, 1.0e-13)
 # path.  The threshold is deliberately not lowered: the last-resort phase (rule
 # 7) covers the states just *below* it, where the historical rungs can still sit
 # inside the wall-strip cluster (G step 7641 measured 0.9654, 3.5 % below 1.0;
-# docs/CASE_REALISTIC.md §17.3-§17.4).
+# docs/dev/CASE_REALISTIC.md §17.3-§17.4).
 const SEMSTOKES_LOST_TOL = 1.0
 # Allowed `stokes_scaling` values of the direct path
 # (docs/PRESSURE_EQUILIBRATION.md): `:none` is the historical unscaled saddle,
@@ -506,7 +506,7 @@ The rules, in the order they apply:
    factorisation, no shift, `rungs = nothing`.  This is the historical
    behaviour of the direct branch and is what keeps healthy systems bitwise
    identical.
-2. **Lost solution** (docs/CASE_REALISTIC.md §13.10).  If `r > lost_tol` the
+2. **Lost solution** (docs/dev/CASE_REALISTIC.md §13.10).  If `r > lost_tol` the
    unshifted LU did not solve the system at all (its answer is worse than
    `x = 0`): the near-null cluster has swallowed the factorisation, and the
    diagonal shift then has to be chosen at the *cluster's* scale rather than
@@ -534,7 +534,7 @@ The rules, in the order they apply:
 6. **Return the best.**  If even that misses `accept_tol` the best iterate is
    returned with its residual; the caller decides (the driver keeps the fatal
    error as the last resort).
-7. **Last-resort tiny shifts** (docs/CASE_REALISTIC.md §17.4, G212).  A finite
+7. **Last-resort tiny shifts** (docs/dev/CASE_REALISTIC.md §17.4, G212).  A finite
    unshifted residual at or below `lost_tol` skips rule 2, and the historical
    rungs can then sit inside the wall-strip cluster: G step 7641 measured
    `r = 0.9654` (3.5 % below the 1.0 trigger), `1e-12 -> 1.56e-2`, and four
@@ -844,7 +844,7 @@ end
 # (measured: 1.7x over the runtime-sized version, 0.31 ms vs 0.54 ms per apply
 # at p=4 on 256 leaves).  The leaf-blocked kernel over `SEMQUAD_KBLK` lanes is
 # `_semquad_kn_blk_core!` (stage D); its width is set so the lane axis survives
-# to the vectoriser -- docs/MG.md  The remaining cost is the
+# to the vectoriser -- docs/dev/MG.md  The remaining cost is the
 # gather/scatter, which stays scalar because a scatter has loop-carried
 # dependences through shared nodes.
 
@@ -1046,7 +1046,7 @@ The values are the same `Float64`s in the same order; only the addressing moves
 -- a unit-stride lane read instead of the per-lane gather `etav[kofs[b] + kq]`
 -- so every apply stays **bitwise** (G225).  This is the
 `Table<2,VectorizedArray>` pre-gather of deal.II's step-37
-(docs/MG_LITERATURE.md item 1) at `SEMQUAD_KBLK = 32`.
+(docs/dev/MG_LITERATURE.md item 1) at `SEMQUAD_KBLK = 32`.
 
 Subtyping `AbstractVector{Float64}` (indexing leaf-major, i.e. through `scalar`)
 lets every existing eta consumer keep working unchanged.
@@ -1178,7 +1178,7 @@ block-major lane table of [`SemQuadEtaLane`](@ref) -- one unit-stride
 `SEMQUAD_KBLK`-lane read per quadrature point instead of a per-lane gather.
 `false` restores the gather form `etav[kofs[b] + kq]` for the A/B; the two read
 the same values, so the switch changes the instruction mix only, never a bit
-(docs/MG.md, G225).  The switch is consulted only when the eta field
+(docs/dev/MG.md, G225).  The switch is consulted only when the eta field
 carries a lane table, i.e. never for a plain `Vector{Float64}` field.
 """
 const SEMQUAD_MG_ETA_LANES = Ref(true)
@@ -1191,7 +1191,7 @@ loop index, so the `(p+1)^2` and `nq^2` inner loops become unit-stride vector
 operations across `SEMQUAD_KBLK` independent leaves; the leaf-specific scalars
 (`2/hx`, `2/hy`, `hx hy/4`, `eta`) are gathered into length-`BLK` vectors first.
 
-**32, not 8** (docs/MG.md): at `BLK = 8` LLVM fully unrolls the
+**32, not 8** (docs/dev/MG.md): at `BLK = 8` LLVM fully unrolls the
 8-lane loop into scalar `vaddsd`/`vmulsd` and the kernel is 2.0-2.4x slower
 than at 16-32 lanes, where the loop survives to the vectoriser and becomes
 `vaddpd`/`vmulpd`/`vsubpd` (4-wide AVX2).  32 is the measured best (1 thread,
@@ -1341,7 +1341,7 @@ function _semquad_kn_blk_core!(out::Union{Vector{Float64},Nothing},
                                nbmax::Int, ::Val{N},
                                ::Val{STORE}) where {N,STORE}
     # The eta read is the only difference between the two kernel forms and it is
-    # a pure addressing choice (docs/MG.md): with a lane table the
+    # a pure addressing choice (docs/dev/MG.md): with a lane table the
     # lane axis is unit stride, so LLVM emits a vector load instead of the
     # per-lane `vgather` over `etav[kofs[b] + kq]`.  Both read the same
     # `Float64`s, so the result is bitwise (G225).  `SEMQUAD_MG_ETA_LANES =
@@ -1543,7 +1543,7 @@ end
 # `@spawn`s + one atomic hand-out cost 6-9 us regardless of the work.  On the
 # levels above `SEMQUAD_MG_SERIAL_DOFS` a 6-level V-cycle still makes ~15 such
 # calls (applies, Jacobi updates, subtracts, transfers) and pays that overhead
-# for every one of them (docs/MG.md, §12).
+# for every one of them (docs/dev/MG.md, §12).
 #
 # A `SemQuadParRegion` keeps `nt-1` worker tasks alive for the *whole sequence*
 # of parallel phases of one level block (one fork/join per region instead of one
@@ -1728,7 +1728,7 @@ function SemQuadKPar(op::SemQuadKOp, nt::Int)
     nt = clamp(nt, 1, max(nl, 1))
     BLK = SEMQUAD_KBLK
     # Chunk *starts* sit on the `SEMQUAD_KBLK` block grid, so a chunk's leaf
-    # window is a whole number of lane-table blocks (docs/MG.md).
+    # window is a whole number of lane-table blocks (docs/dev/MG.md).
     # The partition stays contiguous, covers 1:nl and is still proportional to
     # the leaf count within one block; it decides only *which worker* computes a
     # leaf, and the element vectors are scattered in leaf order, so the values
@@ -1968,7 +1968,7 @@ a row gather over `Cut`, `Cu' * y` over the columns of `Cu` -- and the leaf appl
 is the existing leaf phase.  The products are output-entry independent and keep
 the `mul!` arithmetic, so the result is bitwise both the serial and the
 serial-`Cu`/threaded-leaf form (G224).  `SEMQUAD_MG_REGION_CU[] = false` calls
-`mul!` on the calling task for the A/B (docs/MG.md).
+`mul!` on the calling task for the A/B (docs/dev/MG.md).
 """
 function _semquad_apply_Kred_region!(out::Vector{Float64}, op::SemQuadKOp,
                                      Cu::SparseMatrixCSC{Float64,Int},
@@ -2929,7 +2929,7 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
             # path (`mf_path`): the operator's own eta field
             # (`semquad_eta_field`) samples the same points.  Evaluating the
             # closure here anyway cost 0.15 s of the F setup at one thread
-            # (131 008 calls, measured; docs/MG.md).  `etaq` stays
+            # (131 008 calls, measured; docs/dev/MG.md).  `etaq` stays
             # defined so the `K`-forming branches below compile unchanged.
             etaq = 0.0
             if !mf_path
@@ -3205,10 +3205,10 @@ the actual `eta_fun` (`semquad_eta_contrast`, fixed 33x33 grid), fed to
 (`semquad_auto_mg_threads`); `schur_precond` must be `:mass` (the default) or
 the selector falls back to `:direct`.  The decision and its reason are in
 `LAST_SEMSTOKES_AUTO_CHOICE`.  The rule is re-calibrated at `c7e0f55` after the
-MG optimisation campaign (docs/MG.md§16): any contrast takes MG from
+MG optimisation campaign (docs/dev/MG.md§16): any contrast takes MG from
 20k dofs, contrast <= 100 from 2k, direct below that -- the old contrast-10
 rung is gone because the measurements cannot tell the two low bands apart
-(`julia/scripts/bench_auto_crossover.jl` is the A/B; docs/SOLVER.md §4.2/§4.4
+(`julia/scripts/bench_auto_crossover.jl` is the A/B; docs/dev/SOLVER.md §4.2/§4.4
 carry the table and the old, pre-campaign numbers, which are superseded).
 An `:auto` solve that resolves to `:direct` produces the **bitwise** direct
 result; an `:auto` solve that resolves to `:mg` produces the same answer as an
@@ -3248,13 +3248,13 @@ bit for bit.  `stokes_lost_tol` (default `1.0`) is the second trigger of the
 ladder: an unshifted relative residual above it means the factorisation did not
 solve the system at all, and the diagonal shift then has to be chosen at the
 scale of the near-null cluster rather than far above it
-([`SEMSTOKES_TINY_SHIFTS`](@ref); docs/CASE_REALISTIC.md §13.10).  `Inf`
+([`SEMSTOKES_TINY_SHIFTS`](@ref); docs/dev/CASE_REALISTIC.md §13.10).  `Inf`
 disables that phase, and it never fires on a solve whose unshifted residual is
 below `1.0`, so every answer that was already usable is bitwise unchanged.
 The rung that produced the returned solution is in
 `LAST_SEMSTOKES_SHIFT`, the refinement count in `LAST_SEMSTOKES_REFINE_ITERS`,
 the per-rung residual history in `LAST_SEMSTOKES_LADDER`, and the two saddle
-blocks separately in `LAST_SEMSTOKES_RESID_SPLIT` (docs/CASE_REALISTIC.md §13).
+blocks separately in `LAST_SEMSTOKES_RESID_SPLIT` (docs/dev/CASE_REALISTIC.md §13).
 `stokes_scaling` (default `:none`) selects the symmetric equilibration of the
 reduced saddle used by the direct branch (`:equilibrated`;
 docs/PRESSURE_EQUILIBRATION.md).  The scaling is an exact congruence
@@ -3328,7 +3328,7 @@ count is dominated by the pressure block, and SGS did not reduce it on 2b's
 velocity-block V-cycle but costs 2-3x per apply.  A Chebyshev smoother was
 implemented and measured during the tuning pass; it diverges on the two
 production trees (the reduced operator has near-null modes outside the
-polynomial's window), so it is not shipped (docs/MG.md).
+polynomial's window), so it is not shipped (docs/dev/MG.md).
 `mg_coarse=:auto` rediscretises on uniform trees and uses the exact Galerkin
 operator `P' A P` on non-uniform ones (same iteration count to a few percent,
 but no coarse re-assembly per Picard iteration).
@@ -3355,7 +3355,7 @@ Explicit `mg_pre`/`mg_post` vectors (coarse first) select any per-level
 schedule; `mg_smoothing=:taper` keeps the historical `1, 2, 2, 4, 4, 8, ...`
 shape with omega=0.55.  Measured: the 6-level F hierarchy is best at uniform
 2+2 (81 iterations), the 7-level P1 hierarchy at uniform 3+3 (65); the old
-taper gives 99 / 90 (docs/MG.md).
+taper gives 99 / 90 (docs/dev/MG.md).
 A non-uniform tree is handled by hierarchical coarsening.
 
 `mg_threads=1` (default) keeps the whole `linear=:mg` path serial and bitwise as
@@ -3397,7 +3397,7 @@ realistic case (7498 leaves, `saddle_dofs` ~72k), where the matrix-free MG
 returned relres 4.33 before the exact constrained and BFBT diagonals; the
 direct fallback recovered the solve.  After those fixes the same class of tree
 converges (the card comment in `julia/scripts/case_realistic_2d.jl` and
-docs/SOLVER.md §4.4 carry the measurement), so the fallback remains a safety
+docs/dev/SOLVER.md §4.4 carry the measurement), so the fallback remains a safety
 net, not the expected path.
 
 `assemble_only` selects what the call is allowed to build:
@@ -3414,7 +3414,7 @@ net, not the expected path.
   `Cu` only.  `SEMSTOKES_K_ASSEMBLIES` counts every formation of the sparse
   `K`; an `assemble_only=:mg` call does not move it.  The mode requires
   `linear=:mg, mg_operator=:matrixfree` and is bitwise for every object it
-  returns (docs/MG.md, G220).
+  returns (docs/dev/MG.md, G220).
 """
 function solve_semquad_stokes_var(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,
@@ -3622,7 +3622,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     mg_operator in (:sparse, :matrixfree) ||
         throw(ArgumentError("mg_operator must be :sparse or :matrixfree"))
     # Production default of the h-coarsening step.  `coarsen_factor=2.0` was
-    # measured on the F tree (1.5x end to end, docs/MG.md) but on
+    # measured on the F tree (1.5x end to end, docs/dev/MG.md) but on
     # P1 it collapses the hierarchy from 8 to 6 levels and costs 177 outer
     # iterations instead of 61 (8.03 s against 5.45 s, measured at 1e-6).  The
     # shipped default is therefore 1.5: it still removes F's 1.7 %-coarsening
@@ -3680,7 +3680,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     end
     # BFBT weight: the exact restricted diagonal
     # `diag(Cu' M_u(sqrt(eta)) Cu)` is the shipped default on the matrix-free
-    # path (docs/MG.md).  It is a zero-per-apply-cost change
+    # path (docs/dev/MG.md).  It is a zero-per-apply-cost change
     # that removes 10 outer iterations on `F` (81 -> 71) and leaves `P1` at 65;
     # its leaf-local construction is cheaper than the historical lumped `:leaf`
     # diagonal at 8 threads and the same at 1 (both are dominated by the
@@ -3849,7 +3849,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     mfpar = nothing
     if mf_path
         mfop = semquad_kop(ss, qt; deviatoric=deviatoric)
-        # sampled once, then laid out for the lane kernel (docs/MG.md
+        # sampled once, then laid out for the lane kernel (docs/dev/MG.md
         # §15): the leaf-major field plus its block-major lane table
         mfetav = semquad_eta_lanes(mfop, semquad_eta_field(mfop, eta_fun))
         mfwork = SemQuadKWork(mfop.n, mfop.nq, Nu2)
@@ -4079,7 +4079,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # iterative-refinement steps with the same factorisation.  The default
         # `accept_tol = Inf` stops after the first rung, so the well-conditioned
         # systems (uniform meshes, L2-L4 2b, the blob) stay bit-identical.
-        # docs/CASE_REALISTIC.md §13: on the 8192-leaf realistic tree the 1e-12
+        # docs/dev/CASE_REALISTIC.md §13: on the 8192-leaf realistic tree the 1e-12
         # rung alone leaves 1.3e-3 (1.3x the card's 1e-3) and the driver aborted
         # the long run at step 6130.  §13.10: when the unshifted solve is *lost*
         # (`stokes_lost_tol`, default 1.0) the ladder tries the tiny shifts

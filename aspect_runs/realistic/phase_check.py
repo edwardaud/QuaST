@@ -16,7 +16,7 @@ Four measurements, all on data the two runs already wrote:
                the bottom flux track the top flux"), over the long window and
                over its late part.
   --overturns  the number of box overturns in each window, t_ov = 1/Vrms
-               (docs/CASE_REALISTIC.md section 7.4), i.e. the integral of Vrms dt.
+               (docs/dev/CASE_REALISTIC.md section 7.4), i.e. the integral of Vrms dt.
 
 Defaults: ASPECT = run_E_cont/statistics + run_E_long/statistics (merged, keyed
 by step) and the exact-Q2 gradient series of the VTU frames; ours =
@@ -215,7 +215,7 @@ def slopes(pairs, lo, hi):
 
 def overturns(pairs):
     print("=== box overturns in each window, t_ov = 1/Vrms "
-          "(docs/CASE_REALISTIC.md 7.4): integral of Vrms dt ===")
+          "(docs/dev/CASE_REALISTIC.md 7.4): integral of Vrms dt ===")
     for lo, hi in ((1e-6, 1e-3), (1e-3, 2e-3), (1e-3, 3e-3), (1e-3, 4e-3),
                    (1e-3, 5e-3), (3.5e-3, 5e-3)):
         out = []

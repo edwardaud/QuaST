@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# ASPECT counterpart of the MantleSEM "realistic 2-D case" (docs/CASE_REALISTIC.md)
+# ASPECT counterpart of the MantleSEM "realistic 2-D case" (docs/dev/CASE_REALISTIC.md)
 #
 #   box 2.5 x 1, four free-slip walls, T_top = 0 / T_bot = 1 (nondimensional),
 #   H = 10 internal heating, nominal Ra = 1e5, Boussinesq,

@@ -11,7 +11,7 @@
 # kernel / `Cu'*` split, the historical scalar kernel (`blk=0`), per-leaf and
 # per-dof times, and allocations per apply.  It ends with the V-cycle time, the
 # threaded/serial vector-op overhead on the small levels, and a memory-bandwidth
-# calibration for the roofline of docs/MG.md SS11.1.
+# calibration for the roofline of docs/dev/MG.md SS11.1.
 #
 # The checkpoint is copied to a temp dir and opened read-only.  BLAS is pinned
 # to one thread.  The script writes nothing into the repository.

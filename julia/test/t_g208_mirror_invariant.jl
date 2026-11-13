@@ -5,7 +5,7 @@ using Test, MantleSEM, Random, Printf
 # `symmetry=:x` is supposed to keep the AMR forest closed under the reflection
 # x -> Lx - x: for every leaf `(l, ix, iy)` the partner `(l, nx0*2^l - 1 - ix, iy)`
 # must be a leaf.  The marking and the coarsening passes have always acted on
-# mirror pairs, but until `docs/CASE_REALISTIC.md` §15 three operations did not:
+# mirror pairs, but until `docs/dev/CASE_REALISTIC.md` §15 three operations did not:
 #
 #   * `_coarsen_pair!` merged only the `lf` quartet when the *mirror* quartet
 #     was in `protect` (the `coarsen_theta_tol` guard is built from a field that

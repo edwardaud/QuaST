@@ -1,7 +1,7 @@
 using Test, MantleSEM, LinearAlgebra, SparseArrays
 
 # G209: the near-null pressure modes of the wall-refined realistic saddle, and
-# the tiny-shift rule of the direct path (docs/CASE_REALISTIC.md §13.10).
+# the tiny-shift rule of the direct path (docs/dev/CASE_REALISTIC.md §13.10).
 #
 # What §13.10 measured on the 8260-leaf realistic tree (the step-6600/6604
 # states): the *unshifted* reduced-saddle solve has a growth factor 1.2e15 and

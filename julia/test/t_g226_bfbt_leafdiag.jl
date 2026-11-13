@@ -8,7 +8,7 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays, Random
 # tree its raw diagonal has 16 non-positive entries which the `1e-12*max|d|`
 # clip turns into a 1e12 contrast.  The exact diagonal removed the outliers
 # (0 non-positive, contrast 5.9e5) and measured 81 -> 71 outer iterations on
-# `F`; docs/MG.md ships it on the matrix-free path as
+# `F`; docs/dev/MG.md ships it on the matrix-free path as
 # `mg_pressure_bfbt_d=:exact` (the `:leaf` A/B and the `:matrix` sparse
 # reference stay selectable).
 #
@@ -24,8 +24,8 @@ using Test, MantleSEM, LinearAlgebra, SparseArrays, Random
 #   (e) both weights run a saddle solve to `relres <= 1e-6`, and the exact one's
 #       accuracy against the equilibrated direct solve stays inside the
 #       documented MG class `|du|/|u| <= 2.1e-6`, gauge-removed
-#       `|dp|/|p| <= 8.8e-7` (docs/MG.md) -- `relres` alone does not
-#       certify a preconditioner change (docs/MG.md);
+#       `|dp|/|p| <= 8.8e-7` (docs/dev/MG.md) -- `relres` alone does not
+#       certify a preconditioner change (docs/dev/MG.md);
 #   (f) the driver default resolves to `:exact` on the matrix-free path and
 #       `:leaf` on the sparse-operator path (observable in the pressure cache),
 #       and an invalid value is rejected.

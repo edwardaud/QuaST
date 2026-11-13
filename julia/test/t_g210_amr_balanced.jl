@@ -1,12 +1,12 @@
 using Test, MantleSEM, Random, Printf
 
-# G210: `amr_policy = :balanced` (docs/AMR.md §3-§4).
+# G210: `amr_policy = :balanced` (docs/dev/AMR.md §3-§4).
 #
 # The production run E is pinned at 9994/10000 leaves with 3720 AMR cycles of
 # which only 723 changed anything: the classic policy (absolute
 # `coarsen_theta_tol`, refused leaves charged to the coarsening budget, hard
 # budget guard, strip-wide protect set, driver `refine_frac=0` pin) cannot trade.
-# `docs/BUG_LEDGER.md` §5.2-§5.5 measures the three mechanisms on the live
+# `docs/dev/BUG_LEDGER.md` §5.2-§5.5 measures the three mechanisms on the live
 # tree; this gate pins the replacement:
 #
 #   1. coarsening is *relative*: a quartet is merged only when
@@ -24,7 +24,7 @@ using Test, MantleSEM, Random, Printf
 #      same FNV pins as G208) and `:balanced` is a different trajectory.
 
 # ---- helpers ---------------------------------------------------------------
-# G210 pins the `:balanced` policy exactly as measured in `docs/AMR.md` §3.6, i.e.
+# G210 pins the `:balanced` policy exactly as measured in `docs/dev/AMR.md` §3.6, i.e.
 # with the coarsening pre-check OFF (it did not exist then); G211 pins the gate
 # itself.  Keeping G210 on the pre-gate path makes every number and every
 # assertion in it directly comparable with those sections.
@@ -100,7 +100,7 @@ end
     # ---- 2. budget exchange: refinement continues at the cap --------------
     @testset "budget exchange" begin
         # classic: at exactly `max_leaves` the guard breaks the refine loop
-        # before the first candidate (the production freeze, `docs/BUG_LEDGER.md` §5.4).
+        # before the first candidate (the production freeze, `docs/dev/BUG_LEDGER.md` §5.4).
         qc = g210_seed_tree(5, 2, 3, 7)
         low = Set(lf for lf in qc.leaves if g210_zc(qc, lf) < 0.25)
         eta = g210_eta(qc, low)

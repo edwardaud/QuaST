@@ -1,7 +1,7 @@
-# `amr_policy = :balanced`: the AMR policy of docs/AMR.md §3-§5.
+# `amr_policy = :balanced`: the AMR policy of docs/dev/AMR.md §3-§5.
 #
 # Since 2026-11-13 this is the default of `run_semquad_simulation`
-# (docs/AMR.md).  `semquad_amr_passes!` keeps its own
+# (docs/dev/AMR.md).  `semquad_amr_passes!` keeps its own
 # `:classic` default, so `amr_policy=:classic` never calls this file and the
 # unit-level primitive, every classic production number (E) and the G208 tree
 # pins are unchanged.
@@ -69,7 +69,7 @@ object (the decisions themselves depend only on the dicts).  A key is removed
 when its counter reaches zero or when the leaf stops being a leaf, so the state
 never refers to a stale mesh.  Pass the same object to every cycle of a run
 (`SEMQUAD_AMR_COOLDOWN` is the driver's default); `save_semquad_state` persists
-it as optional HDF5 state (docs/BUG_LEDGER.md §10.5), and a checkpoint
+it as optional HDF5 state (docs/dev/BUG_LEDGER.md §10.5), and a checkpoint
 without it loads an empty cooldown, which is the historical restart behaviour.
 """
 mutable struct AmrCooldown
@@ -293,7 +293,7 @@ merge, computed **before any mutation** so every decision sees the same tree.
    quartet may only rely on decisions that are final, so a refusal is final for
    this level sweep.
 3. **Supply**: the walk only extends past `tau_h` when the deadband's legal
-   quartets cannot pay `need` leaves.  Measured (`docs/AMR.md`
+   quartets cannot pay `need` leaves.  Measured (`docs/dev/AMR.md`
    §4.1): at the operating point 14 of the 15 deadband quartets are
    geometrically illegal while the tree has 1635 legal complete quartets, so a
    gate without that extension would refuse the whole exchange and freeze the
@@ -471,7 +471,7 @@ quartets, exactly as for `:classic`).
 
 `merged` is the number of quartets this cycle merged, `recirc` how many of those
 parents the post-merge `balance!`/`mirror_close!` split again (**the
-recirculation counter**; docs/AMR.md §4.1), `post` the leaves the
+recirculation counter**; docs/dev/AMR.md §4.1), `post` the leaves the
 post-merge balancing added, and `parents` the parent nodes themselves (one entry
 per merged quartet, both halves under `symmetry=:x`), so a probe can attribute
 the recirculation.  `nmerge`/`npost` are the leaf counts after the coarsening
@@ -506,7 +506,7 @@ const LAST_AMR_BALANCED = Ref((refined=0, coarsened=0, exchanged=0, n=0, want=0,
                         cooldown=nothing, hysteresis_cycles=1,
                         coarsen_cells=nothing, coarsen_gate=true)
 
-One AMR cycle of `amr_policy = :balanced` (docs/AMR.md §3-§5).
+One AMR cycle of `amr_policy = :balanced` (docs/dev/AMR.md §3-§5).
 Returns `(refined, coarsened, exchanged)` in leaves (the same units as
 `amr_cycle!`), and records the cycle's threshold/limit diagnostics in
 [`LAST_AMR_BALANCED`](@ref).
@@ -526,12 +526,12 @@ and the mirror quartet (`symmetry=:x`) passes the same test.  `coarsen_cells`
 caps the leaves dropped per cycle (default `round(coarsen_frac * n)`).
 
 `coarsen_gate` (default `true`) adds deal.II's `coarsening_allowed()` pre-check
-(`docs/AMR_COARSEN_ALLOWED_REFERENCE.md`, `docs/AMR.md` §4): a
+(`docs/AMR_COARSEN_ALLOWED_REFERENCE.md`, `docs/dev/AMR.md` §4): a
 quartet is merged only when its parent's external faces keep the 2:1 rule after
 the whole pass, counting the rest of the merge plan (`-1` level) and the refine
 plan (`+1`).  The post-merge `balance!` then has nothing to split in the merged
 region (`LAST_AMR_BALANCED[].recirc == 0`).  Because the deadband's lowest-error
-quartets are usually the geometrically illegal ones (`docs/AMR.md` §4.1
+quartets are usually the geometrically illegal ones (`docs/dev/AMR.md` §4.1
 measured 14 of 15),
 the plan extends the supply past `tau_h` -- but never past `tau_r`, so a
 refine-flagged cell is still never coarsened -- and reports how many merges were

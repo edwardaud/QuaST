@@ -22,7 +22,7 @@ benchmark and cross-code evidence behind every number in `docs/`.
 
 It is not a general-purpose geodynamics package. It is two-dimensional, it does not do
 plate boundaries, viscoelasticity, compressible MHD or three dimensions, and the validation
-that exists covers the cases in `docs/VALIDATION.md`, not everything you may want to run.
+that exists covers the cases in `docs/dev/VALIDATION.md`, not everything you may want to run.
 
 ## Requirements
 
@@ -46,7 +46,7 @@ Always set `CASE_OUT`; the fallback output directory is one an earlier run may h
 The smoke mode builds the default 10 000-leaf budget and takes about two minutes including
 compilation. The other modes are `short`, `spinup`, `freeze`, `wallrefine`, `resume` and
 `symseed`, and the environment variables that steer them are in
-[docs/CASE_REALISTIC.md](docs/CASE_REALISTIC.md).
+[docs/dev/CASE_REALISTIC.md](docs/dev/CASE_REALISTIC.md).
 
 As a library, the entry point is `run_semquad_simulation`. A minimal case builds a tree,
 a parameter card and an initial temperature, then advances it:
@@ -88,13 +88,13 @@ On the production state (8 188 leaves, 69 388 saddle degrees of freedom, viscosi
 5.7e6) the warm Stokes solve at eight threads is 1.36 s with the matrix-free multigrid and
 3.37 s with a direct factorisation that actually reaches the 1e-6 tolerance, a factor of
 2.5, at lower memory. The crossover, measured on seven tree sizes, is documented in
-[docs/PERFORMANCE.md](docs/PERFORMANCE.md) and [docs/MG.md](docs/MG.md).
+[docs/dev/PERFORMANCE.md](docs/dev/PERFORMANCE.md) and [docs/dev/MG.md](docs/dev/MG.md).
 
 Against ASPECT, run on the same physical card from the same initial condition, the top
 heat flux agrees to between 0.005 and 0.9 percent over the window, the same-state import
 reproduces ASPECT's diagnostics to 0.003 percent, and the bottom flux differs by six to
 nine percent depending on the window with the cause not fully decomposed. The evidence,
-including the two-arm linear-solver comparison, is in [docs/VALIDATION.md](docs/VALIDATION.md).
+including the two-arm linear-solver comparison, is in [docs/dev/VALIDATION.md](docs/dev/VALIDATION.md).
 
 ## Tests
 
@@ -110,17 +110,17 @@ julia --project=julia julia/test/run_gates.jl t_g229_default_balanced.jl
 
 | Document | What it answers |
 |---|---|
-| [SOLVER.md](docs/SOLVER.md) | The equations, the discretisation, the four linear paths and the `:auto` rule, the physics inventory, the limits |
-| [PHYSICS.md](docs/PHYSICS.md) | The energy operator, the rheology laws, latent heat per transition, ALA versus TALA, the EOS reference state |
-| [AMR.md](docs/AMR.md) | The quadtree, the balanced marking policy and its defaults, the 2:1 gate, the local rebalance, the hot-path costs |
-| [MG.md](docs/MG.md) | The matrix-free multigrid: the algorithm, the ten optimisation stages with their measured numbers, the studies behind the defaults, the rejected levers |
-| [MG_LITERATURE.md](docs/MG_LITERATURE.md) | What mature codes do, with sources, and what each claim cost to verify |
-| [PERFORMANCE.md](docs/PERFORMANCE.md) | Where a step's time goes, the direct-versus-multigrid verdict, the crossover table, allocations and scaling |
-| [VALIDATION.md](docs/VALIDATION.md) | The benchmarks, the Nusselt-number conventions and their error terms, the energy budget, the ASPECT comparison |
-| [CASE_REALISTIC.md](docs/CASE_REALISTIC.md) | The realistic card, its defaults, the launch protocol, the production runs and the three-arm verification |
-| [VIDEOS.md](docs/VIDEOS.md) | The rendering pipeline for the comparison videos |
-| [BUG_LEDGER.md](docs/BUG_LEDGER.md) | Every serious defect found, with symptom, mechanism, measurement, fix and the gate that pins it |
-| [HANDOFF.md](docs/HANDOFF.md) | The current state, the open problems, the runbook and the rules the project learned the hard way |
+| [SOLVER.md](docs/dev/SOLVER.md) | The equations, the discretisation, the four linear paths and the `:auto` rule, the physics inventory, the limits |
+| [PHYSICS.md](docs/dev/PHYSICS.md) | The energy operator, the rheology laws, latent heat per transition, ALA versus TALA, the EOS reference state |
+| [AMR.md](docs/dev/AMR.md) | The quadtree, the balanced marking policy and its defaults, the 2:1 gate, the local rebalance, the hot-path costs |
+| [MG.md](docs/dev/MG.md) | The matrix-free multigrid: the algorithm, the ten optimisation stages with their measured numbers, the studies behind the defaults, the rejected levers |
+| [MG_LITERATURE.md](docs/dev/MG_LITERATURE.md) | What mature codes do, with sources, and what each claim cost to verify |
+| [PERFORMANCE.md](docs/dev/PERFORMANCE.md) | Where a step's time goes, the direct-versus-multigrid verdict, the crossover table, allocations and scaling |
+| [VALIDATION.md](docs/dev/VALIDATION.md) | The benchmarks, the Nusselt-number conventions and their error terms, the energy budget, the ASPECT comparison |
+| [CASE_REALISTIC.md](docs/dev/CASE_REALISTIC.md) | The realistic card, its defaults, the launch protocol, the production runs and the three-arm verification |
+| [VIDEOS.md](docs/dev/VIDEOS.md) | The rendering pipeline for the comparison videos |
+| [BUG_LEDGER.md](docs/dev/BUG_LEDGER.md) | Every serious defect found, with symptom, mechanism, measurement, fix and the gate that pins it |
+| [HANDOFF.md](docs/dev/HANDOFF.md) | The current state, the open problems, the runbook and the rules the project learned the hard way |
 
 The documents quote measured numbers and name the log each came from. Those logs are
 development artifacts and are not shipped; the reproduction commands in each document

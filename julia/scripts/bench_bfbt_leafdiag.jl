@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # =============================================================================
 # bench_bfbt_leafdiag.jl -- the exact restricted BFBT diagonal, measured on the
-# two production states (docs/MG.md)
+# two production states (docs/dev/MG.md)
 #
 #   julia --project=julia --threads=8 julia/scripts/bench_bfbt_leafdiag.jl F
 #   julia --project=julia --threads=1 julia/scripts/bench_bfbt_leafdiag.jl P1

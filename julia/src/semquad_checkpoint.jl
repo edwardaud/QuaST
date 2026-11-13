@@ -90,7 +90,7 @@ are the strain-weakening field at the two BDF2 levels of the next step
 (docs/RHEOLOGY.md §9); both are optional so an old checkpoint still loads.
 
 `cooldown` is the `AmrCooldown` hysteresis state of `amr_policy=:balanced`
-(`julia/src/amr_balanced.jl`, docs/AMR.md §3.5).  When supplied it is
+(`julia/src/amr_balanced.jl`, docs/dev/AMR.md §3.5).  When supplied it is
 written as two integer datasets (`cooldown_no_refine`/`cooldown_no_coarsen`, one
 column per key: level, ix, iy, remaining cycles) and the integer attribute
 `cooldown_cycle`; they are **state**, not configuration, so they are deliberately
@@ -276,7 +276,7 @@ whose `Lx` was not stored cannot be recovered and falls back to `Lx = 1`; new
 checkpoints always store `Lx`.  `cooldown` is the optional `AmrCooldown`
 hysteresis state of `amr_policy=:balanced`; a checkpoint without the cooldown
 datasets returns an **empty** cooldown (`cycle == 0`), which is exactly the
-historical restart behaviour (docs/BUG_LEDGER.md §10.5).  `velocity_stale`
+historical restart behaviour (docs/dev/BUG_LEDGER.md §10.5).  `velocity_stale`
 is the optional marker described in `save_semquad_state`: true means the stored
 `ux/uz/pv` are the end-of-run diagnostic re-solve and a restart must zero them to
 continue the trajectory (false/absent = use them verbatim).

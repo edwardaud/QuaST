@@ -82,10 +82,10 @@ only on the first pass.  Returns `(ss, theta, theta_prev, nrefined)`.
 default, so the AMR primitive itself stays classic): an absolute
 `coarsen_theta_tol` protect set, the error-fraction coarsening of `amr_cycle!`
 inside a hard `max_leaves` guard, and a `wall_strip`-wide wall protect set.
-`amr_policy=:balanced` (docs/AMR.md §3) replaces those three by the
+`amr_policy=:balanced` (docs/dev/AMR.md §3) replaces those three by the
 relative Dörfler-from-below criterion, budget exchange and a wall-row-only
 protect set, with an `AmrCooldown` hysteresis.  Since 2026-11-13 `:balanced` is
-the default of `run_semquad_simulation` (docs/AMR.md);
+the default of `run_semquad_simulation` (docs/dev/AMR.md);
 this helper keeps `:classic` so `t_g55`/`t_g208` still pin the primitive.
 """
 const LAST_AMR_STATS = Ref((refined=0, coarsened=0, merged=0, leaves=0))
@@ -397,7 +397,7 @@ each `solve_semquad_stokes_var` call from the current tree size and the
 viscosity contrast of the eta field actually used (`semquad_choose_linear`;
 MG additionally forces `mg_operator=:matrixfree` and
 `mg_threads=min(8, Threads.nthreads())`).  **`linear=:auto` is the default**
-since 2026-11-13 (docs/SOLVER.md §4.4): a driver call with no `linear` gets the
+since 2026-11-13 (docs/dev/SOLVER.md §4.4): a driver call with no `linear` gets the
 measured faster path per solve, and an `:auto` solve that resolves to `:direct`
 is bitwise identical to the explicit `:direct` path (G191).  `linear=:direct`
 and `linear=:mg` remain selectable; `:direct` is the only bitwise-reproducible
@@ -680,7 +680,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # thresholds and never reads the absolute tolerance) and the first two
         # are also inert unless `amr_strategy=:threshold`, but they are stored
         # unconditionally so a restart cannot change them silently -- closing
-        # the old `CASE_THETATOL` gap (docs/AMR.md).
+        # the old `CASE_THETATOL` gap (docs/dev/AMR.md).
         # Old checkpoints do not carry the keys and skip the comparison, like
         # every key added later.
         "refine_thresh" => refine_thresh, "coarsen_thresh" => coarsen_thresh,
@@ -693,7 +693,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # so a restart must not switch it silently.  Old checkpoints do not
         # carry the key and skip the comparison, like every key added later.
         "amr_policy" => amr_policy, "amr_hysteresis" => amr_hysteresis,
-        # The coarsening_allowed pre-check changes the mesh trajectory too (`docs/AMR.md` §4),
+        # The coarsening_allowed pre-check changes the mesh trajectory too (`docs/dev/AMR.md` §4),
         # so a restart must not switch it silently either; old checkpoints do not
         # carry the key and skip the comparison, like every key added later.
         "amr_coarsen_gate" => amr_coarsen_gate,
@@ -952,7 +952,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # (`save_semquad_state`'s optional datasets), and it is restored verbatim so
     # the first AMR cycle after a resume is the one the uninterrupted run would
     # have executed; an old checkpoint without the data loads an empty cooldown,
-    # which is exactly the historical restart behaviour (docs/BUG_LEDGER.md
+    # which is exactly the historical restart behaviour (docs/dev/BUG_LEDGER.md
     # §10.5).  The cooldown is state, not configuration: it is not in
     # `run_config` and the restart guard must not compare it.
     if balanced
@@ -1006,7 +1006,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # keep the closure box-free whether or not profiling is on.
     stokes_ns = Ref(0); work_ns = Ref(0)
     # Viscosity closure of the state the last `solve_flow!` used.  Diagnostics
-    # only: the Stokes-failure line reports its eta range (docs/CASE_REALISTIC.md
+    # only: the Stokes-failure line reports its eta range (docs/dev/CASE_REALISTIC.md
     # §13).  `nothing` before the first solve.
     eta_probe = Ref{Any}(nothing)
 
@@ -1286,7 +1286,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             end
             if isfinite(stokes_tol) && LAST_SEMSTOKES_RESIDUAL[] > stokes_tol
                 # The direct path has already escalated its shift ladder and
-                # refined (julia/src/semquadstokes.jl, docs/CASE_REALISTIC.md
+                # refined (julia/src/semquadstokes.jl, docs/dev/CASE_REALISTIC.md
                 # §13); this error is the last resort, so report the numbers that
                 # identify the state.  Written to *stderr*, the same unbuffered
                 # stream as the error, so it is adjacent to it in a redirected
@@ -1326,7 +1326,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 error("Stokes residual $(LAST_SEMSTOKES_RESIDUAL[]) exceeds " *
                       "stokes_tol=$stokes_tol at step $step; $fix (the direct " *
                       "shift ladder and its refinement already ran, " *
-                      "docs/CASE_REALISTIC.md §13)")
+                      "docs/dev/CASE_REALISTIC.md §13)")
             end
             verbose && linear === :schur_cg &&
                 @printf("    Stokes res=%.2e nit=%d\n",
@@ -1692,7 +1692,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                sq.N, length(qt.leaves), max_face_level_jump(qt), nr,
                                LAST_AMR_STATS[].coarsened, LAST_AMR_STATS[].merged)
             if verbose && balanced
-                # `:balanced` diagnostics (docs/AMR.md §4.1/§4):
+                # `:balanced` diagnostics (docs/dev/AMR.md §4.1/§4):
                 # the recirculation counter and the coarsening-gate ledger.
                 d = LAST_AMR_BALANCED[]
                 @printf("      balanced: gate_refused=%d extended=%d recirc=%d post=%+d tau_h=%.3e eligible=%d\n",

@@ -3,7 +3,7 @@ using Test, MantleSEM, LinearAlgebra, Printf
 # G191: production `linear=:auto` path selector (S6).
 #
 # 1. the decision table: every measured case of the re-calibrated A/B
-#    (docs/SOLVER.md §4.2/§4.4, `julia/scripts/bench_auto_crossover.jl`, this
+#    (docs/dev/SOLVER.md §4.2/§4.4, `julia/scripts/bench_auto_crossover.jl`, this
 #    session at c7e0f55) maps to the method the measurement says is faster, with
 #    the margin policy the rule claims: MG only where the *warm* 1-thread ratio
 #    (t_direct/t_mg, the production protocol) is at least 1.5x, direct wherever

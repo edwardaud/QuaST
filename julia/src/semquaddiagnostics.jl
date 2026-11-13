@@ -392,7 +392,7 @@ The steady energy balance the closure diagnostic uses is, per unit area,
     Nut - Nub = H - (base_adv + latent_src + latent_adv)/A,
 
 so `latent_dgdt/A` is the latent contribution to the flux balance (docs/
-RHEOLOGY.md §7.3, `docs/CASE_REALISTIC.md` §7.2).  It is **not**
+RHEOLOGY.md §7.3, `docs/dev/CASE_REALISTIC.md` §7.2).  It is **not**
 `latent_int`: that is an enthalpy, and its time derivative is the transient
 term, not a steady source.
 """
@@ -593,7 +593,7 @@ pass it explicitly when `maxpic > 1`, where it is the last iterate.
 Returns a named tuple with `R`, `R_over_A = R / total_area(qt)` and the terms of
 the identity (`flux`, `dHdt`, `sumC`, `Ibase`, `latent_src`, `rhs`).  This is a
 pure diagnostic: no solver path calls it unless the caller asks for it (the
-driver's opt-in `extdiag=true`, docs/CASE_REALISTIC.md §7.2).
+driver's opt-in `extdiag=true`, docs/dev/CASE_REALISTIC.md §7.2).
 """
 function semquad_exact_residual(sq::SemQuad, qt::Quadtree, pr::Params,
                                 theta::Vector{Float64},

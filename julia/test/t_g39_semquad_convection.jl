@@ -26,7 +26,7 @@ end
     theta0 = [0.01 * cospi(sq.coords[i][1]) * sinpi(sq.coords[i][2]) for i in 1:sq.N]
     pr = Params(Ra=1.0e4, H=0.0, eta_law=:expT, deta_T=1.0e2, bc=:free)
 
-    # Thresholds calibrated on the classic policy; pin it (docs/AMR.md).
+    # Thresholds calibrated on the classic policy; pin it (docs/dev/AMR.md).
     res_ad = run_semquad_simulation(qt_ad, pr, theta0;
                                     tstop=1.0e-3, dt0=1.0e-4,
                                     amr_every=5, refine_frac=0.2,

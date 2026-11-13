@@ -683,7 +683,7 @@ end
 # The two operations that can run away over thousands of cycles (balance and the
 # hard-budget merge) are pair-aware here, `_coarsen_pair!` refuses a pair it
 # cannot merge on both sides, and `mirror_close!` repairs a tree that was
-# damaged before the fix (`docs/CASE_REALISTIC.md` §15).
+# damaged before the fix (`docs/dev/CASE_REALISTIC.md` §15).
 
 """Mirror of a leaf about x = Lx/2: `(l, nx0*2^l - 1 - ix, iy)`."""
 @inline _mirror_leaf(qt::Quadtree, lf::NTuple{3,Int}) =

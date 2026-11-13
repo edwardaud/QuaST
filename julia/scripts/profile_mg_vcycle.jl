@@ -7,7 +7,7 @@
 #   julia --project=julia --threads=8 julia/scripts/profile_mg_vcycle.jl
 #
 # The state is a read-only *copy* of a production checkpoint (default
-# out_julia/_s7/case/pre_step6131.h5, the `F` state of docs/PERFORMANCE.md
+# out_julia/_s7/case/pre_step6131.h5, the `F` state of docs/dev/PERFORMANCE.md
 # §3.3: 8 188 leaves, p=2, 69 388 saddle dofs, eta contrast 6.09e6) with the
 # parameter card of julia/scripts/case_realistic_2d.jl rebuilt from the
 # checkpoint's own `config` attribute (composite isostress rheology, Ra=1e5,
@@ -657,7 +657,7 @@ function main()
             nf, nfp, nftot, nnz(sys.Kred), nnz(sys.Kred) / nf, nnz(sys.Bs))
 
     # ---------------- the full production MG solve ------------------------
-    # This script reproduces the *historical* profile in docs/MG.md:
+    # This script reproduces the *historical* profile in docs/dev/MG.md:
     # coarsen_factor=1.0 and the explicit taper.  The production default shipped
     # after that profile is `mg_coarsen_factor=nothing` (-> 1.5) with the
     # uniform auto schedule; set `MG_PROFILE_NEW=1` to measure the new default.
