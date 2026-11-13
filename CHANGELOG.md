@@ -60,3 +60,14 @@ public release: earlier development happened in a private repository.
   `production.jl`, `semquad_coupled.jl`, `semquad_saturation.jl`, `semquad_vtk.jl`
   and `trust_region.jl`, with the eight gates that pinned only them. None was on
   the solver path; the development repository keeps their history.
+
+### Removed (second pass)
+
+- The uniform structured-mesh solver this code was originally written around:
+  `assembly.jl`, `timestep.jl`, `direct.jl`, `mesh.jl`, `bcs.jl`, `projection.jl`,
+  `psi_stokes.jl`, `streamfunction.jl`, `rt.jl`, `rt1.jl`, `dg1d.jl`, `mg.jl`,
+  `newton_solver.jl`, `refstate.jl`, the uniform-mesh `cbf.jl` and `io.jl`, the
+  uniform-mesh diagnostics at the end of `physics.jl`, six examples that drove it,
+  and the 31 gates that pinned it. The quadtree solver is unchanged: the ten-step
+  production case reproduces `Nu_top = 5.999881`, `leaves = 2644`, `N = 11233`
+  bit for bit after the removal, and the suite is 132,886 passing with no failure.

@@ -14,16 +14,12 @@ using HDF5
 using Printf
 
 include("gll.jl")
-include("mesh.jl")
 include("fe.jl")
 include("tosi_law.jl")
 include("semquad_refstate.jl")
 include("physics.jl")
-include("refstate.jl")
 include("phase.jl")
 include("rheology.jl")
-include("io.jl")
-include("dg1d.jl")
 include("quadtree.jl")
 include("dgquad.jl")
 # Before the `driver/` chunks: `semquad_amr_passes!`/`run_semquad_simulation`
@@ -77,19 +73,7 @@ include("semquad_checkpoint.jl")
 include("semquad_flux.jl")
 include("semquad_phase.jl")
 include("amr_dwr.jl")
-include("bcs.jl")
-include("streamfunction.jl")
-include("rt.jl")
-include("rt1.jl")
-include("assembly.jl")
-include("projection.jl")
-include("direct.jl")
-include("timestep.jl")
-include("newton_solver.jl")
 include("gmres.jl")
-include("mg.jl")
-include("cbf.jl")
-include("psi_stokes.jl")
 
 export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs,
        lagrange_eval, lagrange_d2, barycentric_weights,

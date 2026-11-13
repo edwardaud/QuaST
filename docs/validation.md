@@ -103,3 +103,15 @@ experiments in a 2-D box at the resolutions and rheologies named in
 [dev/CASE_REALISTIC.md](dev/CASE_REALISTIC.md). Outside them, run a resolution check and a
 benchmark check before quoting a number: convergence is necessary, and it does not by itself
 validate a number.
+
+## What is no longer cross-checked
+
+Until this revision the repository also carried the uniform structured-mesh solver
+it was originally written around, and several checks compared the quadtree solver
+against it: the energy operator against the uniform assembly (G34), the high-Rayleigh
+plume against the structured run (G64), and the Ra = 1e8 windows against it
+(G65-G67). That solver is gone, and those comparisons with it. What remains is the
+manufactured-solution convergence (G151, G154), the p-convergence study, the
+Blankenbach 2b driver, the blob regression, and the ASPECT comparison. The uniform
+mesh solver stays in the development repository, so the comparisons can be rebuilt
+if a future change needs them.
