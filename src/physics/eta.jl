@@ -229,6 +229,22 @@ function semquad_plastic_strain_rate_field(sq::SemQuad, sp::SemQuad,
 end
 
 """
+    semquad_eta_at(sq, theta, x, y, pr, leaves)
+
+Viscosity at `(x,y)` used by the quadtree convection loop:
+
+    T = Tbar(y, H) + theta(x,y),   eta = eta_at(T, y, pr).
+
+This supports `:expT` (temperature only) and `:expTz` (temperature + depth) with
+exactly the same formula and `eta_min/eta_max` bounds as the uniform assembler.
+"""
+function semquad_eta_at(sq::SemQuad, theta::Vector{Float64}, x::Float64,
+                        y::Float64, pr::Params, leaves::Set{NTuple{3,Int}})
+    T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    return eta_at(T, y, pr)[1]
+end
+
+"""
     semquad_eta_at(sq, theta, edot_field, pv, sp, x, y, pr, leaves)
 
 Viscosity at `(x,y)` using a *nodal* strain-rate field (the Picard-averaged one

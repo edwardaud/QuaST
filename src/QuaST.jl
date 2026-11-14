@@ -30,13 +30,26 @@ include("physics/constitutive.jl")
 include("physics/phase.jl")
 
 # -- core: quadrature, reference element, quadtree, the scalar SEM space -----
+# `core/semquad.jl` is split along its top-level boundaries.  The residue (type,
+# constructor, leaf metrics, mass matrix) keeps the first and last slices of the
+# former file; the other slices follow in their original order (parallel
+# utilities, constraints, the Nitsche Poisson demo, point evaluation, transfer).
+# Every slice is a contiguous, unedited part of the original file.
 include("core/gll.jl")
 include("core/fe.jl")
 include("core/quadtree.jl")
 include("core/semquad.jl")
+include("core/parallel.jl")
+include("core/constraints.jl")
+include("core/poisson.jl")
+include("core/eval.jl")
+include("core/transfer.jl")
 
 # -- AMR leaf primitives, then the physics laws over the SEM field -----------
 include("amr/leaf_ops.jl")
+# The gradient-jump indicator is SEM data, but its only caller is the AMR pass
+# (`amr/hooks.jl`); it depends on the quadtree and `core/semquad.jl` only.
+include("amr/indicator.jl")
 # A diagnostic product (the entropy-viscosity field), but the energy assembly
 # annotates its `evg` argument with `SEMEVGlobals`, so it must come first.
 include("diagnostics/entropy_viscosity.jl")
@@ -48,7 +61,14 @@ include("physics/weakening.jl")
 include("physics/phase_buoyancy.jl")
 
 # -- AMR policy (needs the quadtree only) ------------------------------------
-include("amr/balanced.jl")
+# `amr/balanced.jl` is split along its top-level boundaries into the cooldown
+# state, the 2:1 coarsening gate, the plan search and the cycle.  Each slice is
+# a contiguous, unedited part of the former file; the include order is the
+# definition order (the `AmrCooldown` type first).
+include("amr/cooldown.jl")
+include("amr/coarsen_gate.jl")
+include("amr/coarsen_plan.jl")
+include("amr/cycle.jl")
 
 # -- stokes: state, selection, assembly, matrix-free operators, solves --------
 include("stokes/state.jl")
