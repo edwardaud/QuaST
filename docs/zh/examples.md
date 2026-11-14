@@ -43,7 +43,7 @@ $$
 
 其中 $x$ 是水平坐标。驱动用 `steady_tol = 1e-5`、`steady_window = 20`、`tmin = 0.02` 判稳态，每 500 步写一次检查点。本机八线程跑 2 550 步、329 s，最后一行是
 
-```
+```text
 level 3: cells=640 nodes=2673 t=0.100 steps=2550  Nu_top=7.9039 (+14.06%)  Vrms=143.64 (-16.37%)  Nu_bot=7.9960  umax=588.5  [329s]
 ```
 
@@ -69,7 +69,7 @@ julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
 
 最后两行是
 
-```
+```text
 done t=1.008e-08 steps=126 leaves=898 N=15361 frames=25 in 141.3 s
 FINAL frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce56ea105542b8cdeda end_u_sha256=1cfcb5c63a476ed2e9a62e9700917ae718bc3165d9a485a9d54609a4844b0b51 Tmax25=1.264329738
 ```
@@ -96,7 +96,7 @@ CASE_OUT=out_julia/demo_smoke CASE_STEPS=10 \
 
 首次约两分钟，大部分是 Julia 编译和第一次 Stokes 求解；本机预热后 47.6 s。它必须以 `[case] DONE mode=smoke steps=10` 和下面这行收尾：
 
-```
+```text
 [case] final: Nu_top=5.999881 Nu_bot=-4.029590 Vrms=6.808435e+03 meanT=1.333328 closure=-8.794e-04 leaves=2644 N=11233
 ```
 
@@ -169,7 +169,7 @@ julia --project=. --threads=8 build_and_run.jl
 
 首次运行约 84 s，几乎全是驱动第一次调用时的 Julia 编译。历史行是 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, leaves, ...]`，所以 `row[3]` 和 `row[4]` 是壁面 Nusselt 数，`row[5]` 是 `Vrms`。输出以
 
-```
+```text
 steps=20 t=2.000000e-03 leaves=256 N=1089
 last row: Nu_top=1.000783 Nu_bot=1.000783 Vrms=2.762497
 ```

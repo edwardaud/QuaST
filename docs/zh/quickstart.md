@@ -27,7 +27,7 @@ CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 
 首次运行约两分钟，大部分时间在编译；第二次只需几秒。`smoke` 在参数卡自带的初值上前进十步，在第 5、10 步自适应网格，在第 1、6、10 步各写一帧。它打印四行头部信息、每步一行、每个网格周期一行 AMR，以及两行收尾：
 
-```
+```text
 [case] mode=smoke Ra=1.0e+05 H=10.0 p=2 max_level=7 max_leaves=10000 amr_every=5 steps=10 ...
 [case] comp_Ad=1.6240183119e+05 comp_As=2.6796419238e-01 Ed=12.0 Es=17.0 n=3.0 T0=0.50 ...
 [case] phases: z0=0.87 w=0.025 slope=+0.032 B=1.8182 | z0=0.78 ... latent_mode=per_phase
@@ -50,7 +50,7 @@ $$
 
 `smoke` 不传检查点，所以输出目录里没有检查点：
 
-```
+```text
 /tmp/quast_smoke/history.csv                   表头加 10 行
 /tmp/quast_smoke/frames/frame_00001_T.bin      每个 512 KB，第 1、6、10 步
 /tmp/quast_smoke/frames/frame_meta.csv         3 行加一个表头
@@ -77,7 +77,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=2000 \
 
 `run.log` 是实时视图。它逐步携带 `verbose=true` 的求解器输出，每 5 步一条 AMR 记录，每 100 步一行参数卡回调的进度：
 
-```
+```text
   step <n> t=<t> dt=<dt> Nu=<Nu_top>/<Nu_bot> Vrms=<Vrms> N=<nodes> leaves=<leaves> closure=<closure>
     AMR: N=<nodes> leaves=<leaves> maxjump=<j> refined=<r> coarsened=<c> merged=<m>
   [case] step=<n> t=<t> leaves=<leaves> N=<nodes> auto_fallbacks=<count>
@@ -87,7 +87,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=2000 \
 
 `frames/frame_meta.csv` 是第二个实时视图，每帧之后 flush，因此每 5 步前进一次。它每帧一行，列为
 
-```
+```text
 frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,eta_max,eta_clip_frac,wall_s,ng
 ```
 
@@ -137,7 +137,7 @@ Julia 报 `ERROR: OutOfMemoryError()` 并带栈回溯，或者进程直接消失
 
 驱动逐键比较检查点里存的设置与当前运行的设置，有任何差异就拒绝继续。消息会指出文件和每个不同的键：
 
-```
+```text
 ERROR: ArgumentError: restart configuration mismatch in /home/you/quast/run1/spinup.h5:
   symmetry: checkpoint=none, current=x
   wall_min_level: checkpoint=0.0, current=5.0
@@ -156,7 +156,7 @@ julia --project=. -e 'using HDF5; h5open(ARGS[1]) do f; println(HDF5.attrs(f)["c
 
 运行会向 stderr 打印两行并中止该步：
 
-```
+```text
 [case] STOKES-FAIL step=<n> res=<r> (vel=<rv> div=<rd>) stokes_tol=1.0e-03 shift=<s> refine=<k> leaves=<nl> N=<N> saddle=<nd> eta=[<lo>,<hi>] eta_clip=<pct>%
 ERROR: Stokes residual <r> exceeds stokes_tol=0.001 at step <n>; the solve auto-selected mg; pass linear=:direct explicitly to force the direct shift ladder (...)
 ```

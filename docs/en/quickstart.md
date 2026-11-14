@@ -51,7 +51,7 @@ selects the multigrid, the selector warns once and runs the serial V-cycle. It p
 header lines that record the case, a step record and a Picard line per step, two AMR lines at
 each mesh cycle, and two closing lines:
 
-```
+```text
 [case] mode=smoke Ra=1.0e+05 H=10.0 p=2 max_level=7 max_leaves=10000 amr_every=5 steps=10 ...
 [case] comp_Ad=1.6240183119e+05 comp_As=2.6796419238e-01 Ed=12.0 Es=17.0 n=3.0 T0=0.50 ...
 [case] phases: z0=0.87 w=0.025 slope=+0.032 B=1.8182 | z0=0.78 w=0.025 slope=-0.032 B=3.0303 ...
@@ -71,7 +71,7 @@ latent coefficients.
 
 The output directory holds no checkpoint, because `smoke` passes none:
 
-```
+```text
 /tmp/quast_smoke/history.csv                   header plus 10 rows
 /tmp/quast_smoke/frames/frame_00001_T.bin      512 KB each, steps 1, 6, 10
 /tmp/quast_smoke/frames/frame_00001_mesh.csv   one line per leaf, same steps
@@ -111,7 +111,7 @@ stream dominates.
 solver (`verbose=true`), every 5 steps two AMR records, and every 100 steps a progress line from
 the case's callback:
 
-```
+```text
   step <n> t=<t> dt=<dt> Nu=<Nu_top>/<Nu_bot> Vrms=<Vrms> N=<nodes> leaves=<leaves> closure=<closure>
     Picard it=<i> change=<c>
     AMR: N=<nodes> leaves=<leaves> maxjump=<j> refined=<r> coarsened=<c> merged=<m>
@@ -126,7 +126,7 @@ and the run continues.
 `frames/frame_meta.csv` is the second live view, flushed after every frame, so it advances every
 5 steps. It holds one row per frame with the columns
 
-```
+```text
 frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,eta_max,eta_clip_frac,wall_s,ng
 ```
 
@@ -195,7 +195,7 @@ keys are restart configuration keys, so a smaller budget means a new run.
 The driver compares the settings stored in a checkpoint with the settings of the live run and
 refuses to continue on any difference. The message names the file and every key that differs:
 
-```
+```text
 ERROR: ArgumentError: restart configuration mismatch in /home/you/quast/run1/spinup.h5:
   symmetry: checkpoint=none, current=x
   wall_min_level: checkpoint=0.0, current=5.0
@@ -217,7 +217,7 @@ rule) and `symseed` (a new `CASE_SYMMETRY`). The source checkpoint is never modi
 
 The run prints two lines to stderr and aborts the step:
 
-```
+```text
 [case] STOKES-FAIL step=<n> res=<r> (vel=<rv> div=<rd>) stokes_tol=1.0e-03 shift=<s> refine=<k> leaves=<nl> N=<N> saddle=<nd> eta=[<lo>,<hi>] eta_clip=<pct>%
 ERROR: Stokes residual <r> exceeds stokes_tol=0.001 at step <n>; the solve auto-selected mg; pass linear=:direct explicitly to force the direct shift ladder (...)
 ```

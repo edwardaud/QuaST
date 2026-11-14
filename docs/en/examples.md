@@ -40,7 +40,7 @@ uniform-mesh solver and was removed with it.
 The steady level-3 record in this project is therefore **historical**: 40 x 16 cells, 640
 leaves, 116 s, from that continuation driver. Its final line was
 
-```
+```text
 STAGE s=1.000  Nu_top=6.942798 Nu_bot=6.938484 Vrms=170.962139 it=39  (ref 6.9299 / 171.755)
 ```
 
@@ -62,7 +62,9 @@ The blob is the `Ra = 1e8` regression that pins the adaptive path. The box is 1 
 are free slip, the heating is `H = 5`, the viscosity is the same two-exponent law, and the
 initial condition is the conductive base state plus one Gaussian:
 
-$$\theta_0(x,z) = 0.12\exp\left[-\left(\frac{x-0.5}{0.12}\right)^2-\left(\frac{z-0.35}{0.10}\right)^2\right]\sin(\pi z).$$
+$$
+\theta_0(x,z) = 0.12\exp\left[-\left(\frac{x-0.5}{0.12}\right)^2-\left(\frac{z-0.35}{0.10}\right)^2\right]\sin(\pi z).
+$$
 
 ```bash
 julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
@@ -77,7 +79,7 @@ including Julia startup.
 
 The final lines are
 
-```
+```text
 done t=1.008e-08 steps=126 leaves=898 N=15361 frames=25 in 116.1 s
 FINAL frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce56ea105542b8cdeda end_u_sha256=1cfcb5c63a476ed2e9a62e9700917ae718bc3165d9a485a9d54609a4844b0b51 Tmax25=1.264329738
 ```
@@ -97,7 +99,9 @@ The production case is a 2.5 x 1 box with `Ra = 1e5`, `H = 10`, composite isostr
 phase transitions at `y = 0.87` and `0.78` with per-transition latent heat, `p = 2`, a
 `max_level = 7` tree, a 10 000-leaf budget and AMR every 5 steps. The initial anomaly is
 
-$$\theta_0(x,y) = 0.05\sin(\pi y)\cos(2\pi x/2.5) + 0.02\sin(2\pi y)\cos(4\pi x/2.5).$$
+$$
+\theta_0(x,y) = 0.05\sin(\pi y)\cos(2\pi x/2.5) + 0.02\sin(2\pi y)\cos(4\pi x/2.5).
+$$
 
 Always set `CASE_OUT` to a scratch directory; the fallback path is one a production run may have
 used.
@@ -199,7 +203,7 @@ The first run takes **84 s** on eight threads, almost all of it Julia's first-ca
 of the driver. The history rows are `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, leaves, ...]`, so
 `row[3]` and `row[4]` are the wall Nusselt numbers and `row[5]` is `Vrms`. The output ends at
 
-```
+```text
 steps=20 t=2.000000e-03 leaves=256 N=1089
 last row: Nu_top=1.000783 Nu_bot=1.000783 Vrms=2.762497
 ```

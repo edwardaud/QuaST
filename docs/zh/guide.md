@@ -446,7 +446,7 @@ $$
 
 程序不创建这个文件：它是 stdout 和 stderr 的 shell 重定向。里面有四行头部、每步一行（`verbose=true`）、每 5 步一行 AMR（带加密、粗化、合并计数和平衡循环的计数器）、每 100 步一行参数卡回调的进度，以及收尾的
 
-```
+```text
 [case] DONE mode=spinup steps=2000 t=<t> wall=<s> s (<s> s/step) linear=auto scaled=0 auto_fallbacks=0
 [case] final: Nu_top=<v> Nu_bot=<v> Vrms=<v> meanT=<v> closure=<v> leaves=<n> N=<n>
 ```
@@ -457,7 +457,7 @@ stdout 是块缓冲的，回调每 100 步 flush 一次，所以重定向的日�
 
 运行返回时写一次，每实际跑一步一行：
 
-```
+```text
 t,dt,Nu_top,Nu_bot,Vrms,meanT,N,leaves,div_max,hmin,umax,cfl,closure,usrms_surf,umax_surf,W,U,balance
 ```
 
@@ -493,7 +493,7 @@ t,dt,Nu_top,Nu_bot,Vrms,meanT,N,leaves,div_max,hmin,umax,cfl,closure,usrms_surf,
 
 `frames/frame_meta.csv` 以追加方式打开，每帧一行：
 
-```
+```text
 frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,eta_max,eta_clip_frac,wall_s,ng
 ```
 
@@ -520,7 +520,7 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 
 `restart_from` 在第一步之前用检查点内容替换网格、`p` 和初始状态，`checkpoint_path` 把续算写到自己的文件。`maxsteps` 和 `tstop` 保持绝对。守卫逐键比较检查点存的 `config` 与当前调用的设置，有任何差异就拒绝启动：
 
-```
+```text
 ArgumentError: restart configuration mismatch in /path/resume.h5:
   symmetry: checkpoint=none, current=x
   wall_min_level: checkpoint=0.0, current=5.0

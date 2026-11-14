@@ -27,11 +27,15 @@ walls are insulating.
 
 Nondimensional Boussinesq momentum, continuity and energy:
 
-$$-\nabla\cdot\left(2\eta\,\varepsilon(\mathbf{u})\right) + \nabla p = \mathbf{f}, \qquad \nabla\cdot\mathbf{u} = 0,$$
+$$
+-\nabla\cdot\left(2\eta\,\varepsilon(\mathbf{u})\right) + \nabla p = \mathbf{f}, \qquad \nabla\cdot\mathbf{u} = 0,
+$$
 
-$$\varepsilon(\mathbf{u}) = \frac{1}{2}\left(\nabla\mathbf{u} + \nabla\mathbf{u}^{\mathsf T}\right), \qquad
+$$
+\varepsilon(\mathbf{u}) = \frac{1}{2}\left(\nabla\mathbf{u} + \nabla\mathbf{u}^{\mathsf T}\right), \qquad
 \frac{\partial\theta}{\partial t} + \mathbf{u}\cdot\nabla\theta = \nabla^2\theta -
-u_y\frac{d\bar T}{dy}. $$
+u_y\frac{d\bar T}{dy}.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -45,7 +49,9 @@ u_y\frac{d\bar T}{dy}. $$
 
 The body force is vertical and carries the thermal buoyancy, the phase buoyancy and `Ra`:
 
-$$f_y = Ra\,T - Ra\sum_i B_i\left[\Gamma_i(y,T) - \Gamma_i(y,\bar T)\right], \qquad T = \bar T + \theta.$$
+$$
+f_y = Ra\,T - Ra\sum_i B_i\left[\Gamma_i(y,T) - \Gamma_i(y,\bar T)\right], \qquad T = \bar T + \theta.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -65,8 +71,10 @@ leaves $-u_y\,d\bar T/dy$.
 `H` is the volumetric heating of `dT/dt + u.grad T = lap T + H`. The case evolves the anomaly
 about the conductive profile that carries it:
 
-$$\bar T(y) = (1-y) + \frac{H}{2}y(1-y), \qquad
-\frac{d\bar T}{dy} = -1 + \frac{H}{2}(1-2y), \qquad \nabla^2\bar T = -H. $$
+$$
+\bar T(y) = (1-y) + \frac{H}{2}y(1-y), \qquad
+\frac{d\bar T}{dy} = -1 + \frac{H}{2}(1-2y), \qquad \nabla^2\bar T = -H.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -77,9 +85,11 @@ With `H = 10`: `Tbar(0.5) = 1.75`, the volume mean of the base state is `0.5 + H
 and the conductive wall gradients are `-6` at the top and `+4` at the bottom. The two Nusselt
 numbers use those gradients as their reference:
 
-$$\mathrm{Nu}_{\mathrm{top}} = \left(1 + \frac{H}{2}\right) - \left\langle\frac{\partial\theta}{\partial y}\right\rangle_{\mathrm{top}}, \qquad
+$$
+\mathrm{Nu}_{\mathrm{top}} = \left(1 + \frac{H}{2}\right) - \left\langle\frac{\partial\theta}{\partial y}\right\rangle_{\mathrm{top}}, \qquad
 \mathrm{Nu}_{\mathrm{bot}} = \left(1 - \frac{H}{2}\right) -
-\left\langle\frac{\partial\theta}{\partial y}\right\rangle_{\mathrm{bot}}. $$
+\left\langle\frac{\partial\theta}{\partial y}\right\rangle_{\mathrm{bot}}.
+$$
 
 The angle brackets are the $x$ -average of the one-sided GLL derivative of $\theta$ at the wall.
 At the conductive state the two values are 6 and -4. A steady convecting state satisfies
@@ -92,9 +102,11 @@ The case sets `eta_law = :composite` with `comp_rule = :isostress`, the partitio
 Two mechanisms deform the material. In inverse form their viscosities at temperature `T`, height
 `y` and strain-rate invariant `edot` are
 
-$$\eta_{\mathrm{diff}}^{-1} = A_d\exp\left(-\frac{E_d + V_d(1-y)}{T_{\mathrm{nd}}}\right), \qquad
+$$
+\eta_{\mathrm{diff}}^{-1} = A_d\exp\left(-\frac{E_d + V_d(1-y)}{T_{\mathrm{nd}}}\right), \qquad
 \eta_{\mathrm{disl}}^{-1} = A_s\exp\left(-\frac{E_s +
-V_s(1-y)}{n\,T_{\mathrm{nd}}}\right)\dot\varepsilon^{\frac{n-1}{n}}. $$
+V_s(1-y)}{n\,T_{\mathrm{nd}}}\right)\dot\varepsilon^{\frac{n-1}{n}}.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -108,11 +120,15 @@ V_s(1-y)}{n\,T_{\mathrm{nd}}}\right)\dot\varepsilon^{\frac{n-1}{n}}. $$
 The isostress rule gives both mechanisms the same stress, so the strain rate splits between
 them:
 
-$$\frac{\tau}{2\eta_{\mathrm{diff}}} + A_s\exp\left(-\frac{E_s+V_s(1-y)}{n\,T_{\mathrm{nd}}}\right)\tau^n = \dot\varepsilon, \qquad \eta = \frac{\tau}{2\dot\varepsilon}.$$
+$$
+\frac{\tau}{2\eta_{\mathrm{diff}}} + A_s\exp\left(-\frac{E_s+V_s(1-y)}{n\,T_{\mathrm{nd}}}\right)\tau^n = \dot\varepsilon, \qquad \eta = \frac{\tau}{2\dot\varepsilon}.
+$$
 
 The code solves the equivalent scalar equation for $x = \eta/\eta_{\mathrm{disl}}$:
 
-$$k\,x + x^n = 1, \qquad k = \frac{\eta_{\mathrm{disl}}}{\eta_{\mathrm{diff}}}, \qquad \eta = x\,\eta_{\mathrm{disl}}.$$
+$$
+k\,x + x^n = 1, \qquad k = \frac{\eta_{\mathrm{disl}}}{\eta_{\mathrm{diff}}}, \qquad \eta = x\,\eta_{\mathrm{disl}}.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -151,7 +167,9 @@ with `deta_T = 1` for constant viscosity):
 
 With `y` the height, the phase fraction of transition `i` is
 
-$$\Gamma_i(y,T) = \frac{1}{2}\left[1 + \tanh\left(\frac{(z_{0,i}-y) - s_i\,(T-T_{\mathrm{ref},i})}{w_i}\right)\right].$$
+$$
+\Gamma_i(y,T) = \frac{1}{2}\left[1 + \tanh\left(\frac{(z_{0,i}-y) - s_i\,(T-T_{\mathrm{ref},i})}{w_i}\right)\right].
+$$
 
 | symbol | meaning |
 |---|---|
@@ -180,9 +198,11 @@ one.
 
 Each coefficient is derived from its own transition:
 
-$$\gamma_i = \frac{s_i\,\rho_0\,g\,d}{\Delta T}, \qquad
+$$
+\gamma_i = \frac{s_i\,\rho_0\,g\,d}{\Delta T}, \qquad
 \Delta S_{A,i} = \frac{\gamma_i\,\Delta\rho_i}{\rho_0^2}, \qquad \lambda_i =
--\frac{T_{\mathrm{abs},i}\,\Delta S_{A,i}}{c_p}. $$
+-\frac{T_{\mathrm{abs},i}\,\Delta S_{A,i}}{c_p}.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -202,7 +222,9 @@ ASPECT writes $+T\,\Delta S_{A}\,D\Gamma_i/Dt$.
 
 The energy equation carries them as an apparent heat capacity plus an advective source:
 
-$$\left(1+\sum_i\lambda_i\frac{\partial\Gamma_i}{\partial T}\right)\left(\frac{\partial\theta}{\partial t} + \mathbf{u}\cdot\nabla\theta\right) = \nabla^2\theta - u_y\frac{d\bar T}{dy} - \sum_i\lambda_i\frac{\partial\Gamma_i}{\partial y}u_y.$$
+$$
+\left(1+\sum_i\lambda_i\frac{\partial\Gamma_i}{\partial T}\right)\left(\frac{\partial\theta}{\partial t} + \mathbf{u}\cdot\nabla\theta\right) = \nabla^2\theta - u_y\frac{d\bar T}{dy} - \sum_i\lambda_i\frac{\partial\Gamma_i}{\partial y}u_y.
+$$
 
 Here $\lambda_i$ is the coefficient of the table above, $\Gamma_i$ the phase fraction of section
 1.5, and $\theta$, $\mathbf{u}$ and $\bar T$ are the fields of section 1.2.
@@ -216,7 +238,9 @@ switch.
 
 ### 1.7 Initial condition
 
-$$\theta_0(x,y) = 0.05\sin(\pi y)\cos(2\pi x/L_x) + 0.02\sin(2\pi y)\cos(4\pi x/L_x).$$
+$$
+\theta_0(x,y) = 0.05\sin(\pi y)\cos(2\pi x/L_x) + 0.02\sin(2\pi y)\cos(4\pi x/L_x).
+$$
 
 It vanishes on the top and bottom walls, as an anomaly must, and is symmetric about `x = Lx/2`.
 There are no random numbers: the case, the seed and a fixed step count make a run deterministic.
@@ -255,10 +279,14 @@ freedom is pinned to remove the constant null space.
 The flow is quasi-static: one Stokes solve per step. The energy equation is integrated with
 BDF2, backward Euler on the first step, with the variable step ratio `w = dt/dt_prev`:
 
-$$\frac{a}{\Delta t}\theta^{n+1} + \mathbf{u}\cdot\nabla\theta^{n+1} - \nabla^2\theta^{n+1}
-= \frac{b}{\Delta t}\theta^{n} - \frac{c}{\Delta t}\theta^{n-1}, $$
+$$
+\frac{a}{\Delta t}\theta^{n+1} + \mathbf{u}\cdot\nabla\theta^{n+1} - \nabla^2\theta^{n+1}
+= \frac{b}{\Delta t}\theta^{n} - \frac{c}{\Delta t}\theta^{n-1},
+$$
 
-$$a = \frac{2w+1}{1+w}, \qquad b = 1+w, \qquad c = \frac{w^2}{1+w}, \qquad w = \frac{\Delta t}{\Delta t_{\mathrm{prev}}}.$$
+$$
+a = \frac{2w+1}{1+w}, \qquad b = 1+w, \qquad c = \frac{w^2}{1+w}, \qquad w = \frac{\Delta t}{\Delta t_{\mathrm{prev}}}.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -273,7 +301,9 @@ deterministic.
 
 The step follows
 
-$$\Delta t^{n+1} = \mathrm{CFL}\,\frac{h_{\min}}{|u|_{\max}},$$
+$$
+\Delta t^{n+1} = \mathrm{CFL}\,\frac{h_{\min}}{|u|_{\max}},
+$$
 
 with `cfl = 0.5` and `h_min` the smallest leaf height. It grows by at most 5% per step, shrinks
 by at most 5% per step unless the hard CFL cut fires, and is clamped to
@@ -286,7 +316,8 @@ that zeroes the velocity cannot freeze `dt`.
 Oscillations are controlled by an elementwise entropy viscosity added to the energy operator,
 one value per leaf:
 
-$$\nu_e = c_{\mathrm{ev}}\frac{h_e^2 R_e}{\sigma}, \qquad
+$$
+\nu_e = c_{\mathrm{ev}}\frac{h_e^2 R_e}{\sigma}, \qquad
 \nu_{\max} = c_{\max}|u|\,h_e, \qquad \nu = \min(\nu_e, \nu_{\max}), \qquad h_e = \sqrt{2}\,h.
 $$
 
@@ -310,7 +341,9 @@ checkpoint because the last step's energy operator cannot be reconstructed witho
 The indicator is the temperature-gradient jump over the leaf faces, with a one-sided term on the
 Dirichlet walls:
 
-$$J_\ell = \frac{h_\ell}{2}\sum_{F\subset\partial\ell}\int_F [\![\nabla\theta\cdot\mathbf{n}]\!]^2\,ds.$$
+$$
+J_\ell = \frac{h_\ell}{2}\sum_{F\subset\partial\ell}\int_F [\![\nabla\theta\cdot\mathbf{n}]\!]^2\,ds.
+$$
 
 | symbol | meaning |
 |---|---|
@@ -537,7 +570,7 @@ the four header lines, two lines per step (`verbose=true` prints the step record
 update), two lines every 5 steps (the `AMR:` record and the `balanced:` counters), a progress
 line every 100 steps from the case's callback, and at the end:
 
-```
+```text
 [case] DONE mode=spinup steps=2000 t=<t> wall=<s> s (<s> s/step) linear=auto scaled=0 auto_fallbacks=0
 [case] final: Nu_top=<v> Nu_bot=<v> Vrms=<v> meanT=<v> closure=<v> leaves=<n> N=<n>
 ```
@@ -549,7 +582,7 @@ by at most 100 steps. Errors go to stderr unbuffered.
 
 Written once, when the run returns, with one row per step actually run:
 
-```
+```text
 t,dt,Nu_top,Nu_bot,Vrms,meanT,N,leaves,div_max,hmin,umax,cfl,closure,usrms_surf,umax_surf,W,U,balance
 ```
 
@@ -594,7 +627,7 @@ the lower-left corner.
 
 `frames/frame_meta.csv` is opened in append mode and gets one row per frame:
 
-```
+```text
 frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,eta_max,eta_clip_frac,wall_s,ng
 ```
 
@@ -637,7 +670,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=4000 \
 The guard compares the checkpoint's stored `config` with the settings of
 the live call, key by key, and refuses to start on any difference:
 
-```
+```text
 ArgumentError: restart configuration mismatch in /path/resume.h5:
   symmetry: checkpoint=none, current=x
   wall_min_level: checkpoint=0.0, current=5.0
