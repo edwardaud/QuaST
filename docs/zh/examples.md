@@ -29,7 +29,7 @@ b = \ln 16384,
 c = \ln 64,
 $$
 
-其中 $T$ 是温度，$z$ 是高度，$\eta$ 是黏度。参考值是 `Nu = 6.9299`、`Vrms = 171.755`（Blankenbach et al. 1989，表 9）。
+其中 $T$ 是温度， $z$ 是高度， $\eta$ 是黏度。参考值是 `Nu = 6.9299`、`Vrms = 171.755`（Blankenbach et al. 1989，表 9）。
 
 ```bash
 julia --project=. --threads=8 examples/blankenbach_2b.jl 3 0.1
@@ -59,7 +59,7 @@ $$
 \theta_0(x,z) = 0.12\exp\left[-\left(\frac{x-0.5}{0.12}\right)^2-\left(\frac{z-0.35}{0.10}\right)^2\right]\sin(\pi z),
 $$
 
-其中 $\theta_0$ 是初始温度异常，$x$ 和 $z$ 是水平与竖直坐标。
+其中 $\theta_0$ 是初始温度异常， $x$ 和 $z$ 是水平与竖直坐标。
 
 ```bash
 julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
