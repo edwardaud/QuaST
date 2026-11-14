@@ -1,4 +1,4 @@
-# Coarsening-gate probe for `amr_policy=:balanced` (docs/dev/AMR.md §4.1).
+# Coarsening-gate probe for the balanced AMR policy (docs/dev/AMR.md §4.1).
 #
 #   julia --project=. examples/amr_coarsen_gate_probe.jl trace <ckpt.h5>
 #
@@ -321,10 +321,9 @@ function trace(ckpt::String)
             thpc = copy(st.theta_prev)
             MS.semquad_amr_passes!(
                 ssc, qc, thc, thpc; refine_frac=REFINE, coarsen_frac=COARSEN,
-                marking=:error_fraction, max_level=qt.maxlevel,
+                max_level=qt.maxlevel,
                 max_leaves=MAXLEAVES, wall_min_level=WALLMIN,
                 wall_strip=WALLSTRIP, symmetry=SYMMETRY,
-                coarsen_theta_tol=1.0e-2, amr_policy=:balanced,
                 amr_hysteresis=HYST, amr_coarsen_gate=GATE)
             s = MS.LAST_AMR_STATS[]
             ok = length(qc.leaves) == n4 && s.refined == nr &&

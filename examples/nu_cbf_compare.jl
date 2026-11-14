@@ -194,11 +194,9 @@ is what makes the scratch resume the same run.
 """
 function run_opts_from_checkpoint(cfg, attrs)
     return (amr_every=cfg_int(cfg, "amr_every", 0),
-            amr_strategy=cfg_sym(cfg, "amr_strategy", :legacy),
             amr_passes=cfg_int(cfg, "amr_passes", 1),
             refine_frac=cfg_float(cfg, "refine_frac", 0.2),
             coarsen_frac=cfg_float(cfg, "coarsen_frac", 0.0),
-            marking=cfg_sym(cfg, "marking", :global),
             max_leaves=cfg_int(cfg, "max_leaves", typemax(Int)),
             max_level=cfg_int(cfg, "max_level", typemax(Int)),
             wall_min_level=cfg_int(cfg, "wall_min_level", 0),

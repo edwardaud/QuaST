@@ -17,13 +17,12 @@ using QuaST
                 eta_min=1.0e-6, eta_max=1.0e6)
 
     qt = deepcopy(qt0)
-    # Policy-agnostic gate calibrated on classic; pin the policy explicitly.
+    # Policy-agnostic gate: the balanced cycle is the only AMR policy.
     res = run_semquad_simulation(qt, pr, theta0;
                                  tstop=1.9e-9, dt0=1.0e-9, dtmax=1.0e-6,
                                  cfl=20.0, dtmin=1.0e-12,
                                  maxpic=1, pic_tol=1.0e-6, pic_relax=1.0,
                                  amr_every=1, refine_frac=0.2, coarsen_frac=0.0,
-                                 amr_policy=:classic,
                                  maxsteps=2, advection=:conservative,
                                  linear=:schur_cg, schur_maxiter=300,
                                  verbose=false)

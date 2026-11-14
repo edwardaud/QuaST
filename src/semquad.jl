@@ -563,8 +563,9 @@ end
 # ---------------------------------------------------------------------------
 # Gradient-jump error indicator for the continuous quadtree SEM field.
 # The value is continuous, but the normal derivative is not; the jump between
-# the coarse and fine one-sided derivatives is the same indicator used by the
-# DG prototype (dgquad.jl), with the coarse side interpolated at the fine-side
+# the coarse and fine one-sided derivatives is the same indicator the DG
+# prototype (removed with the classic policy) used, with the coarse side
+# interpolated at the fine-side
 # quadrature points.  Boundary faces add |du/dn|^2 so the thermal boundary
 # layers are marked as well.
 # ---------------------------------------------------------------------------

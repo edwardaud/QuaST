@@ -254,12 +254,11 @@ using Test, QuaST, LinearAlgebra, Statistics, Printf
         end
         kk = mode === :newton ? (pic_mode=:newton, newton_maxit=15) :
              (maxpic=maxpic,)
-        # Policy-agnostic restart gate calibrated on classic; pin the policy.
+        # Restart gate; the balanced cycle is the only AMR policy.
         r = run_semquad_simulation(qq, pru, th0; p=2, tstop=10.0, dt0=1.0e-6,
                                    dtmax=1.0e-4, cfl=2.0, maxsteps=nsteps,
                                    verbose=false, ev=0.0, advection=:skew,
                                    linear=:direct, pic_diag=true, pic_tol=tol,
-                                   amr_policy=:classic,
                                    kw..., kk...)
         (r=r, diag=copy(SEMQUAD_PIC_DIAG[]))
     end

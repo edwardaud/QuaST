@@ -24,19 +24,17 @@
 #     CASE_OUT   output root            (default out_julia/case_realistic)
 #     CASE_STEPS step budget            (spinup default 10000; freeze 20000)
 #     CASE_FRAME stride in steps        (0 = the mode default)
-#     CASE_AMR / CASE_HYST              AMR policy: `balanced` (default, the
-#                                       production policy of docs/dev/AMR.md §3,
-#                                       forward coarsening + budget exchange +
-#                                       hysteresis) or `classic` (the historical
-#                                       fraction+protect+hard-budget policy, the
-#                                       library default); hysteresis cooldown in
-#                                       AMR cycles (default 1)
+#     CASE_HYST                         hysteresis cooldown of the balanced AMR
+#                                       cycle, in AMR cycles (default 1).
+#                                       The balanced policy of docs/dev/AMR.md §3
+#                                       (forward coarsening + budget exchange +
+#                                       hysteresis) is the only adaptive policy.
 #     CASE_AMR_GATE                     1 (default) = the 2:1 `coarsening_allowed`
 #                                       pre-check of the balanced policy
 #                                       (docs/dev/AMR.md §4); 0 turns it off
-#     CASE_COARSEN / CASE_THETATOL      AMR coarsening: 0.05 / 1e-2 (default, the
-#                                       balanced policy's production values; the
-#                                       historical A/B pair is 0.005 / 1e-3)
+#     CASE_COARSEN                      AMR coarsening fraction: 0.05 (default,
+#                                       the balanced policy's production value;
+#                                       the historical A/B pair used 0.005)
 #     CASE_LINEAR linear solver         (default auto; resolves to MG at the
 #                                       production size, see the LIN_SOLVE
 #                                       comment below)
@@ -108,13 +106,12 @@
 #   0.094 for the 410, 0.131 for the 660; the code has a single L).
 # Numerics
 #   Ra = 1e5, p = 2, max_level = 7 (leaf 1/256), max_leaves = 10000,
-#   amr_every = 5, refine_frac = 0.2, marking = :error_fraction,
-#   amr_policy = :balanced, amr_coarsen_gate = true, amr_hysteresis = 1,
-#   coarsen_frac = 0.05, coarsen_theta_tol = 1e-2, symmetry = :none
+#   amr_every = 5, refine_frac = 0.2,
+#   amr_coarsen_gate = true, amr_hysteresis = 1,
+#   coarsen_frac = 0.05, symmetry = :none
 #   (the balanced policy's production set, i.e. the G card of
-#   docs/dev/CASE_REALISTIC.md §1.5; the library default is `amr_policy = :balanced`
-#   since 2026-11-13, and `CASE_AMR=classic` with the historical
-#   coarsening pair reproduces the E trajectory),
+#   docs/dev/CASE_REALISTIC.md §1.5; the balanced AMR policy is the only one
+#   since the classic policy was removed),
 #   advection = :skew, ev = 0.11 / ev_cmax = 0.052, cfl = 0.5,
 #   pic_mode = :picard, maxpic = 1, linear = :auto, stokes_tol = 1e-3,
 #   mg_tol = 1e-8 (docs/dev/CASE_REALISTIC.md §1.6),
@@ -178,15 +175,12 @@ const LATENT_SCALE = (rho_ref=3300.0, cp=1000.0, dT=1000.0, g=9.81, d=2.9e6,
                       T_surface=0.5)   # ASPECT scale set, §14.2
 const NG           = 256        # frame grid (x and y)
 const AMR_EVERY    = 5
-# Coarsening knobs of the card.  The defaults are the balanced policy's
-# production values (docs/dev/CASE_REALISTIC.md §1.5): under `:balanced`,
-# `coarsen_frac` is the per-cycle cell cap of the budget exchange
-# (`capcells = round(coarsen_frac*n0)`, docs/dev/AMR.md §3.3) and the absolute
-# per-leaf theta guard `coarsen_theta_tol` is only used by `:classic`.  The
-# historical A/B pair is `0.005 / 1e-3`; a `:classic` arm must also pin
-# `CASE_AMR=classic`.
+# Coarsening knob of the card.  The default is the balanced policy's production
+# value (docs/dev/CASE_REALISTIC.md §1.5): `coarsen_frac` is the per-cycle cell
+# cap of the budget exchange
+# (`capcells = round(coarsen_frac*n0)`, docs/dev/AMR.md §3.3).  The historical
+# A/B pair used `0.005`.
 const COARSEN_FRAC = parse(Float64, get(ENV, "CASE_COARSEN", "0.05"))
-const COARSEN_TOL  = parse(Float64, get(ENV, "CASE_THETATOL", "1.0e-2"))
 const EV_COEF      = parse(Float64, get(ENV, "CASE_EV", "0.11"))
 # Wall refinement (`refine_wall_to_min!` after every AMR cycle, src/
 # src/driver/run.jl:401/1089): force every leaf within `wall_strip` of the
@@ -200,15 +194,10 @@ const EV_COEF      = parse(Float64, get(ENV, "CASE_EV", "0.11"))
 # needs the same explicit value (or a `wallrefine` seed).
 const WALL_MIN     = parse(Int, get(ENV, "CASE_WALLMIN", "5"))
 const WALL_STRIP   = parse(Float64, get(ENV, "CASE_WALLSTRIP", "0.1"))
-# AMR policy (docs/dev/AMR.md §3-§4): `balanced` is the production policy and the
-# card's default, so a new run gets forward coarsening, budget exchange,
-# hysteresis and the 2:1 gate without any environment variable.  `classic` is
-# the historical fraction+protect+hard-budget policy; since 2026-11-13 the
-# *library* default of `run_semquad_simulation` is also `:balanced`, so the pin
-# that keeps E reproducible is the explicit `CASE_AMR=classic`; the regression
-# gates pin whichever policy they test explicitly.  The hysteresis cooldown is
-# `CASE_HYST` AMR cycles (default 1).
-const AMR_POLICY   = Symbol(get(ENV, "CASE_AMR", "balanced"))
+# AMR cycle (docs/dev/AMR.md §3-§4): the balanced policy is the only adaptive
+# policy (the classic fraction+protect+hard-budget path was removed), so a new
+# run always gets forward coarsening, budget exchange, hysteresis and the 2:1
+# gate.  The hysteresis cooldown is `CASE_HYST` AMR cycles (default 1).
 const AMR_HYST     = parse(Int, get(ENV, "CASE_HYST", "1"))
 # x-mirror closure of the AMR passes (`symmetry=:x`).  The default is `none`,
 # the production card (docs/dev/CASE_REALISTIC.md §1.5): `none` switches the
@@ -451,13 +440,13 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
         "B410" => B410, "B660" => B660, "p" => PORD, "max_level" => MAXLEV,
         "max_leaves" => MAXLEAVES, "mode" => mode, "linear" => string(LIN_SOLVE),
         "wall_min_level" => WALL_MIN, "wall_strip" => WALL_STRIP,
-        "amr_policy" => string(AMR_POLICY), "amr_hysteresis" => AMR_HYST,
+        "amr_policy" => "balanced", "amr_hysteresis" => AMR_HYST,
         "amr_coarsen_gate" => AMR_GATE,
         "edot_ref" => 1.65e3, "cfl" => 0.5)
     # Only an opt-in run records it, so the checkpoints of the default card stay
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
-    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g tol=%.1e linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g amr=%s hyst=%d symmetry=%s gate=%d stokes_scaling=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, COARSEN_TOL, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_POLICY, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING)
+    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING)
     @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.1f Es=%.1f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)
@@ -470,11 +459,11 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
         p=PORD, tstop=Inf, maxsteps=maxsteps,
         dt0=1.0e-6, dtmax=5.0e-5, dtmin=1.0e-9, cfl=0.5, dt_growth=1.05,
         maxpic=1, pic_tol=1.0e-6, pic_mode=:picard,
-        amr_every=amr_every, amr_strategy=:legacy, marking=:error_fraction,
-        refine_frac=0.2, coarsen_frac=COARSEN_FRAC, coarsen_theta_tol=COARSEN_TOL,
+        amr_every=amr_every,
+        refine_frac=0.2, coarsen_frac=COARSEN_FRAC,
         max_leaves=MAXLEAVES, max_level=MAXLEV, symmetry=SYMMETRY,
         wall_min_level=WALL_MIN, wall_strip=WALL_STRIP,
-        amr_policy=AMR_POLICY, amr_hysteresis=AMR_HYST,
+        amr_hysteresis=AMR_HYST,
         amr_coarsen_gate=AMR_GATE == 1,
         transfer_mode=:nodal,
         advection=:skew, ev=EV_COEF, ev_cmax=0.052, ev_alpha=2,
@@ -753,8 +742,6 @@ end
 # --------------------------------------------------------------------- main ----
 function main()
     mode = length(ARGS) >= 1 ? ARGS[1] : "short"
-    AMR_POLICY in (:classic, :balanced) ||
-        error("CASE_AMR must be classic or balanced, got $AMR_POLICY")
     AMR_GATE in (0, 1) ||
         error("CASE_AMR_GATE must be 0 or 1, got $AMR_GATE")
     SYMMETRY in (:none, :x) ||

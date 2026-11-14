@@ -4,7 +4,7 @@ using Test, QuaST, Random, Printf
 # (docs/dev/AMR.md, docs/dev/AMR.md).
 #
 # The audit changed allocation behaviour and loop guards in
-# `src/amr_balanced.jl`, `src/dgquad.jl` and `src/quadtree.jl`.
+# `src/amr_balanced.jl`, `src/amr_leaf_ops.jl` and `src/quadtree.jl`.
 # "Faster" is only acceptable if it is the *same* result, so this gate pins:
 #
 #   1. **Equivalence against the pre-audit implementation.**  The historical

@@ -4,6 +4,21 @@ All notable changes to this project are recorded here, in Keep a Changelog forma
 semantic versioning; in the 0.x series the public API may still change. This is the first
 public release: earlier development happened in a private repository.
 
+## [Unreleased]
+
+### Removed
+
+- The classic AMR policy. `amr_policy` (and with it `:classic` and the
+  `:threshold` dispatch), `amr_cycle!` (`src/dgquad.jl`),
+  `amr_cycle_hysteresis!` (`src/amr_advanced.jl`), the DG prototype that shared
+  `dgquad.jl`, and the classic-only keywords `amr_strategy`, `marking`,
+  `refine_thresh`, `coarsen_thresh` and `coarsen_theta_tol` are gone. The
+  balanced policy (`amr_cycle_balanced!`) is the only adaptive policy, and
+  `run_semquad_simulation`'s `initial_refine` now runs it as well, so a run with
+  the old defaults is bit-for-bit unchanged. Checkpoints keep the
+  `amr_policy = "balanced"` config key so files written before the removal still
+  match the restart guard.
+
 ## [0.1.0] - 2026-11-13
 
 ### Added

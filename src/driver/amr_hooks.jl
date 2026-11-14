@@ -69,24 +69,22 @@ end
 
 """
     semquad_amr_passes!(ss, qt, theta, theta_prev; passes=1, refine_frac=0.2,
-                        coarsen_frac=0.0, marking=:global)
+                        coarsen_frac=0.0)
 
 Run `passes` consecutive AMR cycles on the same time level.  Each pass recomputes
 the gradient-jump indicator on the current mesh, refines/balances, rebuilds the
 Taylor–Hood spaces, and transfers `theta`/`theta_prev`.  `passes=1` is the
 original one-level-per-step behaviour; larger values are a numerical budget to
-let interior plumes catch up with a heavily refined wall.  Coarsening is applied
-only on the first pass.  Returns `(ss, theta, theta_prev, nrefined)`.
+let interior plumes catch up with a heavily refined wall.  Every pass may trade
+coarsening for refinement (the budget exchange), so `coarsen_frac` is not zeroed
+after the first pass.  Returns `(ss, theta, theta_prev, nrefined)`.
 
-`amr_policy=:classic` is the historical policy (and this unit-level helper's
-default, so the AMR primitive itself stays classic): an absolute
-`coarsen_theta_tol` protect set, the error-fraction coarsening of `amr_cycle!`
-inside a hard `max_leaves` guard, and a `wall_strip`-wide wall protect set.
-`amr_policy=:balanced` (docs/dev/AMR.md §3) replaces those three by the
-relative Dörfler-from-below criterion, budget exchange and a wall-row-only
-protect set, with an `AmrCooldown` hysteresis.  Since 2026-11-13 `:balanced` is
-the default of `run_semquad_simulation` (docs/dev/AMR.md);
-this helper keeps `:classic` so `t_g55`/`t_g208` still pin the primitive.
+The cycle is [`amr_cycle_balanced!`](@ref) (docs/dev/AMR.md §3): relative
+Dörfler thresholds from above and below, budget exchange instead of a refine
+stop at the budget, a wall-row-only protect set and an `AmrCooldown` hysteresis.
+It is the only adaptive policy: the `:classic` fraction + hard-budget path was
+removed at `8c622df` (docs/dev/AMR.md).  `refine_wall_to_min!` and the hard leaf
+budget pass below are part of the cycle, not of a policy.
 """
 const LAST_AMR_STATS = Ref((refined=0, coarsened=0, merged=0, leaves=0))
 
@@ -94,29 +92,23 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                              theta::Vector{Float64}, theta_prev::Vector{Float64};
                              refine_frac::Float64=0.2,
                              coarsen_frac::Float64=0.0,
-                             marking::Symbol=:global, passes::Int=1, amr_strategy::Symbol=:legacy,
-                             refine_thresh::Float64=0.5, coarsen_thresh::Float64=0.1,
+                             passes::Int=1,
                              max_level::Int=typemax(Int),
                              max_leaves::Int=typemax(Int),
                              wall_min_level::Int=0,
                              wall_strip::Float64=0.1,
                              symmetry::Symbol=:none,
                              transfer_mode::Symbol=:nodal,
-                             coarsen_theta_tol::Float64=Inf, hotspot_weight::Float64=0.0, hotspot_frac::Float64=0.5,
+                             hotspot_weight::Float64=0.0, hotspot_frac::Float64=0.5,
                              hotspot_min_level::Int=0, hotspot_mode::Symbol=:theta, hotspot_zmin::Float64=0.0, zero_side_eta::Bool=false, side_strip::Float64=0.05,
                              top_wall_level::Int=0, top_wall_frac::Float64=0.5,
-                             amr_policy::Symbol=:classic,
                              amr_cooldown::Union{Nothing,AmrCooldown}=nothing,
                              amr_hysteresis::Int=1,
                              amr_coarsen_gate::Bool=true)
     passes >= 1 || throw(ArgumentError("passes must be >= 1"))
-    amr_policy in (:classic, :balanced) ||
-        throw(ArgumentError("amr_policy must be :classic or :balanced"))
     amr_hysteresis >= 0 ||
         throw(ArgumentError("amr_hysteresis must be >= 0"))
-    balanced = amr_policy === :balanced
-    cool = balanced ? (amr_cooldown === nothing ? SEMQUAD_AMR_COOLDOWN[] :
-                       amr_cooldown) : nothing
+    cool = amr_cooldown === nothing ? SEMQUAD_AMR_COOLDOWN[] : amr_cooldown
     sq = ss.su
     nr = 0
     nc = 0
@@ -124,38 +116,14 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
     for pass in 1:passes
         eta = semquad_gradient_jump(sq, qt, theta)
         protect = Set{NTuple{3,Int}}()
-        if balanced
-            # (c') Only the first/last leaf rows are protected: the strip's
-            # minimum level is guaranteed by `refine_wall_to_min!` below, and
-            # the absolute `coarsen_theta_tol` guard is replaced by the
-            # relative Dörfler cut inside `amr_cycle_balanced!`.
-            for lf in qt.leaves
-                if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
-                    push!(protect, lf)
-                end
-            end
-        end
-        if !balanced && wall_min_level > 0
-            # Wall cells get their resolution from refine_wall_to_min!, not
-            # from the error-fraction budget.  Zero their indicator and protect
-            # them from coarsening so boundary layers do not consume the whole
-            # refinement budget / repeatedly displace interior plumes.
-            for lf in qt.leaves
-                h = leaf_hy(qt, lf[1])
-                zc = (lf[3] + 0.5) * h
-                if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1 ||
-                   zc <= wall_strip || zc >= 1.0 - wall_strip
-                    eta[lf] = 0.0
-                    push!(protect, lf)
-                end
-            end
-        end
-        if !balanced && isfinite(coarsen_theta_tol) && coarsen_frac > 0.0
-            for lf in sq.leaves
-                ids = sq.elem[lf]
-                lo = minimum(theta[ids])
-                hi = maximum(theta[ids])
-                hi - lo > coarsen_theta_tol && push!(protect, lf)
+        # (c') Only the first/last leaf rows are protected: the strip's minimum
+        # level is guaranteed by `refine_wall_to_min!` below, and the absolute
+        # theta-range guard of the removed `:classic` policy has no replacement
+        # -- the relative Dörfler cut inside `amr_cycle_balanced!` decides which
+        # quartets may be coarsened.
+        for lf in qt.leaves
+            if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
+                push!(protect, lf)
             end
         end
         if zero_side_eta
@@ -246,39 +214,27 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                 end
             end
         end
-        if balanced
-            # (a')+(b')+(d'): relative coarsening, budget exchange, hysteresis.
-            # The exchange has to be able to trade on every pass, so the
-            # coarsen fraction is not zeroed after pass 1 here.
-            n, nc0, _nex = amr_cycle_balanced!(qt, eta;
-                        refine_frac=refine_frac, coarsen_frac=coarsen_frac,
-                        max_level=max_level, max_leaves=max_leaves,
-                        symmetry=symmetry, protect=protect,
-                        wall_min_level=wall_min_level, wall_strip=wall_strip,
-                        cooldown=cool, hysteresis_cycles=amr_hysteresis,
-                        coarsen_gate=amr_coarsen_gate)
-        elseif amr_strategy === :threshold
-            n, nc0 = amr_cycle_hysteresis!(qt, eta;
-                       refine_thresh=refine_thresh, coarsen_thresh=coarsen_thresh,
-                       max_level=max_level, max_leaves=max_leaves,
-                       symmetry=symmetry, protect=protect)
-        else
-            n, nc0 = amr_cycle!(qt, eta; refine_frac=refine_frac,
-                          coarsen_frac=(pass == 1 ? coarsen_frac : 0.0),
-                          marking=marking, max_level=max_level,
-                          max_leaves=max_leaves, symmetry=symmetry,
-                          protect=protect)
-        end
+        # (a')+(b')+(d'): relative coarsening, budget exchange, hysteresis.
+        # The exchange has to be able to trade on every pass, so the coarsen
+        # fraction is not zeroed after pass 1.
+        n, nc0, _nex = amr_cycle_balanced!(qt, eta;
+                    refine_frac=refine_frac, coarsen_frac=coarsen_frac,
+                    max_level=max_level, max_leaves=max_leaves,
+                    symmetry=symmetry, protect=protect,
+                    wall_min_level=wall_min_level, wall_strip=wall_strip,
+                    cooldown=cool, hysteresis_cycles=amr_hysteresis,
+                    coarsen_gate=amr_coarsen_gate)
         refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
                             symmetry=symmetry)
-        # The wall refinement runs after amr_cycle!'s hard leaf budget and can
-        # push the tree over max_leaves.  Re-run the budget pass (no refine /
-        # no coarsen fractions) so leaves <= max_leaves is a hard invariant.
-        # Hard leaf budget.  With coarsen_frac = 0 the cycle itself cannot
-        # coarsen, and 2:1 balancing can still add leaves, so merge the
-        # lowest-error complete quartets here (the old budget pass called
-        # amr_cycle! with zero fractions, whose guard gave up as soon as the
-        # first leaf in indicator order could not be merged).
+        # The wall refinement runs after the cycle's budget exchange and can push
+        # the tree over max_leaves.  Re-run the budget pass (no refine / no
+        # coarsen fractions) so leaves <= max_leaves is a hard invariant.
+        # Hard leaf budget.  The cycle itself does not coarsen a quartet that
+        # the Dörfler cut did not select, and 2:1 balancing can still add
+        # leaves, so merge the lowest-error complete quartets here (the removed
+        # classic budget pass called the fraction cycle with zero fractions,
+        # whose guard gave up as soon as the first leaf in indicator order could
+        # not be merged).
         #
         # `symmetry=:x`: the repair pass closes a tree that the wall refinement
         # (or a legacy checkpoint) left asymmetric, and the paired merges of the

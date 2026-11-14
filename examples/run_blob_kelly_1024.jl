@@ -5,17 +5,13 @@ using QuaST, Printf, SHA
 # Promoted 2026-11-13 from the untracked out_julia/agent/run_blob_kelly_1024.jl
 # (docs/dev/AMR.md): a clean checkout could not regenerate
 # the 25-frame digest.  The protocol is unchanged -- same Params, tree seed,
-# fixed dt, Kelly marking every 5 steps, p=4, direct solve and 256^2 frames --
-# and the only additions are the per-frame SHA-256 rows and the policy pin.
+# fixed dt, Kelly AMR every 5 steps, p=4, direct solve and 256^2 frames --
+# and the only additions are the per-frame SHA-256 rows.
 #
 # The classic-era baseline (final theta digest 868a79d9...458afe88, frame-25
-# Tmax 1.264427445) was produced under `amr_policy=:classic`; after the
-# 2026-11-13 default flip the balanced path is the default baseline.  Both
-# remain reproducible:
-#
-#   BLOB_POLICY=classic BLOB_OUT=out_julia/fresh_blob_kelly_1024_classic \
-#       julia --project=. examples/run_blob_kelly_1024.jl
-#   julia --project=. examples/run_blob_kelly_1024.jl   # balanced
+# Tmax 1.264427445) was produced under the classic AMR policy, which no longer
+# exists: the balanced policy is the only adaptive policy, so this script
+# reproduces the balanced-era baseline.
 #
 # `FINAL theta_sha256=...` and `FINAL Tmax25=...` are printed for the digest
 # quoted in docs/dev/VALIDATION.md; frame_sha256.csv holds all 25 per-frame digests.
@@ -26,16 +22,12 @@ const NG = 256
 const TOUT = 4.0e-10
 const DT = 8.0e-11
 const MAXLEAVES = 1024
-const POLICY = Symbol(get(ENV, "BLOB_POLICY", "balanced"))
 const DIR = normpath(get(ENV, "BLOB_OUT",
-    joinpath(@__DIR__, "..", "out_julia",
-             "fresh_blob_kelly_1024_" * string(POLICY))))
+    joinpath(@__DIR__, "..", "out_julia", "fresh_blob_kelly_1024")))
 
 _hash(v) = bytes2hex(sha256(collect(reinterpret(UInt8, v))))
 
 function main()
-    POLICY in (:classic, :balanced) ||
-        error("BLOB_POLICY must be classic or balanced, got $POLICY")
     if isdir(DIR)
         # Only ever clear a directory that holds nothing but this producer's own
         # output: an unset BLOB_OUT used to be able to point outside the tree.
@@ -98,8 +90,7 @@ function main()
     res = run_semquad_simulation(qt, PR, theta0; p=p, tstop=1.0e-8, dt0=DT, dtmax=DT, dtmin=1.0e-16,
                                  maxsteps=200, maxpic=1,
                                  amr_every=5, refine_frac=0.2, coarsen_frac=0.005,
-                                 coarsen_theta_tol=1.0e-3, amr_policy=POLICY,
-                                 marking=:error_fraction, symmetry=:x,
+                                 symmetry=:x,
                                  max_leaves=MAXLEAVES, max_level=6,
                                  ev=0.11, ev_cmax=0.052, advection=:skew, linear=:direct,
                                  stokes_tol=1.0e-6, callback=cb, verbose=false)
@@ -111,11 +102,11 @@ function main()
     end_th = _hash(res.theta)
     end_u = _hash(vcat(res.ux, res.uz))
     open(joinpath(DIR, "run_summary.csv"), "w") do io
-        println(io, "policy,frames,steps,end_theta_sha256,end_u_sha256,Tmax25,wall_s")
-        @printf(io, "%s,%d,%d,%s,%s,%.10g,%.1f\n", POLICY, knot[], res.steps,
+        println(io, "frames,steps,end_theta_sha256,end_u_sha256,Tmax25,wall_s")
+        @printf(io, "%d,%d,%s,%s,%.10g,%.1f\n", knot[], res.steps,
                 end_th, end_u, last_tmax[], time() - t0)
     end
-    @printf("FINAL policy=%s frames=%d end_theta_sha256=%s end_u_sha256=%s Tmax25=%.10g\n",
-            POLICY, knot[], end_th, end_u, last_tmax[])
+    @printf("FINAL frames=%d end_theta_sha256=%s end_u_sha256=%s Tmax25=%.10g\n",
+            knot[], end_th, end_u, last_tmax[])
 end
 main()

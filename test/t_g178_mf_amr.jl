@@ -114,14 +114,12 @@ function _g178_blob(lin::Symbol; tstop::Float64=1.6e-9, maxleaves::Int=1024)
         end
     end
     t0 = time()
-    # Policy-agnostic AMR comparison calibrated on classic; pin the policy explicitly.
+    # AMR comparison; the balanced cycle is the only AMR policy.
     res = run_semquad_simulation(qt, _G178_BLOB, theta0; p=4, tstop=tstop,
                                  dt0=dt, dtmax=dt, dtmin=1.0e-16,
                                  maxsteps=100, maxpic=1, amr_every=5,
-                                 amr_policy=:classic,
                                  refine_frac=0.2, coarsen_frac=0.005,
-                                 coarsen_theta_tol=1.0e-3,
-                                 marking=:error_fraction, symmetry=:x,
+                                 symmetry=:x,
                                  max_leaves=maxleaves, max_level=6,
                                  ev=0.11, ev_cmax=0.052, advection=:skew,
                                  linear=lin, mg_operator=:matrixfree,

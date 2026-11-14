@@ -1,10 +1,10 @@
-# `amr_policy = :balanced`: the AMR policy of docs/dev/AMR.md §3-§5.
+# The balanced AMR policy of docs/dev/AMR.md §3-§5.
 #
-# Since 2026-11-13 this is the default of `run_semquad_simulation`
-# (docs/dev/AMR.md).  `semquad_amr_passes!` keeps its own
-# `:classic` default, so `amr_policy=:classic` never calls this file and the
-# unit-level primitive, every classic production number (E) and the G208 tree
-# pins are unchanged.
+# It is the only adaptive policy: `run_semquad_simulation` has used it since
+# 2026-11-13 (docs/dev/AMR.md), and the `:classic` fraction + hard-budget path
+# (formerly `amr_cycle!` in `dgquad.jl`) was removed at `8c622df`, so
+# `semquad_amr_passes!` and the driver's `initial_refine` both call
+# `amr_cycle_balanced!` unconditionally.
 #
 # Measured motivation (production run E, `out_julia/case_realistic_E`, step
 # 18800: 9994/10000 leaves, 3720 AMR cycles of which 723 changed anything, last
@@ -15,8 +15,8 @@
 #       9980 leaves and only **14** are coarsenable, so no sibling quartet can
 #       ever be merged;
 #   (b) the classic coarsen loop charges *every* walked leaf to its `cum_c`
-#       budget, merged or not (dgquad.jl:433-445), so the budget is spent by
-#       refused leaves: measured 94.8 % by protected leaves, 5.2 % by
+#       budget, merged or not (the removed `amr_cycle!`), so the budget is
+#       spent by refused leaves: measured 94.8 % by protected leaves, 5.2 % by
 #       incomplete quartets, 0.0 % by mergeable ones;
 #   (c) at 9994 leaves the hard budget guard `length + 10 > max_leaves` breaks
 #       the refinement loop **before the first candidate** (0 of the 82
@@ -467,7 +467,7 @@ the Dörfler refinement set would need, `eligible` the complete quartets that
 passed every gate, `budget_limited` that refinement stopped because no eligible
 quartet was left, `budget_infeasible` that the tree is still above `max_leaves`
 after the cycle (the caller's hard budget pass then merges the lowest-error
-quartets, exactly as for `:classic`).
+quartets).
 
 `merged` is the number of quartets this cycle merged, `recirc` how many of those
 parents the post-merge `balance!`/`mirror_close!` split again (**the
@@ -506,10 +506,9 @@ const LAST_AMR_BALANCED = Ref((refined=0, coarsened=0, exchanged=0, n=0, want=0,
                         cooldown=nothing, hysteresis_cycles=1,
                         coarsen_cells=nothing, coarsen_gate=true)
 
-One AMR cycle of `amr_policy = :balanced` (docs/dev/AMR.md §3-§5).
-Returns `(refined, coarsened, exchanged)` in leaves (the same units as
-`amr_cycle!`), and records the cycle's threshold/limit diagnostics in
-[`LAST_AMR_BALANCED`](@ref).
+One AMR cycle of the balanced policy (docs/dev/AMR.md §3-§5), the only adaptive
+policy.  Returns `(refined, coarsened, exchanged)` in leaves, and records the
+cycle's threshold/limit diagnostics in [`LAST_AMR_BALANCED`](@ref).
 
 The thresholds are cumulative error fractions, computed exactly by sorting
 (deal.II bisects the same quantity, docs/dev/AMR.md §1.3):

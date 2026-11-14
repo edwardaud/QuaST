@@ -10,7 +10,7 @@
 ## Did a default change?
 
 <!-- If yes, name the regenerated baselines and the gate that pins the new default
-     (G229 for amr_policy, G230 for linear). If no, say so. -->
+     (G229 for the AMR default path, G230 for linear). If no, say so. -->
 
 ## How it was tested
 

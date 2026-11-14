@@ -21,11 +21,11 @@ include("physics.jl")
 include("phase.jl")
 include("rheology.jl")
 include("quadtree.jl")
-include("dgquad.jl")
+include("amr_leaf_ops.jl")
 # Before the `driver/` chunks: `semquad_amr_passes!`/`run_semquad_simulation`
 # type their `amr_cooldown` keyword with `AmrCooldown`, which is defined in
-# `amr_balanced.jl`.
-include("amr_advanced.jl")
+# `amr_balanced.jl`.  It is the only adaptive policy (`amr_advanced.jl` and the
+# classic cycle in the former `dgquad.jl` were removed at `8c622df`).
 include("amr_balanced.jl")
 include("semquad.jl")
 # `semquadstokes.jl` is now the `src/stokes/` chunk tree.  Joined in the order
@@ -102,9 +102,7 @@ export DG1D, make_dg1d, assemble_dg1d_poisson, solve_dg1d_poisson, dg1d_l2_error
        
        Quadtree, refine!, coarsen!, neighbors, balance!, rebalance_local!, LocalBalance, LOCAL_BALANCE, refine_where!, max_face_level_jump, leaf_box, total_area, face_pairs, wall_graded_tree,
        mirror_defect, mirror_close!, LAST_MIRROR_CLOSE,
-       DGQuad, make_dgquad, assemble_dgquad_poisson, dgquad_eval, is_uniform,
-       dgquad_jump_indicator, amr_cycle!, semquad_enforce_leaf_budget!, LAST_BUDGET_PASS, assemble_dgquad_advection,
-       run_dgquad_advection_subcycled,
+       semquad_enforce_leaf_budget!, LAST_BUDGET_PASS,
        SemQuad, make_semquad, semquad_constraints, assemble_semquad_poisson,
        transfer_semquad, semquad_mass, semquad_gradient_jump, assemble_semquad_energy,
        assemble_semquad_energy_latent_jvp,
@@ -144,7 +142,7 @@ export DG1D, make_dg1d, assemble_dg1d_poisson, solve_dg1d_poisson, dg1d_l2_error
        semquad_weakening_jvp, solve_semquad_weakening, semquad_weak_stats,
        semquad_visco_plastic_eta, semquad_strain_rate_field, blend_field,
        semquad_deta_dp, semquad_deta_dp_eps, semquad_deta_chi,
-       picard_diverging, picard_adapt_relax, amr_cycle_hysteresis!, amr_cycle_balanced!, AmrCooldown, SEMQUAD_AMR_COOLDOWN, LAST_AMR_BALANCED, goal_upper_half, dwr_leaf_indicator, solve_stokes_adjoint_system, stokes_residual, stokes_reduced_residual, assemble_semquad_velocity_mass, velocity_goal_rhs, hierarchical_stokes_residual, interpolate_semquad, dual_weights_semquad, poisson_dwr_cell_term, poisson_dwr_face_terms, poisson_dwr_estimate, restrict_indicator_to_tree, aggregate_indicator_to_level, stokes_dwr_indicator,
+       picard_diverging, picard_adapt_relax, amr_cycle_balanced!, AmrCooldown, SEMQUAD_AMR_COOLDOWN, LAST_AMR_BALANCED, goal_upper_half, dwr_leaf_indicator, solve_stokes_adjoint_system, stokes_residual, stokes_reduced_residual, assemble_semquad_velocity_mass, velocity_goal_rhs, hierarchical_stokes_residual, interpolate_semquad, dual_weights_semquad, poisson_dwr_cell_term, poisson_dwr_face_terms, poisson_dwr_estimate, restrict_indicator_to_tree, aggregate_indicator_to_level, stokes_dwr_indicator,
        solve_semquad_poisson, semquad_eval,
        DofMap, ThetaMap, make_dofmap, make_theta_map, gather_reduced, cfl_length, cfl_local_dt,
        scatter_reduced

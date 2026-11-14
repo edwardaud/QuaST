@@ -7,7 +7,8 @@ using QuaST: FACE_DIRS
 # Background (docs/dev/SOLVER.md §16): on the Ra=1e8 blob production run the
 # step that first hit `max_leaves=1024` (958 -> 1030 leaves after refinement)
 # spent 31.5-31.9 s in one AMR cycle.  The cause was not a single slow balance
-# pass but the *leaf-budget guard* in `amr_cycle!`: the lowest-error complete
+# pass but the *leaf-budget guard* of the then-current fraction cycle (the
+# removed `amr_cycle!`): the lowest-error complete
 # quartet was coarsened, 2:1 balancing re-split its parent (the parent has a
 # one-level-finer neighbour), and the loop retried the same quartet 10000
 # times, each retry a full-tree `balance!` (2 passes, ~8.2k `neighbors` calls
@@ -18,8 +19,9 @@ using QuaST: FACE_DIRS
 #       full-scan implementation on random refinement/coarsening sequences;
 #   (2) `neighbors`/`face_pairs` caches are invalidated by every tree
 #       mutation (a queried-then-mutated tree equals a freshly built one);
-#   (3) an over-budget AMR cycle whose best quartet cannot survive balancing
-#       terminates as a fixed point in milliseconds instead of 10000 rounds.
+#   (3) a cycle with no refine/coarsen fractions on an over-budget tree
+#       terminates as a fixed point in milliseconds instead of 10000 rounds,
+#       and the hard leaf-budget pass then merges the tree down.
 
 # The old full-scan balance, kept here as the reference semantics.
 function balance_full_scan!(qt::Quadtree; maxiter::Int=1000)
@@ -208,12 +210,12 @@ end
     q = copy_tree(qt)
     # JIT warm-up on a throwaway copy (the cycle is a no-op fixed point anyway)
     qw = copy_tree(qt)
-    amr_cycle!(qw, eta; refine_frac=0.0, coarsen_frac=0.0, marking=:global,
-               max_level=7, max_leaves=n0 - 4, symmetry=:none)
+    amr_cycle_balanced!(qw, eta; refine_frac=0.0, coarsen_frac=0.0,
+                        max_level=7, max_leaves=n0 - 4, symmetry=:none)
     t0 = time()
-    nr, nc = amr_cycle!(q, eta; refine_frac=0.0, coarsen_frac=0.0,
-                        marking=:global, max_level=7, max_leaves=n0 - 4,
-                        symmetry=:none)
+    nr, nc, _ = amr_cycle_balanced!(q, eta; refine_frac=0.0, coarsen_frac=0.0,
+                                    max_level=7, max_leaves=n0 - 4,
+                                    symmetry=:none)
     elapsed = time() - t0
     @printf("G186: %d-leaf over-budget cycle %.4f s (nr=%d nc=%d)\n",
             n0, elapsed, nr, nc)

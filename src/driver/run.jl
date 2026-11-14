@@ -41,25 +41,24 @@ walls (the energy solve imposes homogeneous Dirichlet data there); the sides are
 insulating, and the velocity is free-slip.  `eta_law` may be `:expT` (temperature
 only) or `:expTz` (temperature + depth, ASPECT nondimensional law); `:expTz`
 requires `eta_b`/`eta_c`.  `amr_every > 0` triggers one
-indicator/refine/coarsen/transfer cycle every `amr_every` steps; `marking=:global`
-(default) refines the globally largest indicators, while `:level` refines the top
-`refine_frac` fraction within every level (an experiment to keep interior plumes
-in the budget when the wall dominates).  `amr_passes > 1` reruns the
+indicator/refine/coarsen/transfer cycle every `amr_every` steps, using the
+balanced policy of [`amr_cycle_balanced!`](@ref) (the only adaptive policy;
+`refine_frac`/`coarsen_frac` are its cumulative-error thresholds).
+`amr_passes > 1` reruns the
 indicator/refine/transfer cycle on the same time level (a numerical budget;
-default 1).  `max_leaves` is a hard post-balance leaf budget: AMR is skipped once the tree
-exceeds it and the cycle coarsens the lowest-error leaves back to the budget
-(default: no cap), so a comparison against a static mesh can be made at a
-fixed DOF budget.  `max_level` caps refinement at that quadtree level
+default 1).  `max_leaves` is a hard post-balance leaf budget: the cycle pays for
+a refinement by merging the lowest-error eligible quartet, and any over-budget
+remainder is merged by the budget pass (default: no cap), so a comparison
+against a static mesh can be made at a fixed DOF budget.  `max_level` caps
+refinement at that quadtree level
 (default: no cap); coarsening is unaffected.  `wall_min_level > 0` forces
 leaves within `wall_strip` of the bottom/top walls back to at least that level
 after every AMR cycle (the numerical boundary-refinement criterion; default 0).
 `symmetry=:x` marks mirror leaves together (for symmetric benchmark/IC tests;
 default `:none`).  `transfer_mode=:l2` uses the global L2 projection for
 coarsening instead of pointwise nodal restriction (default `:nodal` for
-backward-compatible tests).  `coarsen_theta_tol < Inf` refuses to coarsen a
-leaf whose nodal theta range exceeds that value (representation-error guard;
-default `Inf`).  `initial_refine > 0` runs that many
-indicator/refine/transfer cycles on `theta0` *before* the first time step;
+backward-compatible tests).  `initial_refine > 0` runs that many
+balanced AMR cycles on `theta0` *before* the first time step;
 when `theta_ic(x,y)` is given, the analytic initial condition is re-sampled on
 each refined tree instead of transferring the coarse initial field.  This is
 the clean-protocol path for high-Ra runs: the boundary layer/plume is resolved
@@ -113,15 +112,15 @@ it answered.
 `bc` is taken from `pr.bc` (`:free` free-slip or `:rigid`
 no-slip, both walls).  `checkpoint_path`/`checkpoint_every` write an HDF5
 checkpoint of the full state (quadtree and its maxlevel, theta, theta_prev, t,
-dt, dt_prev, step, p) every `checkpoint_every` steps and once at the end; for
-`amr_policy=:balanced` the optional `AmrCooldown` hysteresis state (the two
+dt, dt_prev, step, p) every `checkpoint_every` steps and once at the end; the
+`AmrCooldown` hysteresis state (the two
 cooldown dicts and the cycle counter) is written too, so a resume restores the
-AMR policy exactly.  `restart_from=<file>` replaces the mesh, p and initial
+AMR cycle exactly.  `restart_from=<file>` replaces the mesh, p and initial
 state with that state before the first step, so a restarted run is
 bit-comparable with an uninterrupted one (`tstop`/`maxsteps` stay absolute); a
 checkpoint without the cooldown data (every old file) loads an empty cooldown,
 which is the historical restart behaviour.  The trajectory-affecting
-settings (AMR cadence and marking, wall/hotspot rules, advection, EV, Picard
+settings (AMR cadence and fractions, wall/hotspot rules, advection, EV, Picard
 controls, cfl, dtmax/dtmin) are stored with the state; a restart raises
 `ArgumentError` listing every setting that differs from the live run, so a
 resumed run cannot silently continue with another configuration.  The cooldown
@@ -165,21 +164,17 @@ described above; `history_extra` names them).
 """
 function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64};
                                 p::Int=2, tstop::Float64=1.0e-3,
-                                dt0::Float64=1.0e-4, amr_every::Int=0, amr_strategy::Symbol=:legacy,
-                                refine_thresh::Float64=0.5, coarsen_thresh::Float64=0.1,
+                                dt0::Float64=1.0e-4, amr_every::Int=0,
                                 refine_frac::Float64=0.2,
-                                marking::Symbol=:global,
                                 amr_passes::Int=1,
                                 coarsen_frac::Float64=0.0,
                                 max_leaves::Int=typemax(Int),
                                 max_level::Int=typemax(Int),
                                 wall_min_level::Int=0, wall_strip::Float64=0.1,
                                 symmetry::Symbol=:none,
-                                amr_policy::Symbol=:balanced,
                                 amr_hysteresis::Int=1,
                                 amr_coarsen_gate::Bool=true,
                                 transfer_mode::Symbol=:nodal,
-                                coarsen_theta_tol::Float64=Inf,
                                 initial_refine::Int=0,
                                 theta_ic::Union{Nothing,Function}=nothing,
                                 maxsteps::Int=10000,
@@ -342,43 +337,27 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     0.0 < wall_strip < 0.5 || throw(ArgumentError("wall_strip must be in (0, 0.5)"))
     symmetry in (:none, :x) ||
         throw(ArgumentError("symmetry must be :none or :x"))
-    amr_policy in (:classic, :balanced) ||
-        throw(ArgumentError("amr_policy must be :classic or :balanced"))
     amr_hysteresis >= 0 ||
         throw(ArgumentError("amr_hysteresis must be >= 0"))
-    balanced = amr_policy === :balanced
     transfer_mode in (:nodal, :l2) ||
         throw(ArgumentError("transfer_mode must be :nodal or :l2"))
-    coarsen_theta_tol >= 0.0 ||
-        throw(ArgumentError("coarsen_theta_tol must be >= 0"))
     checkpoint_every >= 0 ||
         throw(ArgumentError("checkpoint_every must be >= 0"))
     # Settings that change the trajectory.  They are stored in the checkpoint
     # and validated on restart, so a resumed run cannot silently continue with
     # a different AMR/physics/time-integration setup.
     run_config = Dict{String,Any}(
-        "amr_every" => amr_every, "amr_strategy" => amr_strategy,
+        "amr_every" => amr_every,
         "refine_frac" => refine_frac, "coarsen_frac" => coarsen_frac,
-        # `marking=:threshold` selects leaves by these absolute indicator
-        # thresholds and the classic policy protects leaves by the absolute
-        # theta range in `coarsen_theta_tol`; both change the mesh trajectory.
-        # All three are inert under `:balanced` (its cycle uses Dörfler
-        # thresholds and never reads the absolute tolerance) and the first two
-        # are also inert unless `amr_strategy=:threshold`, but they are stored
-        # unconditionally so a restart cannot change them silently -- closing
-        # the old `CASE_THETATOL` gap (docs/dev/AMR.md).
-        # Old checkpoints do not carry the keys and skip the comparison, like
-        # every key added later.
-        "refine_thresh" => refine_thresh, "coarsen_thresh" => coarsen_thresh,
-        "coarsen_theta_tol" => coarsen_theta_tol,
-        "marking" => marking, "amr_passes" => amr_passes,
+        "amr_passes" => amr_passes,
         "max_leaves" => max_leaves, "max_level" => max_level,
         "wall_min_level" => wall_min_level, "wall_strip" => wall_strip,
         "symmetry" => symmetry, "transfer_mode" => transfer_mode,
-        # `amr_policy` changes the mesh trajectory as much as the fractions do,
-        # so a restart must not switch it silently.  Old checkpoints do not
-        # carry the key and skip the comparison, like every key added later.
-        "amr_policy" => amr_policy, "amr_hysteresis" => amr_hysteresis,
+        # The balanced cycle is the only AMR policy; the key stays so a
+        # checkpoint written before the classic policy was removed still
+        # matches its recorded `balanced` (docs/dev/AMR.md).  A file that
+        # predates the key skips the comparison, like every key added later.
+        "amr_policy" => "balanced", "amr_hysteresis" => amr_hysteresis,
         # The coarsening_allowed pre-check changes the mesh trajectory too (`docs/dev/AMR.md` §4),
         # so a restart must not switch it silently either; old checkpoints do not
         # carry the key and skip the comparison, like every key added later.
@@ -547,20 +526,41 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     end
     theta = copy(theta0)
     if restart === nothing
+        # `initial_refine` runs the balanced cycle -- the only adaptive policy --
+        # on the initial condition, with the indicator and the wall-row protect
+        # set the first in-loop pass builds in `semquad_amr_passes!`.  The
+        # cooldown is reset here so a fresh run never inherits the module global
+        # of an earlier run in the same process; the loop below resets it again
+        # for a restart-free start, so the pre-refinement state is not carried
+        # into the time loop (each pass still pays its hysteresis, which is what
+        # an equal in-loop pass sequence would do).
+        SEMQUAD_AMR_COOLDOWN[] = AmrCooldown()
         for pass in 1:initial_refine
         length(qt.leaves) < max_leaves || break
         eta = semquad_gradient_jump(sq, qt, theta)
-        amr_cycle!(qt, eta; refine_frac=refine_frac,
-                   coarsen_frac=(pass == 1 ? coarsen_frac : 0.0),
-                   marking=marking, max_level=max_level,
-                   max_leaves=max_leaves, symmetry=symmetry)
+        protect = Set{NTuple{3,Int}}()
+        for lf in qt.leaves
+            if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
+                push!(protect, lf)
+            end
+        end
+        amr_cycle_balanced!(qt, eta; refine_frac=refine_frac,
+                            coarsen_frac=coarsen_frac,
+                            max_level=max_level, max_leaves=max_leaves,
+                            symmetry=symmetry, protect=protect,
+                            wall_min_level=wall_min_level,
+                            wall_strip=wall_strip,
+                            cooldown=SEMQUAD_AMR_COOLDOWN[],
+                            hysteresis_cycles=amr_hysteresis,
+                            coarsen_gate=amr_coarsen_gate)
         refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
                             symmetry=symmetry)
-        # Hard leaf budget.  With coarsen_frac = 0 the cycle itself cannot
-        # coarsen, and 2:1 balancing can still add leaves, so merge the
-        # lowest-error complete quartets here (the old budget pass called
-        # amr_cycle! with zero fractions, whose guard gave up as soon as the
-        # first leaf in indicator order could not be merged).
+        # Hard leaf budget.  The cycle itself does not coarsen a quartet that
+        # its Dörfler cut did not select, and 2:1 balancing can still add
+        # leaves, so merge the lowest-error complete quartets here (the removed
+        # classic budget pass called the fraction cycle with zero fractions,
+        # whose guard gave up as soon as the first leaf in indicator order could
+        # not be merged).
         if symmetry === :x
             mirror_close!(qt; max_level=max_level)
             balance!(qt; symmetry=:x)
@@ -633,19 +633,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # the next step.
     ev_field = (restart !== nothing && ev > 0.0) ? restart.ev : nothing
     velocity_stale = true
-    # `amr_policy=:balanced` hysteresis state.  A fresh run starts with an empty
-    # cooldown, so it is deterministic.  A checkpoint carries the cooldown
+    # Hysteresis state of the balanced AMR cycle.  A fresh run starts with an
+    # empty cooldown, so it is deterministic.  A checkpoint carries the cooldown
     # (`save_semquad_state`'s optional datasets), and it is restored verbatim so
     # the first AMR cycle after a resume is the one the uninterrupted run would
     # have executed; an old checkpoint without the data loads an empty cooldown,
     # which is exactly the historical restart behaviour (docs/dev/BUG_LEDGER.md
     # §10.5).  The cooldown is state, not configuration: it is not in
     # `run_config` and the restart guard must not compare it.
-    if balanced
-        SEMQUAD_AMR_COOLDOWN[] =
-            (restart !== nothing && restart.cooldown !== nothing) ?
-            restart.cooldown : AmrCooldown()
-    end
+    SEMQUAD_AMR_COOLDOWN[] =
+        (restart !== nothing && restart.cooldown !== nothing) ?
+        restart.cooldown : AmrCooldown()
 
     # P1: running time averages (t >= tavg_start) and steady-state detection.
     avg_n = 0
@@ -1328,29 +1326,19 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # uninterrupted run (which would have refined that step).
         if amr_every > 0 && step % amr_every == 0
             tp = profile_steps ? time_ns() : 0
-            # At the leaf budget keep running the cycle with refine_frac=0 so
-            # coarsening can bring the tree back below max_leaves; skipping AMR
-            # entirely would freeze the mesh at leaves > max_leaves.
-            # `:balanced` never zeroes refine_frac: the cycle itself frees the
-            # slots (budget exchange), which is the whole point of the policy.
-            rf = balanced ? refine_frac :
-                 (length(qt.leaves) < max_leaves ? refine_frac : 0.0)
             old_sq = sq
             ss, theta, theta_prev, nr = semquad_amr_passes!(
                 ss, qt, theta, theta_prev;
-                refine_frac=rf, coarsen_frac=coarsen_frac,
-                amr_strategy=amr_strategy, refine_thresh=refine_thresh,
-                coarsen_thresh=coarsen_thresh,
-                marking=marking, passes=amr_passes, max_level=max_level,
+                refine_frac=refine_frac, coarsen_frac=coarsen_frac,
+                passes=amr_passes, max_level=max_level,
                 max_leaves=max_leaves, wall_min_level=wall_min_level,
                 wall_strip=wall_strip, symmetry=symmetry,
                 transfer_mode=transfer_mode,
-                coarsen_theta_tol=coarsen_theta_tol,
                 hotspot_weight=hotspot_weight, hotspot_frac=hotspot_frac,
                 hotspot_min_level=hotspot_min_level,
                 hotspot_mode=hotspot_mode, hotspot_zmin=hotspot_zmin, zero_side_eta=zero_side_eta, side_strip=side_strip,
                 top_wall_level=top_wall_level, top_wall_frac=top_wall_frac,
-                amr_policy=amr_policy, amr_hysteresis=amr_hysteresis,
+                amr_hysteresis=amr_hysteresis,
                 amr_coarsen_gate=amr_coarsen_gate)
             sq = ss.su
             # The weakening field lives on the scalar space, so it follows the
@@ -1377,8 +1365,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             verbose && @printf("    AMR: N=%d leaves=%d maxjump=%d refined=%d coarsened=%d merged=%d\n",
                                sq.N, length(qt.leaves), max_face_level_jump(qt), nr,
                                LAST_AMR_STATS[].coarsened, LAST_AMR_STATS[].merged)
-            if verbose && balanced
-                # `:balanced` diagnostics (docs/dev/AMR.md §4.1/§4):
+            if verbose
+                # Balanced-cycle diagnostics (docs/dev/AMR.md §4.1/§4):
                 # the recirculation counter and the coarsening-gate ledger.
                 d = LAST_AMR_BALANCED[]
                 @printf("      balanced: gate_refused=%d extended=%d recirc=%d post=%+d tau_h=%.3e eligible=%d\n",
@@ -1409,7 +1397,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                t=t, dt=dt, dt_prev=dt_prev, step=step, p=p,
                                config=run_config, meta=checkpoint_meta,
                                ev=ev_field, weak=chi, weak_prev=chi_prev,
-                               cooldown=balanced ? SEMQUAD_AMR_COOLDOWN[] : nothing)
+                               cooldown=SEMQUAD_AMR_COOLDOWN[])
         end
 
         # Steady-state detection, same criterion as the uniform driver: the
@@ -1456,7 +1444,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                            t=t, dt=dt, dt_prev=dt_prev, step=step, p=p,
                            config=run_config, meta=checkpoint_meta,
                            ev=ev_field, weak=chi, weak_prev=chi_prev,
-                           cooldown=balanced ? SEMQUAD_AMR_COOLDOWN[] : nothing,
+                           cooldown=SEMQUAD_AMR_COOLDOWN[],
                            velocity_stale=final_velocity_stale)
     end
 

@@ -58,7 +58,7 @@
 #   JULIA, JULIA_PROJECT, CASE_SCRIPT, PY   julia / project / script / h5 python
 #   INTERVAL=120        seconds between checks
 #   CASE_STEPS=20000    step budget passed to the resumed run
-#   CASE_MAXLEAVES=8192 CASE_COARSEN=0.05 CASE_THETATOL=1e-2
+#   CASE_MAXLEAVES=8192 CASE_COARSEN=0.05
 #   CASE_LINEAR=direct  CASE_LATENT=per_phase  CASE_MAXLEV=7
 #   CASE_WALLMIN=5 CASE_WALLSTRIP=0.1
 #                       wall refinement forwarded to the restart; the checkpoint
@@ -66,14 +66,16 @@
 #                       restart, so a case whose checkpoints were made with the
 #                       wall unrefined needs CASE_WALLMIN=0 (or a `wallrefine`
 #                       seed) or the resume is refused by the restart guard
-#   CASE_AMR=classic CASE_SYMMETRY=x CASE_AMR_GATE=0
-#                       AMR policy forwarded to the restart.  These three keep
+#   CASE_SYMMETRY=x CASE_AMR_GATE=0
+#                       AMR keys forwarded to the restart.  These two keep
 #                       the PRE-2026-11-13 card values on purpose: the watchdog
 #                       only resumes existing checkpoints, while the card itself
-#                       now defaults to balanced / none / 1, so a run started
-#                       under the new defaults must export all three (the
+#                       now defaults to none / 1, so a run started
+#                       under the new defaults must export both (the
 #                       restart guard compares them, and a pre-gate checkpoint
-#                       has no amr_coarsen_gate key to compare against).
+#                       has no amr_coarsen_gate key to compare against).  The
+#                       AMR policy itself is no longer a choice (the classic
+#                       policy was removed; the balanced cycle is the only one).
 #   STALE_TOL=400       max (last logged step - checkpoint step) allowed
 #   LAUNCH_GRACE=90     seconds after a launch during which no second launch
 #   FAIL_BACKOFF=600    sleep after a launch that did not survive 3 s
@@ -95,15 +97,13 @@ INTERVAL=${INTERVAL:-120}
 CASE_STEPS=${CASE_STEPS:-20000}
 CASE_MAXLEAVES=${CASE_MAXLEAVES:-8192}
 CASE_COARSEN=${CASE_COARSEN:-0.05}
-CASE_THETATOL=${CASE_THETATOL:-1e-2}
 CASE_LINEAR=${CASE_LINEAR:-direct}
 CASE_LATENT=${CASE_LATENT:-per_phase}
 CASE_MAXLEV=${CASE_MAXLEV:-7}
 CASE_WALLMIN=${CASE_WALLMIN:-5}
 CASE_WALLSTRIP=${CASE_WALLSTRIP:-0.1}
-# The three AMR keys keep the old card values: this script resumes a checkpoint
-# written under them, while the card now defaults to balanced / none / 1.
-CASE_AMR=${CASE_AMR:-classic}
+# The two AMR keys keep the old card values: this script resumes a checkpoint
+# written under them, while the card now defaults to none / 1.
 CASE_SYMMETRY=${CASE_SYMMETRY:-x}
 CASE_AMR_GATE=${CASE_AMR_GATE:-0}
 
@@ -412,11 +412,11 @@ trap cleanup EXIT
 : >>"$WLOG" || { echo "cannot write $WLOG" >&2; exit 2; }
 {
     printf '%s action=start pid=%s step=0 ckpt=- ckpt_step=- ckpt_mtime=none log_step=- frame_step=-\n' "$(now_iso)" "$$"
-    printf '# watchdog: case=%s log=%s julia=%s script=%s interval=%ss steps=%s maxleaves=%s linear=%s latent=%s wall_min=%s wall_strip=%s amr=%s symmetry=%s amr_gate=%s flock=%s\n' \
+    printf '# watchdog: case=%s log=%s julia=%s script=%s interval=%ss steps=%s maxleaves=%s linear=%s latent=%s wall_min=%s wall_strip=%s symmetry=%s amr_gate=%s flock=%s\n' \
         "$CASE_DIR" "$LOG" "$JULIA" "$CASE_SCRIPT" "$INTERVAL" "$CASE_STEPS" \
         "$CASE_MAXLEAVES" "$CASE_LINEAR" "$CASE_LATENT" \
         "$CASE_WALLMIN" "$CASE_WALLSTRIP" \
-        "$CASE_AMR" "$CASE_SYMMETRY" "$CASE_AMR_GATE" "$HAVE_FLOCK"
+        "$CASE_SYMMETRY" "$CASE_AMR_GATE" "$HAVE_FLOCK"
 } >>"$WLOG" 2>/dev/null || true
 
 # --------------------------------- main loop --------------------------------
@@ -516,13 +516,11 @@ while [ "$STOP" -eq 0 ]; do
     CASE_STEPS="$CASE_STEPS" \
     CASE_MAXLEAVES="$CASE_MAXLEAVES" \
     CASE_COARSEN="$CASE_COARSEN" \
-    CASE_THETATOL="$CASE_THETATOL" \
     CASE_LINEAR="$CASE_LINEAR" \
     CASE_LATENT="$CASE_LATENT" \
     CASE_MAXLEV="$CASE_MAXLEV" \
     CASE_WALLMIN="$CASE_WALLMIN" \
     CASE_WALLSTRIP="$CASE_WALLSTRIP" \
-    CASE_AMR="$CASE_AMR" \
     CASE_SYMMETRY="$CASE_SYMMETRY" \
     CASE_AMR_GATE="$CASE_AMR_GATE" \
         setsid nohup "$JULIA" --project="$JULIA_PROJECT" "$CASE_SCRIPT" \

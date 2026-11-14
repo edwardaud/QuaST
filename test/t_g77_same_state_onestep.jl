@@ -24,13 +24,12 @@ end
     qt9 = wall_graded_tree(2, 9; strip=0.005)
     sq9 = make_semquad(qt9, 4)
     th0 = [H77_TOP(x, y) for (x, y) in sq9.coords]
-    # Policy-agnostic gate calibrated on classic; pin the policy explicitly.
+    # Policy-agnostic gate: the balanced cycle is the only AMR policy.
     r9 = run_semquad_simulation(qt9, pr, th0;
                                 p=4, tstop=5.0e-8, dt0=5.0e-9,
                                 dtmax=5.0e-9, cfl=0.25, maxsteps=10,
                                 maxpic=1, initial_refine=1, theta_ic=H77_TOP,
-                                amr_every=1, marking=:error_fraction,
-                                amr_policy=:classic,
+                                amr_every=1,
                                 refine_frac=0.2, coarsen_frac=0.1,
                                 max_leaves=70000, max_level=9,
                                 wall_min_level=9, wall_strip=0.005,

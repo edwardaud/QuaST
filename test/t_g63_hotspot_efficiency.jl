@@ -52,7 +52,7 @@ function h63_run_dynamic(qt, p, nsteps, dt; pre=2, pre_frac=0.35,
     for _ in 1:pre
         eta = semquad_gradient_jump(sq, qt, theta)
         if length(qt.leaves) < cap
-            amr_cycle!(qt, eta; refine_frac=pre_frac, coarsen_frac=0.0)
+            amr_cycle_balanced!(qt, eta; refine_frac=pre_frac, coarsen_frac=0.0)
             sq2 = make_semquad(qt, p)
             theta = h63_blob(sq2)
             sq = sq2
@@ -74,9 +74,10 @@ function h63_run_dynamic(qt, p, nsteps, dt; pre=2, pre_frac=0.35,
         if step % 2 == 0 && step < nsteps
             eta = semquad_gradient_jump(sq, qt, theta)
             if length(qt.leaves) < cap
-                amr_cycle!(qt, eta; refine_frac=dyn_frac, coarsen_frac=0.1)
+                amr_cycle_balanced!(qt, eta; refine_frac=dyn_frac,
+                                    coarsen_frac=0.1)
             else
-                amr_cycle!(qt, eta; refine_frac=0.0, coarsen_frac=0.2)
+                amr_cycle_balanced!(qt, eta; refine_frac=0.0, coarsen_frac=0.2)
             end
             sq2 = make_semquad(qt, p)
             theta = transfer_semquad(sq, theta, sq2)
@@ -120,8 +121,11 @@ end
     @test max_face_level_jump(qt) <= 1
 
     qtd = uniform_tree(3)
+    # The balanced cycle's refine_frac is a cumulative-error share, not a cell
+    # fraction, so the dynamic arm needs a wider cut than the classic 0.05/0.35
+    # to resolve the same hotspot within the 160-leaf cap.
     sd, qtd2, thd = h63_run_dynamic(qtd, p, nsteps, dt;
-                                    pre=2, pre_frac=0.35, dyn_frac=0.05,
+                                    pre=2, pre_frac=0.9, dyn_frac=0.5,
                                     cap=160)
     ed = norm(transfer_semquad(sd, thd, sf) - thf) / norm(thf)
     @printf("G63 dynamic N=%d err=%.6e | static N=%d err=%.6e\n",

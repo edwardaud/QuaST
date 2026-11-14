@@ -186,10 +186,10 @@ leaf is `1/256` of the box height, and the leaf count at `max_leaves = 10000`.
 
 The indicator is the gradient jump `(h/2) int_face [du.n]^2 ds` over interior
 faces plus a one-sided term on the top and bottom walls. Marking is
-`:error_fraction`, that is Dörfler marking: `refine_frac = 0.2` is the share of the
+Dörfler marking: `refine_frac = 0.2` is the share of the
 total indicator to resolve, so the number of cells it takes follows from the
-indicator field. The production policy
-(`amr_policy = :balanced`) coarsens from below with the relative threshold
+indicator field. The policy
+(the balanced cycle) coarsens from below with the relative threshold
 `coarsen_frac * total` on a complete quartet, pays for refinement by merging the
 lowest-error eligible quartet (budget exchange), and holds a hysteresis cooldown
 so a quartet that was just merged is not re-split; `amr_coarsen_gate` refuses a
@@ -297,11 +297,9 @@ the card's default in the second column.
 | `CASE_FRAME` | 0 | integer | Frame stride in steps. 0 uses the card's 5. |
 | `CASE_MAXLEV` | 7 | integer | Maximum quadtree level, so the finest leaf is `1/(2*2^level)` of the box height. |
 | `CASE_MAXLEAVES` | 10000 | integer | Hard leaf budget, enforced after every AMR cycle. |
-| `CASE_AMR` | `balanced` | `balanced`, `classic` | AMR policy. `balanced` is the production policy of 2.1; `classic` is the historical fraction-plus-protect policy. |
 | `CASE_AMR_GATE` | 1 | 0, 1 | The 2:1 coarsening pre-check of the balanced policy. 0 turns it off. |
 | `CASE_HYST` | 1 | integer | Hysteresis length in AMR cycles: the cooldown, and the deadband multiplier of the balanced policy. |
-| `CASE_COARSEN` | 0.05 | float | Coarsening share: relative threshold and per-cycle cell cap under `balanced`, error fraction under `classic`. |
-| `CASE_THETATOL` | 1e-2 | float | Absolute per-leaf theta-range protect tolerance. Only `classic` reads it, but it is stored and compared on restart. |
+| `CASE_COARSEN` | 0.05 | float | Coarsening share: relative threshold and per-cycle cell cap of the balanced policy. |
 | `CASE_WALLMIN` | 5 | integer | Minimum level inside the wall strip and on the wall rows. 0 turns the wall rule off. |
 | `CASE_WALLSTRIP` | 0.1 | float in (0, 0.5) | Width of the wall strip, as a fraction of the box height from each wall. |
 | `CASE_SYMMETRY` | `none` | `none`, `x` | x-mirror closure of the AMR passes: `x` refines and merges mirror partners together, for symmetric benchmarks. |
@@ -311,7 +309,7 @@ the card's default in the second column.
 | `CASE_STOKES_SCALING` | `none` | `none`, `equilibrated` | Equilibration of the direct saddle. It engages only on a solve that would otherwise fail, so a healthy solve is unchanged. |
 | `CASE_EXTDIAG` | 0 | 0, 1 | Append the exact energy-identity residual `resid_A` to `history.csv`. It changes the column count, so it is accepted only in a new output directory. |
 
-`main()` rejects an unknown `CASE_AMR`, `CASE_AMR_GATE`, `CASE_SYMMETRY` or
+`main()` rejects an unknown `CASE_AMR_GATE`, `CASE_SYMMETRY` or
 `CASE_STOKES_SCALING` before it does any work. Settings that are literals, not
 knobs: `Ra = 1e5`, `H = 10`, `p = 2`, `stokes_tol = 1e-3`, `mg_tol = 1e-8`,
 `amr_every = 5`, `refine_frac = 0.2`, `dt0 = 1e-6`, `dtmax = 5e-5`,
@@ -337,9 +335,8 @@ The defaults are the library defaults; the card column is the value
 | `dt0`, `dtmax`, `dtmin`, `dt_growth` | 1e-4, `Inf`, 1e-14, 1.05 | 1e-6, 5e-5, 1e-9, 1.05 | Step size and its bounds. |
 | `cfl` | 0 | 0.5 | CFL number of the step update; 0 freezes `dt` at `dt0`. |
 | `amr_every` | 0 | 5 | Steps between AMR cycles; 0 freezes the mesh. |
-| `amr_policy`, `amr_hysteresis`, `amr_coarsen_gate` | `:balanced`, 1, true | `:balanced`, `CASE_HYST`, `CASE_AMR_GATE == 1` | Policy, hysteresis length and the 2:1 gate. |
-| `marking` | `:global` | `:error_fraction` | `:global`, `:level` or Dörfler `:error_fraction`. |
-| `refine_frac`, `coarsen_frac`, `coarsen_theta_tol` | 0.2, 0.0, `Inf` | 0.2, `CASE_COARSEN`, `CASE_THETATOL` | Marking shares and the `:classic` protect tolerance. |
+| `amr_hysteresis`, `amr_coarsen_gate` | 1, true | `CASE_HYST`, `CASE_AMR_GATE == 1` | Hysteresis length and the 2:1 gate of the balanced cycle. |
+| `refine_frac`, `coarsen_frac` | 0.2, 0.0 | 0.2, `CASE_COARSEN` | Cumulative-error shares of the balanced cycle (Dörfler marking from above and from below). |
 | `max_level`, `max_leaves` | no cap | 7, 10000 | Depth cap and hard leaf budget. |
 | `wall_min_level`, `wall_strip` | 0, 0.1 | 5, 0.1 | The wall rule; 0 turns it off. |
 | `symmetry`, `transfer_mode` | `:none`, `:nodal` | `CASE_SYMMETRY`, `:nodal` | Mirror closure and the AMR transfer. |
@@ -477,9 +474,9 @@ ArgumentError: restart configuration mismatch in /path/resume.h5:
   wall_min_level: checkpoint=0.0, current=5.0
 ```
 
-The compared keys are the trajectory-affecting ones: the AMR cadence, strategy,
-passes, marking, fractions, thresholds, leaf budget, level cap, wall rule, hotspot
-and top-wall rules, symmetry, transfer mode, policy, hysteresis and gate;
+The compared keys are the trajectory-affecting ones: the AMR cadence,
+passes, fractions, leaf budget, level cap, wall rule, hotspot
+and top-wall rules, symmetry, transfer mode, hysteresis and gate;
 advection and the entropy-viscosity coefficients; the Picard and time-step
 controls (`maxpic`, `pic_tol`, `pic_relax`, `pic_mode`, `pic_reject`, `cfl`,
 `dtmax`, `dtmin`); `mass_form` and `deviatoric`; the heating flags and `H`; the

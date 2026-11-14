@@ -31,7 +31,7 @@ end
     # The dt invariant is calibrated against the classic cycle; pin it.
     ad = run_semquad_simulation(qt_ad, pr, theta0;
                                 amr_every=1, refine_frac=0.0, coarsen_frac=0.0,
-                                amr_policy=:classic, kw...)
+                                kw...)
     st = run_semquad_simulation(qt_st, pr, theta0;
                                 amr_every=0, kw...)
 

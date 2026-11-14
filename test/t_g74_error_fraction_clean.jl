@@ -1,6 +1,6 @@
 # G74: clean dynamic AMR with ASPECT-style error-fraction marking.
 #
-# Analytic topstrong, initial_refine=1, amr_every=1, marking=:error_fraction
+# Analytic topstrong, initial_refine=1, amr_every=1 (Dörfler marking, the only
 # (refine/coarsen fractions of total error), coarsen_frac=0.1, hard
 # max_leaves=30000, max_level=7/8, wall_min_level=7/8, wall_strip=0.01.
 # Two steps to t=2e-10; compare on a fixed level9 reference tree.
@@ -24,14 +24,13 @@ function h74_run(level::Int)
     qt = wall_graded_tree(2, level; strip=0.10)
     sq = make_semquad(qt, 4)
     theta0 = [H74_TOPSTRONG(x, y) for (x, y) in sq.coords]
-    # Policy-agnostic gate calibrated on classic; pin the policy explicitly.
+    # Policy-agnostic gate: the balanced cycle is the only AMR policy.
     return run_semquad_simulation(qt, pr, theta0;
                                   p=4, tstop=2.0e-10, dt0=1.0e-10,
                                   dtmax=1.0e-10, cfl=0.25, maxsteps=2,
                                   maxpic=1, initial_refine=1,
                                   theta_ic=H74_TOPSTRONG,
-                                  amr_every=1, marking=:error_fraction,
-                                  amr_policy=:classic,
+                                  amr_every=1,
                                   refine_frac=0.2, coarsen_frac=0.1,
                                   max_leaves=30000, max_level=level,
                                   wall_min_level=level, wall_strip=0.01,

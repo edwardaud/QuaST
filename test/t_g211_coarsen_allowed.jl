@@ -24,19 +24,9 @@ using Test, QuaST, Random, Printf
 #      *does* recirculate -- the two arms differ only in the gate;
 #   5. invariants over random cycles: face 2:1, `mirror_defect == 0` under `:x`,
 #      leaf budget, area, and the recirculation stays a small fraction;
-#   6. `amr_policy=:classic` is bitwise identical to the historical path (the same
-#      FNV pins as G208/G210) and the flag is part of `run_config`.
+#   6. the flag is wired through the driver and is part of `run_config`.
 
 # ---- helpers ---------------------------------------------------------------
-g211_fnv(a) = begin
-    h = 0xcbf29ce484222325
-    for b in reinterpret(UInt8, a)
-        h ⊻= UInt64(b)
-        h *= 0x100000001b3
-    end
-    string(h, base=16, pad=16)
-end
-
 g211_kids(lf) = QuaST._quartet_kids(lf)
 g211_pq(lf) = QuaST._pq(lf)
 g211_row(qt, lf) = lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
@@ -263,13 +253,13 @@ end
         end
     end
 
-    # ---- 5. driver wiring and bitwise classic ---------------------------
-    @testset "driver: classic bitwise, gate wired into run_config" begin
+    # ---- 5. driver wiring --------------------------------------------------
+    @testset "driver: the gate is wired into run_config" begin
         pr = Params(Ra=1.0e4, H=0.0, eta_law=:expTz,
                     eta_b=9.70406052783923433184,
                     eta_c=4.1588830833596718565,
                     Twall_top=0.0, Twall_bot=1.0, bc=:free)
-        function drv(policy::Symbol; gate::Bool=true, checkpoint::String="")
+        function drv(; gate::Bool=true, checkpoint::String="")
             qt = Quadtree(5; cells_x=5, cells_y=2, Lx=2.5)
             for _ in 1:2, lf in collect(qt.leaves)
                 refine!(qt, lf)
@@ -283,23 +273,15 @@ end
             return run_semquad_simulation(qt, pr, th; p=2, tstop=8.0e-4,
                                           dt0=1.0e-4, maxsteps=5, amr_every=1,
                                           coarsen_frac=0.0, refine_frac=0.5,
-                                          marking=:error_fraction, max_level=5,
+                                          max_level=5,
                                           max_leaves=120, linear=:direct,
-                                          amr_policy=policy,
                                           amr_coarsen_gate=gate, verbose=false,
                                           checkpoint_path=checkpoint,
                                           checkpoint_every=5)
         end
-        rc = drv(:classic)
-        rb = drv(:balanced; gate=true)
-        rb0 = drv(:balanced; gate=false)
-        # G208/G210 pin the historical path; `:classic` must reproduce it exactly
-        @test g211_fnv(reinterpret(UInt8, rc.theta)) == "84de84a66ab9dd69"
-        @test g211_fnv(reinterpret(UInt8, vcat(rc.ux, rc.uz))) == "6ea033597f291f32"
-        @test g211_fnv(reinterpret(UInt8, reduce(vcat, rc.history))) ==
-              "8fcbf706331b1542"
-        @test rc.steps == 5
-        # the gate reaches the balanced path and both arms are finite
+        rb = drv(; gate=true)
+        rb0 = drv(; gate=false)
+        # both arms reach the driver path and are finite
         @test rb.steps == 5 && rb0.steps == 5
         @test all(isfinite, rb.theta) && all(isfinite, rb0.theta)
         @test max_face_level_jump(rb.qt) <= 1
@@ -307,11 +289,11 @@ end
         @test length(rb.qt.leaves) <= 120 + 18
         # the flag is part of run_config (a restart cannot switch it silently)
         path = joinpath(mktempdir(), "g211.h5")
-        drv(:balanced; gate=true, checkpoint=path)
+        drv(; gate=true, checkpoint=path)
         st = load_semquad_state(path)
         @test st.config["amr_coarsen_gate"] == "true"
         path0 = joinpath(mktempdir(), "g211_off.h5")
-        drv(:balanced; gate=false, checkpoint=path0)
+        drv(; gate=false, checkpoint=path0)
         @test load_semquad_state(path0).config["amr_coarsen_gate"] == "false"
         @test haskey(st.config, "amr_policy")
     end

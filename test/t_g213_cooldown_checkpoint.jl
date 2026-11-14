@@ -14,9 +14,7 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
 #      cooldown and resume exactly as the pre-change code did.  To reproduce an
 #      old in-loop file, the fixture also rewrites `dt_prev` to the previous
 #      step's `dt` (the old writer stored it before `dt_prev = dt`, which is the
-#      separate ordering fix this gate pins);
-#   4. the classic arm (`amr_policy=:classic`) is untouched: the historical
-#      G208 FNV pins still hold and a classic checkpoint has no cooldown data.
+#      separate ordering fix this gate pins).
 
 # ---- helpers ---------------------------------------------------------------
 fnv(a) = begin
@@ -52,9 +50,9 @@ function g213_drv(; maxsteps, checkpoint="", restart="", cb=nothing)
     return run_semquad_simulation(qt, pr, th; p=2, tstop=Inf,
                                   dt0=1.0e-4, maxsteps=maxsteps, amr_every=1,
                                   coarsen_frac=0.05, refine_frac=0.2,
-                                  marking=:error_fraction, max_level=7,
+                                  max_level=7,
                                   max_leaves=640, linear=:direct,
-                                  amr_policy=:balanced, symmetry=:x,
+                                  symmetry=:x,
                                   verbose=false, cfl=0.5,
                                   checkpoint_path=checkpoint,
                                   checkpoint_every=10,
@@ -64,32 +62,6 @@ end
 
 "Rows of a `/balanced` cycle as a comparable tuple."
 cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
-
-# The G208/G210 classic driver, used for the default-path hash check.
-function g213_classic(; checkpoint="")
-    pr = Params(Ra=1.0e4, H=0.0, eta_law=:expTz,
-                eta_b=9.70406052783923433184,
-                eta_c=4.1588830833596718565,
-                Twall_top=0.0, Twall_bot=1.0, bc=:free)
-    qt = Quadtree(5; cells_x=5, cells_y=2, Lx=2.5)
-    for _ in 1:2, lf in collect(qt.leaves)
-        refine!(qt, lf)
-    end
-    balance!(qt)
-    ss = make_semstokes(qt, 2)
-    th = [0.1 * sinpi(y) * cospi(x / qt.Lx) for (x, y) in ss.su.coords]
-    for (g, (_, y)) in enumerate(ss.su.coords)
-        (y <= 1.0e-12 || y >= 1.0 - 1.0e-12) && (th[g] = 0.0)
-    end
-    return run_semquad_simulation(qt, pr, th; p=2, tstop=8.0e-4,
-                                  dt0=1.0e-4, maxsteps=5, amr_every=1,
-                                  coarsen_frac=0.0, refine_frac=0.5,
-                                  marking=:error_fraction, max_level=5,
-                                  max_leaves=120, linear=:direct,
-                                  verbose=false, amr_policy=:classic,
-                                  checkpoint_path=checkpoint,
-                                  checkpoint_every=5)
-end
 
 @testset "G213 cooldown checkpoint and bitwise resume" begin
     # ---- 1. save/load round trip of a non-trivial cooldown -----------------
@@ -313,23 +285,5 @@ end
         @test got[].leaves == 640
         @test got[].N == 2853
         @test fnv(reinterpret(UInt8, b.theta)) == "a579666395604f77"
-    end
-
-    # ---- 4. the default (classic) path is untouched ------------------------
-    @testset "default path" begin
-        path = joinpath(mktempdir(), "g213_classic.h5")
-        r = g213_classic(checkpoint=path)
-        @test fnv(reinterpret(UInt8, r.theta)) == "84de84a66ab9dd69"
-        @test fnv(reinterpret(UInt8, vcat(r.ux, r.uz))) == "6ea033597f291f32"
-        @test fnv(reinterpret(UInt8, reduce(vcat, r.history))) ==
-              "8fcbf706331b1542"
-        h5open(path, "r") do f
-            @test !haskey(f, "cooldown_no_refine")
-            @test !haskey(f, "cooldown_no_coarsen")
-            @test !haskey(HDF5.attrs(f), "cooldown_cycle")
-        end
-        ld = load_semquad_state(path)
-        @test isempty(ld.cooldown.no_refine)
-        @test ld.cooldown.cycle == 0
     end
 end

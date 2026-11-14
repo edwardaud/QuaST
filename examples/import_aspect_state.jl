@@ -21,7 +21,7 @@
 #     (point location by descending the logical quadtree, then the
 #     tensor-product Q2 Lagrange basis);
 #  2. builds the production-card tree from that field: the card's 5x2 base at
-#     level 3, then repeated `amr_cycle!` (error-fraction 0.2 / 0.05, theta
+#     level 3, then repeated `amr_cycle_balanced!` (0.2 / 0.05, theta
 #     gradient-jump indicator) + `refine_wall_to_min!` (5 / 0.1) +
 #     `mirror_close!`/`balance!(symmetry=:x)` + `semquad_enforce_leaf_budget!`
 #     until the leaf budget is reached — i.e. the card's own AMR rule, driven by
@@ -274,9 +274,10 @@ function build_tree(a::AspField; max_leaves::Int=10000, wall_min::Int=5,
         theta = zeros(Float64, sq.N)
         interp_state!(theta, nothing, nothing, sq, a)
         eta = semquad_gradient_jump(sq, qt, theta)
-        amr_cycle!(qt, eta; refine_frac=refine_frac, coarsen_frac=coarsen_frac,
-                   marking=:error_fraction, max_level=amr_max_level,
-                   max_leaves=max_leaves, symmetry=:x)
+        amr_cycle_balanced!(qt, eta; refine_frac=refine_frac,
+                            coarsen_frac=coarsen_frac,
+                            max_level=amr_max_level,
+                            max_leaves=max_leaves, symmetry=:x)
         refine_wall_to_min!(qt, wall_min; strip=wall_strip, symmetry=:x)
         mirror_close!(qt; max_level=amr_max_level)
         balance!(qt; symmetry=:x)

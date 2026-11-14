@@ -12,13 +12,12 @@ using QuaST
           for (x, y) in sq.coords]
     pr = Params(Ra=1.0e7, H=5.0, eta_law=:expT, deta_T=1.0e3,
                 bc=:free, eta_min=1.0e-6, eta_max=1.0e6)
-    # Policy-agnostic gate calibrated on classic; pin the policy explicitly.
+    # Policy-agnostic gate: the balanced cycle is the only AMR policy.
     res = run_semquad_simulation(qt, pr, th;
                                  p=3, tstop=1.0, dt0=1.0e-9, dtmax=1.0e-9,
                                  cfl=0.0, maxsteps=1, maxpic=1,
                                  initial_refine=0, amr_every=1,
-                                 amr_policy=:classic,
-                                 marking=:error_fraction, refine_frac=0.2,
+                                 refine_frac=0.2,
                                  coarsen_frac=0.0, max_level=6,
                                  wall_min_level=6, wall_strip=0.10,
                                  symmetry=:x, linear=:direct,

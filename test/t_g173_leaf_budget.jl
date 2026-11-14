@@ -111,11 +111,10 @@ using Test, QuaST, LinearAlgebra, Printf
     end
     seen = Int[]
     cb = st -> push!(seen, length(st.qt.leaves))
-    # This gate pins the classic hard max_leaves cap and its quartet-merge path.
+    # This gate pins the hard max_leaves cap and its quartet-merge path.
     res = run_semquad_simulation(qt5, pr, th5; p=2, tstop=6.0e-4, dt0=1.0e-4,
                                  maxsteps=6, amr_every=1, coarsen_frac=0.0,
-                                 refine_frac=0.5, marking=:error_fraction,
-                                 amr_policy=:classic,
+                                 refine_frac=0.5,
                                  max_level=5, max_leaves=40, linear=:direct,
                                  callback=cb, verbose=false)
     @test !isempty(seen)
@@ -126,13 +125,20 @@ using Test, QuaST, LinearAlgebra, Printf
     # initial tree, so the over-budget merge inside semquad_amr_passes! runs
     # (this is the path that crashed with an undefined `verbose` when the
     # budget was first wired in).
+    #
+    # The cap is 40, not 32: the balanced cycle protects the first/last leaf
+    # rows from coarsening (the boundary layer must not be merged away), so a
+    # level-3 8x8 tree has a protected 16-leaf floor plus the quartets that
+    # cannot survive the 2:1 rebalance.  The pass merges 64 -> 40 and reports
+    # the rest as unreachable; the hard cap is still verified by case (5)
+    # above, whose 40-leaf cap is reachable.
     qt6 = Quadtree(5)
     for _ in 1:3, lf in collect(qt6.leaves)
         refine!(qt6, lf)
     end
     balance!(qt6)
     n6 = length(qt6.leaves)
-    @test n6 > 32
+    @test n6 > 40
     ss6 = make_semstokes(qt6, 2)
     th6 = [0.1 * sinpi(y) * cos(2pi * x) for (x, y) in ss6.su.coords]
     for (g, (_, y)) in enumerate(ss6.su.coords)
@@ -142,13 +148,13 @@ using Test, QuaST, LinearAlgebra, Printf
     cb6 = st -> push!(seen6, length(st.qt.leaves))
     res6 = run_semquad_simulation(qt6, pr, th6; p=2, tstop=4.0e-4, dt0=1.0e-4,
                                   maxsteps=4, amr_every=1, coarsen_frac=0.0,
-                                  refine_frac=0.5, marking=:error_fraction,
-                                  amr_policy=:classic,
-                                  max_level=5, max_leaves=32, linear=:direct,
+                                  refine_frac=0.5,
+                                  max_level=5, max_leaves=40, linear=:direct,
                                   callback=cb6, verbose=false)
     @test !isempty(seen6)
-    @test maximum(seen6) <= 32
-    @test length(res6.qt.leaves) <= 32
+    @test maximum(seen6) <= 40
+    @test length(res6.qt.leaves) <= 40
+    @test length(res6.qt.leaves) < n6          # the over-budget merge ran
 
     @printf("G173: budget enforcement ok (driver leaves=%d, peak=%d, merge path %d->%d)\n",
             length(res.qt.leaves), maximum(seen), n6, length(res6.qt.leaves))

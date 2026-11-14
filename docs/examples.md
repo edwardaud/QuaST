@@ -63,27 +63,26 @@ theta0(x, z) = 0.12 exp(-((x - 0.5)/0.12)^2 - ((z - 0.35)/0.10)^2) sin(pi z)
 julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
 ```
 
-The producer runs 126 steps with `p = 4`, the direct solver, Kelly marking every 5 steps, a
+The producer runs 126 steps with `p = 4`, the direct solver, Kelly AMR every 5 steps, a
 1024-leaf hard budget and 256 x 256 frames every `4e-10` up to `t = 1e-8`. It deletes its
-output directory at start, so set `BLOB_OUT` if you want a different path. The default
-(`BLOB_POLICY=balanced`) ends at 898 leaves and 25 frames. On this checkout the producer
+output directory at start, so set `BLOB_OUT` if you want a different path. The balanced AMR
+policy (the only one) ends at 898 leaves and 25 frames. On this checkout the producer
 reported **116.1 s** for the 126 steps, with 3 min 15 s total wall including Julia startup.
 
 The final lines are
 
 ```
 done t=1.008e-08 steps=126 leaves=898 N=15361 frames=25 in 116.1 s
-FINAL policy=balanced frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce56ea105542b8cdeda end_u_sha256=1cfcb5c63a476ed2e9a62e9700917ae718bc3165d9a485a9d54609a4844b0b51 Tmax25=1.264329738
+FINAL frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce56ea105542b8cdeda end_u_sha256=1cfcb5c63a476ed2e9a62e9700917ae718bc3165d9a485a9d54609a4844b0b51 Tmax25=1.264329738
 ```
 
 `end_theta_sha256` is the bitwise pin, and `Tmax25` is the scalar to compare. Against ASPECT's
 `Tmax = 1.2531` at the same frame, the computed 1.264330 is **+0.9 percent**; the field-level
 difference was 2.87 percent for the classic arm and was not re-measured for the balanced arm,
-so do not quote 2.87 percent for this default. The classic arm is available with
-`BLOB_POLICY=classic BLOB_OUT=out_julia/blob_classic julia --project=. --threads=8
-examples/run_blob_kelly_1024.jl`; its documented digest is
+so do not quote 2.87 percent for this default. The classic arm's documented digest was
 `868a79d92a78bcfe89cfacd4774a0301c0eeb0a865284ab005155f6f458afe88` with `Tmax25=1.264427445`
-(project record, not re-run here). The digest is bitwise only on the pinned Julia, BLAS and
+(project record); the classic policy was removed, so it is no longer reproducible. The digest
+is bitwise only on the pinned Julia, BLAS and
 thread stack; `Tmax25` is the platform-tolerant check.
 
 ## 3. The realistic card

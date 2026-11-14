@@ -15,12 +15,11 @@ using QuaST
     pr = Params(Ra=1.0e4, H=5.0, eta_law=:expT, deta_T=1.0, bc=:free)
 
     qt1 = deepcopy(qt0)
-    # This gate pins the classic hard max_leaves cap (no budget exchange); keep it classic.
+    # This gate pins the hard max_leaves cap (no budget exchange is needed to hold it).
     res1 = run_semquad_simulation(qt1, pr, theta0;
                                   p=4, tstop=1.0, dt0=1.0e-9, dtmax=1.0e-9,
                                   cfl=0.0, maxsteps=1, maxpic=1,
                                   amr_every=1, refine_frac=0.2,
-                                  amr_policy=:classic,
                                   max_leaves=n0, linear=:schur_cg,
                                   schur_maxiter=100, advection=:skew,
                                   verbose=false)
@@ -31,7 +30,6 @@ using QuaST
                                   p=4, tstop=1.0, dt0=1.0e-9, dtmax=1.0e-9,
                                   cfl=0.0, maxsteps=1, maxpic=1,
                                   amr_every=1, refine_frac=0.2,
-                                  amr_policy=:classic,
                                   max_leaves=n0 + 100, linear=:schur_cg,
                                   schur_maxiter=100, advection=:skew,
                                   verbose=false)

@@ -89,15 +89,15 @@ dataset is written (an EV-free run, or an old checkpoint).  `weak`/`weak_prev`
 are the strain-weakening field at the two BDF2 levels of the next step
 (docs/dev/PHYSICS.md §9); both are optional so an old checkpoint still loads.
 
-`cooldown` is the `AmrCooldown` hysteresis state of `amr_policy=:balanced`
+`cooldown` is the `AmrCooldown` hysteresis state of the balanced AMR cycle
 (`src/amr_balanced.jl`, docs/dev/AMR.md §3.5).  When supplied it is
 written as two integer datasets (`cooldown_no_refine`/`cooldown_no_coarsen`, one
 column per key: level, ix, iy, remaining cycles) and the integer attribute
 `cooldown_cycle`; they are **state**, not configuration, so they are deliberately
-absent from the `config` string and the restart guard.  When omitted (the classic
-path, or an old writer) no cooldown data is written; `load_semquad_state` then
-returns an empty cooldown.  The datasets are optional on read, so old
-checkpoints load and restart exactly as before.
+absent from the `config` string and the restart guard.  When omitted (an old
+writer, or a caller that does not track the cycle's hysteresis) no cooldown data
+is written; `load_semquad_state` then returns an empty cooldown.  The datasets
+are optional on read, so old checkpoints load and restart exactly as before.
 
 `velocity_stale` is the optional restart marker for the final checkpoint of a
 run: when the last step ran an AMR cycle, the driver re-solves the flow after the
@@ -278,8 +278,9 @@ recovered by inferring the base cells from the leaves: this is what makes the
 multi-root 2b checkpoints (5x2 base) loadable.  A stretched single-root box
 whose `Lx` was not stored cannot be recovered and falls back to `Lx = 1`; new
 checkpoints always store `Lx`.  `cooldown` is the optional `AmrCooldown`
-hysteresis state of `amr_policy=:balanced`; a checkpoint without the cooldown
-datasets returns an **empty** cooldown (`cycle == 0`), which is exactly the
+hysteresis state of the balanced AMR cycle; a checkpoint without the cooldown
+datasets (every file written before the cooldown existed) returns an **empty**
+cooldown (`cycle == 0`), which is exactly the
 historical restart behaviour (docs/dev/BUG_LEDGER.md §10.5).  `velocity_stale`
 is the optional marker described in `save_semquad_state`: true means the stored
 `ux/uz/pv` are the end-of-run diagnostic re-solve and a restart must zero them to

@@ -109,21 +109,14 @@ end
 
 # `run_semquad_simulation` validates its `run_config` against the checkpoint on
 # restart, so every trajectory-affecting setting is taken from the file.
-# `coarsen_theta_tol` is an exception: it is *not* in `run_config`, and the card
-# that produced these checkpoints ran with the documented 1e-2 (docs/
-# CASE_REALISTIC.md §"E is the classic-policy run"); without it the classic
-# coarsening strip-mines the tree (8188 -> 4810 leaves in one cycle) and the
-# trajectory is not the production one.
-function driver_kwargs(cfg::Dict{String,String}; amr_every::Int,
-                       coarsen_theta_tol::Float64=1.0e-2)
+function driver_kwargs(cfg::Dict{String,String}; amr_every::Int)
     g(k, d) = haskey(cfg, k) ? parse(Float64, cfg[k]) : d
     i(k, d) = Int(round(g(k, Float64(d))))
     s(k, d) = haskey(cfg, k) ? Symbol(cfg[k]) : d
     b(k, d) = haskey(cfg, k) ? cfg[k] == "true" : d
-    return (amr_every=amr_every, amr_strategy=s("amr_strategy", :legacy),
-            amr_passes=i("amr_passes", 1), marking=s("marking", :error_fraction),
+    return (amr_every=amr_every,
+            amr_passes=i("amr_passes", 1),
             refine_frac=g("refine_frac", 0.2), coarsen_frac=g("coarsen_frac", 0.0),
-            coarsen_theta_tol=coarsen_theta_tol,
             max_leaves=i("max_leaves", typemax(Int)),
             max_level=i("max_level", typemax(Int)),
             wall_min_level=i("wall_min_level", 0), wall_strip=g("wall_strip", 0.1),

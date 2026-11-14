@@ -5,6 +5,9 @@
 # t=2e-10; the two solutions are compared on a fixed level9 reference tree.
 # This is the clean-protocol gate (no n16 seed, no fixed tree, converged
 # Stokes); the 5-step/1e-9 run gives e78=1.13e-6 as a diagnostic.
+# With the balanced (cumulative-error) marking the interior reaches level 5
+# rather than the classic policy's 6 at the same refine_frac; the wall levels
+# and the self-convergence ratio are unchanged.
 using Test
 using LinearAlgebra
 using Printf
@@ -25,14 +28,13 @@ function h71_run(level::Int)
     qt = wall_graded_tree(2, level; strip=0.10)
     sq = make_semquad(qt, 4)
     theta0 = [H71_TOPSTRONG(x, y) for (x, y) in sq.coords]
-    # Policy-agnostic gate calibrated on classic; pin the policy explicitly.
+    # Policy-agnostic gate: the balanced cycle is the only AMR policy.
     return run_semquad_simulation(qt, pr, theta0;
                                   p=4, tstop=2.0e-10, dt0=1.0e-10,
                                   dtmax=1.0e-10, cfl=0.25, maxsteps=2,
                                   maxpic=1, initial_refine=1,
                                   theta_ic=H71_TOPSTRONG,
                                   amr_every=1, refine_frac=0.2,
-                                  amr_policy=:classic,
                                   coarsen_frac=0.0, max_leaves=70000,
                                   max_level=level, linear=:schur_cg,
                                   schur_maxiter=2000, stokes_tol=1.0e-6,
@@ -57,8 +59,8 @@ end
     @test r8.steps == 2
     @test st7.wall_max == 7
     @test st8.wall_max == 8
-    @test st7.interior_max >= 6
-    @test st8.interior_max >= 6
+    @test st7.interior_max >= 5
+    @test st8.interior_max >= 5
     @test r7.ss.su.N < r8.ss.su.N
     @test e78 < 1.0e-5
     @test maximum(abs, r7.theta) < 0.1

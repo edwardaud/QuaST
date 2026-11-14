@@ -23,13 +23,12 @@ end
     pr = Params(Ra=1.0e8, H=5.0, eta_law=:expTz,
                 eta_b=9.704060527839234, eta_c=4.158883083359672,
                 bc=:free, eta_min=1.0e-6, eta_max=1.0e6)
-    # Policy-agnostic gate calibrated on classic; pin the policy explicitly.
+    # Policy-agnostic gate: the balanced cycle is the only AMR policy.
     res = run_semquad_simulation(deepcopy(qt), pr, th;
                                  p=4, tstop=1.0, dt0=1.0e-9,
                                  dtmax=1.0e-9, cfl=0.0, maxsteps=1,
                                  maxpic=1, initial_refine=0, amr_every=1,
-                                 amr_policy=:classic,
-                                 marking=:error_fraction, refine_frac=0.2,
+                                 refine_frac=0.2,
                                  coarsen_frac=0.1, max_leaves=30000,
                                  max_level=7, wall_min_level=7,
                                  wall_strip=0.005, symmetry=:x,

@@ -90,7 +90,6 @@ end
     # The comparison was calibrated on the classic cycle; pin it.
     st = run_semquad_simulation(qta, pr, th; p=2, tstop=1.0, dt0=1.0e-4,
                                 cfl=5.0, maxsteps=4, amr_every=2,
-                                amr_policy=:classic,
                                 refine_frac=0.3, ev=0.11, ev_cmax=0.052,
                                 linear=:mg, verbose=false)
     @test st.steps == 4

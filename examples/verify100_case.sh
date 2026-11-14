@@ -52,9 +52,9 @@ fi
 # production value (CASE_HYST=1, CASE_EV=0.11), so the direct and MG arms
 # cannot drift apart through a changed default.
 export CASE_OUT="$OUT" CASE_STEPS="$STEPS" CASE_MAXLEAVES=10000 \
-    CASE_COARSEN=0.05 CASE_THETATOL=1e-2 CASE_LINEAR="$ARM" \
+    CASE_COARSEN=0.05 CASE_LINEAR="$ARM" \
     CASE_LATENT=per_phase CASE_MAXLEV=7 CASE_WALLMIN=5 CASE_WALLSTRIP=0.1 \
-    CASE_AMR=balanced CASE_HYST=1 CASE_AMR_GATE=1 CASE_SYMMETRY=none \
+    CASE_HYST=1 CASE_AMR_GATE=1 CASE_SYMMETRY=none \
     CASE_EV=0.11 CASE_STOKES_SCALING=equilibrated CASE_FRAME="${CASE_FRAME:-0}"
 
 JL_ARGS=(--project=. --threads=8 examples/case_realistic_2d.jl spinup)

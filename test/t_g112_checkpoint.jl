@@ -26,12 +26,11 @@ using Test, QuaST
         dt = dt0
         # with adaptive dt the number of steps is the only stop criterion
         tstop = cfl > 0.0 ? 1.0e9 : nsteps * dt
-        # Policy-agnostic restart gate calibrated on classic; pin the policy explicitly.
+        # Restart gate: the balanced cycle is the only AMR policy, so nothing to pin.
         run_semquad_simulation(qt, pr, theta0;
             p=p, tstop=tstop, dt0=dt, dtmax=dtmax, dtmin=1.0e-16, cfl=cfl,
             maxsteps=nsteps,
-            amr_every=amr, symmetry=:x, marking=:error_fraction,
-            amr_policy=:classic,
+            amr_every=amr, symmetry=:x,
             ev=0.0, advection=:skew, linear=:direct, maxpic=1,
             pic_tol=1.0e-6, verbose=false,
             restart_from=restart_from, checkpoint_path=ckpt,
@@ -118,8 +117,7 @@ using Test, QuaST
         dt = 2.0e-5
         run_semquad_simulation(qt, pr, theta0;
             p=3, tstop=nsteps * dt, dt0=dt, dtmax=dt, dtmin=1.0e-16,
-            amr_every=3, symmetry=:x, marking=:error_fraction, refine_frac=0.25,
-            amr_policy=:classic,
+            amr_every=3, symmetry=:x, refine_frac=0.25,
             max_leaves=4000, max_level=6, ev=0.0, advection=:skew,
             linear=:direct, maxpic=1, pic_tol=1.0e-6, verbose=false,
             restart_from=restart_from, checkpoint_path=ckpt, checkpoint_every=every)

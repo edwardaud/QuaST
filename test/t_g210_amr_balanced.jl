@@ -1,6 +1,7 @@
 using Test, QuaST, Random, Printf
 
-# G210: `amr_policy = :balanced` (docs/dev/AMR.md §3-§4).
+# G210: the balanced AMR policy (docs/dev/AMR.md §3-§4), the only adaptive one
+# since the classic policy was removed at `8c622df`.
 #
 # The production run E is pinned at 9994/10000 leaves with 3720 AMR cycles of
 # which only 723 changed anything: the classic policy (absolute
@@ -13,32 +14,23 @@ using Test, QuaST, Random, Printf
 #      `max(eta_child) <= tau_h` with `tau_h = min(tau_c, hysteresis*tau_r)`,
 #      both thresholds cumulative error fractions of the *current* tree;
 #   2. the budget is paid for by coarsening ("exchange"), never a reason to stop
-#      refining: `refined > 0` where the classic cycle refines 0;
+#      refining;
 #   3. hysteresis: a quartet that was just merged is not re-refined on the next
 #      cycle (and without the cooldown it is);
 #   4. the wall protect set is the first/last leaf rows only;
 #   5. invariants: 2:1 balance, `mirror_defect == 0` under `symmetry=:x`, the
 #      leaf budget, area preservation, and never a silent `refined=0 coarsened=0`
 #      cycle while a refinement is wanted;
-#   6. `amr_policy=:classic` is bitwise identical to the historical path (the
-#      same FNV pins as G208) and `:balanced` is a different trajectory.
+#   6. the cycle is wired into the driver and the recorded `run_config` keeps
+#      `amr_policy = "balanced"`.
 
 # ---- helpers ---------------------------------------------------------------
-# G210 pins the `:balanced` policy exactly as measured in `docs/dev/AMR.md` §3.6, i.e.
+# G210 pins the balanced policy exactly as measured in `docs/dev/AMR.md` §3.6, i.e.
 # with the coarsening pre-check OFF (it did not exist then); G211 pins the gate
 # itself.  Keeping G210 on the pre-gate path makes every number and every
 # assertion in it directly comparable with those sections.
 g210_cycle!(qt, eta; kw...) =
     QuaST.amr_cycle_balanced!(qt, eta; coarsen_gate=false, kw...)
-
-g210_fnv(a) = begin
-    h = 0xcbf29ce484222325
-    for b in reinterpret(UInt8, a)
-        h ⊻= UInt64(b)
-        h *= 0x100000001b3
-    end
-    string(h, base=16, pad=16)
-end
 
 function g210_seed_tree(cx::Int, cy::Int, base::Int, maxlev::Int)
     qt = Quadtree(maxlev; cells_x=cx, cells_y=cy, Lx=cx / cy)
@@ -99,26 +91,17 @@ end
 
     # ---- 2. budget exchange: refinement continues at the cap --------------
     @testset "budget exchange" begin
-        # classic: at exactly `max_leaves` the guard breaks the refine loop
-        # before the first candidate (the production freeze, `docs/dev/BUG_LEDGER.md` §5.4).
-        qc = g210_seed_tree(5, 2, 3, 7)
-        low = Set(lf for lf in qc.leaves if g210_zc(qc, lf) < 0.25)
-        eta = g210_eta(qc, low)
-        nr_c, nc_c = amr_cycle!(qc, copy(eta); refine_frac=0.2, coarsen_frac=0.05,
-                                marking=:error_fraction, max_level=7,
-                                max_leaves=640, symmetry=:x,
-                                protect=Set{NTuple{3,Int}}())
-        @test nr_c == 0                     # the freeze, pinned
-        # balanced: the same state refines, funded by merging the low tail
+        # the same state refines, funded by merging the low tail
         qb = g210_seed_tree(5, 2, 3, 7)
+        low = Set(lf for lf in qb.leaves if g210_zc(qb, lf) < 0.25)
+        eta = g210_eta(qb, low)
         nr_b, nc_b, nex_b = g210_cycle!(qb, eta; refine_frac=0.2,
                                                 coarsen_frac=0.05, max_level=7,
                                                 max_leaves=640, symmetry=:x,
                                                 protect=g210_rows(qb))
         d = LAST_AMR_BALANCED[]
-        @printf("  exchange: classic refined=%d coarsened=%d | balanced refined=%d coarsened=%d exchanged=%d leaves=%d budget_limited=%s\n",
-                nr_c, nc_c, nr_b, nc_b, nex_b, length(qb.leaves), d.budget_limited)
-        @test nr_b > nr_c
+        @printf("  exchange: balanced refined=%d coarsened=%d exchanged=%d leaves=%d budget_limited=%s\n",
+                nr_b, nc_b, nex_b, length(qb.leaves), d.budget_limited)
         @test nr_b > 0
         @test nex_b > 0                     # the refinement was paid for
         @test length(qb.leaves) <= 640 + 18 # budget (G208's documented slack)
@@ -238,13 +221,13 @@ end
         end
     end
 
-    # ---- 6. the driver path: `:classic` bitwise, `:balanced` different -----
-    @testset "driver wiring and bitwise classic" begin
+    # ---- 6. the driver path: the cycle is wired and the policy is recorded --
+    @testset "driver wiring" begin
         pr = Params(Ra=1.0e4, H=0.0, eta_law=:expTz,
                     eta_b=9.70406052783923433184,
                     eta_c=4.1588830833596718565,
                     Twall_top=0.0, Twall_bot=1.0, bc=:free)
-        function drv(policy::Symbol; checkpoint::String="")
+        function drv(; checkpoint::String="")
             qt = Quadtree(5; cells_x=5, cells_y=2, Lx=2.5)
             for _ in 1:2, lf in collect(qt.leaves)
                 refine!(qt, lf)
@@ -258,30 +241,22 @@ end
             res = run_semquad_simulation(qt, pr, th; p=2, tstop=8.0e-4,
                                          dt0=1.0e-4, maxsteps=5, amr_every=1,
                                          coarsen_frac=0.0, refine_frac=0.5,
-                                         marking=:error_fraction, max_level=5,
+                                         max_level=5,
                                          max_leaves=120, linear=:direct,
-                                         amr_policy=policy, verbose=false,
+                                         verbose=false,
                                          checkpoint_path=checkpoint,
                                          checkpoint_every=5)
             return res
         end
-        rc = drv(:classic)
-        rb = drv(:balanced)
-        # G208 pins the historical path; `amr_policy=:classic` must reproduce it
-        @test g210_fnv(reinterpret(UInt8, rc.theta)) == "84de84a66ab9dd69"
-        @test g210_fnv(reinterpret(UInt8, vcat(rc.ux, rc.uz))) == "6ea033597f291f32"
-        @test g210_fnv(reinterpret(UInt8, reduce(vcat, rc.history))) ==
-              "8fcbf706331b1542"
-        @test rc.steps == 5
-        # ... and :balanced is a different mesh trajectory (the kwarg is wired)
-        @test g210_fnv(reinterpret(UInt8, rb.theta)) != "84de84a66ab9dd69"
+        rb = drv()
         @test rb.steps == 5
         @test all(isfinite, rb.theta)
         @test max_face_level_jump(rb.qt) <= 1
         @test length(rb.qt.leaves) <= 120 + 18
-        # the policy is part of run_config (a restart cannot switch it silently)
+        # the policy is part of run_config (kept as the constant "balanced" so a
+        # checkpoint written before the classic policy was removed still matches)
         path = joinpath(mktempdir(), "g210.h5")
-        drv(:balanced; checkpoint=path)
+        drv(; checkpoint=path)
         st = load_semquad_state(path)
         @test st.config["amr_policy"] == "balanced"
         @test st.config["amr_hysteresis"] == "1.0"

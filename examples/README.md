@@ -14,7 +14,6 @@ your own file as the argument. `examples/data/` holds the ASCII initial temperat
 | Script | What it computes |
 |---|---|
 | `amr_coarsen_gate_probe.jl` | Replays the balanced AMR pass on a checkpoint tree with the cycle, wall rule and leaf budget timed separately, and reports quartet merges, merges that the post-merge balance splits again, foreign splits, the residual leaf count and the 2:1 violations; its `supply` mode reports the coarsening supply that the 2:1 pre-check would keep. Usage: `trace <ckpt.h5>` or `supply <ckpt.h5>`. |
-| `amr_policy_probe.jl` | Three modes: `quantify` measures the quantities the classic policy compares on one checkpoint tree, `cycles` replays the AMR passes under `:classic` and `:balanced`, and `compare` reads two run directories and prints the stage-3 A/B table. |
 | `blankenbach_2b.jl` | Blankenbach 2b on square cells (5 x 2 base) with the time-dependent driver and a steady-state stop; prints wall `Nu_top` and `Vrms` against the 6.9299 / 171.755 reference. Usage: `<level> <tstop> [ev]`. |
 | `blankenbach_2b_cbf_ev.jl` | Runs 2b from the stored ASPECT initial temperature and measures whether the consistent boundary flux changes when the stored entropy-viscosity field is removed; the two values must be bitwise equal. Usage: `[level] [tstop]`. |
 | `blankenbach_2b_stretch.jl` | 2b on a stretched single-root grid (`2^L` by `2^L` cells with `h_x = 2.5 h_y`), with optional wall refinement. Usage: `[level] [wall] [tstop]`. |
@@ -29,7 +28,7 @@ your own file as the argument. `examples/data/` holds the ASCII initial temperat
 | `nusselt_audit.jl` | Measures every term of the discrete energy identity on a fixed state and the residual of each candidate Nusselt definition against it. Usage: `[options] ckpt [ckpt...]`. |
 | `nusselt_wall_functional_test.jl` | Applies the pointwise and consistent-boundary-flux wall functionals to exact polynomials on the production tree and compares them with the exact wall flux. Needs a checkpoint argument. |
 | `run_2b.jl` | Steady 2b with four continuation stages on a 40 x 16 `p = 4` mesh; prints `Nu_top`, `Nu_bot` and `Vrms` per stage. Usage: `[nxe] [nze] [stage...]`. |
-| `run_blob_kelly_1024.jl` | Produces the 25-frame blob regression: 126 steps at `Ra = 1e8` on a 1024-leaf tree with Kelly marking every 5 steps, per-frame SHA-256 rows, and the final `Tmax25` and `theta` digest. `BLOB_POLICY` and `BLOB_OUT` select the arm and the output directory. |
+| `run_blob_kelly_1024.jl` | Produces the 25-frame blob regression: 126 steps at `Ra = 1e8` on a 1024-leaf tree with Kelly AMR every 5 steps, per-frame SHA-256 rows, and the final `Tmax25` and `theta` digest. `BLOB_OUT` selects the output directory. |
 | `run_tosi_case1.jl` | Steady Tosi Case 1 on an 8 x 8 `p = 4` mesh; prints `Nu_top`, `Nu_bot` and `Vrms`. |
 | `run_tosi_case2_diag16.jl` | Steady Tosi Case 2 on a 16 x 16 `p = 4` mesh with the mean temperature, surface RMS velocity and surface maximum velocity. |
 | `run_tosi_case3_diag16.jl` | The same diagnostics for Tosi Case 3 on a 16 x 16 `p = 4` mesh. |

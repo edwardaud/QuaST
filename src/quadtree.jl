@@ -661,7 +661,7 @@ constraints ask for the boundary faces (4 queries per leaf per assembly).
 end
 
 # ---------------------------------------------------------------------------
-# x-mirror symmetry (`symmetry=:x` in `amr_cycle!` / the budget pass)
+# x-mirror symmetry (`symmetry=:x` in `amr_cycle_balanced!` / the budget pass)
 # ---------------------------------------------------------------------------
 #
 # `symmetry=:x` keeps the leaf set closed under the reflection x -> Lx - x: for
@@ -674,8 +674,8 @@ end
 #   * `_coarsen_pair!` merged only the `lf` quartet when the mirror quartet was
 #     protected (`protect` is built from the theta field, so it is not
 #     mirror-symmetric: measured 81 non-mirrored leaves from 0 in one pass),
-#   * `semquad_enforce_leaf_budget!` and `amr_cycle!`'s hard-budget guard did
-#     the same when the mirror quartet was protected or incomplete.
+#   * `semquad_enforce_leaf_budget!` and the removed classic cycle's hard-budget
+#     guard did the same when the mirror quartet was protected or incomplete.
 #
 # A single one-sided merge leaves **five** non-mirrored leaves (the merged
 # parent plus the four children of the still-split mirror parent), which is why
@@ -693,7 +693,7 @@ end
     mirror_defect(qt)
 
 Number of leaves whose x-mirror partner is not a leaf of the tree.  Zero is the
-`symmetry=:x` invariant; `mirror_close!` restores it, `balance!`/`amr_cycle!`
+`symmetry=:x` invariant; `mirror_close!` restores it, `balance!`/`amr_cycle_balanced!`
 with `symmetry=:x` preserve it.
 """
 function mirror_defect(qt::Quadtree)
@@ -738,9 +738,10 @@ end
 
 Close a `protect` set under the x-mirror: under `symmetry=:x` a protected leaf
 protects its mirror partner too.  Without this the pair-strict merges would be
-refused by an *asymmetric* protect entry -- the `coarsen_theta_tol` guard is
-derived from a field that is only approximately symmetric, and a 30 % random
-protect set refuses ~94 % of the pairs, i.e. the tree stops coarsening at all.
+refused by an *asymmetric* protect entry -- a protect set derived from a field
+that is only approximately symmetric (the removed classic cycle's
+`coarsen_theta_tol` guard), or a 30 % random protect set, refuses ~94 % of the
+pairs, i.e. the tree stops coarsening at all.
 Protecting the partner instead keeps the invariant *and* the coarsening
 ability; it is the conservative direction (never coarsen a leaf whose mirror is
 protected either).

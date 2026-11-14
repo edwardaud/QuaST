@@ -1,7 +1,8 @@
 # Goal-oriented (DWR) AMR kernel, experimental.  Kept separate from the
-# legacy AMR path.  The adjoint solve is not wired in yet; this file provides
-# the goal functional and the residual*adjoint leaf indicator so the next
-# step can plug in a Stokes/energy adjoint without touching amr_cycle!.
+# balanced AMR path (`amr_balanced.jl`).  The adjoint solve is not wired in yet;
+# this file provides the goal functional and the residual*adjoint leaf indicator
+# so the next step can plug in a Stokes/energy adjoint without touching
+# `amr_cycle_balanced!`.
 
 """
     goal_upper_half(sq; z0=0.5)

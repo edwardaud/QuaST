@@ -30,12 +30,12 @@ end
 
     qta = uniform_tree(2)
     ssa = make_semquad(qta, 4)
-    # Threshold calibrated on the classic policy; pin it (docs/dev/AMR.md).
+    # Threshold calibrated on the balanced policy (docs/dev/AMR.md).
     ra = run_semquad_simulation(qta, pr, h60_theta(ssa);
                                 p=4, tstop=1.0e-4, dt0=1.0e-5, cfl=0.0,
                                 maxpic=1, amr_every=1, refine_frac=0.3,
                                 coarsen_frac=0.0, max_leaves=300,
-                                maxsteps=10, amr_policy=:classic,
+                                maxsteps=10,
                                 linear=:direct, verbose=false)
 
     qts = uniform_tree(4)

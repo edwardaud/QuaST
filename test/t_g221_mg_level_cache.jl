@@ -203,12 +203,11 @@ _g221_vcycle(mg) = QuaST.semquad_mg_apply(mg, [0.1 + 0.01 * i
                            uz=copy(st.uz), leaves=length(st.qt.leaves)))
             return nothing
         end
-        # Policy-agnostic cache gate calibrated on classic; pin the policy.
+        # Policy-agnostic cache gate; the balanced cycle is the only AMR policy.
         res = run_semquad_simulation(q, pr, th0; p=2, tstop=Inf, maxsteps=8,
                                      dt0=1.0e-4, cfl=5.0, maxpic=1,
                                      amr_every=2, refine_frac=0.2,
-                                     amr_policy=:classic,
-                                     coarsen_frac=0.05, marking=:error_fraction,
+                                     coarsen_frac=0.05,
                                      max_leaves=400, max_level=6,
                                      linear=:mg, mg_operator=:matrixfree,
                                      mg_vel_solver=:vcycle, mg_tol=1.0e-8,
