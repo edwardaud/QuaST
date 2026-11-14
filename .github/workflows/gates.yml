@@ -65,7 +65,7 @@ jobs:
               t_g50_semstokes_schur_wall.jl
               t_g92_stokes_system.jl
               t_g97_assemble_only.jl
-          - name: ala-amr-dwr
+          - name: ala-amr
             gates: >-
               t_g32_semquad_amr.jl
               t_g129_Bquad.jl
