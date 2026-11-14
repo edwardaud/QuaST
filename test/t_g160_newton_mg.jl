@@ -13,7 +13,7 @@ using Test, QuaST, LinearAlgebra
 # same convergence, same iteration count, same steady state.  The L2 tree keeps
 # the gate fast; the 8800-leaf wall case is exercised by
 # `examples/blankenbach_2b_newton.jl 6 ... mg` (documented in
-# ROUTE_C_STATUS.md).
+# docs/dev/SOLVER.md).
 
 const _B2B = 9.70406052783923433184
 const _C2B = 4.1588830833596718565

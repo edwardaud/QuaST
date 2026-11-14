@@ -1,20 +1,20 @@
-# Visco-plastic rheology for the quadtree SEM path (route C).
+# Visco-plastic rheology for the quadtree SEM path.
 #
-# The viscosity law itself (`eta_at`) is shared with route A; this file adds the
+# The viscosity law itself (`eta_at`) is shared with the earlier structured-grid layer; this file adds the
 # strain-rate dependent plastic branch on top of it:
 #
 #     tau_y   = min(c cos(phi) + p sin(phi), tau_max)      Drucker-Prager
 #     eta_pl  = tau_y / (2 |edot|)
 #     eta     = min(eta_visc, eta_pl)                      then eta_min/max clip
 #
-# Nondimensionalisation (route C, Boussinesq):
+# Nondimensionalisation (this solver, Boussinesq):
 #   viscosity  [eta0],  length [H],  time [H^2/kappa],  pressure and stress
 #   [eta0 kappa / H^2],  strain rate [kappa / H^2].
 # `yield_c` and `yield_taumax` are therefore in units of `eta0 kappa / H^2`, and
 # `p` is the *dynamic* pressure of the Stokes solve (top-mean zero).  Using the
 # dynamic rather than the total pressure is the standard Boussinesq
 # approximation; the hydrostatic part is a function of depth only and is
-# deliberately not included here (route C has no reference state yet, see P3).
+# deliberately not included here (this solver has no reference state yet, see P3).
 #
 # Depth dependence (docs/dev/PHYSICS.md §8): with the depth d = 1-y the cohesion
 # and the friction coefficient are linear profiles,
@@ -97,7 +97,7 @@ Drucker-Prager yield stress
 
     tau_y = min( f(chi) * (c(d)*cos(phi) + mu(d)*p), tau_max ),   d = 1-y,
 
-in the nondimensional stress units of route C.  The two lower-arity methods are
+in the nondimensional stress units of this solver.  The two lower-arity methods are
 convenience forms used by the steady solvers and the older gates: with zero
 depth gradients `semquad_yield_stress(p, y, pr)` does not depend on `y` and the
 2-argument form is exactly the historical constant-coefficient surface.
@@ -121,7 +121,7 @@ end
 
 Second invariant of the strain-rate tensor,
 `|edot| = sqrt(0.5 (exx^2 + ezz^2 + 2 exz^2))`, at `(x,y)`; this is the
-convention used by ASPECT and by `eta_plastic` on route A, so a pure shear flow
+convention used by ASPECT and by `eta_plastic` on the earlier structured-grid layer, so a pure shear flow
 `u = (y, 0)` gives `|edot| = 0.5`.
 """
 function semquad_strain_rate_at(sq::SemQuad, ux::Vector{Float64},

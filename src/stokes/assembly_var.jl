@@ -176,7 +176,7 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
                 gx[k] = fd.dphi_v[i, qx] * fd.phi_v[j, qy] * (2.0 / hx)
                 gz[k] = fd.phi_v[i, qx] * fd.dphi_v[j, qy] * (2.0 / hy)
             end
-            # Performance (ported from Route D): fx/fz are spatially varying but
+            # Performance (ported from an earlier revision): fx/fz are spatially varying but
             # constant over the element basis loop; evaluating them once per
             # quadrature point instead of 2*nv times cuts the closure calls from
             # 1.4M to 158k on the 8800-leaf tree (measured ~0.5 s -> ~0.05 s).

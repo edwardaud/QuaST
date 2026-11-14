@@ -7,7 +7,7 @@ using Test, QuaST, LinearAlgebra, Printf
 # inner Stokes <-> eta(eps) fixed point (`semquad_tosi_inner`).  The tangent has
 # two parts: the explicit deta/dT stiffness and the geometric Kgeo operator
 # (`geo_u`/`geo_coef`, validated by G156).  The gate:
-#   1. evolves the route-C Tosi driver to a developed state,
+#   1. evolves the Tosi driver to a developed state,
 #   2. checks the Tosi JVP against a central difference of the Tosi map,
 #   3. runs the Tosi Newton from that state and checks it converges to a
 #      convective steady state that is a fixed point of the same map.

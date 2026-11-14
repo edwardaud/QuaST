@@ -1,4 +1,4 @@
-# Uniform steady-state entry point for the route C semi-quad solver.
+# Uniform steady-state entry point for the quadtree semi-quad solver.
 #
 # Three steady Newtons exist, one per rheology:
 #
@@ -15,7 +15,7 @@
 """
     semquad_steady_newton(sq, qt, ss, pr, theta0; kind=:auto, dt, ...)
 
-Solve for the steady state of the route C semi-quad discretisation, choosing the
+Solve for the steady state of the quadtree semi-quad discretisation, choosing the
 Newton variant from the rheology:
 
 * `kind=:auto` -> `:tosi` when `pr.tosi !== nothing`, `:dp` when

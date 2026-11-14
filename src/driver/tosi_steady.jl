@@ -1,4 +1,4 @@
-# Steady Newton for the Tosi (2015) viscoplastic rheology on route C.
+# Steady Newton for the Tosi (2015) viscoplastic rheology on this solver.
 #
 # The Tosi viscosity depends on temperature *and* on the strain rate,
 #
@@ -21,7 +21,7 @@
 # (`solve_semquad_stokes_var(...; geo_u=u, geo_coef=deta_deps)` returns
 # `Kred = Cu'(K + Kgeo)Cu`).  The energy linearisation is unchanged.
 #
-# Gate: G161 compares the Newton fixed point with the endpoint of a route-C Tosi
+# Gate: G161 compares the Newton fixed point with the endpoint of a quadtree Tosi
 # time-stepping run (Case 1a parameters).
 
 """

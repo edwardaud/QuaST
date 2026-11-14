@@ -1,4 +1,4 @@
-# Globalization of the *per-time-step* nonlinear solve of the route-C driver.
+# Globalization of the *per-time-step* nonlinear solve of the quadtree driver.
 #
 # The driver's step is the fixed point of one Picard sweep
 #
@@ -396,7 +396,7 @@ semquad_step_residual(ctx, theta::Vector{Float64}) = vcat(ctx.rS, ctx.rC, ctx.rE
     semquad_step_newton(ss, qt, pr, theta_nm1, theta_n, ux, uz, pv, make_eta; ...)
 
 Damped Newton-Krylov solve of the nonlinear system of **one time step** of the
-route-C driver (not a steady-state solve): the root of `(r_S, r_C, r_E)` above,
+the quadtree driver (not a steady-state solve): the root of `(r_S, r_C, r_E)` above,
 i.e. exactly the fixed point that the `maxpic` Picard loop converges to.
 `theta_nm1` is `theta^(n-1)` (frozen) and `theta_n` is the **start-of-step**
 temperature `theta^n`, which is also the initial iterate (the driver calls this

@@ -30,7 +30,7 @@ public release: earlier development happened in a private repository.
   depth-dependent Drucker-Prager yielding with strain weakening, phase transitions with
   per-transition latent heat, internal heating, an Adams-Williamson or Murnaghan reference
   state, and the Boussinesq or anelastic mass form.
-- Two linear paths behind one `linear` switch: sparse direct factorisation with a diagonal
+- Two linear paths behind one `linear` switch: sparse direct factorization with a diagonal
   shift ladder, and matrix-free geometric multigrid with a w-BFBT pressure preconditioner.
   `linear = :auto` selects the multigrid at 20 000 saddle dofs or more at any contrast, and
   at 2 000 or more when the sampled viscosity contrast is at most 100; otherwise it selects
@@ -102,7 +102,7 @@ public release: earlier development happened in a private repository.
   the SPD stabilisation factor of the visco-plastic Jacobian, which the
   variable-viscosity assembly calls.
 - The 110 exported names that bound nothing in the package. `export` of a missing
-  name is legal Julia, so the whole route-A surface (`Mesh`, `make_mesh`, `DG1D`,
+  name is legal Julia, so the whole the earlier structured-grid layer surface (`Mesh`, `make_mesh`, `DG1D`,
   `rt0`, the psi-omega spaces, `run_simulation`) was still advertised to users and
   failed only when they touched it. The export list is now generated from what the
   module actually defines: 309 names to 199.

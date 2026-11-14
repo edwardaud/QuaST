@@ -699,13 +699,13 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     nf = size(Cu, 2); nfp = size(Cp, 2)
     Bs = -CpB
     Bt = Bm === Bc ? sparse(transpose(Bs)) : -(Cu' * Bm' * Cp)
-    # Compressibility: in route C's (dynamic) pressure gauge the ALA density
+    # Compressibility: in the multigrid path's (dynamic) pressure gauge the ALA density
     # perturbation -rho_ad Di gamma (p - p_ad) contributes +rho_ad Di gamma p
     # to the *upward* momentum.  The sign is not free: with ASPECT's own
     # temperature field this sign reproduces ASPECT's velocity to six digits
     # (Vrms 24.7657 vs 24.7657, max|u| 46.858 vs 46.858), while the opposite
     # sign gives Vrms 26.94 (the historical 8% King error).  See
-    # ROUTE_C_STATUS.md for the operator-agreement test.
+    # docs/dev/SOLVER.md for the operator-agreement test.
     if compress_block !== nothing
         Bmm = sparse(transpose(Bm)) - compress_block
         Bt = -(Cu' * Bmm * Cp)

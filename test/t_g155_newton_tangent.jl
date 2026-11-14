@@ -2,7 +2,7 @@
 using Test, QuaST, LinearAlgebra
 
 # G155: analytic tangent-linear Jacobian and Newton-Krylov for the steady
-# theta map of route C.
+# theta map of this solver.
 #
 # The Jacobian is checked against a central finite difference of the *same*
 # step map (not of a linearised residual), then the Newton iteration must reach

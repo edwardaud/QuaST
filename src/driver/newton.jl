@@ -1,4 +1,4 @@
-# Analytic tangent-linear Newton for the steady route-C step map.
+# Analytic tangent-linear Newton for the steady quadtree step map.
 #
 # The map is
 #
@@ -20,7 +20,7 @@
 #
 # and `J_F v = delta-theta+ - v`.  This is the tangent-linear JVP used inside
 # GMRES; it avoids the finite-difference noise that makes the FD/JFNK version
-# stall at ~1e-3 in the strong-viscosity case (see ROUTE_C_STATUS §4.9).
+# stall at ~1e-3 in the strong-viscosity case (see docs/dev/SOLVER.md §4.9).
 #
 # Restrictions (checked up front): Boussinesq temperature-dependent viscosity,
 # no viscoplastic/yielding rheology, no entropy viscosity (ev=0), no phase
@@ -84,7 +84,7 @@ Build the reduced-saddle solver reused by the steady step and its JVP.
 `[Kred Bt; Bs 0]` is shifted by `1e-12 * max|diag|` and factorised once with
 UMFPACK; every JVP right-hand side is then a back-substitution.
 
-`linear=:mg` builds Route C's geometric multigrid for `Kred` and the
+`linear=:mg` builds the multigrid path's geometric multigrid for `Kred` and the
 `semquad_mg_pressure_precond` Schur block once, and solves each right-hand side
 with right-preconditioned GMRES (the same preconditioner as the transient
 `linear=:mg` path).  This removes the direct factorisation from the Newton
@@ -120,7 +120,7 @@ function _semquad_newton_saddle(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
         # viscosity gradient, e.g. 2b at L4) can still give UMFPACK a zero pivot;
         # the relative shift then grows until the factorisation succeeds.  This
         # is the "adaptive shift" that the L4 negative result in
-        # ROUTE_C_STATUS §1.14 asked for.
+        # docs/dev/SOLVER.md §1.14 asked for.
         Slu = nothing
         used = 0.0
         for rel in (1.0e-12, 1.0e-10, 1.0e-8, 1.0e-6, 1.0e-4, 1.0e-2)

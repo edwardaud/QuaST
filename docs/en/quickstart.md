@@ -171,7 +171,7 @@ overwrites `history.csv`, overwrites the frames with the same step numbers and a
 |---|---|---|
 | `CASE_OUT` | `out_julia/case_realistic` | Output root. Set it on every invocation, absolute. Everything the run writes lives under it. |
 | `CASE_STEPS` | 0 (mode default: 10 smoke, 150 short, 10000 spinup, 20000 freeze, 2000 resume and wallrefine) | Step budget, compared against the absolute step number, so on a resume it is the step to stop at. |
-| `CASE_LINEAR` | `auto` | Linear solver. `auto` picks the multigrid at 20 000 saddle dofs or more, or at 2 000 dofs or more with a viscosity contrast at most 100, and the sparse direct factorisation otherwise. `direct` forces the bitwise reproducible path, at roughly twice the wall time and twice the memory. `mg` forces the matrix-free multigrid, serial, because the case passes no `mg_threads`; only `auto` gets the threaded V-cycle. |
+| `CASE_LINEAR` | `auto` | Linear solver. `auto` picks the multigrid at 20 000 saddle dofs or more, or at 2 000 dofs or more with a viscosity contrast at most 100, and the sparse direct factorization otherwise. `direct` forces the bitwise reproducible path, at roughly twice the wall time and twice the memory. `mg` forces the matrix-free multigrid, serial, because the case passes no `mg_threads`; only `auto` gets the threaded V-cycle. |
 
 [guide.md](guide.md) lists the other thirteen `CASE_*` variables and every keyword of
 `run_semquad_simulation`.
@@ -185,7 +185,7 @@ Julia reports `ERROR: OutOfMemoryError()` with a stack trace, or the process dis
 
 The default case peaks at about 1.3 GB resident with the multigrid path and about 2.4 GB with
 `CASE_LINEAR=direct`, at the 10 000-leaf budget. Keep `CASE_LINEAR=auto` or set `CASE_LINEAR=mg`,
-which uses about half the memory of the direct factorisation at this size; lower the budget with
+which uses about half the memory of the direct factorization at this size; lower the budget with
 `CASE_MAXLEAVES=5000` or `CASE_MAXLEV=6`; check `free -g` before launching. WSL gives the
 virtual machine its own memory limit, raised in `.wslconfig` on the Windows side. The two mesh
 keys are restart configuration keys, so a smaller budget means a new run.

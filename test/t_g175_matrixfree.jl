@@ -110,7 +110,7 @@ end
 
     # ---- non-uniform tree with hanging constraints --------------------------
     # `Cu` is not a selection matrix here, so this is the real test of the
-    # Cu/K/Cu' route (the uniform trees above only exercise Dirichlet rows).
+    # Cu/K/Cu' path (the uniform trees above only exercise Dirichlet rows).
     qtw = Quadtree(4; cells_x=5, cells_y=2)
     for _ in 1:2, lf in collect(qtw.leaves)
         refine!(qtw, lf)

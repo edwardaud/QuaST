@@ -1,4 +1,4 @@
-# Strain weakening for the quadtree SEM path (route C), docs/dev/PHYSICS.md §9.
+# Strain weakening for the quadtree SEM path of this solver, docs/dev/PHYSICS.md §9.
 #
 # A scalar field chi(x,y,t) in [0,1] is advected with the flow and integrated
 # with the same BDF2 machinery as the temperature:

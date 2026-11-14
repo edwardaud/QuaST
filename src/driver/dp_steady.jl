@@ -1,4 +1,4 @@
-# Steady Newton for the Drucker-Prager visco-plastic rheology on route C.
+# Steady Newton for the Drucker-Prager visco-plastic rheology on this solver.
 #
 # Unlike the Tosi (2015) law, the DP viscosity depends on the *dynamic pressure*
 # through the yield stress:
@@ -48,7 +48,7 @@ tangent `-eta/edot` would cancel the viscous modulus exactly.  The step solves
 `S dx = r` (the residual Jacobian is `-S`) and is damped by a line search on the
 block-scaled residual norm.  This is the "inner (u,p) iteration" of the DP map
 Newton, done as a Newton instead of a Picard loop (the Picard loop does not
-converge for yield-stress feedback; see ROUTE_C_STATUS §1.11).
+converge for yield-stress feedback; see docs/dev/SOLVER.md §1.11).
 
 Returns `(u, p, converged, iters, history, resid)`.
 """

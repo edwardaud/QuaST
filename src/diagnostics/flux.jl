@@ -12,7 +12,7 @@
 #
 # i.e. the flux is a by-product of the volume residual and is consistent with
 # the discrete solution and the global budget (this is the same construction as
-# route A's cbf.jl).
+# the earlier structured-grid layer's cbf.jl).
 #
 # Normalisation: the returned value is `-sum r` = `int_wall dtheta/dn ds`, the
 # same quantity `semquad_nu_walls` differentiates pointwise, so the Nusselt

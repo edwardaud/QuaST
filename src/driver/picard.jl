@@ -1,4 +1,4 @@
-# Picard stabilization helpers for the visco-plastic rheology (route C).
+# Picard stabilization helpers for the visco-plastic rheology of this solver.
 #
 # The plastic branch depends on the strain-rate invariant, which in turn depends
 # on the velocity being solved for.  Evaluating it from the previous iterate is

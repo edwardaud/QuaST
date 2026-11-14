@@ -1,6 +1,6 @@
 using QuaST, Printf
 
-# Steady benchmarks on the quadtree solver. One entry point per case, so a case
+# Steady benchmarks on this solver. One entry point per case, so a case
 # that is still unrun in the documentation can be produced with one command:
 #
 #     julia --project=. examples/benchmark_cases.jl <case> [level] [tstop]

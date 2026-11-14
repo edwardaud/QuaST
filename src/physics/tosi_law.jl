@@ -29,8 +29,8 @@ the paper's Table 2 either way, so this must be an explicit choice).
 `eta0` makes the law nondimensional (`eta_nd = eta_abs / eta0`).  The benchmark
 law is *already* nondimensional (its values live in [1e-6, 10]), so the default
 is `eta0 = 1`.  This was settled empirically: with `eta0 = 0.1` the effective
-Rayleigh number drops by a factor 10 and route C never convects (Nu = 1, Vrms
-decaying 0.03 -> 0.01), while with `eta0 = 1` it reproduces route A's Case 5a
+Rayleigh number drops by a factor 10 and the run never convects (Nu = 1, Vrms
+decaying 0.03 -> 0.01), while with `eta0 = 1` it reproduces the earlier structured-grid layer's Case 5a
 trajectory at t = 0.136 to within 5-8% (Nu 2.91/3.71 vs 2.70/3.46, Vrms 49.7 vs
 52.3).  The ASPECT comment "eta0 is not the same as the Tosi material model
 Reference viscosity" is easy to misread; trust the empirical test.

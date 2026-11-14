@@ -1,4 +1,4 @@
-# Phase transitions for route C: buoyancy of the phase anomaly (and, later, the
+# Phase transitions for this solver: buoyancy of the phase anomaly (and, later, the
 # latent-heat source).
 #
 # The phase function and its derivatives are the generic ones in `phase.jl`
@@ -15,8 +15,8 @@
 #
 # and the upward momentum gains  -Ra * B * dGamma  for every transition, i.e. a
 # positive `B` (dense material above the transition) gives a downward force when
-# the phase fraction exceeds its base value.  This mirrors route A's
-# `phase_force` (assembly.jl) without the ALA density factor, which route C
+# the phase fraction exceeds its base value.  This mirrors the earlier structured-grid layer's
+# `phase_force` (assembly.jl) without the ALA density factor, which this solver
 # applies through `semquad_rho` when a reference state is set.
 #
 # Cross-check against ASPECT (`source/material_model/latent_heat.cc`): ASPECT

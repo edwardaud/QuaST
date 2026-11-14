@@ -3,7 +3,7 @@ using Test, QuaST, LinearAlgebra
 
 # G151: p-convergence and manufactured solutions.
 #
-# Route C assumes "SEM => high order", but until now that was never measured.
+# this solver assumes "SEM => high order", but until now that was never measured.
 # These checks pin the two properties that matter:
 #   * fixed mesh, p = 2..6: the true L2 error (independent Gauss quadrature, NOT
 #     dot(e, M e), which measures against the nodal interpolant) falls by a
@@ -15,7 +15,7 @@ using Test, QuaST, LinearAlgebra
 #     and the discrete divergence vanishes for it.
 #
 # The numbers here are deliberately only "factor > 5 per order" / "within 20% of
-# uniform"; the measured ratios are much larger (see ROUTE_C_STATUS.md).
+# uniform"; the measured ratios are much larger (see docs/dev/SOLVER.md).
 
 function _g151_l2(sq, u, uex)
     p = sq.p

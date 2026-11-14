@@ -1,7 +1,7 @@
-# Reference state for route C (P3.2 foundation).
+# Reference state for this solver (P3.2 foundation).
 #
-# Route A carries a grid-based `RefState` (refstate.jl) with separate rho, alpha,
-# cp and beta profiles.  Route C evaluates everything at quadrature points, so a
+# the earlier structured-grid layer carries a grid-based `RefState` (refstate.jl) with separate rho, alpha,
+# cp and beta profiles.  this solver evaluates everything at quadrature points, so a
 # closed-form state is cheaper and exactly differentiable; this module provides
 # the constant-property adiabat and the interface the energy assembly uses.
 #

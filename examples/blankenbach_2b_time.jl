@@ -7,7 +7,7 @@ using QuaST, Printf
 # with b, c scaled by s = 0.25, 0.5, 0.75, 1.0, each starting from the previous
 # temperature field.  This keeps the same time-stepping machinery throughout and
 # avoids the violent first transient of the full contrast
-# (ROUTE_C_STATUS 4.14: the analytic IC with eta_min = 6e-5 gives u ~ 4e3 at t=0).
+# (docs/dev/SOLVER.md 4.14: the analytic IC with eta_min = 6e-5 gives u ~ 4e3 at t=0).
 #
 #   eta = exp(-b T + c (1 - z)), b = ln(16384), c = ln(64)
 #   IC  = (1 - z) + 0.01 cos(pi x / 2.5) sin(pi z)

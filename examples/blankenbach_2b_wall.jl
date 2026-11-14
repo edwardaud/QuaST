@@ -1,6 +1,6 @@
 using QuaST, Printf
 
-# Blankenbach 2b on route C with **wall refinement** instead of uniform h-refinement:
+# Blankenbach 2b with **wall refinement** instead of uniform h-refinement:
 # base level 4 (80x32 cells) plus a band of strip = 0.1 near both walls refined to
 # level 6, i.e. the thermal boundary layers see 320x128 while the interior stays
 # coarse.  This is the point of the quadtree: Nu is a wall-gradient diagnostic.

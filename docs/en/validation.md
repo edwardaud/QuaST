@@ -7,7 +7,7 @@ number, is [../dev/VALIDATION.md](../dev/VALIDATION.md); the realistic case is
 [../dev/CASE_REALISTIC.md](../dev/CASE_REALISTIC.md). The solver has been checked at three
 levels: analytic and constitutive checks that the operator is the operator it claims to be,
 published benchmark solutions that the whole pipeline lands on the published numbers, and a
-code-to-code comparison with ASPECT that sizes the discretisation uncertainty of a
+code-to-code comparison with ASPECT that sizes the discretization uncertainty of a
 time-dependent solution. The first two say the implementation is right. The third says how far
 two defensible discretisations can part on the same physics.
 
@@ -74,7 +74,7 @@ wall gradient and keeps the families here.
 
 The same-state rows are the sharp test: both codes start from the same imported
 temperature field and evaluate the same wall functional, so a difference there is
-a discretisation difference and nothing else. The blob is a 25-frame transient,
+a discretization difference and nothing else. The blob is a 25-frame transient,
 so its `Tmax` also carries the accumulated trajectory.
 
 ## The cross-code comparison with ASPECT
@@ -166,7 +166,7 @@ validate a number.
 ## What is no longer cross-checked
 
 Until this revision the repository also carried the uniform structured-mesh solver it was
-originally written around, and several checks compared the quadtree solver against it: the
+originally written around, and several checks compared this solver against it: the
 energy operator against the uniform assembly (G34), the high-Rayleigh plume against the
 structured run (G64), and the `Ra = 1e8` windows against it (G65-G67). That solver is gone, and
 those comparisons with it. What remains is the manufactured-solution convergence (G151, G154),

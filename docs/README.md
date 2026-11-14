@@ -40,7 +40,7 @@ The five pages have the same names in `zh/`.
 | [FILES.md](dev/FILES.md) | Every file in the repository with the one line that says what it is |
 
 [AUDIT.md](dev/AUDIT.md) is a frozen snapshot of the tree at 1747345, before the
-route-A layer was removed; it records what was there and why it went.
+the earlier structured-grid layer layer was removed; it records what was there and why it went.
 
 ## Where to start
 

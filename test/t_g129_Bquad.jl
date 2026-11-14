@@ -5,7 +5,7 @@ using SparseArrays
 @testset "G129 quadrature divergence matrix" begin
     # Step 1 of P3.2d: rebuild B by quadrature without changing the physics.
     # The production matrix is assembled from reference-element matrices scaled by
-    # h/2, so the two routes are compared directly; a later stage multiplies the
+    # h/2, so the two path are compared directly; a later stage multiplies the
     # quadrature one by rho(y).
     qt = Quadtree(5)
     for _ in 1:2, lf in collect(qt.leaves); refine!(qt, lf); end

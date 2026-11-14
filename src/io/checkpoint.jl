@@ -1,4 +1,4 @@
-# Checkpoint / restart for the quadtree SEM convection path (route C).
+# Checkpoint / restart for the quadtree SEM convection path.
 #
 # The full state of `run_semquad_simulation` is the quadtree, the two BDF2
 # temperature levels, the velocity/pressure fields, the elementwise entropy
@@ -13,7 +13,7 @@
 # be recorded rather than recomputed (see `semquad_flux.jl` and G149).
 #
 # Kept in its own file so the legacy time loop can be restored from the
-# c-route-baseline-2026-10-30 tag/archive without touching this code.
+# release baseline-2026-10-30 tag/archive without touching this code.
 
 # --- optional `:balanced` AMR cooldown state --------------------------------
 # The cooldown is a Dict of leaf keys -> remaining cycles.  It is serialised as
@@ -291,7 +291,7 @@ function load_semquad_state(path::AbstractString)
     return h5open(path, "r") do f
         haskey(f, "leaves") ||
             throw(ArgumentError("checkpoint $path has no `leaves` dataset " *
-                                "(not a route-C state file)"))
+                                "(not a quadtree state file)"))
         L = read(f["leaves"])
         nl = size(L, 2)
         nl > 0 || throw(ArgumentError("checkpoint $path has an empty leaf list"))

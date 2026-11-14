@@ -1,6 +1,6 @@
 using QuaST, Printf
 
-# Blankenbach 2b on the STRETCHED single-root base (the original route C grid):
+# Blankenbach 2b on the STRETCHED single-root base (the original quadtree grid):
 #   Quadtree(L; Lx = 2.5)  ->  single root, 2^L x 2^L cells, h_y = 2^-L,
 #   h_x = 2.5 * 2^-L  (anisotropic 2.5:1, but no forest and no cross-root paths).
 # Optional wall refinement uses refine_wall_to_min!, which is verified for a single

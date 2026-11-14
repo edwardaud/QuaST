@@ -12,7 +12,7 @@ elsewhere: the driver only composes them.
 |---|---|
 | `dp_steady.jl` | Steady Newton for the Drucker–Prager rheology, including the pressure derivative. |
 | `mass.jl` | The TALA/EOS density functions, the compressibility block and the eta-range diagnostic. |
-| `newton.jl` | Analytic tangent-linear Newton for the steady route-C step map. |
+| `newton.jl` | Analytic tangent-linear Newton for the steady quadtree step map. |
 | `picard.jl` | Lagged viscosity, strain-rate averaging and adaptive Picard relaxation. |
 | `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. |
 | `steady_entry.jl` | Uniform steady-state entry point dispatching the three Newton paths. |

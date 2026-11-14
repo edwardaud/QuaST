@@ -198,7 +198,7 @@ Volume integrals of the buoyancy work and the viscous dissipation,
     W = int rho_bar T u_z dV,    T = Tbar + theta
     U = int 2 eta edot:edot dV,
 
-both in the nondimensional units of route C (Ra multiplies the buoyancy, so the
+both in the nondimensional units of this solver (Ra multiplies the buoyancy, so the
 mechanical balance of the continuous problem is `Ra * W = U`).  `eta_fun(x,y)`
 must return the viscosity used by the Stokes solve at that point.
 

@@ -58,7 +58,7 @@ using SparseArrays
     @test maximum(abs, Brho * u2) < 1.0e-5
     @test maximum(abs, Ban * u2) > 1.0e-4
 
-    # (6) with rho = 1 the stratified route reduces to the constant one
+    # (6) with rho = 1 the stratified path reduces to the constant one
     B1 = semquad_stokes_B(res.ss, res.qt; rho_fun=y -> 1.0)
     Bn = semquad_stokes_B(res.ss, res.qt)
     @test maximum(abs, B1 - Bn) < 1.0e-14

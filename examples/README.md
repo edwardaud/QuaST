@@ -12,9 +12,9 @@ Run output is written under `out_julia/`, which git ignores.
 | `amr_coarsen_gate_probe.jl` | Coarsening-gate probe for the balanced AMR policy (docs/dev/AMR.md §4.1). |
 | `blankenbach_2b.jl` | Blankenbach 1989 case 2b, ASPECT's setup (benchmarks/blankenbach/base_case2b.prm): |
 | `blankenbach_2b_cbf_ev.jl` | Blankenbach 2b: what does the consistent boundary flux (CBF) actually say on |
-| `blankenbach_2b_stretch.jl` | Blankenbach 2b on the STRETCHED single-root base (the original route C grid): |
+| `blankenbach_2b_stretch.jl` | Blankenbach 2b on the STRETCHED single-root base (the original quadtree grid): |
 | `blankenbach_2b_time.jl` | Blankenbach (1989) 2b, **time-dependent**, on the square-cell grid (5x2 base). |
-| `blankenbach_2b_wall.jl` | Blankenbach 2b on route C with **wall refinement** instead of uniform h-refinement: |
+| `blankenbach_2b_wall.jl` | Blankenbach 2b with **wall refinement** instead of uniform h-refinement: |
 | `calib_realistic_2d.jl` | Calibration of the composite (diffusion + dislocation) prefactors for the |
 | `case_realistic_2d.jl` | ============================================================================= |
 | `import_aspect_state.jl` | ============================================================================= |

@@ -1311,7 +1311,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         verbose && @printf("  step %4d t=%.3e dt=%.2e Nu=%.5f/%.5f Vrms=%.4e N=%d leaves=%d closure=%.3e\n",
                            step, t, dt, Nut, Nub, Vr, sq.N, length(qt.leaves), closure)
 
-        # Time averages over t >= tavg_start (the diagnostic route A has via
+        # Time averages over t >= tavg_start (the diagnostic the earlier structured-grid layer has via
         # `tavg_start`); reported in the result as `avg`.
         if t >= tavg_start
             avg_n += 1

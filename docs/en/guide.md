@@ -4,7 +4,7 @@
 
 This document describes the case that `examples/case_realistic_2d.jl` sets up: the physics, the
 numerical method, every knob, every output file, restarting, and the thread and memory
-behaviour. Every case value here is a literal in that script or a default of
+behavior. Every case value here is a literal in that script or a default of
 `run_semquad_simulation` in `src/driver/run.jl`. Section 9 points to the engineering record.
 
 The case is a 2.5 x 1 box of incompressible fluid with free-slip walls, temperature 0 at the top
@@ -192,7 +192,7 @@ one.
 
 `B = drho / (rho0 alpha0 dT)` is the nondimensional buoyancy number of the density jump, with
 `rho0 = 3300 kg/m^3`, `alpha0 = 3e-5 1/K` and `dT = 1000 K`. An upwelling gains buoyancy at the
-410 and loses it at the 660, the behaviour of an exothermic and an endothermic transition.
+410 and loses it at the 660, the behavior of an exothermic and an endothermic transition.
 
 ### 1.6 Latent heat
 
@@ -250,7 +250,7 @@ dissipation and adiabatic heating (`Di = 0`), the reference state (`refstate = n
 deviatoric projection (`deviatoric = false`) and the anelastic mass form
 (`mass_form = :boussinesq`).
 
-## 2. The discretisation
+## 2. The discretization
 
 ### 2.1 Mesh and spaces
 
@@ -387,11 +387,11 @@ percent.
 
 The direct path forms the reduced saddle `[Kred Bt; Bs 0]` (velocity and pressure after the
 constraint and boundary elimination), factorises it with UMFPACK and checks the true reduced
-residual. A wall-refined free-slip tree makes the unshifted factorisation unstable, so the path
+residual. A wall-refined free-slip tree makes the unshifted factorization unstable, so the path
 runs a shift ladder: relative diagonal shifts of `1e-12`, then `1e-10`, then `1e-8`. If no rung
 meets the acceptance tolerance, a few GMRES refinement iterations against the unshifted
 operator, preconditioned by the best rung, polish the iterate. Two smaller shifts, `1e-14` and
-`1e-13`, are tried first when the unshifted factorisation has lost the solution outright, and
+`1e-13`, are tried first when the unshifted factorization has lost the solution outright, and
 again as a last resort before the step fails. With `stokes_scaling = :equilibrated` it first
 tries the symmetric equilibration `S -> D S D`, which lifts the near-null pressure modes above
 the round-off floor and engages only on a solve that would otherwise enter the ladder. The
@@ -426,7 +426,7 @@ An explicit `linear = :mg` has no such safety net and fails loudly. At the case'
 saddle is 78 720 dofs at 8 188 leaves and 95 308 at 10 000 leaves, both above the 20 000 rule,
 so a new run resolves to the multigrid. The library also keeps two historical paths,
 `:schur_cg` (CG on the Schur complement, with `schur_maxiter` and `schur_precond`) and `:lagged`
-(a reused direct factorisation); this case uses neither.
+(a reused direct factorization); this case uses neither.
 
 ## 5. Parameter reference
 
@@ -703,11 +703,11 @@ Start Julia with `--threads=N`. The only part of this case that uses the Julia t
 the matrix-free V-cycle that `linear = :auto` selects, and it is capped at eight threads,
 `mg_threads = min(8, Threads.nthreads())`, so more than eight adds nothing on the auto path.
 With one thread the auto path warns once and runs serial. An explicit `linear = :mg` keeps
-`mg_threads = 1` unless the caller sets it, and the direct factorisation is serial in every
+`mg_threads = 1` unless the caller sets it, and the direct factorization is serial in every
 case.
 
 The measured memory of the production state is a peak resident set of about 1.3 GB with the
-multigrid path at eight threads and about 2.4 GB with the direct factorisation, at the
+multigrid path at eight threads and about 2.4 GB with the direct factorization, at the
 10 000-leaf budget. Both figures are process peaks, so they include the Julia runtime and the
 loaded state. Budget 2 GB of free memory for a default run and 3 GB with the direct path.
 

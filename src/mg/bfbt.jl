@@ -246,7 +246,7 @@ sets (free-slip walls constrain different rows for `u` and `w`).
 
 The leaves are split into a fixed `nblocks` contiguous blocks and the block
 partials are reduced in block order, so the diagonal is bitwise identical at 1
-and 8 Julia threads.  It equals the sparse route to round-off (different
+and 8 Julia threads.  It equals the sparse path to round-off (different
 summation order), not bitwise; the gate `G226` pins the difference.
 """
 function _semquad_bfbt_diag_exact(su::SemQuad,
@@ -305,7 +305,7 @@ velocity mass matrix, restricted to the free dofs of the reduced saddle.
 * `how=:exact` ([`_semquad_bfbt_diag_exact`](@ref)) is the exact restricted
   diagonal computed leaf by leaf with the hanging-node constraint folded in
   locally.  It is the shipped default on the matrix-free path (see
-  `mg_pressure_bfbt_d`) and equals the `:matrix` route to round-off.
+  `mg_pressure_bfbt_d`) and equals the `:matrix` path to round-off.
 * `how=:leaf` is the historical *lumped* restriction: the leaf mass diagonal
   restricted as `Cux' diag(M) + Cuz' diag(M)`.  A free column of `Cu` also
   appears as a master in its hanging-node rows, so `diag(C' M C)` folds cross
