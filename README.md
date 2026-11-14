@@ -1,15 +1,17 @@
 # QuaST
 
-A spectral-element solver for two-dimensional mantle convection on an adaptively refined
-quadtree, with a matrix-free multigrid Stokes solver.
+**English** · [中文](README.zh.md)
 
-QuaST solves the incompressible Boussinesq or anelastic Stokes and energy equations with
-Taylor-Hood elements of degree `p` and `p-1` on Gauss-Legendre-Lobatto nodes. The mesh is
-a quadtree kept 2:1 balanced, hanging-node continuity is enforced exactly, time stepping is
-BDF2, and the mesh adapts with a policy that trades error against a fixed leaf budget. The
-Stokes saddle is solved either by a sparse direct factorisation or by matrix-free geometric
-multigrid, and the solver picks between them from the problem size and the viscosity
-contrast.
+A spectral-element solver for two-dimensional mantle convection on an adaptively
+refined quadtree, with a matrix-free multigrid Stokes solver.
+
+QuaST solves the incompressible Boussinesq or anelastic Stokes and energy equations
+with Taylor–Hood elements of degree $p$ and $p-1$ on Gauss–Legendre–Lobatto nodes.
+The mesh is a quadtree kept 2:1 balanced, hanging-node continuity is enforced
+exactly, time stepping is BDF2, and the mesh adapts with a policy that trades error
+against a fixed leaf budget. The Stokes saddle is solved either by a sparse direct
+factorisation or by matrix-free geometric multigrid, and the solver picks between
+them from the problem size and the viscosity contrast.
 
 It is a research code for two dimensions. It does not do three dimensions, plate
 boundaries, viscoelasticity or compressible MHD.
@@ -50,54 +52,56 @@ Progress goes to `run.log`, per-step diagnostics accumulate in `history.csv`, an
 
 ## What it does
 
-- Quadtree adaptive mesh with a balanced refinement policy, a 2:1 legality gate and local
-  rebalancing; the wall boundary layer can be held at a minimum level.
-- `Q_p` velocity and `Q_{p-1}` pressure on GLL nodes, with hanging nodes eliminated through
-  exact constraints rather than penalties.
-- Composite diffusion-dislocation rheology, depth-dependent Drucker-Prager yielding with
-  strain weakening, phase transitions with per-transition latent heat, internal heating,
-  and an Adams-Williamson or Murnaghan reference state.
-- Sparse direct and matrix-free multigrid Stokes solvers behind one `linear` switch, with
-  `:auto` choosing from the saddle size and the viscosity contrast.
+- Quadtree adaptive mesh with a balanced refinement policy, a 2:1 legality gate and
+  local rebalancing; the wall boundary layer can be held at a minimum level.
+- $Q_p$ velocity and $Q_{p-1}$ pressure on GLL nodes, with hanging nodes eliminated
+  through exact constraints rather than penalties.
+- Composite diffusion–dislocation rheology, depth-dependent Drucker–Prager yielding
+  with strain weakening, phase transitions with per-transition latent heat, internal
+  heating, and an Adams–Williamson or Murnaghan reference state.
+- Sparse direct and matrix-free multigrid Stokes solvers behind one `linear` switch,
+  with `:auto` choosing from the saddle size and the viscosity contrast.
 - Bitwise-checkpointed runs: a resume from the same checkpoint and configuration
   reproduces the trajectory exactly.
 
 ## Validation
 
-The Blankenbach 2b benchmark reproduces the published Nusselt number to the printed digits,
-the blob regression reproduces its reference digest bitwise, the Tosi cases and the
-composite rheology agree with the ASPECT constitutive card, and a case run in ASPECT from
-the same initial condition agrees on the top heat flux to within one percent over the
-window. The bottom heat flux differs by six to nine percent depending on the window; the
-cause is documented but not fully decomposed. Details, tolerances and the limits of the
-validation are in [docs/validation.md](docs/validation.md).
+The Blankenbach 2b benchmark reproduces the published Nusselt number to the printed
+digits, the blob regression reproduces its reference digest bitwise, the Tosi cases
+and the composite rheology agree with the ASPECT constitutive card, and a case run in
+ASPECT from the same initial condition agrees on the top heat flux to within one
+percent over the window. The bottom heat flux differs by six to nine percent
+depending on the window; the cause is documented but not fully decomposed.
 
 ## Documentation
 
+The full set, with a language switch on every page, starts at [docs/](docs/README.md).
+
 | Document | What it covers |
 |---|---|
-| [quickstart](docs/quickstart.md) | Install, smoke run, first production run, stopping and resuming, the failures a new user hits |
-| [guide](docs/guide.md) | The physics, the method, every `CASE_*` variable and keyword, the output formats, threads and memory |
-| [examples](docs/examples.md) | Four runnable cases with their runtimes and expected accuracy |
-| [validation](docs/validation.md) | Can you trust it: benchmarks, the ASPECT comparison, the Nusselt conventions, the limits |
-| [faq](docs/faq.md) | Changing `Ra`, adding a phase, threading, restarting, citing |
-| [docs/dev/](docs/dev/README.md) | The engineering record: derivation, performance history, defect ledger. For maintainers, not a manual |
+| [Quick start](docs/en/quickstart.md) | Install, first run, stopping and resuming, the failures a new user hits |
+| [Guide](docs/en/guide.md) | The physics, the method, every case variable and keyword, the output formats |
+| [Examples](docs/en/examples.md) | Four runnable cases with their runtimes and expected accuracy |
+| [Validation](docs/en/validation.md) | Benchmarks, the ASPECT comparison, the Nusselt conventions, the limits |
+| [FAQ](docs/en/faq.md) | Changing `Ra`, adding a phase, threading, restarting, citing |
+| [Architecture](docs/architecture.md) | Where every file lives, and why |
+| [Engineering record](docs/dev/README.md) | Derivation, performance history, defect ledger. For maintainers |
 
 ## Tests
 
 ```bash
-julia --project=. test/runtests.jl                    # full suite, ~35 min
-julia --project=. test/run_gates.jl t_g229_default_balanced.jl   # one gate
+julia --project=. test/runtests.jl                            # full suite, ~22 min
+julia --project=. test/run_gates.jl t_g229_default_balanced.jl # one gate
 ```
 
-The suite is 156 gate files and 131 851 assertions, covering bitwise regression pins,
-benchmark values, invariants and accuracy classes.
+The suite is 156 gate files and 131 851 assertions, covering bitwise regression
+pins, benchmark values, invariants and accuracy classes. CI runs all of them.
 
 ## The ASPECT comparison
 
-`aspect_runs/realistic/` has the `.prm` inputs, the small C++ plugin that supplies the
-composite rheology to ASPECT 2.5, and the analysis scripts. Running it needs the ASPECT
-image, which is not part of this repository.
+`aspect_runs/realistic/` has the `.prm` inputs, the small C++ plugin that supplies
+the composite rheology to ASPECT 2.5, and the analysis scripts. Running it needs the
+ASPECT image, which is not part of this repository.
 
 ## Licence
 

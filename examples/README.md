@@ -3,7 +3,7 @@
 Runnable cases and checks. Run them from the repository root after
 `julia --project=. -e 'using Pkg; Pkg.instantiate()'`, as
 `julia --project=. examples/<script>` plus whatever arguments the script header lists.
-`docs/examples.md` walks through the main runs and gives their measured runtimes.
+`docs/en/examples.md` walks through the main runs and gives their measured runtimes.
 
 Run output is written under `out_julia/`, which git ignores.
 

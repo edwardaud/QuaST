@@ -1,3 +1,5 @@
+<p align="right"><a href="../en/quickstart.md">English</a> · <a href="../zh/README.md">中文</a></p>
+
 # 中文文档
 
 | 页面 | 内容 |
