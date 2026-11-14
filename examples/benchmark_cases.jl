@@ -34,52 +34,87 @@ struct Case
     pr::Params
     amp::Float64
     tstop::Float64
+    ic_file::String          # ASPECT's ascii initial condition, "" for the analytic roll
 end
 
+"""Read an ASPECT `ascii data` temperature file: `x y T` rows, `#` comments."""
+function read_ic(path::String)
+    xs = Float64[]; ys = Float64[]; ts = Float64[]
+    for line in eachline(path)
+        t = strip(line)
+        (isempty(t) || startswith(t, "#")) && continue
+        parts = split(t)
+        length(parts) < 3 && continue
+        push!(xs, parse(Float64, parts[1]))
+        push!(ys, parse(Float64, parts[2]))
+        push!(ts, parse(Float64, parts[3]))
+    end
+    ux = sort(unique(round.(xs, digits = 9)))
+    uy = sort(unique(round.(ys, digits = 9)))
+    T = fill(NaN, length(ux), length(uy))
+    for k in eachindex(xs)
+        i = searchsortedfirst(ux, round(xs[k], digits = 9))
+        j = searchsortedfirst(uy, round(ys[k], digits = 9))
+        T[i, j] = ts[k]
+    end
+    return ux, uy, T
+end
+
+"""Bilinear value of an ascii field at (x, y); used to start from ASPECT's state."""
+function ic_value(ux, uy, T, x, y)
+    i = clamp(searchsortedlast(ux, x), 1, length(ux) - 1)
+    j = clamp(searchsortedlast(uy, y), 1, length(uy) - 1)
+    tx = clamp((x - ux[i]) / (ux[i + 1] - ux[i]), 0.0, 1.0)
+    ty = clamp((y - uy[j]) / (uy[j + 1] - uy[j]), 0.0, 1.0)
+    return (1 - tx) * (1 - ty) * T[i, j] + tx * (1 - ty) * T[i + 1, j] +
+           (1 - tx) * ty * T[i, j + 1] + tx * ty * T[i + 1, j + 1]
+end
+
+const DATADIR = normpath(joinpath(@__DIR__, "data"))
+
 function make_case(name::String)
+    ic(name) = joinpath(DATADIR, "initial_temperature_case$(name).txt")
     if name == "1a"
         # Ra = 1e4, no heating, constant viscosity
         return Case(name, 1.0, 4, 4,
                     Params(Ra=1.0e4, H=0.0, eta_law=:expT, deta_T=1.0,
-                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 0.2)
+                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 1.0, ic("1a"))
     elseif name == "1b"
-        # Ra = 1e4, internal heating H = 10
+        # Ra = 1e5, no heating, constant viscosity
         return Case(name, 1.0, 4, 4,
-                    Params(Ra=1.0e4, H=10.0, eta_law=:expT, deta_T=1.0,
-                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 0.2)
+                    Params(Ra=1.0e5, H=0.0, eta_law=:expT, deta_T=1.0,
+                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 1.0, ic("1b"))
     elseif name == "1c"
-        # Ra = 1e4, eta = exp(-b T) with Delta eta = 1000
+        # Ra = 1e6, no heating, constant viscosity
+        return Case(name, 1.0, 4, 4,
+                    Params(Ra=1.0e6, H=0.0, eta_law=:expT, deta_T=1.0,
+                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 1.0, ic("1c"))
+    elseif name == "2a"
+        # Ra = 1e4, no heating, eta = exp(-ln(1000) T)
         return Case(name, 1.0, 4, 4,
                     Params(Ra=1.0e4, H=0.0, eta_law=:expT, deta_T=1.0e3,
-                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 0.2)
-    elseif name == "2a"
-        # Ra = 1e5, H = 10, constant viscosity
-        return Case(name, 1.0, 4, 4,
-                    Params(Ra=1.0e5, H=10.0, eta_law=:expT, deta_T=1.0,
-                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 0.2)
+                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 1.0, ic("2a"))
     elseif name == "2b"
         # Ra = 1e4, joint temperature and depth dependence, 2.5 x 1 box
         B = 9.70406052783923433184
         C = 4.1588830833596718565
         return Case(name, 2.5, 5, 2,
                     Params(Ra=1.0e4, H=0.0, eta_law=:expTz, eta_b=B, eta_c=C,
-                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.01, 0.5)
+                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.01, 1.0, ic("2b"))
     elseif name == "tosi1"
-        # Tosi et al. (2015) case 1: temperature dependent only
         law = TosiLaw(etaT=1.0e5, etaZ=1.0, eta_star=0.0, sigma_y=0.0,
                       eta_init=1.0e-1, eta0=1.0, eta_min=1.0e-6, eta_max=10.0,
                       z_is_depth=true)
         return Case(name, 1.0, 4, 4,
                     Params(Ra=1.0e4, H=0.0, eta_law=:tosi, tosi=law,
-                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 0.2)
+                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 1.0, "")
     elseif name == "tosi5a"
-        # Tosi et al. (2015) case 5a: Ra = 1e2, the full viscoplastic law
         law = TosiLaw(etaT=1.0e5, etaZ=10.0, eta_star=1.0e-3, sigma_y=4.0,
                       eta_init=1.0e-1, eta0=1.0e-1, eta_min=1.0e-6, eta_max=10.0,
                       z_is_depth=true)
         return Case(name, 1.0, 4, 4,
                     Params(Ra=1.0e2, H=0.0, eta_law=:tosi, tosi=law,
-                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 0.2)
+                           Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.1, 1.0, "")
     end
     error("unknown case $name; use 1a, 1b, 1c, 2a, 2b, tosi1 or tosi5a")
 end
@@ -91,8 +126,16 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
     end
     balance!(qt)
     ss = make_semstokes(qt, 2)
-    th0 = [roll(x, y, c.Lx, c.amp) for (x, y) in ss.su.coords]
-    # pin the walls to the boundary values the roll already satisfies
+    # Start from ASPECT's own initial condition when it ships with the case:
+    # those fields are already close to the steady state, which is why the
+    # reference runs need hundreds of steps rather than tens of thousands.  The
+    # stored field is T; the solver wants the anomaly about the conductive base.
+    if !isempty(c.ic_file) && isfile(c.ic_file)
+        ux, uy, Tic = read_ic(c.ic_file)
+        th0 = [ic_value(ux, uy, Tic, x, y) - (1.0 - y) for (x, y) in ss.su.coords]
+    else
+        th0 = [roll(x, y, c.Lx, c.amp) for (x, y) in ss.su.coords]
+    end
     for (g, (_, y)) in enumerate(ss.su.coords)
         (y <= 1.0e-12 || y >= 1.0 - 1.0e-12) && (th0[g] = 0.0)
     end
