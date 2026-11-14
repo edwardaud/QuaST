@@ -13,26 +13,45 @@ using SparseArrays
 using HDF5
 using Printf
 
-include("gll.jl")
-include("fe.jl")
-include("tosi_law.jl")
-include("semquad_refstate.jl")
-include("physics.jl")
-include("phase.jl")
-include("rheology.jl")
-include("quadtree.jl")
-include("amr_leaf_ops.jl")
-# Before the `driver/` chunks: `semquad_amr_passes!`/`run_semquad_simulation`
-# type their `amr_cooldown` keyword with `AmrCooldown`, which is defined in
-# `amr_balanced.jl`.  It is the only adaptive policy (`amr_advanced.jl` and the
-# classic cycle in the former `dgquad.jl` were removed at `8c622df`).
-include("amr_balanced.jl")
-include("semquad.jl")
-# `semquadstokes.jl` is now the `src/stokes/` chunk tree.  Joined in the order
-# below, the chunks are byte-identical to the former single file, and that
-# order *is* the original statement order (the `SemStokes` state first, then
-# the selectors and direct solver, then the operator kernels, then the two
-# solves), so it must not be reordered.
+# ---------------------------------------------------------------------------
+# Include order.  `include` is textual insertion into the module body, so the
+# order is constrained only by *definition-time* references: a struct field
+# type, a supertype, a method/keyword signature, or a `const` initialiser that
+# names a type defined in another file.  `physics/` therefore appears in two
+# blocks: the parameter and material-law types that `core/semquad.jl` itself
+# needs come first, and the laws that *take* a `SemQuad` come after it.
+# ---------------------------------------------------------------------------
+
+# -- physics: parameter types and the material laws that define them ---------
+include("physics/tosi_law.jl")
+include("physics/refstate.jl")
+include("physics/params.jl")
+include("physics/constitutive.jl")
+include("physics/phase.jl")
+include("physics/rheology.jl")
+
+# -- core: quadrature, reference element, quadtree, the scalar SEM space -----
+include("core/gll.jl")
+include("core/fe.jl")
+include("core/quadtree.jl")
+include("core/semquad.jl")
+
+# -- AMR leaf primitives, then the physics laws over the SEM field -----------
+include("amr/leaf_ops.jl")
+# A diagnostic product (the entropy-viscosity field), but the energy assembly
+# annotates its `evg` argument with `SEMEVGlobals`, so it must come first.
+include("diagnostics/entropy_viscosity.jl")
+include("physics/latent.jl")
+include("physics/energy_assembly.jl")
+include("physics/energy.jl")
+include("physics/eta.jl")
+include("physics/weakening.jl")
+include("physics/phase_buoyancy.jl")
+
+# -- AMR policy (needs the quadtree only) ------------------------------------
+include("amr/balanced.jl")
+
+# -- stokes: state, selection, assembly, matrix-free operators, solves --------
 include("stokes/state.jl")
 include("stokes/selector.jl")
 include("stokes/direct.jl")
@@ -43,9 +62,8 @@ include("stokes/solve.jl")
 include("stokes/assembly_var.jl")
 include("stokes/solve_var.jl")
 include("stokes/operators.jl")
-# Same contract for `semquad_mg.jl`, now `src/mg/`: byte-identical chunks in
-# the original order (hierarchy cache -> build -> V-cycle -> pressure blocks ->
-# BFBT -> saddle solver).
+
+# -- mg: hierarchy, caches, V-cycle, pressure blocks, saddle Krylov ----------
 include("mg/hierarchy.jl")
 include("mg/levelcache.jl")
 include("mg/build.jl")
@@ -53,26 +71,24 @@ include("mg/vcycle.jl")
 include("mg/pressure.jl")
 include("mg/bfbt.jl")
 include("mg/saddle.jl")
-include("semquad_s1solve.jl")
-include("semquadenergy.jl")
-include("semquaddiagnostics.jl")
-include("semquad_rheology.jl")
-include("semquad_weaken.jl")
-include("semquad_picard.jl")
-include("semquad_newton.jl")
-include("semquad_step_newton.jl")
-include("semquad_tosi_steady.jl")
-include("semquad_dp_steady.jl")
-include("semquad_steady_entry.jl")
-# `semquadconvection.jl` is now the `src/driver/` chunk tree; same byte-identity
-# and original-order contract as the stokes and mg chunks above.
-include("driver/amr_hooks.jl")
+include("mg/s1solve.jl")
+include("mg/gmres.jl")
+
+# -- AMR hooks and the driver (the time loop and the steady/Newton paths) ----
+include("amr/hooks.jl")
+include("driver/picard.jl")
+include("driver/newton.jl")
+include("driver/step_newton.jl")
+include("driver/tosi_steady.jl")
+include("driver/dp_steady.jl")
+include("driver/steady_entry.jl")
 include("driver/run.jl")
 include("driver/mass.jl")
-include("semquad_checkpoint.jl")
-include("semquad_flux.jl")
-include("semquad_phase.jl")
-include("gmres.jl")
+
+# -- I/O and diagnostics -----------------------------------------------------
+include("io/checkpoint.jl")
+include("diagnostics/global.jl")
+include("diagnostics/flux.jl")
 
 export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs,
        lagrange_eval, lagrange_d2, barycentric_weights,
