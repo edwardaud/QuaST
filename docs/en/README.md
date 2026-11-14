@@ -1,6 +1,6 @@
-# English documentation
+<p align="right"><a href="../en/README.md">English</a> · <a href="../zh/README.md">中文</a></p>
 
-<p align="right"><a href="../zh/README.md">中文</a></p>
+# English documentation
 
 The five user pages, one set of two languages.
 
