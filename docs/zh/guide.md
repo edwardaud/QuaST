@@ -311,14 +311,19 @@ $$
 直接路径形成约束和边界消去后的约化鞍点
 
 $$
-\begin{bmatrix}
-K_{\mathrm{red}} & B^{\mathsf T}\\
-B_s & 0
-\end{bmatrix}
-\begin{bmatrix}\mathbf u\\ p\end{bmatrix}
-=
-\begin{bmatrix}\mathbf f\\ 0\end{bmatrix},
+K_{\mathrm{red}}\,\mathbf u + B^{\mathsf T} p = \mathbf f,
+\qquad
+B_s\,\mathbf u = 0,
 $$
+
+也就是一个 2 x 2 的块系统：
+
+| 块 | 尺寸 | 是什么 |
+|---|---|---|
+| $K_{\mathrm{red}}$ | 速度为行、速度为列 | 施加约束与边界消去后的约化速度矩阵 |
+| $B^{\mathsf T}$ | 速度为行、压力为列 | 梯度 |
+| $B_s$ | 压力为行、速度为列 | 散度 |
+| $0$ | 压力为行、压力为列 | 零块，鞍点结构就来自它 |
 
 其中 $K_{\mathrm{red}}$ 是约化速度矩阵， $B$ 是梯度， $B_s$ 是散度， $p$ 是压力。它用 UMFPACK 分解，并检查真正的约化残差。壁面加密的自由滑移树会让无平移分解不稳定，所以该路径走平移阶梯：相对对角平移 $10^{-12}$ 、 $10^{-10}$ 、 $10^{-8}$ ，最后一级对无平移算子做若干步迭代精化。`stokes_scaling = :equilibrated` 先试对称平衡 $S\to DSD$ ，其中 $S$ 是鞍点矩阵、 $D$ 是对角缩放矩阵，把接近零的压力模态抬到舍入下限之上，只在本来会进阶梯的求解上生效。直接路径是唯一逐位可复现的路径。
 
