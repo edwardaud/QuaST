@@ -1,10 +1,6 @@
 # Architecture
 
-`src/` is one Julia module. `QuaST.jl` (188 lines) fixes the include order and
-the exports; eight class folders hold the rest, 59 Julia files and 19 806 lines.
-The tree is organised by class of code: the grid knows nothing about the
-rheology, and the rheology nothing about the solver. `test/`, `examples/`,
-`benchmarks/` and `scripts/` sit outside the module.
+`src/` is a single Julia module. `QuaST.jl` (188 lines) fixes the include order and the exports; eight class folders hold the rest, 59 Julia files and 19 806 lines of them. The tree is organized by class of code: the grid knows nothing about the rheology, and the rheology knows nothing about the solver. `test/`, `examples/`, `benchmarks/` and `scripts/` sit outside the module.
 
 ## Where things live
 
@@ -23,11 +19,7 @@ Counted over the `.jl` files only, with `awk 'END{print NR}'`; `src/QuaST.jl` is
 
 ## Include order
 
-`include` pastes a file into the module body, so the order is constrained by
-definition-time references only: a struct field type, a supertype, a method
-signature, or a `const` initialiser. Function bodies may call anything defined
-later, which is why `src/driver/run.jl` calls `save_semquad_state` before
-`src/io/checkpoint.jl` is included.
+`include` pastes a file into the module body, so the order is constrained only by definition-time references: a struct field type, a supertype, a method signature, or the initializer of a `const`. A function body may call anything defined later, which is why `src/driver/run.jl` can call `save_semquad_state` before `src/io/checkpoint.jl` has been included.
 
 ```text
 physics/     tosi_law refstate params constitutive phase
