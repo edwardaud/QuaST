@@ -13,12 +13,15 @@ const ROOT = normpath(joinpath(@__DIR__, ".."))
 const LOGDIR = joinpath(ROOT, "out_julia", "benchmarks")
 
 # case -> (Ra, heating, viscosity, reference Nu, reference Vrms)
+# The case definitions are ASPECT's benchmarks/blankenbach inputs: 1a/1b/1c are
+# isoviscous at Ra = 1e4/1e5/1e6 with no internal heating, 2a adds eta(T) with a
+# contrast of 1000, and 2b is the joint temperature and depth law.
 const CASES = Dict(
-    "1a" => ("1e4", "0", "constant", 4.884409, 42.864947),
-    "1b" => ("1e4", "10", "constant", 10.534095, 193.21454),
-    "1c" => ("1e4", "0", "Δη_T = 1e3", 21.972465, 833.98977),
-    "2a" => ("1e5", "10", "constant", 10.066, 480.4334),
-    "2b" => ("1e4", "0", "T and z", 6.9299, 171.755),
+    "1a" => ("1e4", "0", "constant", 4.8844093, 42.864956),
+    "1b" => ("1e5", "0", "constant", 10.534095, 193.21454),
+    "1c" => ("1e6", "0", "constant", 21.972465, 833.98977),
+    "2a" => ("1e4", "0", "Δη_T = 1e3", 10.066, 480.4334),
+    "2b" => ("1e4", "0", "temperature and depth", 6.9299, 171.755),
 )
 
 fmt(x, n = 6) = string(round(x, digits = n))
