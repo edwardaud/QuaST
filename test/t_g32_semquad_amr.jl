@@ -18,18 +18,6 @@ function uniform_tree(level::Int)
     return qt
 end
 
-# Uniform level-`level` tree with `cx x cy` base cells, or a stretched
-# single-root box (`Lx != 1`).  Used by the DWR leaf-size regression below.
-function tree_at(level::Int; cx::Int=1, cy::Int=1, Lx::Union{Nothing,Float64}=nothing)
-    qt = Lx === nothing ? Quadtree(level; cells_x=cx, cells_y=cy) :
-                          Quadtree(level; Lx=Lx)
-    for _ in 1:level, lf in collect(qt.leaves)
-        refine!(qt, lf)
-    end
-    balance!(qt)
-    return qt
-end
-
 function l2err(sq, u, f)
     M = 20
     e = 0.0
@@ -103,18 +91,4 @@ end
     @test eg1 < eg0                  # fewer dofs than uniform L4, less error than L3
     @test egu < eg1                  # ... but the uniform L4 mesh is still better
 
-    # DWR leaf sizes, previously "fixed but not locked": a quadratic u with
-    # f = -Delta u has an exactly zero cell residual, but only if the code uses
-    # the true leaf extents.  With `2^-l` (wrong on a 5x2 base) or with the
-    # y-size used for x on a stretched box, the residual is O(h^2) instead.
-    for (cx, cy, Lx) in ((5, 2, nothing), (1, 1, 2.5))
-        qtc = tree_at(1; cx=cx, cy=cy, Lx=Lx)
-        qtf = tree_at(2; cx=cx, cy=cy, Lx=Lx)
-        sqc = make_semquad(qtc, 2)
-        sqf = make_semquad(qtf, 2)
-        upoly = [x * x + y * y for (x, y) in sqf.coords]
-        zsin = [sin(pi * x / qtf.Lx) * cos(pi * y) for (x, y) in sqf.coords]
-        eta0 = poisson_dwr_cell_term(sqf, qtf, upoly, zsin, (x, y) -> -4.0, sqc)
-        @test maximum(abs, values(eta0)) < 1.0e-10
-    end
 end

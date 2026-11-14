@@ -72,7 +72,6 @@ include("driver/mass.jl")
 include("semquad_checkpoint.jl")
 include("semquad_flux.jl")
 include("semquad_phase.jl")
-include("amr_dwr.jl")
 include("gmres.jl")
 
 export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs,
@@ -142,8 +141,7 @@ export DG1D, make_dg1d, assemble_dg1d_poisson, solve_dg1d_poisson, dg1d_l2_error
        semquad_weakening_jvp, solve_semquad_weakening, semquad_weak_stats,
        semquad_visco_plastic_eta, semquad_strain_rate_field, blend_field,
        semquad_deta_dp, semquad_deta_dp_eps, semquad_deta_chi,
-       picard_diverging, picard_adapt_relax, amr_cycle_balanced!, AmrCooldown, SEMQUAD_AMR_COOLDOWN, LAST_AMR_BALANCED, goal_upper_half, dwr_leaf_indicator, solve_stokes_adjoint_system, stokes_residual, stokes_reduced_residual, assemble_semquad_velocity_mass, velocity_goal_rhs, hierarchical_stokes_residual, interpolate_semquad, dual_weights_semquad, poisson_dwr_cell_term, poisson_dwr_face_terms, poisson_dwr_estimate, restrict_indicator_to_tree, aggregate_indicator_to_level, stokes_dwr_indicator,
-       solve_semquad_poisson, semquad_eval,
+       picard_diverging, picard_adapt_relax, amr_cycle_balanced!, AmrCooldown, SEMQUAD_AMR_COOLDOWN, LAST_AMR_BALANCED, assemble_semquad_velocity_mass, solve_semquad_poisson, semquad_eval,
        DofMap, ThetaMap, make_dofmap, make_theta_map, gather_reduced, cfl_length, cfl_local_dt,
        scatter_reduced
 export assemble_stokes, assemble_B, assemble_energy, assemble_body_force,

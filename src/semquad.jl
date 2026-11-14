@@ -470,6 +470,13 @@ function semquad_mass(sq::SemQuad)
     return sparse(I, J, V, sq.N, sq.N)
 end
 
+# Moved here from the removed DWR module: the DP steady-Newton PTC branch
+# (`semquad_dp_steady.jl`) builds its reduced mass matrix from this.
+function assemble_semquad_velocity_mass(sq::SemQuad)
+    M = semquad_mass(sq)
+    return [M spzeros(sq.N, sq.N); spzeros(sq.N, sq.N) M]
+end
+
 """
     transfer_semquad(old, uold, new; mode=:nodal, zero_walls=false, qt_new=nothing)
 

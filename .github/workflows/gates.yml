@@ -68,9 +68,6 @@ jobs:
           - name: ala-amr-dwr
             gates: >-
               t_g32_semquad_amr.jl
-              t_g107_poisson_dwr_cell.jl
-              t_g108_poisson_dwr_face.jl
-              t_g111_dwr_effectivity.jl
               t_g129_Bquad.jl
               t_g130_tala_mass.jl
               t_g132_compress_block.jl

@@ -86,3 +86,11 @@ public release: earlier development happened in a private repository.
   and the 31 gates that pinned it. The quadtree solver is unchanged: the ten-step
   production case reproduces `Nu_top = 5.999881`, `leaves = 2644`, `N = 11233`
   bit for bit after the removal, and the suite is 132,886 passing with no failure.
+
+### Removed (third pass)
+
+- The goal-oriented (DWR) AMR kernel `src/amr_dwr.jl` and the seventeen gates that
+  pinned it. Nothing on the production path called it. The one function it carried
+  that is still used, `assemble_semquad_velocity_mass`, moved verbatim to
+  `src/semquad.jl`; `return_system` and `assemble_only` stay because the Newton and
+  multigrid stack depends on them.

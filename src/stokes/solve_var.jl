@@ -223,7 +223,7 @@ net, not the expected path.
 
 * `false` (default) -- solve;
 * `true` -- assemble the full system and return it (`K`, `Kred`, `Bs`, `Bt`,
-  `fr`, `gr`, ...), as every DWR/Newton/`return_system` caller expects;
+  `fr`, `gr`, ...), as every caller/Newton/`return_system` caller expects;
 * `:mg` -- the **reduced matrix-free MG assembly**: return the same
   `Cu`/`Cp`/`B`/`Bc`/`Bm`/`fv`/`u0`/`p0`/`Bs`/`Bt` but with `K === nothing` and
   `Kred === nothing`, and without evaluating the viscosity closure inside the
@@ -486,7 +486,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     else
         # An `assemble_only` call never solves, so it must not overwrite the
         # `:auto` decision of the last real solve: the MG hierarchy builder and
-        # the DWR/Newton probes assemble with `linear=:direct, assemble_only=true`
+        # the caller/Newton probes assemble with `linear=:direct, assemble_only=true`
         # *inside* an auto MG solve, and recording `:none` there would hide the
         # selector's decision (it broke the auto diagnostics until S7).
         assemble_only !== false ||
