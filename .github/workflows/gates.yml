@@ -33,6 +33,8 @@ jobs:
         run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
       - name: Load the package
         run: julia --project=. -e 'using QuaST'
+      - name: Check the documentation
+        run: julia --project=. scripts/check_docs.jl
       - name: Ten-step production case
         env:
           CASE_OUT: /tmp/quast_smoke
