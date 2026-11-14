@@ -12,7 +12,7 @@
 #   initial T = (1-y) + 0.05 sin(pi y) cos(2 pi x / 2.5)
 #                        + 0.02 sin(2 pi y) cos(4 pi x / 2.5).
 #
-# Dimensional scale set (docs/ASPECT_REALISTIC_COMPARE.md, section 2):
+# Dimensional scale set (docs/dev/VALIDATION.md, section 2):
 #   d      = 2.9e6 m        kappa = 1e-6 m^2/s     dT = 1000 K
 #   rho0   = 3300 kg/m^3    g     = 9.81 m/s^2     alpha = 3e-5 1/K
 #   cp     = 1000 J/kg/K    eta0  = rho0 g alpha dT d^3 / (Ra kappa)
@@ -23,7 +23,7 @@
 # The rheology is ASPECT's `diffusion dislocation` model (used verbatim
 # through the `realistic composite` plugin, which only adds the phase
 # transitions); the phase parameters are those of ASPECT's `latent heat`
-# material model.  See docs/ASPECT_REALISTIC_COMPARE.md for the derivation
+# material model.  See docs/dev/VALIDATION.md for the derivation
 # of every number below.
 # ---------------------------------------------------------------------------
 

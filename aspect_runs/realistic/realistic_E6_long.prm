@@ -3,7 +3,7 @@
 # `realistic_E.prm` with ONE extra refinement level in the bottom boundary
 # layer (y_nd <= 0.05), everything else identical.
 #
-# Why: section 10 of docs/ASPECT_REALISTIC_COMPARE.md shows that ASPECT's
+# Why: section 10 of docs/dev/VALIDATION.md shows that ASPECT's
 # bottom-wall cells are h = 0.0312 d high (level 5) against our h = 0.015625
 # (1/64), i.e. 2x coarser, and estimates a 1-2 % contribution to the -6.1 %
 # window-mean Nu_bot gap.  This run measures that contribution instead of
@@ -39,7 +39,7 @@
 #
 # End time: t_nd = 1e-3 * t0 = 1e-3 * d^2/kappa = 8.41e15 s (section 9.1).
 #
-# Time mapping (docs/ASPECT_REALISTIC_COMPARE.md section 2.1):
+# Time mapping (docs/dev/VALIDATION.md section 2.1):
 #   t0 = d^2/kappa = (2.9e6)^2/1e-6 = 8.41e18 s
 #
 #   box 2.5 x 1, four free-slip walls, T_top = 0 / T_bot = 1 (nondimensional),
@@ -53,7 +53,7 @@
 #   initial T = (1-y) + 0.05 sin(pi y) cos(2 pi x / 2.5)
 #                        + 0.02 sin(2 pi y) cos(4 pi x / 2.5).
 #
-# Dimensional scale set (docs/ASPECT_REALISTIC_COMPARE.md, section 2):
+# Dimensional scale set (docs/dev/VALIDATION.md, section 2):
 #   d      = 2.9e6 m        kappa = 1e-6 m^2/s     dT = 1000 K
 #   rho0   = 3300 kg/m^3    g     = 9.81 m/s^2     alpha = 3e-5 1/K
 #   cp     = 1000 J/kg/K    eta0  = rho0 g alpha dT d^3 / (Ra kappa)
@@ -64,7 +64,7 @@
 # The rheology is ASPECT's `diffusion dislocation` model (used verbatim
 # through the `realistic composite` plugin, which only adds the phase
 # transitions); the phase parameters are those of ASPECT's `latent heat`
-# material model.  See docs/ASPECT_REALISTIC_COMPARE.md for the derivation
+# material model.  See docs/dev/VALIDATION.md for the derivation
 # of every number below.
 # ---------------------------------------------------------------------------
 
