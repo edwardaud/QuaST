@@ -42,6 +42,25 @@ percent-level `Nu` needs. On the coarse level-3 state the wall family is the
 least converged, by 3.6 percent, which is why the 2b row above quotes it and the
 history stays in [../dev/VALIDATION.md](../dev/VALIDATION.md) section 2.1.
 
+## The Tosi family
+
+Tosi et al. (2015) extends the Blankenbach cases with a viscoplastic rheology.
+The reference values are the median of the eleven participating codes, Table 2 of
+the paper. Case 1 is steady; case 5a is a limit cycle.
+
+| case | quantity | reference | our value |
+|---|---|---:|---|
+| 1 | `Nu_top` | 3.4298 | running |
+| 1 | `Nu_bot` | 3.3143 | running |
+| 1 | mean `T` | 0.7767 | running |
+| 5a | `Nu_top` range | 2.6950 to 7.2792 | not reproducible yet |
+| 5a | mean `T` range | 0.6543 to 0.6722 | not reproducible yet |
+
+Case 5a is periodic, not steady: comparing it needs a period and a min/max pair,
+which the current benchmark driver does not measure. The state is recorded in
+[../dev/VALIDATION.md](../dev/VALIDATION.md) section 2.4 rather than reported as a
+number here.
+
 ## Cross-code comparisons
 
 | case | quantity | ours | other code | difference |
