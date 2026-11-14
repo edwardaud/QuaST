@@ -10,3 +10,6 @@ data block. Do not reformat it; the reader expects that layout.
 
 The other Blankenbach initial conditions (1b, 1c, 2a) were removed with the
 uniform-mesh solver, which was their only reader.
+
+Keep a new field in this directory only when a tracked script reads it. Run
+outputs belong under `out_julia/`, which git ignores.
