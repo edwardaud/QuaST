@@ -81,8 +81,7 @@ FINAL frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce
 旗舰算例是 2.5 × 1 盒子，`Ra = 1e5`、`H = 10`，复合等应力流变，`z = 0.87` 和 `0.78` 两个相变并带逐相变潜热，`p = 2`，`max_level = 7` 的四叉树，10000 叶预算，每 5 步 AMR。初始异常是
 
 $$
-\theta_0(x,y) = 0.05\sin(\pi y)\cos\left(\frac{2\pi x}{2.5}\right)
-+ 0.02\sin(2\pi y)\cos\left(\frac{4\pi x}{2.5}\right),
+\theta_0(x,y) = 0.05\sin(\pi y)\cos\left(\frac{2\pi x}{2.5}\right) + 0.02\sin(2\pi y)\cos\left(\frac{4\pi x}{2.5}\right),
 $$
 
 其中 $x$ 和 $y$ 是水平与竖直坐标。始终把 `CASE_OUT` 设到临时目录；回退路径可能是生产运行用过的目录。

@@ -56,6 +56,9 @@ function check(path)
                 bad(rel, block_start, "blank line inside a display block")
             elseif occursin("\\begin{", line)
                 bad(rel, block_start, "LaTeX environment inside a display block")
+            elseif occursin(r"^\s*([-+*>#|]|\d+[.)])\s"m, line) ||
+                   occursin(r"^\s*[=-]{1,}\s*$"m, line)
+                bad(rel, block_start, "line inside a display block is Markdown block syntax")
             end
             prev_blank = false
             continue

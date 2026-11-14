@@ -75,11 +75,7 @@ horizontal average.
 Family **A**, the one runs report as `Nu_top` and `Nu_bot`, is the one-sided GLL derivative:
 
 $$
-\mathrm{Nu}^{A}_{\text{top}} = \left(1 + \frac{H}{2}\right)
-- \left\langle \frac{\partial\theta}{\partial y} \right\rangle_{\text{top}},
-\qquad
-\mathrm{Nu}^{A}_{\text{bot}} = \left(1 - \frac{H}{2}\right)
-- \left\langle \frac{\partial\theta}{\partial y} \right\rangle_{\text{bot}}.
+\mathrm{Nu}^{A}_{\text{top}} = \left(1 + \frac{H}{2}\right) - \left\langle \frac{\partial\theta}{\partial y} \right\rangle_{\text{top}}, \qquad \mathrm{Nu}^{A}_{\text{bot}} = \left(1 - \frac{H}{2}\right) - \left\langle \frac{\partial\theta}{\partial y} \right\rangle_{\text{bot}}.
 $$
 
 Family **B** is the steady consistent boundary flux (`semquad_nu_cbf`), the residual of the

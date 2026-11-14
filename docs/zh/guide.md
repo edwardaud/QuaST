@@ -207,8 +207,7 @@ $$
 ### 1.7 初始条件
 
 $$
-\theta_0(x,y) = 0.05\sin(\pi y)\cos\left(\frac{2\pi x}{L_x}\right)
-+ 0.02\sin(2\pi y)\cos\left(\frac{4\pi x}{L_x}\right),
+\theta_0(x,y) = 0.05\sin(\pi y)\cos\left(\frac{2\pi x}{L_x}\right) + 0.02\sin(2\pi y)\cos\left(\frac{4\pi x}{L_x}\right),
 $$
 
 其中 $L_x=2.5$ 是盒宽， $\theta_0$ 是初始温度异常。它在顶壁和底壁为零，这是异常必须满足的；它关于 $x=L_x/2$ 对称。没有随机数：参数卡、种子和固定步数让一次运行确定。
