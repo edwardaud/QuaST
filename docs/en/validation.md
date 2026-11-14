@@ -11,39 +11,49 @@ code-to-code comparison with ASPECT that sizes the discretisation uncertainty of
 time-dependent solution. The first two say the implementation is right. The third says how far
 two defensible discretisations can part on the same physics.
 
-## Benchmarks
+## Steady benchmarks
 
-| case | quantity | reference | computed | difference |
-|---|---|---|---|---|
-| Blankenbach 2b, level 3 (40 x 16) | `Nu`, energy family | 6.9299 | 6.9874 | +0.83% |
-| Blankenbach 2b, level 3 (40 x 16) | `Vrms` | 171.755 | 171.18 | -0.33% |
-| Blankenbach 2b, wall-refined L4 | `Nu`, wall gradient | 6.9299 | 6.9480 | +0.26% |
-| Blankenbach 2b, wall-refined L4 | `Nu`, steady CBF | 6.9299 | 6.9325 | +0.04% |
-| Blankenbach 2b, wall-refined L4 | `Vrms` | 171.755 | 172.010 | +0.15% |
-| Blankenbach 1a | `Nu` / `Vrms` | 4.884409 / 42.864947 | not run (10-step snapshot only) | n/a |
-| Blob, `Ra = 1e8`, frame 25 | `Tmax` | 1.2531 (ASPECT) | 1.2644 | +0.9% |
-| Realistic, ASPECT state imported | `Nu_top` | 5.990543 | 5.990543 | 0.000% |
-| Realistic, ASPECT state imported | `Nu_bot` | -3.075076 | -3.074986 | +0.003% |
+The Blankenbach et al. (1989) family. Each row is one run driven to its steady
+state on the quadtree solver; `Nu` is the top wall flux from the one-sided GLL
+gradient, `Vrms` the volume RMS velocity, and the last column is the difference
+from the published value.
 
-The 2b rows are the pre-`266a656` record, kept for comparison; the blob and same-state rows are
-current measurements. The 2b rows need their families: at level 3 the three Nusselt definitions
-straddle the reference by +4.5 and -5.3 percent, which is the coarse wall element talking. On
-the wall-refined level-4 state the wall, CBF and energy families span 0.22 percent (6.9480,
-6.9325, 6.9330), and that is the number to compare. The same-state rows are the operator-level
-check: ASPECT's field and ours give the same wall fluxes to 0.003 percent, so the difference
-between the codes is accumulated history; the discrete operator agrees. The blob is a 25-frame
-transient; the 2.87 percent field difference of the classic arm against ASPECT mixes `p = 4`
-with Q2, two wall resolutions and two adaptive meshes, so the 0.9 percent last-frame `Tmax` is
-the clean scalar. The commands that regenerate the 2b and blob records are in
-[examples.md](examples.md).
+| case | `Ra` | heating | viscosity | `Nu` | ref. | `Vrms` | ref. | status |
+|---|---:|---:|---|---:|---:|---:|---:|---|
+| 1a | $10^4$ | 0 | constant | — | 4.884409 | — | 42.864947 | running: the flow has not settled by $t = 0.2$ |
+| 1b | $10^4$ | 10 | constant | | 10.534095 | | 193.21454 | running |
+| 1c | $10^4$ | 0 | $\Delta\eta\_T = 10^3$ | | 21.972465 | | 833.98977 | queued |
+| 2a | $10^5$ | 10 | constant | | 10.066 | | 480.4334 | running |
+| 2b | $10^4$ | 0 | joint $T$ and $z$ | 6.9428 | 6.9299 | 170.962 | 171.755 | done |
 
-The steady 2b rows are historical: they came from a stage-continuation driver that was removed
-together with the uniform-mesh solver, and no script in this repository reproduces them today.
-`blankenbach_2b.jl` runs the same case in time-dependent mode instead; at level 3 for
-`tstop = 0.1` it ends at `Nu_top = 7.9039` and `Vrms = 143.64`, still in the startup transient.
-What the suite pins is `t_g150_regression_snapshot`: a 20-step run from ASPECT's initial
-condition at `1e-6` relative, `Nu_top = 7.0299964227238032`. Read the level-4 row when a
-percent-level steady `Nu` matters.
+The 2b row is the level-3 record. Its three flux families disagree by more than
+the family spread on a coarse wall element, so the table below separates them:
+
+| 2b state | `Nu` family | value | ref. | difference |
+|---|---|---:|---:|---:|
+| level 3, 40 x 16 | wall gradient | 6.9428 | 6.9299 | +0.19% |
+| level 3, 40 x 16 | energy, historical | 6.9874 | 6.9299 | +0.83% |
+| wall-refined L4 | wall gradient | 6.9480 | 6.9299 | +0.26% |
+| wall-refined L4 | steady CBF | 6.9325 | 6.9299 | +0.04% |
+| wall-refined L4 | energy | 6.9330 | 6.9299 | +0.05% |
+
+The three families span 0.22 percent on the wall-refined state, which is what a
+percent-level `Nu` needs. On the coarse level-3 state the wall family is the
+least converged, by 3.6 percent, which is why the 2b row above quotes it and the
+history stays in [../dev/VALIDATION.md](../dev/VALIDATION.md) section 2.1.
+
+## Cross-code comparisons
+
+| case | quantity | ours | other code | difference |
+|---|---|---:|---:|---:|
+| blob, `Ra = 1e8`, frame 25 | `Tmax` | 1.2644 | 1.2531 (ASPECT) | +0.9% |
+| realistic, ASPECT state imported | `Nu_top` | 5.990543 | 5.990543 (ASPECT) | 0.000% |
+| realistic, ASPECT state imported | `Nu_bot` | -3.074986 | -3.075076 (ASPECT) | +0.003% |
+
+The same-state rows are the sharp test: both codes start from the same imported
+temperature field and evaluate the same wall functional, so a difference there is
+a discretisation difference and nothing else. The blob is a 25-frame transient,
+so its `Tmax` also carries the accumulated trajectory.
 
 ## The cross-code comparison with ASPECT
 
