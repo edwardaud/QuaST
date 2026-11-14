@@ -1,8 +1,25 @@
 # QuaST
 
-**English** · [中文](README.zh.md)
+<p align="center">
+  <b>A spectral-element solver for two-dimensional mantle convection</b><br>
+  adaptively refined quadtree · matrix-free multigrid Stokes solve
+</p>
 
-A spectral-element solver for two-dimensional mantle convection, on an adaptively refined quadtree, with a matrix-free multigrid Stokes solver.
+<p align="center">
+  <a href="docs/en/README.md">Documentation</a> ·
+  <a href="docs/en/quickstart.md">Quick start</a> ·
+  <a href="docs/en/examples.md">Examples</a> ·
+  <a href="docs/en/validation.md">Validation</a> ·
+  <a href="README.zh.md">中文</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/edwardaud/QuaST/actions/workflows/gates.yml"><img alt="Gates" src="https://github.com/edwardaud/QuaST/actions/workflows/gates.yml/badge.svg"></a>
+  <img alt="Julia" src="https://img.shields.io/badge/Julia-1.12-9558B2?logo=julia&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-131%20851%20assertions-brightgreen">
+  <img alt="Docs" src="https://img.shields.io/badge/docs-English%20%7C%20中文-blue">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+</p>
 
 QuaST solves the incompressible Boussinesq or anelastic Stokes and energy equations with Taylor–Hood elements of degree $p$ and $p-1$ on Gauss–Legendre–Lobatto nodes. The mesh is a quadtree held at 2:1 balance, hanging nodes are eliminated by exact constraints rather than penalties, time stepping is BDF2, and the mesh adapts by trading error against a fixed leaf count. The Stokes saddle is solved either by sparse direct factorization or by matrix-free geometric multigrid, and `:auto` picks between them from the saddle size and the viscosity contrast.
 
@@ -28,7 +45,8 @@ Ten steps of the realistic card, about two minutes including compilation:
 CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
-Set `CASE_OUT` every time. Without it the card writes into `out_julia/case_realistic`, which may already hold a run you care about.
+> [!WARNING]
+> Set `CASE_OUT` every time. Without it the card writes into `out_julia/case_realistic`, which may already hold a run you care about.
 
 A production spin-up, about two hours on eight threads:
 
@@ -42,11 +60,13 @@ Progress goes to `run.log`, per-step diagnostics accumulate in `history.csv`, an
 
 ## What it does
 
-- Quadtree adaptive meshing: balanced refinement, a 2:1 legality check, local rebalancing, and wall boundary layers that can be held at a minimum level.
-- $Q\_p$ velocity and $Q\_{p-1}$ pressure on GLL nodes, with hanging nodes eliminated through exact constraints.
-- Composite diffusion–dislocation rheology, depth-dependent Drucker–Prager yielding with strain weakening, per-transition latent heat, internal heating, and Adams–Williamson or Murnaghan reference states.
-- Sparse direct and matrix-free multigrid Stokes solvers behind one `linear` switch; `:auto` chooses from the saddle size and the viscosity contrast.
-- Bitwise restart: resuming from the same checkpoint with the same configuration reproduces the trajectory exactly.
+| | |
+|---|---|
+| **Mesh** | Quadtree adaptation with balanced refinement, a 2:1 legality check, local rebalancing, and wall boundary layers held at a minimum level |
+| **Discretization** | $Q\_p$ velocity and $Q\_{p-1}$ pressure on GLL nodes, hanging nodes eliminated through exact constraints |
+| **Physics** | Composite diffusion–dislocation rheology, depth-dependent Drucker–Prager yielding with strain weakening, per-transition latent heat, internal heating, Adams–Williamson or Murnaghan reference states |
+| **Linear algebra** | Sparse direct and matrix-free multigrid Stokes solvers behind one `linear` switch; `:auto` chooses from the saddle size and the viscosity contrast |
+| **Restart** | Bitwise: resuming from the same checkpoint with the same configuration reproduces the trajectory exactly |
 
 ## Validation
 
@@ -54,7 +74,10 @@ The published benchmarks have been run on several mesh levels, and the results a
 
 For case 2b, a wall-refined level-4 state brings the three Nusselt definitions — wall gradient, steady consistent boundary flux, and energy — within 0.22% of each other, and within 0.04% to 0.26% of the published value.
 
-The ASPECT comparison runs at two levels: a cross-code comparison from a common initial condition, and a state-level comparison that imports an ASPECT checkpoint, where the two operators agree to 0.003% at the bottom wall. Over transient windows the bottom heat flux differs by −6.11% to +6.05% depending on the window. That gap is documented but not fully explained, and the [validation page](docs/en/validation.md) says so.
+The ASPECT comparison runs at two levels: a cross-code comparison from a common initial condition, and a state-level comparison that imports an ASPECT checkpoint, where the two operators agree to 0.003% at the bottom wall.
+
+> [!NOTE]
+> Over transient windows the bottom heat flux differs from ASPECT by −6.11% to +6.05%, depending on the window. That gap is documented but not fully explained, and the [validation page](docs/en/validation.md) says so.
 
 ## Documentation
 

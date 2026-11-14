@@ -88,7 +88,10 @@ Plan on 1.5 to 2.5 hours on eight threads. A from-scratch step costs about 2.8 s
   [case] step=<n> t=<t> leaves=<leaves> N=<nodes> auto_fallbacks=<count>
 ```
 
-The callback flushes stdout, so a redirected log lags by at most 100 steps. A rising `auto_fallbacks` count is not a failure. Each fallback redoes one Stokes solve on the direct path, and the run keeps going.
+The callback flushes stdout, so a redirected log lags by at most 100 steps.
+
+> [!NOTE]
+> A rising `auto_fallbacks` count is not a failure. Each fallback redoes one Stokes solve on the direct path, and the run keeps going.
 
 `frames/frame_meta.csv` gives you a second live view. It is flushed after every frame, so it advances every 5 steps, one row per frame:
 
@@ -120,7 +123,8 @@ Three things to know:
 - `resume` writes to `$CASE_OUT/resume.h5`, so the next resume either takes that path explicitly or starts again from the older `spinup.h5`. With no argument it reads `$CASE_OUT/spinup.h5`.
 - A resume inherits the settings stored in the checkpoint. A plain run needs no extra variables. A run that changed a `CASE_*` knob must repeat the same value, or the configuration guard refuses it (section 6).
 
-Always set `CASE_OUT`, and give it an absolute path. The fallback is `out_julia/case_realistic` inside the repository, which may still hold files from an earlier spin-up. Writing there overwrites `history.csv`, overwrites frames with the same step numbers, and appends rows to `frame_meta.csv`. Use one directory per run, and a scratch path for every smoke test and test run.
+> [!WARNING]
+> Always set `CASE_OUT`, and give it an absolute path. The fallback is `out_julia/case_realistic` inside the repository, which may still hold files from an earlier spin-up. Writing there overwrites `history.csv`, overwrites frames with the same step numbers, and appends rows to `frame_meta.csv`. Use one directory per run, and a scratch path for every smoke test and test run.
 
 ## 5. The three knobs that matter
 

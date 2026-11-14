@@ -6,6 +6,21 @@ This page documents the case that `examples/case_realistic_2d.jl` builds: the ph
 
 The problem is a 2.5 x 1 box of incompressible fluid with free-slip walls, temperature 0 at the top and 1 at the bottom, internal heating `H = 10`, a nominal Rayleigh number `Ra = 1e5`, composite diffusion–dislocation rheology, and two phase transitions with latent heat. Yielding and strain weakening are off.
 
+<details>
+<summary><b>Contents</b></summary>
+
+- [1. The physical problem](#1-the-physical-problem)
+- [2. The discretization](#2-the-discretization)
+- [3. The adaptive policy](#3-the-adaptive-policy)
+- [4. Linear solvers and the `:auto` rule](#4-linear-solvers-and-the-auto-rule)
+- [5. Parameter reference](#5-parameter-reference)
+- [6. Output formats](#6-output-formats)
+- [7. Restarting and the configuration guard](#7-restarting-and-the-configuration-guard)
+- [8. Threads and memory](#8-threads-and-memory)
+- [9. The engineering record](#9-the-engineering-record)
+
+</details>
+
 ## 1. The physical problem
 
 ### 1.1 Domain and boundary conditions

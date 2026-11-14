@@ -54,7 +54,10 @@ The same-state rows are the sharp test. Both codes start from the same imported 
 
 The comparison runs ASPECT 2.5.0-pre at commit `340c0d018` on the same 2.5 x 1 case, with the same composite rheology, the same initial condition, and no tuned parameter; sections 5 and 6 of [the validation volume](../dev/VALIDATION.md) record the setup. The top flux, which is the box's total heat loss, agrees to **0.005 to 0.9 percent** over `t_nd = 1e-3 .. 5e-3`, with a cross-correlation of at least 0.994 at every lag.
 
-The bottom flux does not agree. The difference is **-6.11%** (consistent-boundary-flux family) or **-8.44%** (gradient family) over `t_nd = 1e-6 .. 1e-3`, crosses zero at `1.42e-3`, and reaches **+6.05% / +5.83%** over the later window, up to +8.5% late. Since the sign depends on the window, a bottom-flux number without its window means nothing.
+The bottom flux does not agree. The difference is **-6.11%** (consistent-boundary-flux family) or **-8.44%** (gradient family) over `t_nd = 1e-6 .. 1e-3`, crosses zero at `1.42e-3`, and reaches **+6.05% / +5.83%** over the later window, up to +8.5% late.
+
+> [!WARNING]
+> The sign of that difference depends on the time window, so a bottom-flux number quoted without its window says nothing.
 
 The same-state test separates the operator from the history. ASPECT's state at `t_nd = 9.586e-4` was imported into the QuaST tree, and both codes advanced from it: `Nu_bot` agrees to **0.003%** and `Nu_top` to **0.000%**. So the two operators agree on a shared field, and the 6 to 9% gap is accumulated bottom-boundary-layer history. A provenance study prices five candidate mechanisms: the definition costs 0.7%, wall resolution at most about 1 point, artificial viscosity 7 to 15%, the realization 2 to 4% with the wrong sign, and phases are excluded. That leaves 85 to 90% attributed to the different bottom-layer structure of the two solutions, with the mechanism still open.
 

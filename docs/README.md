@@ -2,6 +2,12 @@
 
 # Documentation
 
+<p align="center">
+  <img alt="Julia" src="https://img.shields.io/badge/Julia-1.12-9558B2?logo=julia&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-131%20851%20assertions-brightgreen">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+</p>
+
 The user guides live in `en/` and `zh/`, five pages in each language: install and run, the method and its parameters, the examples, the validation evidence, the FAQ. [architecture.md](architecture.md), beside this page, maps the source tree. The engineering record lives in `dev/`: derivations, measured numbers and the defect ledger, written for maintainers. A user page tells you how to do something; a `dev/` volume tells you why a default has the value it has, and which measurement settled it.
 
 ## User guides

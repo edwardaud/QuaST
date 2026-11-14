@@ -1,10 +1,27 @@
 # QuaST
 
-[English](README.md) · **中文**
+<p align="center">
+  <b>二维地幔对流谱元求解器</b><br>
+  自适应四叉树网格 · 无矩阵多重网格 Stokes 求解
+</p>
 
-二维地幔对流谱元求解器。网格是自适应加密的四叉树，Stokes 鞍点可走稀疏直接分解，也可走无矩阵多重网格。
+<p align="center">
+  <a href="docs/zh/README.md">文档</a> ·
+  <a href="docs/zh/quickstart.md">快速开始</a> ·
+  <a href="docs/zh/examples.md">算例</a> ·
+  <a href="docs/zh/validation.md">验证</a> ·
+  <a href="README.md">English</a>
+</p>
 
-QuaST 求解不可压 Boussinesq 或滞弹性（anelastic）形式的 Stokes 方程与能量方程。单元是 $Q\_p/Q\_{p-1}$ Taylor–Hood，节点取 Gauss–Legendre–Lobatto 点。网格是保持 2:1 平衡的四叉树，悬挂节点用**精确约束**消去而非罚函数。时间推进用 BDF2，网格按“误差对固定叶数上限”的策略自适应。线性求解由规模与黏度对比自动选路。
+<p align="center">
+  <a href="https://github.com/edwardaud/QuaST/actions/workflows/gates.yml"><img alt="Gates" src="https://github.com/edwardaud/QuaST/actions/workflows/gates.yml/badge.svg"></a>
+  <img alt="Julia" src="https://img.shields.io/badge/Julia-1.12-9558B2?logo=julia&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-131%20851%20assertions-brightgreen">
+  <img alt="Docs" src="https://img.shields.io/badge/docs-English%20%7C%20中文-blue">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
+</p>
+
+QuaST 求解不可压 Boussinesq 或滞弹性（anelastic）形式的 Stokes 方程与能量方程。单元是 $Q\_p/Q\_{p-1}$ Taylor–Hood，节点取 Gauss–Legendre–Lobatto 点。网格是保持 2:1 平衡的四叉树，悬挂节点用精确约束消去而非罚函数。时间推进用 BDF2，网格按“误差对固定叶数上限”的策略自适应。线性求解由规模与黏度对比自动选路。
 
 这是一个只做二维的研究代码：没有三维，没有板块边界，没有黏弹性，也没有可压缩 MHD。
 
@@ -28,7 +45,8 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
-**每次都要设 `CASE_OUT`**。不设的时候结果会写进 `out_julia/case_realistic`，那里可能存着你在意的运行数据。
+> [!WARNING]
+> 每次都要设 `CASE_OUT`。不设的时候结果会写进 `out_julia/case_realistic`，那里可能存着你在意的运行数据。
 
 生产规模的预积分，八线程约两小时：
 
@@ -42,11 +60,13 @@ CASE_OUT=out_julia/run1 CASE_STEPS=2000 \
 
 ## 功能
 
-- 四叉树自适应网格：平衡加密、2:1 合法性校验、局部再平衡；壁面边界层可强制保持最小层级。
-- 速度取 $Q\_p$ 、压力取 $Q\_{p-1}$ ，GLL 节点，悬挂节点用精确约束消去。
-- 扩散–位错复合流变、随深度变化的 Drucker–Prager 屈服与应变弱化、逐相变潜热、内部加热、Adams–Williamson 与 Murnaghan 两种参考态。
-- 稀疏直接与无矩阵多重网格两条 Stokes 路径，由 `linear` 一个开关选择；`:auto` 按鞍点规模与黏度对比自动决定。
-- 可逐位续算：同一检查点配同一套配置重启，轨迹逐位重现。
+| | |
+|---|---|
+| **网格** | 四叉树自适应：平衡加密、2:1 合法性校验、局部再平衡；壁面边界层可强制保持最小层级 |
+| **离散** | 速度取 $Q\_p$ 、压力取 $Q\_{p-1}$ ，GLL 节点，悬挂节点用精确约束消去 |
+| **物理** | 扩散–位错复合流变、随深度变化的 Drucker–Prager 屈服与应变弱化、逐相变潜热、内部加热、Adams–Williamson 与 Murnaghan 两种参考态 |
+| **线性代数** | 稀疏直接与无矩阵多重网格两条 Stokes 路径，由 `linear` 一个开关选择；`:auto` 按鞍点规模与黏度对比自动决定 |
+| **重启** | 逐位可复现：同一检查点配同一套配置重启，轨迹逐位重现 |
 
 ## 验证
 
@@ -54,7 +74,10 @@ CASE_OUT=out_julia/run1 CASE_STEPS=2000 \
 
 2b 的壁面加密态把三种 `Nu` 定义（壁面梯度、稳态 CBF、能量族）收到 0.22% 的散布内，与发表值相差 0.04% 到 0.26%。
 
-与 ASPECT 的对照分两层：同一初始条件下的跨代码比较，以及导入 ASPECT 检查点后的状态级比较——后者两个算子在底壁一致到 0.003%。底壁热流在瞬态窗口内的差随窗口变化（−6.11% 到 +6.05%），原因已有记录但未完全分解，[验证](docs/zh/validation.md)页如实写明了这一点。
+与 ASPECT 的对照分两层：同一初始条件下的跨代码比较，以及导入 ASPECT 检查点后的状态级比较——后者两个算子在底壁一致到 0.003%。
+
+> [!NOTE]
+> 底壁热流在瞬态窗口内的差随窗口变化（−6.11% 到 +6.05%）。原因已有记录但未完全分解，[验证](docs/zh/validation.md)页如实写明了这一点。
 
 ## 文档
 
