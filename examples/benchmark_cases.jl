@@ -184,7 +184,16 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
                                 maxpic=maxpic, pic_tol=1.0e-5,
                                 maxsteps=200_000, steady_tol=1.0e-6,
                                 steady_window=20, tmin=0.05, callback=cb,
-                                linear=:auto, amr_every=0, max_level=level,
+                                linear=:auto, max_level=level,
+                                # Wall refinement: the production rule forces
+                                # every leaf within `strip` of a wall, and the
+                                # wall rows, back to `wall_min`. Nu is a
+                                # one-sided gradient inside that layer, so this
+                                # is where the error lives (docs/dev/AMR.md).
+                                amr_every=parse(Int, get(ENV, "CASE_AMR_EVERY", "0")),
+                                initial_refine=parse(Int, get(ENV, "CASE_INITREF", "0")),
+                                wall_min_level=parse(Int, get(ENV, "CASE_WALLMIN", "0")),
+                                wall_strip=parse(Float64, get(ENV, "CASE_WALLSTRIP", "0.1")),
                                 checkpoint_path=isempty(out) ? "" : joinpath(out, "$(c.name).h5"),
                                 checkpoint_every=500, verbose=true)
     nt, nb = semquad_nu_walls(ss.su, st.qt, st.theta, c.pr)

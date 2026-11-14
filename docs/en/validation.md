@@ -13,23 +13,46 @@ two defensible discretisations can part on the same physics.
 
 ## Steady benchmarks
 
-The Blankenbach et al. (1989) family. Each row is one run driven to its steady
-state on the quadtree solver; `Nu` is the top wall flux from the one-sided GLL
-gradient, `Vrms` the volume RMS velocity, and the last column is the difference
-from the published value.
+The Blankenbach et al. (1989) family, run to a steady state on the quadtree
+solver. Each row is one converged run at one refinement level, so the table shows
+the convergence of the answer rather than a single point. `Nu` is the top wall
+flux from the one-sided GLL gradient, `Vrms` the volume RMS velocity, and a run is
+only listed as converged when the top and bottom fluxes agree, which they must
+in a steady state with no internal heating.
 
-| case | `Ra` | heating | viscosity | `Nu` | ref. | `Vrms` | ref. | status |
-|---|---:|---:|---|---:|---:|---:|---:|---|
-| 1a | $10^4$ | 0 | constant | — | 4.884409 | — | 42.864947 | running: the flow has not settled by $t = 0.2$ |
-| 1b | $10^4$ | 10 | constant | | 10.534095 | | 193.21454 | running |
-| 1c | $10^4$ | 0 | $\Delta\eta\_T = 10^3$ | | 21.972465 | | 833.98977 | queued |
-| 2a | $10^5$ | 10 | constant | | 10.066 | | 480.4334 | running |
-| 2b | $10^4$ | 0 | joint $T$ and $z$ | 6.9428 | 6.9299 | 170.962 | 171.755 | done |
+| case | `Ra` | viscosity | level | `Nu` | reference | Δ | `Vrms` | Δ |
+|---|---:|---|---:|---:|---:|---:|---:|---:|
+| 1a | $10^4$ | constant | 3 | 4.936942 | 4.884409 | +1.08% | 42.8638 | −0.00% |
+| 1a | $10^4$ | constant | 4 | 4.897925 | 4.884409 | +0.28% | 42.8616 | −0.01% |
+| 1a | $10^4$ | constant | 5 | 4.888163 | 4.884409 | **+0.08%** | 42.8724 | +0.02% |
+| 1b | $10^5$ | constant | 3 | 10.988574 | 10.534095 | +4.31% | 193.2127 | −0.00% |
+| 1b | $10^5$ | constant | 4 | 10.669987 | 10.534095 | **+1.29%** | 193.2139 | −0.00% |
+| 1c | $10^6$ | constant | 3 | 23.687756 | 21.972465 | +7.81% | 833.3367 | −0.08% |
+| 1c | $10^6$ | constant | 4 | 23.037486 | 21.972465 | **+4.85%** | 833.9917 | −0.00% |
+| 2a | $10^4$ | $\eta=e^{-\ln(10^3) T}$ | 3 | not converged | 10.066 | — | 474.63 | −1.21% |
+| 2b | $10^4$ | temperature and depth | 3 | 7.248805 | 6.9299 | +4.60% | 170.213 | −0.90% |
 
-The 2b row is the level-3 record. Its three flux families disagree by more than
-the family spread on a coarse wall element, so the table below separates them:
+The 1a row is the one to read for the method: the error falls by 3.9 between
+level 3 and 4 and by 3.5 between 4 and 5, against a factor of 4 for a second-order
+element. The `Vrms` column is already at 0.01 percent on the coarsest level, which
+is what makes the two columns useful together: the velocity field is a large-scale
+quantity, while `Nu` is the one-sided gradient inside a boundary layer thinner than
+the wall element.
 
-| 2b state | `Nu` family | value | ref. | difference |
+The 2a row at level 3 is marked "not converged" on purpose. Its two wall fluxes
+disagree by 5.4 percent (`Nu_top = 10.455`, `Nu_bot = 11.024`), and with no
+internal heating they can only differ while the temperature field is still
+evolving. Quoting its `Nu` would repeat the mistake this table exists to prevent.
+
+Runs still in flight when this page was written: 1b level 5, 1c level 5, 2a
+level 4, 2b level 4. Their rows will replace the entries above when they finish.
+
+### The 2b flux families
+
+2b has a published record at a wall-refined level 4 state, where the three
+Nusselt definitions can be compared against each other:
+
+| state | `Nu` family | value | reference | Δ |
 |---|---|---:|---:|---:|
 | level 3, 40 x 16 | wall gradient | 6.9428 | 6.9299 | +0.19% |
 | level 3, 40 x 16 | energy, historical | 6.9874 | 6.9299 | +0.83% |
@@ -37,29 +60,9 @@ the family spread on a coarse wall element, so the table below separates them:
 | wall-refined L4 | steady CBF | 6.9325 | 6.9299 | +0.04% |
 | wall-refined L4 | energy | 6.9330 | 6.9299 | +0.05% |
 
-The three families span 0.22 percent on the wall-refined state, which is what a
-percent-level `Nu` needs. On the coarse level-3 state the wall family is the
-least converged, by 3.6 percent, which is why the 2b row above quotes it and the
-history stays in [../dev/VALIDATION.md](../dev/VALIDATION.md) section 2.1.
-
-## The Tosi family
-
-Tosi et al. (2015) extends the Blankenbach cases with a viscoplastic rheology.
-The reference values are the median of the eleven participating codes, Table 2 of
-the paper. Case 1 is steady; case 5a is a limit cycle.
-
-| case | quantity | reference | our value |
-|---|---|---:|---|
-| 1 | `Nu_top` | 3.4298 | running |
-| 1 | `Nu_bot` | 3.3143 | running |
-| 1 | mean `T` | 0.7767 | running |
-| 5a | `Nu_top` range | 2.6950 to 7.2792 | not reproducible yet |
-| 5a | mean `T` range | 0.6543 to 0.6722 | not reproducible yet |
-
-Case 5a is periodic, not steady: comparing it needs a period and a min/max pair,
-which the current benchmark driver does not measure. The state is recorded in
-[../dev/VALIDATION.md](../dev/VALIDATION.md) section 2.4 rather than reported as a
-number here.
+The three families span 0.22 percent on the wall-refined state. On a uniform coarse
+mesh they spread much wider, which is why the current run above quotes the plain
+wall gradient and keeps the families here.
 
 ## Cross-code comparisons
 
