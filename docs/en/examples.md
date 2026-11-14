@@ -2,142 +2,149 @@
 
 # Examples
 
-Four runs, each with its command, the physics it computes, the measured runtime on eight threads
-and the number to check. Run everything from the repository root. The first command is needed
-once:
+Four runs you can start immediately. Each comes with its command, the physics it computes, the measured runtime on eight threads, and a number to check against. Run everything from the repository root. The first command is needed once:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-The timings are wall clock on eight Julia threads; the direct solver is serial inside that
-process, so a direct-path run does not use the other seven threads. The measured
-records and their conditions are in [../dev/VALIDATION.md](../dev/VALIDATION.md) and
-[../dev/CASE_REALISTIC.md](../dev/CASE_REALISTIC.md).
+The timings are wall clock on eight Julia threads, not CPU time. The direct solver is serial inside the process, so a run on that path leaves seven threads idle. The measurement records and their conditions are in [the validation volume](../dev/VALIDATION.md) and [the realistic-case volume](../dev/CASE_REALISTIC.md).
+
+| Example | Command | Wall clock, eight threads | What to check |
+|---|---|---|---|
+| Blankenbach 2b, steady | `benchmark_cases.jl 2b 3 0.2` | about 45 minutes | `Nu_top = Nu_bot` |
+| Blankenbach 2b, transient | `blankenbach_2b.jl 3 0.1` | 329 s | time-dependent output |
+| Blob | `run_blob_kelly_1024.jl` | about two minutes | `Tmax25` and the two digests |
+| Realistic case, smoke | `case_realistic_2d.jl smoke` | about two minutes the first time | `Nu_top = 5.999881` |
+| Programmatic run | `build_and_run.jl` | about 84 s the first time | `Nu_top = Nu_bot = 1.000783` |
 
 ## 1. Blankenbach 2b
 
-The 2b benchmark is a 2.5 x 1 box with free-slip walls, `Ra = 1e4`, no internal heating, and the
-joint viscosity law `eta = exp(-b T + c (1 - z))` with `b = ln 16384` and `c = ln 64`. The
-reference values are `Nu = 6.9299` and `Vrms = 171.755` (Blankenbach et al. 1989, Table 9).
+The 2b benchmark is a 2.5 x 1 box with free-slip walls, `Ra = 1e4`, no internal heating, and a viscosity that depends on both temperature and depth:
+
+$$
+\eta = \exp(-bT + c(1-z)),
+\qquad
+b = \ln 16384,
+\qquad
+c = \ln 64,
+$$
+
+where $T$ is temperature, $z$ is height, and $\eta$ is viscosity. The reference values are `Nu = 6.9299` and `Vrms = 171.755` (Blankenbach et al. 1989, Table 9).
+
+### Running to a steady state
+
+`examples/benchmark_cases.jl` is the entry point to use now. It starts from ASPECT's own temperature field, which is already close to the steady state, so a run needs hundreds or thousands of steps instead of tens of thousands:
 
 ```bash
-julia --project=. --threads=8 examples/blankenbach_2b.jl 4 5.0
+julia --project=. --threads=8 examples/benchmark_cases.jl 2b 3 0.2
 ```
 
-The signature is `<level> <tstop> [ev]`: the script builds a 5 x 2 base grid of square leaves,
-refines it uniformly to `level`, and runs at `p = 2` with the direct solver. Level 4 is 2 560
-leaves. The run ends on the steady criterion (`steady_tol = 1e-5` over a 20-step window after
-`tmin = 0.02`) or at `tstop = 5.0`, whichever comes first. The initial temperature is
-`T0 = (1 - z) + 0.01 cos(pi x / 2.5) sin(pi z)`.
-
-What this script produces is a **time-dependent** run, not the steady benchmark: level 3 for
-`tstop = 0.1` takes 2 550 steps and 329 s on eight threads and ends at `Nu_top = 7.9039`,
-`Vrms = 143.64`, still in the startup transient. Reaching the published steady value needs a
-much longer integration, or the stage-continuation driver that used to ship with the
-uniform-mesh solver and was removed with it.
-
-The steady level-3 record in this project is therefore **historical**: 40 x 16 cells, 640
-leaves, 116 s, from that continuation driver. Its final line was
+The arguments are `case level tstop`. Level 3 refines a 5 x 2 base grid three times, giving 40 x 16 square leaves at `p = 2` on the direct solver. The run prints
 
 ```text
-STAGE s=1.000  Nu_top=6.942798 Nu_bot=6.938484 Vrms=170.962139 it=39  (ref 6.9299 / 171.755)
+[2b] steps=5492 t=2.0001e-01 wall=20530 s  Nu_top=7.248805 Nu_bot=7.250974 Vrms=170.213063  leaves=640
+[2b] reference Nu=6.929900 (4.60%)  Vrms=171.755000 (-0.90%)
 ```
 
-The pointwise wall `Nu_top` is **+0.19 percent** above the reference and `Vrms` is **-0.46
-percent** below it. The energy-family record from the same era quotes `Nu = 6.9874` (+0.83
-percent) and `Vrms = 171.18` (-0.33 percent); the wall family was the least converged at this
-resolution. The wall-refined level-4 state is the one to quote for a percent-level `Nu`: there
-the wall, CBF and energy families span 0.22 percent, `6.9480`, `6.9325` and `6.9330` against
-6.9299, and `Vrms = 172.010` (+0.15 percent).
+The two wall fluxes agree to 0.03%, so the state is steady. The 4.60% offset in `Nu` is the wall boundary layer being under-resolved at this mesh, not an implementation error. Agreement between the top and bottom fluxes is the acceptance test: with no internal heating, a steady state cannot have them differ.
 
-The gate that pins 2b today is `t_g150_regression_snapshot`: a 20-step run from ASPECT's initial
-condition, checked at `1e-6` relative, with the FNV-1a `theta` hash `d22fdab099ae84e0` and
-`Nu_top = 7.0299964227238032` reproducing bitwise on the pinned stack; see
-[../dev/BUG_LEDGER.md](../dev/BUG_LEDGER.md) section 1.3. No gate asserts 6.9428 or 171.18.
+### Why the wall needs its own refinement
+
+`Nu` is a one-sided gradient inside the boundary layer, and uniform refinement spends its cells in the interior where nothing depends on them. The measurements make the point:
+
+| 2b state | `Nu` against the reference |
+|---|---:|
+| uniform level 3 (40 x 16) | +4.60% |
+| uniform level 4 (80 x 32) | +5.31% (stopped before convergence) |
+| wall-refined level 4 | +0.26% |
+
+Uniform refinement from level 3 to level 4 does not help and in fact makes the number slightly worse, while wall refinement reaches 0.26% with far fewer cells. Turn the wall rule on with
+
+```bash
+CASE_WALLMIN=5 CASE_INITREF=1 julia --project=. --threads=8 examples/benchmark_cases.jl 2b 4 0.2
+```
+
+`CASE_WALLMIN` sets the minimum level for the wall strip and the wall rows, and `CASE_INITREF=1` runs one adaptation pass on the initial condition. On that wall-refined state the three Nusselt definitions — wall gradient, steady consistent boundary flux, and energy — give 6.9480, 6.9325 and 6.9330, a spread of 0.22%.
+
+### The transient version
+
+`examples/blankenbach_2b.jl` runs the same physics as a time-dependent problem with no steady-state test. It is useful for checking that the case starts and that the direct path works:
+
+```bash
+julia --project=. --threads=8 examples/blankenbach_2b.jl 3 0.1
+```
+
+The signature is `[level] [tstop] [ev]`, defaulting to `level = 3`, `tstop = 0.1` and `ev = 0.11`. On this machine, eight threads take 2 550 steps and 329 s, ending with
+
+```text
+level 3: cells=640 nodes=2673 t=0.100 steps=2550  Nu_top=7.9039 (+14.06%)  Vrms=143.64 (-16.37%)  Nu_bot=7.9960  umax=588.5  [329s]
+```
+
+At `t = 0.1` the state is still in its startup transient: `Nu_top` sits 14.06% above the reference and `Vrms` 16.37% below it, and neither wall flux has settled. Use this run to confirm that the example works, that the direct path is available and that the output formats are right, not to quote a percentage.
+
+Bitwise regression belongs to `t_g150_regression_snapshot`: a 5 x 2, level-2 mesh with entropy viscosity and CFL stepping, 20 steps from ASPECT's initial condition, pinning `Nu_top = 7.029996422723808`, `Nu_bot = 5.585292640587811` and `Vrms = 125.9039928721316` at a relative tolerance of `1e-6`.
 
 ## 2. The blob regression
 
-The blob is the `Ra = 1e8` regression that pins the adaptive path. The box is 1 x 1, the walls
-are free slip, the heating is `H = 5`, the viscosity is the same two-exponent law, and the
-initial condition is the conductive base state plus one Gaussian:
+The blob is the `Ra = 1e8` regression that pins the adaptive path. The box is 1 x 1, the walls are free slip, the heating is `H = 5`, the viscosity is the same two-exponent law, and the initial condition is the conductive base state plus one Gaussian:
 
 $$
-\theta_0(x,z) = 0.12\exp\left[-\left(\frac{x-0.5}{0.12}\right)^2-\left(\frac{z-0.35}{0.10}\right)^2\right]\sin(\pi z).
+\theta_0(x,z) = 0.12\exp\left[-\left(\frac{x-0.5}{0.12}\right)^2-\left(\frac{z-0.35}{0.10}\right)^2\right]\sin(\pi z),
 $$
+
+where $\theta\_0$ is the initial temperature anomaly and $x$ and $z$ are the horizontal and vertical coordinates.
 
 ```bash
 julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
 ```
 
-The producer runs 126 steps with `p = 4`, the direct solver, AMR every 5 steps, a 1 024-leaf
-hard budget and 256 x 256 frames every `4e-10` up to `t = 1e-8`. It clears its output directory
-at start and refuses to clear one that holds files it did not write, so set `BLOB_OUT` if you
-want a different path. The balanced AMR policy ends at 898 leaves and 25 frames. On this
-checkout the producer reported **116.1 s** for the 126 steps, with 3 min 15 s total wall
-including Julia startup.
+The script runs with `p = 4` on the direct solver, adapts every 5 steps, keeps a 1 024-leaf hard cap, and writes 256 x 256 frames every `4e-10` up to `t = 1e-8`. It clears its output directory at start, so point `BLOB_OUT` elsewhere if you want a different path. The run ends at 898 leaves and 25 frames. On this machine, eight threads finish the 126 steps in about two minutes including Julia startup.
 
-The final lines are
+The last two lines are
 
 ```text
-done t=1.008e-08 steps=126 leaves=898 N=15361 frames=25 in 116.1 s
+done t=1.008e-08 steps=126 leaves=898 N=15361 frames=25 in 141.3 s
 FINAL frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce56ea105542b8cdeda end_u_sha256=1cfcb5c63a476ed2e9a62e9700917ae718bc3165d9a485a9d54609a4844b0b51 Tmax25=1.264329738
 ```
 
-`end_theta_sha256` is the bitwise pin, and `Tmax25` is the scalar to compare. Against ASPECT's
-`Tmax = 1.2531` at the same frame, the computed 1.264330 is **+0.9 percent**; the field-level
-difference was 2.87 percent for the classic arm and was not re-measured for the balanced arm, so
-do not quote 2.87 percent for this default. The classic arm's documented digest was
-`868a79d92a78bcfe89cfacd4774a0301c0eeb0a865284ab005155f6f458afe88` with `Tmax25=1.264427445`
-(project record); the classic policy was removed, so it is no longer reproducible. The digest is
-bitwise only on the pinned Julia, BLAS and thread stack; `Tmax25` is the platform-tolerant
-check.
+`end_theta_sha256` is the bitwise pin and `Tmax25` is the scalar to compare. ASPECT reports `Tmax = 1.2531` at the same frame, so the computed 1.264330 is **+0.9%** high. The 2.87% field-level difference was measured for the classic arm and was never re-measured for the current balanced one, so do not quote 2.87% for this default run. The digest holds bitwise only on the pinned Julia, BLAS and thread stack; `Tmax25` is the check that tolerates a different machine.
 
-## 3. The realistic card
+## 3. The realistic case
 
-The production case is a 2.5 x 1 box with `Ra = 1e5`, `H = 10`, composite isostress rheology, two
-phase transitions at `y = 0.87` and `0.78` with per-transition latent heat, `p = 2`, a
-`max_level = 7` tree, a 10 000-leaf budget and AMR every 5 steps. The initial anomaly is
+The production case is a 2.5 x 1 box with `Ra = 1e5` and `H = 10`, composite isostress rheology, phase transitions at `z = 0.87` and `0.78` with per-transition latent heat, `p = 2`, a `max_level = 7` tree, a 10 000-leaf cap, and adaptation every 5 steps. The initial anomaly is
 
 $$
-\theta_0(x,y) = 0.05\sin(\pi y)\cos(2\pi x/2.5) + 0.02\sin(2\pi y)\cos(4\pi x/2.5).
+\theta_0(x,y) = 0.05\sin(\pi y)\cos\left(\frac{2\pi x}{2.5}\right) + 0.02\sin(2\pi y)\cos\left(\frac{4\pi x}{2.5}\right),
 $$
 
-Always set `CASE_OUT` to a scratch directory; the fallback path is one a production run may have
-used.
+where $x$ and $y$ are the horizontal and vertical coordinates. Always point `CASE_OUT` at a scratch directory: the fallback path may hold files left by a production run.
 
-The smoke is 10 steps with the full case:
+The smoke test runs 10 steps with the full case:
 
 ```bash
 CASE_OUT=out_julia/demo_smoke CASE_STEPS=10 \
   julia --project=. --threads=8 examples/case_realistic_2d.jl smoke
 ```
 
-It takes **108.5 s** on eight threads, most of it Julia compilation and the first Stokes solve,
-and must end with `[case] DONE mode=smoke steps=10` and
-`[case] final: Nu_top=5.999881 Nu_bot=-4.029590 Vrms=6.808435e+03 ... leaves=2644 N=11233`. The
-conductive reference for this base state is `Nu_top = 6`, so the top flux is right to **2e-5
-relative** after 10 steps; the bottom is 0.74 percent below its `-4` reference because the
-bottom boundary layer is still forming.
+The first run takes about two minutes, mostly Julia compilation and the first Stokes solve; on a warm machine it is 47.6 s. It must end with `[case] DONE mode=smoke steps=10` followed by
 
-The 2 000-step spin-up is the same case with AMR on:
+```text
+[case] final: Nu_top=5.999881 Nu_bot=-4.029590 Vrms=6.808435e+03 meanT=1.333328 closure=-8.794e-04 leaves=2644 N=11233
+```
+
+The conductive reference for this base state is `Nu_top = 6`, so the top flux is right to **2e-5 relative** after ten steps. The bottom sits 0.74% below its `-4` reference because the bottom boundary layer is still forming.
+
+The 2 000-step spin-up is the same card with adaptation on:
 
 ```bash
 CASE_OUT=out_julia/demo CASE_STEPS=2000 \
   julia --project=. --threads=8 examples/case_realistic_2d.jl spinup
 ```
 
-It grows the tree from 640 leaves to the 10 000-leaf cap in the first 100 steps and writes
-`spinup.h5` every 200 steps and at exit. The full 2 000 steps were not re-run for this page. The
-project's production record is 4.13 s/step at the 10 000-leaf cap, so 2 000 steps is about **2.3
-h** at that rate; the early steps are cheaper while the tree grows, which makes 2.3 h an upper
-bound. The case has no analytic reference: the 2 000-step state is still the startup transient,
-and the two production policies agree on `Nu_top` to 0.01 percent in the common early window but
-differ by 5.1 percent at `t = 4.34e-3`. Compare a 2 000-step run with another run of the same
-case; the 20 000-step E endpoint (`Nu_top = 18.2892`, `Nu_bot = -2.7636`) is a different regime.
+The tree grows from 640 leaves to the 10 000-leaf cap within the first 100 steps, and `spinup.h5` is written every 200 steps and again at exit. This page has not run the full 2 000 steps. At the project's record of 4.13 s per step at the cap, 2 000 steps is about **2.3 hours**, an upper bound because the early steps are cheaper while the tree is still small. The case has no analytic reference: after 2 000 steps it is still in the startup transient. Compare it against another run of the same card, not against the 20 000-step endpoint (`Nu_top = 18.2892`, `Nu_bot = -2.7636`), which is a different regime.
 
-Freeze and resume are two ways to continue the same checkpoint. `resume` keeps AMR on; `freeze`
-rewrites only `amr_every` to 0 and continues on the frozen mesh:
+`resume` and `freeze` are two ways to continue the same checkpoint. `resume` keeps adaptation on; `freeze` rewrites only `amr_every` to 0 and continues on the frozen mesh:
 
 ```bash
 CASE_OUT=out_julia/demo_frozen CASE_STEPS=4000 \
@@ -149,17 +156,11 @@ CASE_OUT=out_julia/demo_resume CASE_STEPS=4000 \
   out_julia/demo/spinup.h5
 ```
 
-Both run 2 000 further steps from step 2000 to step 4000. At the project's 4.13 s/step record
-each is about **2.3 h**; neither full branch was re-run for this page. Use separate `CASE_OUT`
-directories: each writes its own `frames/` and `history.csv`. `CASE_STEPS` is an absolute step
-number, so a budget at or below the checkpoint step makes the driver run zero steps and write
-nothing. `resume` on a frozen checkpoint fails the guard because the mode passes `amr_every = 5`;
-continue that branch with `freeze` on `frozen.h5`.
+Both carry the state from step 2 000 to step 4 000, about **2.3 hours** each at the recorded rate; neither was re-run for this page. Give each its own `CASE_OUT` so the `frames/` and `history.csv` do not collide. `CASE_STEPS` is an absolute step number, so a budget at or below the checkpoint step makes the driver run zero steps and write nothing. Asking `resume` to continue a frozen checkpoint fails the configuration guard, because that mode passes `amr_every = 5`; continue that branch with `freeze` on `frozen.h5`.
 
 ## 4. A programmatic run
 
-`run_semquad_simulation` takes a tree, a `Params` card and an initial anomaly. Save this block
-as `build_and_run.jl`; it is complete and prints one history row per step.
+`run_semquad_simulation` takes a tree, a `Params` card and an initial temperature anomaly. Save this block as `build_and_run.jl`; it is complete and prints one history row per step.
 
 ```julia
 using QuaST, Printf
@@ -181,7 +182,7 @@ pr = Params(Ra=1.0e4, H=0.0, eta_law=:expT, deta_T=1.0,
 ss = make_semstokes(qt, 2)
 theta0 = [0.01 * cospi(x) * sinpi(y) for (x, y) in ss.su.coords]
 
-# 4. Advance 20 steps and read the history back.
+# 4. Advance 20 steps, then read the history back.
 res = run_semquad_simulation(qt, pr, theta0; p=2, tstop=Inf, maxsteps=20,
                              dt0=1.0e-4, dtmax=1.0e-4, cfl=0.0,
                              linear=:direct, verbose=false)
@@ -199,21 +200,11 @@ end
 julia --project=. --threads=8 build_and_run.jl
 ```
 
-The first run takes **84 s** on eight threads, almost all of it Julia's first-call compilation
-of the driver. The history rows are `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, leaves, ...]`, so
-`row[3]` and `row[4]` are the wall Nusselt numbers and `row[5]` is `Vrms`. The output ends at
+The first run takes about 84 s, almost all of it compiling the driver on first call. Each history row is `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, leaves, ...]`, so `row[3]` and `row[4]` are the wall Nusselt numbers and `row[5]` is `Vrms`. The output ends with
 
 ```text
 steps=20 t=2.000000e-03 leaves=256 N=1089
 last row: Nu_top=1.000783 Nu_bot=1.000783 Vrms=2.762497
 ```
 
-The exact check is symmetry: the flow is reflection-symmetric, so `Nu_top` and `Nu_bot` print
-the same value; a difference above `1e-6` means the Stokes or energy solve was disturbed. The
-0.000783 offset from the conductive value 1 is the physical transient at `t = 2e-3`; the solver
-error is far below it. A rerun on another BLAS build should agree to `1e-5` in `Nu` and `Vrms`;
-the direct solver's round-off is far below the printed digits.
-
-The parameters of this block are the library defaults plus the ones written out: `p = 2`,
-`tstop = Inf`, `maxsteps = 20`, constant `dt = 1e-4` (`cfl = 0`), the direct solver. The driver
-default is `linear = :auto`; a run that has to be bitwise reproducible pins `:direct`, as here.
+The sharpest check here is symmetry: the flow is reflection-symmetric about the mid-plane, so `Nu_top` and `Nu_bot` must print the same value, and a difference above `1e-6` means the Stokes or energy solve was disturbed. The 0.000783 offset from the conductive value of 1 is the physical transient at `t = 2e-3`, not solver error. Rerunning on a different BLAS build should agree to `1e-5` in `Nu` and `Vrms`; the direct solver's round-off is far below that.
