@@ -19,7 +19,7 @@ the joint viscosity law `eta = exp(-b T + c (1 - z))` with `b = ln 16384` and `c
 The reference values are `Nu = 6.9299` and `Vrms = 171.755` (Blankenbach et al. 1989, Table 9).
 
 ```bash
-julia --project=. --threads=8 examples/run_2b.jl
+julia --project=. --threads=8 examples/blankenbach_2b.jl 4 5.0
 ```
 
 The arguments are `[nxe] [nze] [stage...]`; the defaults are 40 x 16, `p = 4`, and the four
