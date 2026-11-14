@@ -1,3 +1,4 @@
+# G116: the strain-rate evaluator — exact on representable polynomials, zero for rigid rotation.
 using Test, QuaST
 
 @testset "G116 strain-rate evaluator" begin

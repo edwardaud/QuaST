@@ -1,3 +1,4 @@
+# G185: the energy kernel's optional-function paths are bitwise unchanged.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
 # G185 / S3 stage 2: the energy kernel's optional-function paths are numerically

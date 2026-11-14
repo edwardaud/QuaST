@@ -1,3 +1,4 @@
+# G220: the reduced matrix-free MG assembly (assemble_only=:mg).
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G220: the reduced matrix-free MG assembly (`assemble_only=:mg`).

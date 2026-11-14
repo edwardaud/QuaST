@@ -1,3 +1,4 @@
+# G222: the MG apply optimisations are bitwise.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G222: the shipped matrix-free apply speed-ups are bitwise.

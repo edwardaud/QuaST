@@ -1,3 +1,4 @@
+# G187: the balance! fixed-point guard and its unreachability invariant.
 using Test, QuaST, LinearAlgebra, Random
 
 # G187 / S3 stage 4: the `balance!` fixed-point guard.

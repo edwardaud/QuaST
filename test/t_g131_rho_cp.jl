@@ -1,3 +1,4 @@
+# G131: rho*cp weighting of the energy equation — off by default, pointwise when on.
 using Test, QuaST
 using SparseArrays
 

@@ -1,3 +1,4 @@
+# G207: the direct path's diagonal-shift ladder — control flow on a prescribed residual sequence.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
 # G207: the direct path's diagonal-shift ladder (docs/dev/CASE_REALISTIC.md §13).

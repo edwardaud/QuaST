@@ -1,3 +1,4 @@
+# G141: adaptive Picard relaxation — shrink on divergence, grow on contraction, floored and capped.
 using Test, QuaST
 
 # G141: adaptive under-relaxation of the Picard iteration.

@@ -1,3 +1,4 @@
+# Run one or more gate files in one Julia process.
 using Test
 using QuaST
 

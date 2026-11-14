@@ -1,3 +1,4 @@
+# G186: 2:1 balancing as a worklist, with the face cache invalidated on mutation.
 using Test, QuaST, Random, Printf
 using QuaST: FACE_DIRS
 

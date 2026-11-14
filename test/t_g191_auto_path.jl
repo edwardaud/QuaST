@@ -1,3 +1,4 @@
+# G191: the production linear=:auto path selector's decision table.
 using Test, QuaST, LinearAlgebra, Printf
 
 # G191: production `linear=:auto` path selector (S6).

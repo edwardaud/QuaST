@@ -1,3 +1,4 @@
+# G177: the MF-4 saddle solve — CG on the velocity block with true-residual FGMRES.
 using Test, QuaST, LinearAlgebra, Random
 
 # G177 / S3-MF-4 (updated in MF-6): the `linear=:mg` saddle solve, its two

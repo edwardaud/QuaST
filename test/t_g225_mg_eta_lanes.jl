@@ -1,3 +1,4 @@
+# G225: the eta lane pre-gather is a bitwise re-layout.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G225: the eta lane pre-gather is a pure re-layout and is bitwise.

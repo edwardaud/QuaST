@@ -1,3 +1,4 @@
+# G229: the default AMR path is the balanced policy — no policy keyword required.
 using Test, QuaST, Printf
 
 # G229: the library path of `run_semquad_simulation` is the balanced AMR policy

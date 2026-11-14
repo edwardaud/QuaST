@@ -1,3 +1,4 @@
+# G160: the MG-accelerated steady Newton agrees with the direct path.
 using Test, QuaST, LinearAlgebra
 
 # G160: the steady Newton-Krylov solve with the geometric-MG saddle solver.

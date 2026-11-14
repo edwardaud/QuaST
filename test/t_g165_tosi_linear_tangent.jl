@@ -1,3 +1,4 @@
+# G165: the Tosi linear-law tangent, including the eta0 scaling and clipping.
 using Test, QuaST, LinearAlgebra, Printf
 
 # G165: Tosi tangent for the *linear* law (benchmark Case 1/3) and the eta0

@@ -1,3 +1,4 @@
+# G117: Drucker-Prager yielding — the plastic cut-off with the taumax cap and eta_min floor.
 using Test, QuaST
 
 @testset "G117 Drucker-Prager yielding" begin

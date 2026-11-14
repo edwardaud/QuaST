@@ -1,3 +1,4 @@
+# G137: the consistent boundary flux — Nu = 1 in conduction and agreement with the pointwise flux.
 using Test, QuaST, LinearAlgebra
 
 # G137: consistent boundary flux (CBF) for the temperature equation.

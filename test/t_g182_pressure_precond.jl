@@ -1,3 +1,4 @@
+# G182: the pressure-block selector mg_pressure_precond across its modes.
 using Test, QuaST, LinearAlgebra, Random
 
 # G182 / S3-press: the pressure-block selector `mg_pressure_precond`

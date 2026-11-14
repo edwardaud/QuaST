@@ -1,3 +1,4 @@
+# G97: assemble-only Stokes returns the system without solving.
 using Test, QuaST, LinearAlgebra
 @testset "G97 assemble-only Stokes" begin
     qt=Quadtree(1); ss=make_semstokes(qt,2)

@@ -1,3 +1,4 @@
+# G211: the coarsening_allowed predicate and its live-gated plan.
 using Test, QuaST, Random, Printf
 
 # G211: the coarsening pre-check `coarsening_allowed` (docs/dev/AMR.md §4,

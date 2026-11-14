@@ -1,3 +1,4 @@
+# The whole gate suite: include every t_g*.jl file in order inside one @testset.
 using Test
 using QuaST
 

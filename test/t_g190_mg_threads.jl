@@ -1,3 +1,4 @@
+# G190: the threaded V-cycle is bitwise the serial one.
 using Test, QuaST, LinearAlgebra, Random
 
 # G190 / S5-2: the threaded (leaf-blocked) matrix-free V-cycle is *bitwise* the

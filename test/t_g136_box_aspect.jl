@@ -1,3 +1,4 @@
+# G136: the stretched box (Lx) — square leaves, multi-root equivalence and the guards.
 using Test, QuaST, LinearAlgebra
 
 # G136: stretched box (Lx != 1).

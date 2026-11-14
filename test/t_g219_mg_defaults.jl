@@ -1,3 +1,4 @@
+# G219: the matrix-free MG defaults — coarsening factor and smoothing.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G219: the production matrix-free MG defaults (task 1/2 of the MG optimisation

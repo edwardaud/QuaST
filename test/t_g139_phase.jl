@@ -1,3 +1,4 @@
+# G139: phase-transition buoyancy — zero anomaly gives zero force and the sign follows Gamma.
 using Test, QuaST
 
 # G139: phase-transition buoyancy.

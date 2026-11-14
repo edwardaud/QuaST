@@ -1,3 +1,4 @@
+# G114: SEM diagnostics — Nusselt closure, time averages and the steady-state stop.
 using Test, QuaST
 
 @testset "G114 SEM diagnostics: closure, averages, steady stop" begin

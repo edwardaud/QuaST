@@ -1,3 +1,4 @@
+# G210: the balanced AMR policy — relative coarsening, budget exchange and cooldown.
 using Test, QuaST, Random, Printf
 
 # G210: the balanced AMR policy (docs/dev/AMR.md §3-§4), the only adaptive one

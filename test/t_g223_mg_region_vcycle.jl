@@ -1,3 +1,4 @@
+# G223: the consolidated S6 V-cycle is bitwise the per-call path.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G223: the S6 consolidated V-cycle is bitwise the per-call path, and it really

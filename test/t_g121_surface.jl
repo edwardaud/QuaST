@@ -1,3 +1,4 @@
+# G121: surface velocity diagnostics — RMS and max of the top-wall tangential velocity.
 using Test, QuaST
 
 @testset "G121 surface velocity diagnostics" begin

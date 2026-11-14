@@ -1,3 +1,4 @@
+# G125: heating sources — dissipation and adiabatic terms against closed-form integrals.
 using Test, QuaST
 
 @testset "G125 heating sources: dissipation and adiabatic" begin

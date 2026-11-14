@@ -1,3 +1,4 @@
+# G215: the AMR hot path is equivalent to the pre-audit implementation.
 using Test, QuaST, Random, Printf
 
 # G215: the S15/S16 hot-path audit of the `:balanced` AMR code

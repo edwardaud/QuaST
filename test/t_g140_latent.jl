@@ -1,3 +1,4 @@
+# G140: latent heat as an apparent heat capacity — L=0 is bitwise and the operator gains the Gamma term.
 using Test, QuaST, LinearAlgebra
 
 # G140: latent heat as an apparent heat capacity.

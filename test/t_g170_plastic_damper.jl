@@ -1,3 +1,4 @@
+# G170: ASPECT's plastic damper for the Drucker-Prager law — the formula and its derivatives.
 using Test, QuaST, LinearAlgebra, Printf
 
 # G170: ASPECT's plastic damper for the Drucker-Prager law.

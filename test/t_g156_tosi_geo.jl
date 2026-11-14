@@ -1,3 +1,4 @@
+# G156: the Tosi geometric Jacobian — d eta/d eps_II and d eta/dT against central differences.
 using Test, QuaST, LinearAlgebra
 
 # G156: strain-rate geometric Jacobian (ASPECT A') for the Tosi rheology.

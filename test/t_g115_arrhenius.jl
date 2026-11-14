@@ -1,3 +1,4 @@
+# G115: the Arrhenius viscosity law — closed form, T=1 normalisation and the clamps.
 using Test, QuaST
 
 @testset "G115 Arrhenius viscosity law" begin

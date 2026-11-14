@@ -1,3 +1,4 @@
+# G179: the cached pressure-block approximate inverse — reuse on one tree, rebuild past the eta threshold.
 using Test, QuaST, LinearAlgebra, Random
 
 # G179 / S3 stage A: correctness of the cached pressure-block approximate inverse.

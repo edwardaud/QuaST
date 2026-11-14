@@ -1,3 +1,4 @@
+# G167: the maxpic > 1 guard for the strain-rate dependent Tosi rheology.
 using Test, QuaST, LinearAlgebra
 
 # G167: the `maxpic > 1` guard for the Tosi (strain-rate dependent) rheology.

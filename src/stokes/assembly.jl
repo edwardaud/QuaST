@@ -1,3 +1,4 @@
+# Reference Stokes element matrices, make_semstokes and the sparse pressure mass/stiffness.
 function make_semstokes(qt::Quadtree, p::Int)
     return SemStokes(p, p - 1, make_semquad(qt, p), make_semquad(qt, p - 1))
 end

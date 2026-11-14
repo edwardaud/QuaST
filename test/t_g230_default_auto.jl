@@ -1,3 +1,4 @@
+# G230: the default linear solver is :auto — direct below the thresholds, MG above.
 using Test, QuaST, LinearAlgebra
 
 # G230: the library default of `run_semquad_simulation` is `linear=:auto`

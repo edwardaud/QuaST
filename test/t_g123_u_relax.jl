@@ -1,3 +1,4 @@
+# G123: lagged viscosity and velocity under-relaxation in the Tosi Picard loop.
 using Test, QuaST
 
 @testset "G123 lagged viscosity and velocity under-relaxation" begin

@@ -1,3 +1,4 @@
+# G138: the heat-flux wall condition — the imposed flux is conserved and two flux walls are rejected.
 using Test, QuaST, LinearAlgebra
 
 # G138: prescribed heat flux at a wall.

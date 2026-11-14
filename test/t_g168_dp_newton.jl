@@ -1,3 +1,4 @@
+# G168: Drucker-Prager steady Newton — the derivatives and Kgeo against finite differences.
 using Test, QuaST, LinearAlgebra, Printf
 
 # G168: Drucker-Prager steady Newton (map form) with the DP tangent.

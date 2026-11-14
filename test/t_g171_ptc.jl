@@ -1,3 +1,4 @@
+# G171: pseudo-transient continuation for the Drucker-Prager Stokes Newton — bounded and convergent.
 using Test, QuaST, LinearAlgebra, Printf
 
 # G171: pseudo-transient continuation (PTC) for the DP Stokes Newton.

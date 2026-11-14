@@ -1,3 +1,4 @@
+# G163: the Drucker-Prager Kp saddle block — assembled and checked against finite differences.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
 # G163: Drucker-Prager pressure-derivative saddle block `Kp`.

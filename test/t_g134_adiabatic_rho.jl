@@ -1,3 +1,4 @@
+# G134: adiabatic heating carries rho_ad(y) — the source scales with the reference density.
 using Test, QuaST
 
 @testset "G134 adiabatic heating carries rho_ad(y)" begin

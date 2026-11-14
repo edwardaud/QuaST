@@ -1,3 +1,4 @@
+# G119: the Tosi viscoplastic law — equations (6)-(8) against an independent implementation.
 using Test, QuaST
 
 @testset "G119 Tosi viscoplastic law" begin

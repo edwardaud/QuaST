@@ -1,3 +1,4 @@
+# G118: Picard strain-rate averaging and the divergence monitor — the nodal field, the blend and the growth test.
 using Test, QuaST
 
 @testset "G118 Picard strain-rate averaging and divergence monitor" begin

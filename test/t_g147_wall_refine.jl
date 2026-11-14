@@ -1,3 +1,4 @@
+# G147: refine_wall_to_min! — strip width, target level and the 2:1 balance.
 using Test, QuaST, LinearAlgebra
 
 # G147: refine_wall_to_min! (the wall-refinement path used by AMR).

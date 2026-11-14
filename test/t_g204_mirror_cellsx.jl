@@ -1,3 +1,4 @@
+# G204: the x-mirror with cells_x > 1 — an involution that respects the actual cell count.
 using QuaST, Test
 
 # G204: the x-mirror used by `symmetry=:x` must use the ACTUAL number of cells

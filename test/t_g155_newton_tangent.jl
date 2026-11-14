@@ -1,3 +1,4 @@
+# G155: the analytic tangent Newton — eta'(T) and the steady JVP against finite differences.
 using Test, QuaST, LinearAlgebra
 
 # G155: analytic tangent-linear Jacobian and Newton-Krylov for the steady

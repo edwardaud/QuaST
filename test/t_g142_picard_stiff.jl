@@ -1,3 +1,4 @@
+# G142: maxpic > 1 with adaptive damping lands near the lagged answer.
 using Test, QuaST, LinearAlgebra
 
 # G142: maxpic > 1 lands near the lagged answer.

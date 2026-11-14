@@ -1,3 +1,4 @@
+# G205: the linear=:auto MG-to-direct fallback below and above the thresholds.
 using Test, QuaST, LinearAlgebra
 
 # G205: `linear=:auto` safety net (S7).

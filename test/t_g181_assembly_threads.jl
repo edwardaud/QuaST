@@ -1,3 +1,4 @@
+# G181: threaded leaf assembly — deterministic and bitwise equal to the serial matrices.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
 # G181 / S4 stage 1: leaf-level parallel (multi-threaded) Stokes assembly.

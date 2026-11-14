@@ -1,3 +1,4 @@
+# G175: the matrix-free velocity stiffness semquad_apply_K! against the assembled K.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G175 / S3-MF-1: matrix-free velocity stiffness `semquad_apply_K!`.

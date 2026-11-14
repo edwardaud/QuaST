@@ -1,3 +1,4 @@
+# G224: the region transfer and split Cu phases are bitwise.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G224: the S7 region phases are bitwise the serial path and add no fork/joins.

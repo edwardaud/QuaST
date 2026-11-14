@@ -1,3 +1,4 @@
+# G124: the Tosi linear branch (Case 1/3 control) — no strain-rate or depth dependence.
 using Test, QuaST
 
 @testset "G124 Tosi linear branch (Case 1/3 control)" begin

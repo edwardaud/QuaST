@@ -1,3 +1,4 @@
+# Build the geometric multigrid hierarchy: coarsen the tree, assemble each level and factor the coarsest.
 function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
                               bc::Symbol, deviatoric::Bool;
                               coarsen_layers::Int=1,

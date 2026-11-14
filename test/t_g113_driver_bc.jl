@@ -1,3 +1,4 @@
+# G113: the driver honours pr.bc — :rigid walls differ from :free and lower Vrms.
 using Test, QuaST
 
 @testset "G113 driver honours pr.bc (free vs rigid)" begin

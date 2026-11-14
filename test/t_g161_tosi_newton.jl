@@ -1,3 +1,4 @@
+# G161: the Tosi inner eta(eps) solve and Newton — fixed point and JVP against finite differences.
 using Test, QuaST, LinearAlgebra, Printf
 
 # G161: complete Tosi Newton (inner eta(eps) solve + Kgeo tangent).

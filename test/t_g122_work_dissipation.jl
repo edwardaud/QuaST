@@ -1,3 +1,4 @@
+# G122: work and viscous dissipation — closed-form integrals and Ra*W = U.
 using Test, QuaST
 
 @testset "G122 work and viscous dissipation" begin

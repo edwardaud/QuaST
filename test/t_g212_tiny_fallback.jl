@@ -1,3 +1,4 @@
+# G212: the last-resort tiny shifts of the direct path — the lost-solve fallback.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
 # G212: the last-resort tiny-shift fallback of the direct path

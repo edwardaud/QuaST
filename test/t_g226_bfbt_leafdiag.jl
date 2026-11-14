@@ -1,3 +1,4 @@
+# G226: the exact restricted BFBT diagonal — sparse reference, positivity and solve accuracy.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G226: the exact restricted BFBT diagonal `D = diag(Cu' M_u(sqrt(eta)) Cu)`.

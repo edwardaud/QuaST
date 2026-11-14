@@ -1,3 +1,4 @@
+# G96: the vector velocity mass matrix is the scalar mass on each component.
 using Test, QuaST, LinearAlgebra
 @testset "G96 velocity mass" begin
     qt=Quadtree(1); ss=make_semstokes(qt,2); sq=ss.su

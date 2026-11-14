@@ -1,3 +1,4 @@
+# G218: the constrained matrix-free Jacobi diagonal.
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G218: the matrix-free Jacobi diagonal of the *constrained* velocity operator.

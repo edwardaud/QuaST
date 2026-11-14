@@ -1,3 +1,4 @@
+# G112: SEM checkpoint / exact restart — a restarted run is bit-identical to an uninterrupted one.
 using Test, QuaST
 
 @testset "G112 SEM checkpoint / exact restart" begin

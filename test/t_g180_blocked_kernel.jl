@@ -1,3 +1,4 @@
+# G180: the blocked leaf kernel is bitwise the scalar reference apply.
 ﻿using Test, QuaST, LinearAlgebra, Random
 
 # G180 / S3 stage D: the leaf-blocked SIMD kernel is the same operator as the

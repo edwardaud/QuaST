@@ -1,3 +1,4 @@
+# G173: the hard leaf budget under refine-only AMR, with 2:1 preserved.
 using Test, QuaST, LinearAlgebra, Printf
 
 # G173: hard leaf budget under refine-only AMR (coarsen_frac = 0).

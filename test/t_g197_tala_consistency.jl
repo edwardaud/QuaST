@@ -1,3 +1,4 @@
+# G197: TALA self-consistency — the analytic state and the discrete momentum balance.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
 # G197 -- TALA self-consistency of the route-C (semquad) path

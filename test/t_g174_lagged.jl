@@ -1,3 +1,4 @@
+# G174: the stale-factor (:lagged) cache — bitwise vs direct, refactor on AMR, bounded iterations.
 using QuaST, Printf, LinearAlgebra
 
 # G174: gate for the stale-factor cache (:lagged) -- the S2 speed-up path.

@@ -1,3 +1,4 @@
+# G188: assembly and point-evaluation kernel specialisation is bitwise.
 using Test, QuaST, LinearAlgebra, SparseArrays, SHA, Random
 
 # G188 / S3 stage 4: kernel specialisation of the assembly and point-evaluation

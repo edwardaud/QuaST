@@ -1,3 +1,4 @@
+# G184: the mg_smoothing/mg_omega keywords reach the solve.
 using Test, QuaST, LinearAlgebra
 
 # G184 / S3 stage 2 (stage 0): the driver forwards `mg_smoothing`/`mg_omega`.
