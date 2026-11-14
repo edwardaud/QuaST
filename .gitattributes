@@ -1,0 +1,12 @@
+# Normalise on commit, check out with LF everywhere.  Without this, a file
+# written on Windows and a file written in WSL differ on every line, and a
+# one-paragraph edit shows up as a whole-file rewrite.
+
+* text=auto eol=lf
+
+# data and media are not text
+*.h5 binary
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.pdf binary
