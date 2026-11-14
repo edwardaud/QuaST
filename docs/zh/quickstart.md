@@ -46,7 +46,7 @@ $$
 \mathrm{Nu}_{bot} = 1 - \frac H2 = -4,
 $$
 
-其中 $H$ 是内部加热数， $\mathrm{Nu}_{top}$ 和 $\mathrm{Nu}_{bot}$ 分别是顶壁和底壁的 Nusselt 数。十步内两者都保持在附近。
+其中 $H$ 是内部加热数， $\mathrm{Nu}\_{top}$ 和 $\mathrm{Nu}\_{bot}$ 分别是顶壁和底壁的 Nusselt 数。十步内两者都保持在附近。
 
 `smoke` 不传检查点，所以输出目录里没有检查点：
 

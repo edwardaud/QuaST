@@ -54,7 +54,7 @@ Progress goes to `run.log`, per-step diagnostics accumulate in `history.csv`, an
 
 - Quadtree adaptive mesh with a balanced refinement policy, a 2:1 legality gate and
   local rebalancing; the wall boundary layer can be held at a minimum level.
-- $Q_p$ velocity and $Q_{p-1}$ pressure on GLL nodes, with hanging nodes eliminated
+- $Q\_p$ velocity and $Q\_{p-1}$ pressure on GLL nodes, with hanging nodes eliminated
   through exact constraints rather than penalties.
 - Composite diffusion–dislocation rheology, depth-dependent Drucker–Prager yielding
   with strain weakening, phase transitions with per-transition latent heat, internal

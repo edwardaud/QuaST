@@ -39,7 +39,7 @@ $$
 
 | symbol | meaning |
 |---|---|
-| $\mathbf{u} = (u_x, u_y)$ | velocity; $y$ is height, so $u_y$ is the vertical component (the code calls it `uz`) |
+| $\mathbf{u} = (u\_x, u\_y)$ | velocity; $y$ is height, so $u\_y$ is the vertical component (the code calls it `uz`) |
 | $p$ | dynamic pressure |
 | $\eta$ | effective viscosity, from section 1.4 |
 | $\varepsilon(\mathbf{u})$ | strain-rate tensor |
@@ -56,15 +56,15 @@ $$
 | symbol | meaning |
 |---|---|
 | $Ra$ | Rayleigh number, `1e5` on this case; it multiplies temperature, with the viscosity in units of the reference viscosity |
-| $B_i$ | nondimensional buoyancy number of transition $i$, positive for a dense phase |
-| $\Gamma_i(y,T)$ | phase fraction of transition $i$, section 1.5 |
+| $B\_i$ | nondimensional buoyancy number of transition $i$, positive for a dense phase |
+| $\Gamma\_i(y,T)$ | phase fraction of transition $i$, section 1.5 |
 | $T$ | full temperature; the library evaluates $\bar T + \theta$ |
 
 The $\bar T(y)$ part of $Ra\,T$ is a function of height alone and is balanced by the discrete
 pressure up to the pressure space's interpolation error, so the flow is driven by the anomaly and
 the phase contrast. The energy equation carries no explicit heating term: substituting
 $T = \bar T + \theta$ cancels the source `H` against $\nabla^2\bar T = -H$ (section 1.3) and
-leaves $-u_y\,d\bar T/dy$.
+leaves $-u\_y\,d\bar T/dy$.
 
 ### 1.3 Base state, heating and Nusselt numbers
 
@@ -93,7 +93,7 @@ $$
 
 The angle brackets are the $x$ -average of the one-sided GLL derivative of $\theta$ at the wall.
 At the conductive state the two values are 6 and -4. A steady convecting state satisfies
-$\mathrm{Nu}_{\mathrm{top}} - \mathrm{Nu}_{\mathrm{bot}} = H$; the departure from that identity
+$\mathrm{Nu}\_{\mathrm{top}} - \mathrm{Nu}\_{\mathrm{bot}} = H$; the departure from that identity
 is the `closure` column of the history (section 6.2).
 
 ### 1.4 Rheology
@@ -110,12 +110,12 @@ $$
 
 | symbol | meaning |
 |---|---|
-| $A_d$, $A_s$ | diffusion and dislocation prefactors, in units of $1/\eta_0$ |
-| $E_d$, $E_s$ | activation energies divided by $R\,\Delta T$ |
-| $V_d$, $V_s$ | activation volumes as depth factors; both are zero on this case |
+| $A\_d$, $A\_s$ | diffusion and dislocation prefactors, in units of $1/\eta\_0$ |
+| $E\_d$, $E\_s$ | activation energies divided by $R\,\Delta T$ |
+| $V\_d$, $V\_s$ | activation volumes as depth factors; both are zero on this case |
 | $n$ | dislocation stress exponent, `3` |
-| $T_{\mathrm{nd}} = \max(T + \eta_{T0}, T_{\mathrm{cut}})$ | absolute temperature in units of the temperature drop; `eta_T0 = 0.5`, `comp_Tcut = 0` (off) |
-| $\dot\varepsilon = \max(\varepsilon_{II}, \dot\varepsilon_{\min})$ | floored second invariant, $\varepsilon_{II} = \sqrt{\tfrac12\varepsilon:\varepsilon}$, `comp_eps_min = 1e-12` |
+| $T\_{\mathrm{nd}} = \max(T + \eta\_{T0}, T\_{\mathrm{cut}})$ | absolute temperature in units of the temperature drop; `eta_T0 = 0.5`, `comp_Tcut = 0` (off) |
+| $\dot\varepsilon = \max(\varepsilon\_{II}, \dot\varepsilon\_{\min})$ | floored second invariant, $\varepsilon\_{II} = \sqrt{\tfrac12\varepsilon:\varepsilon}$, `comp_eps_min = 1e-12` |
 
 The isostress rule gives both mechanisms the same stress, so the strain rate splits between
 them:
@@ -124,7 +124,7 @@ $$
 \frac{\tau}{2\eta_{\mathrm{diff}}} + A_s\exp\left(-\frac{E_s+V_s(1-y)}{n\,T_{\mathrm{nd}}}\right)\tau^n = \dot\varepsilon, \qquad \eta = \frac{\tau}{2\dot\varepsilon}.
 $$
 
-The code solves the equivalent scalar equation for $x = \eta/\eta_{\mathrm{disl}}$:
+The code solves the equivalent scalar equation for $x = \eta/\eta\_{\mathrm{disl}}$:
 
 $$
 k\,x + x^n = 1, \qquad k = \frac{\eta_{\mathrm{disl}}}{\eta_{\mathrm{diff}}}, \qquad \eta = x\,\eta_{\mathrm{disl}}.
@@ -146,7 +146,7 @@ The constants are `A_d = 1.6240183119e5`, `A_s = 2.6796419238e-1`, `E_d = 12`, `
 `n = 3`, `eta_T0 = 0.5`. They solve two conditions at `y = 0.5`: `eta(T = 0.5, edot_ref) = 1`,
 fixing the common scale, and `eta(T = 0.1) / eta(T = 0.9) = 1e4` at `edot_ref`, fixing the
 branch ratio. The reference strain rate `edot_ref = 1.65e3` comes from a constant-viscosity
-precursor of the same case. At $T = 0.5$ and $\dot\varepsilon = \dot\varepsilon_{\mathrm{ref}}$
+precursor of the same case. At $T = 0.5$ and $\dot\varepsilon = \dot\varepsilon\_{\mathrm{ref}}$
 the law gives $\eta = 1$; the volume mean of the base state is $1.3333$, and where the interior
 runs above $T = 1$ the composite law gives $\eta$ between `1e-3` and `1e-2`, an effective
 Rayleigh number of order `1e7` to `1e8`.
@@ -157,9 +157,9 @@ with `deta_T = 1` for constant viscosity):
 
 | `eta_law` | formula | parameters |
 |---|---|---|
-| `:expT` | $\eta = \exp[-\ln(\Delta\eta_T)\,T]$ | `deta_T` is the viscosity ratio: $\eta(0) = 1$, $\eta(1) = 1/\Delta\eta_T$ |
+| `:expT` | $\eta = \exp[-\ln(\Delta\eta\_T)\,T]$ | `deta_T` is the viscosity ratio: $\eta(0) = 1$, $\eta(1) = 1/\Delta\eta\_T$ |
 | `:expTz` | $\eta = \exp(-bT + c(1-y))$ | `eta_b` = b, `eta_c` = c; 2b uses `b = ln 16384`, `c = ln 64` |
-| `:arrhenius` | $\eta = \exp\{E\,[1/(T+T_0) - 1/(1+T_0)]\}$ | `eta_E` = E, `eta_T0` = T_0 |
+| `:arrhenius` | $\eta = \exp\{E\,[1/(T+T\_0) - 1/(1+T\_0)]\}$ | `eta_E` = E, `eta_T0` = T_0 |
 | `:composite` | the two displays above | `comp_*`, `eta_T0`, `comp_rule` |
 | `:tosi` | Tosi viscoplastic law in absolute units | `tosi = TosiLaw(...)`, which carries its own plastic branch |
 
@@ -173,10 +173,10 @@ $$
 
 | symbol | meaning |
 |---|---|
-| $z_{0,i}$ | reference height of the transition |
-| $w_i$ | transition width in height |
-| $s_i = dz/dT$ | Clapeyron slope as a height shift per unit temperature |
-| $T_{\mathrm{ref},i}$ | reference temperature |
+| $z\_{0,i}$ | reference height of the transition |
+| $w\_i$ | transition width in height |
+| $s\_i = dz/dT$ | Clapeyron slope as a height shift per unit temperature |
+| $T\_{\mathrm{ref},i}$ | reference temperature |
 
 A hot upwelling displaces the transition downward at a positive slope and upward at a negative
 one.
@@ -206,14 +206,14 @@ $$
 
 | symbol | meaning |
 |---|---|
-| $\gamma_i$ | Clapeyron slope in Pa/K |
-| $\Delta S_{A,i}$ | entropy change of the transition, J/(kg K) |
-| $\lambda_i$ | latent coefficient in the energy equation, nondimensional |
-| $T_{\mathrm{abs},i}$ | absolute base-state temperature at the transition, in units of $\Delta T$, including the surface offset |
-| $\rho_0$, $c_p$, $g$, $d$, $\Delta T$ | scale set: `3300 kg/m^3`, `1000 J/(kg K)`, `9.81 m/s^2`, `2.9e6 m`, `1000 K` |
+| $\gamma\_i$ | Clapeyron slope in Pa/K |
+| $\Delta S\_{A,i}$ | entropy change of the transition, J/(kg K) |
+| $\lambda\_i$ | latent coefficient in the energy equation, nondimensional |
+| $T\_{\mathrm{abs},i}$ | absolute base-state temperature at the transition, in units of $\Delta T$, including the surface offset |
+| $\rho\_0$, $c\_p$, $g$, $d$, $\Delta T$ | scale set: `3300 kg/m^3`, `1000 J/(kg K)`, `9.81 m/s^2`, `2.9e6 m`, `1000 K` |
 
-The minus sign is this code's convention: it writes the term as $-\lambda_i\,D\Gamma_i/Dt$ where
-ASPECT writes $+T\,\Delta S_{A}\,D\Gamma_i/Dt$.
+The minus sign is this code's convention: it writes the term as $-\lambda\_i\,D\Gamma\_i/Dt$ where
+ASPECT writes $+T\,\Delta S\_{A}\,D\Gamma\_i/Dt$.
 
 | | `dS_A` | `latent` | reading |
 |---|---|---|---|
@@ -226,7 +226,7 @@ $$
 \left(1+\sum_i\lambda_i\frac{\partial\Gamma_i}{\partial T}\right)\left(\frac{\partial\theta}{\partial t} + \mathbf{u}\cdot\nabla\theta\right) = \nabla^2\theta - u_y\frac{d\bar T}{dy} - \sum_i\lambda_i\frac{\partial\Gamma_i}{\partial y}u_y.
 $$
 
-Here $\lambda_i$ is the coefficient of the table above, $\Gamma_i$ the phase fraction of section
+Here $\lambda\_i$ is the coefficient of the table above, $\Gamma\_i$ the phase fraction of section
 1.5, and $\theta$, $\mathbf{u}$ and $\bar T$ are the fields of section 1.2.
 
 The capacity factor stays inside `[0.88, 1.12]`: the sum of the two coefficient magnitudes,
@@ -260,11 +260,11 @@ merges one. The case caps the depth at `max_level = 7`, so the finest leaf is `1
 height, and the leaf count at `max_leaves = 10000`. The initial tree is uniform level 3, 640
 leaves.
 
-The velocity and pressure pair is Taylor-Hood: velocity in $Q_p$, pressure in $Q_{p-1}$, with
-`p = 2` on this case ($Q_2$ velocity, $Q_1$ pressure). Nodes are the Gauss-Legendre-Lobatto
+The velocity and pressure pair is Taylor-Hood: velocity in $Q\_p$, pressure in $Q\_{p-1}$, with
+`p = 2` on this case ($Q\_2$ velocity, $Q\_1$ pressure). Nodes are the Gauss-Legendre-Lobatto
 points of the reference square, `p+1` per direction for the velocity and `p` for the pressure.
 The element matrices use Gauss-Legendre quadrature with `p+2` points per direction, the default
-`nq = p + 2` of `make_fedata`, which integrates the $Q_p$ mass and stiffness matrices exactly.
+`nq = p + 2` of `make_fedata`, which integrates the $Q\_p$ mass and stiffness matrices exactly.
 
 ### 2.2 Hanging nodes and constraints
 
@@ -292,7 +292,7 @@ $$
 |---|---|
 | $\theta^n$ | anomaly at the start of the step |
 | $\theta^{n-1}$ | anomaly one step earlier |
-| $\Delta t$ | current step; $\Delta t_{\mathrm{prev}}$ the previous one |
+| $\Delta t$ | current step; $\Delta t\_{\mathrm{prev}}$ the previous one |
 | $a, b, c$ | BDF2 mass coefficients; the first step uses $a = b = 1/\Delta t$, $c = 0$ |
 
 With `maxpic = 1` (the case) the viscosity is lagged: the single flow solve of a step uses the
@@ -323,15 +323,15 @@ $$
 
 | symbol | meaning |
 |---|---|
-| $c_{\mathrm{ev}}$ | entropy-viscosity coefficient, `ev = 0.11` |
-| $c_{\max}$ | maximum-viscosity coefficient, `ev_cmax = 0.052` |
-| $h$ | leaf size; $h_e$ is its diagonal scale |
-| $R_e$ | maximum over the leaf's quadrature points of the residual of the $\theta$ equation, multiplied by $\lvert T - \langle T\rangle\rvert$ when `ev_alpha = 2` |
-| $\sigma$ | global spread of the entropy residual, $\max(e_{\max}-\bar e, \bar e-e_{\min})$ of $(T-\langle T\rangle)^2$ over the mesh, with $\langle T\rangle = (T_{\min}+T_{\max})/2$ and $\bar e$ the area mean of $(T-\langle T\rangle)^2$ |
+| $c\_{\mathrm{ev}}$ | entropy-viscosity coefficient, `ev = 0.11` |
+| $c\_{\max}$ | maximum-viscosity coefficient, `ev_cmax = 0.052` |
+| $h$ | leaf size; $h\_e$ is its diagonal scale |
+| $R\_e$ | maximum over the leaf's quadrature points of the residual of the $\theta$ equation, multiplied by $\lvert T - \langle T\rangle\rvert$ when `ev_alpha = 2` |
+| $\sigma$ | global spread of the entropy residual, $\max(e\_{\max}-\bar e, \bar e-e\_{\min})$ of $(T-\langle T\rangle)^2$ over the mesh, with $\langle T\rangle = (T\_{\min}+T\_{\max})/2$ and $\bar e$ the area mean of $(T-\langle T\rangle)^2$ |
 | $\lvert u\rvert$ | maximum velocity magnitude in the leaf |
 
 The viscosity is zero on the wall rows and is recomputed every step. For the first two steps,
-and whenever a variation vanishes, the code uses $\nu = \nu_{\max}$ instead. It is stored in the
+and whenever a variation vanishes, the code uses $\nu = \nu\_{\max}$ instead. It is stored in the
 checkpoint because the last step's energy operator cannot be reconstructed without it.
 
 ## 3. The adaptive policy
@@ -347,7 +347,7 @@ $$
 
 | symbol | meaning |
 |---|---|
-| $h_\ell$ | leaf height; the $(h/2)$ scale uses the face-normal leaf size |
+| $h\_\ell$ | leaf height; the $(h/2)$ scale uses the face-normal leaf size |
 | $F$ | a face of the leaf |
 | $[\![\cdot]\!]$ | jump of the normal derivative between the two sides |
 | $\mathbf{n}$ | face normal |
@@ -484,7 +484,7 @@ passes.
 
 | keyword | default | case | effect |
 |---|---|---|---|
-| `p` | 2 | 2 | Polynomial order: velocity $Q_p$, pressure $Q_{p-1}$. |
+| `p` | 2 | 2 | Polynomial order: velocity $Q\_p$, pressure $Q\_{p-1}$. |
 | `maxsteps` | 10000 | mode default, `CASE_STEPS` overrides | Absolute step number to stop at. |
 | `tstop` | 1e-3 | `Inf` | Stop at this nondimensional time. |
 | `dt0`, `dtmax`, `dtmin`, `dt_growth` | 1e-4, `Inf`, 1e-14, 1.05 | 1e-6, 5e-5, 1e-9, 1.05 | Step size and its bounds. |

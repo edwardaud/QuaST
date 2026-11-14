@@ -68,6 +68,11 @@ function check(path)
         # inline math must not touch a Chinese character; inline code is not math
         bare = replace(line, r"`[^`]*`" => "")
         for m in eachmatch(r"(?<!\$)\$([^$\n]+)\$(?!\$)", bare)
+            # GitHub parses emphasis before it looks for math, so an unescaped
+            # underscore inside inline math is claimed by Markdown as soon as a
+            # second one can pair with it, and both formulas stop rendering.
+            occursin(r"(?<!\\)_", m.captures[1]) &&
+                bad(rel, i, "unescaped _ inside inline math (write \\_ so emphasis cannot claim it)")
             s = m.offset
             e = s + length(m.match)
             before = s > 1 ? bare[prevind(bare, s):prevind(bare, s)] : ""

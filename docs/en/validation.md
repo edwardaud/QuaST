@@ -81,7 +81,7 @@ $$
 Family **B** is the steady consistent boundary flux (`semquad_nu_cbf`), the residual of the
 steady operator summed over the wall degrees of freedom; family **C** is the same sum for the
 BDF2 step operator, which is what ASPECT's `heat flux statistics` writes. B and C agree to
-$10^{-4}$; A differs from them by $-\tfrac{h}{3}\,\theta''_{\text{wall}}$.
+$10^{-4}$; A differs from them by $-\tfrac{h}{3}\,\theta''\_{\text{wall}}$.
 
 Quote **A**. It is the exact derivative of the discrete solution, its wall quadrature is exact,
 its truncation error is second order and measures 3e-5 to 9e-5 relative at the late states, and

@@ -35,9 +35,9 @@ Pick `eta_law` on `Params`:
 
 | `eta_law` | viscosity | parameters |
 |---|---|---|
-| `:expT` | $\eta = \exp[-\ln(\Delta\eta_T)\,T]$ | `deta_T` is the viscosity ratio |
+| `:expT` | $\eta = \exp[-\ln(\Delta\eta\_T)\,T]$ | `deta_T` is the viscosity ratio |
 | `:expTz` | $\eta = \exp(-bT + c(1-y))$ | `eta_b` = b, `eta_c` = c |
-| `:arrhenius` | $\eta = \exp\{E[1/(T+T_0) - 1/(1+T_0)]\}$ | `eta_E` = E, `eta_T0` = T_0 |
+| `:arrhenius` | $\eta = \exp\{E[1/(T+T\_0) - 1/(1+T\_0)]\}$ | `eta_E` = E, `eta_T0` = T_0 |
 | `:composite` | diffusion plus dislocation, isostress or isostrain | `comp_Ad`, `comp_As`, `comp_Ed`, `comp_Es`, `comp_Vd`, `comp_Vs`, `comp_n`, `comp_rule`, `comp_eps_min`, `eta_T0` |
 | `:tosi` | Tosi viscoplastic law in absolute units | `tosi=TosiLaw(...)` |
 

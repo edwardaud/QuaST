@@ -28,7 +28,7 @@ $$
 B = \frac{\Delta\rho}{\rho_0\alpha_0\Delta T},
 $$
 
-其中 $\Delta\rho$ 是密度跳变， $\rho_0$ 是参考密度， $\alpha_0$ 是热膨胀系数， $\Delta T$ 是温度降。
+其中 $\Delta\rho$ 是密度跳变， $\rho\_0$ 是参考密度， $\alpha\_0$ 是热膨胀系数， $\Delta T$ 是温度降。
 
 潜热用 `latent_mode=:per_phase`，系数用 `per_phase_latent(pr, ph; rho_ref=..., cp=..., dT=..., g=..., d=..., T_surface=...)` 填。现成的一对在 `examples/case_realistic_2d.jl` 的 `phases()` 里，可以直接抄。
 
@@ -82,7 +82,7 @@ CASE_OUT=out_julia/demo CASE_STEPS=4000 \
 
 ## 怎么和 ASPECT 对照？
 
-用 `aspect_runs/realistic/`，以 `realistic_composite` 插件跑 ASPECT 2.5.0-pre，再按[工程记录的验证卷](../dev/VALIDATION.md) 5.1 节的尺度组和流变映射转换。先比 `Nu_top`：在 $t_{nd} = 10^{-3}$ 到 $5\times10^{-3}$ 内一致到 0.005 到 0.9 个百分点，其中 $t_{nd}$ 是无量纲时间。`Nu_bot` 必须带窗口引用，因为 $10^{-6}$ 到 $10^{-3}$ 的差是 -6.11%， $10^{-3}$ 到 $5\times10^{-3}$ 是 +6.05%；不带窗口的均值在大小和符号上都错。要做状态级检查，用 `examples/import_aspect_state.jl` 导入 ASPECT 检查点；两个算子在底壁一致到 0.003%。
+用 `aspect_runs/realistic/`，以 `realistic_composite` 插件跑 ASPECT 2.5.0-pre，再按[工程记录的验证卷](../dev/VALIDATION.md) 5.1 节的尺度组和流变映射转换。先比 `Nu_top`：在 $t\_{nd} = 10^{-3}$ 到 $5\times10^{-3}$ 内一致到 0.005 到 0.9 个百分点，其中 $t\_{nd}$ 是无量纲时间。`Nu_bot` 必须带窗口引用，因为 $10^{-6}$ 到 $10^{-3}$ 的差是 -6.11%， $10^{-3}$ 到 $5\times10^{-3}$ 是 +6.05%；不带窗口的均值在大小和符号上都错。要做状态级检查，用 `examples/import_aspect_state.jl` 导入 ASPECT 检查点；两个算子在底壁一致到 0.003%。
 
 ## 怎么引用？
 

@@ -5,7 +5,7 @@
 二维地幔对流谱元求解器，网格是自适应加密的四叉树，Stokes 用无矩阵多重网格。
 
 QuaST 求解不可压 Boussinesq 或滞弹性（anelastic）的 Stokes 与能量方程，单元是
-$Q_p/Q_{p-1}$ Taylor–Hood，节点取 Gauss–Legendre–Lobatto 点。网格是保持 2:1 平衡的
+$Q\_p/Q\_{p-1}$ Taylor–Hood，节点取 Gauss–Legendre–Lobatto 点。网格是保持 2:1 平衡的
 四叉树，悬挂节点用**精确约束**消去而非罚函数，时间推进是 BDF2，网格按“误差对固定叶
 子预算”的策略自适应。Stokes 鞍点可走稀疏直接分解，也可走无矩阵几何多重网格，由规模
 与黏度对比自动选择。
@@ -48,7 +48,7 @@ CASE_OUT=out_julia/run1 CASE_STEPS=2000 \
 ## 能力
 
 - 四叉树自适应网格：平衡加密策略、2:1 合法性闸门、局部再平衡；壁面边界层可保持最小层级。
-- $Q_p$ 速度、 $Q_{p-1}$ 压力，GLL 节点，悬挂节点用精确约束消去。
+- $Q\_p$ 速度、 $Q\_{p-1}$ 压力，GLL 节点，悬挂节点用精确约束消去。
 - 扩散–位错的复合流变、随深度变化的 Drucker–Prager 屈服与应变弱化、逐相变潜热、
   内部加热、Adams–Williamson 或 Murnaghan 参考态。
 - 稀疏直接与无矩阵多重网格两条 Stokes 路径，由 `linear` 一个开关选择，`:auto` 按鞍点

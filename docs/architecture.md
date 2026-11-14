@@ -59,11 +59,11 @@ names its `SEMEVGlobals` in the `evg` signature, so it must come first.
 ## The folders
 
 **`core/`** `gll.jl` computes the GLL nodes, their barycentric weights and the
-Gauss-Legendre rule; `fe.jl` builds `FEData`, pairing a $Q_p$ velocity basis
-with a $Q_{p-1}$ pressure basis on a $p+2$ Gauss rule. `quadtree.jl` is the
+Gauss-Legendre rule; `fe.jl` builds `FEData`, pairing a $Q\_p$ velocity basis
+with a $Q\_{p-1}$ pressure basis on a $p+2$ Gauss rule. `quadtree.jl` is the
 mesh: leaves are `(level, ix, iy)`, `refine!` and `coarsen!` mutate, `balance!`
 keeps 2:1, and `QuadFaceTable` answers `face_pairs` and `neighbors` without a
-rescan. `semquad.jl` is `SemQuad`, the scalar $Q_p$ space. Its split slices
+rescan. `semquad.jl` is `SemQuad`, the scalar $Q\_p$ space. Its split slices
 follow: `constraints.jl` (hanging interpolation `C`, applied as
 $C^\top A C\,u = C^\top b$), `eval.jl`, `transfer.jl` (nodal or L2),
 `parallel.jl`, and `poisson.jl` for verification only.
@@ -80,7 +80,7 @@ defines `PhaseTransition` with `phase_gamma` and `per_phase_latent`;
 `phase_buoyancy.jl` the buoyancy anomaly. `refstate.jl` is `SemRefState` with
 `semquad_rho`, `semquad_alpha`, `semquad_cp`, `semquad_Tad` and
 `semquad_drho_dz`. `energy_assembly.jl` assembles `M`, `K`, `C` and `F` for
-$\partial_t\theta + u\cdot\nabla\theta = \nabla^2\theta - u_z\bar T'(z)$;
+$\partial\_t\theta + u\cdot\nabla\theta = \nabla^2\theta - u\_z\bar T'(z)$;
 `energy.jl` steps it; `weakening.jl` carries the weakening field.
 
 **`stokes/`** `state.jl` is `SemStokes` (a velocity and a pressure `SemQuad`)
@@ -108,7 +108,7 @@ leaf from the normal-derivative jump. `leaf_ops.jl` has `_refine_pair!`,
 `_coarsen_pair!` and the hard budget `semquad_enforce_leaf_budget!`.
 `coarsen_gate.jl` is the 2:1 `coarsening_allowed` pre-check; `coarsen_plan.jl`
 is the plan and funding merge. `cycle.jl` is `amr_cycle_balanced!`, with
-thresholds $\tau_r$, $\tau_c$ and the deadband $\tau_h = \min(\tau_c, h\tau_r)$
+thresholds $\tau\_r$, $\tau\_c$ and the deadband $\tau\_h = \min(\tau\_c, h\tau\_r)$
 of the `hysteresis` keyword; `cooldown.jl` is `AmrCooldown`; `hooks.jl` is
 `semquad_amr_passes!` (indicator, cycle, budget, rebuild `SemStokes`, transfer).
 
@@ -129,7 +129,7 @@ rebuilds the tree, and `run_semquad_simulation` compares `config` on restart, so
 a resume cannot silently change its AMR or physics setup.
 
 **`diagnostics/`** `global.jl` is the acceptance set: `semquad_nu_walls` (the
-wall Nusselt numbers, $Nu_{top} = 1 + H/2 - \langle\partial_y\theta\rangle$),
+wall Nusselt numbers, $Nu\_{top} = 1 + H/2 - \langle\partial\_y\theta\rangle$),
 `semquad_nu_energy`, `semquad_heat_budget`, `semquad_vrms`, `semquad_mean_T`,
 `semquad_max_divergence`, `semquad_work_dissipation`, `semquad_surface_velocity`,
 `semquad_exact_residual` and `semquad_level_stats`. `flux.jl` is the
