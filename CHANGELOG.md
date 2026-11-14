@@ -94,3 +94,24 @@ public release: earlier development happened in a private repository.
   that is still used, `assemble_semquad_velocity_mass`, moved verbatim to
   `src/semquad.jl`; `return_system` and `assemble_only` stay because the Newton and
   multigrid stack depends on them.
+
+### Removed (fourth pass)
+
+- `src/physics/rheology.jl`, the SI-unit ASPECT material model the uniform-mesh
+  solver used. One function survived and moved to `physics/eta.jl`: `spd_factor`,
+  the SPD stabilisation factor of the visco-plastic Jacobian, which the
+  variable-viscosity assembly calls.
+- The 110 exported names that bound nothing in the package. `export` of a missing
+  name is legal Julia, so the whole route-A surface (`Mesh`, `make_mesh`, `DG1D`,
+  `rt0`, the psi-omega spaces, `run_simulation`) was still advertised to users and
+  failed only when they touched it. The export list is now generated from what the
+  module actually defines: 309 names to 199.
+- Three ASCII initial conditions (`data/initial_temperature_case{1b,1c,2a}.txt`)
+  whose only reader was a deleted gate, and `aspect_runs/realistic/compare.py`,
+  superseded by `compare_E.py`.
+
+### Fixed
+
+- `t_g203`'s cost assertion timed a 200 microsecond loop 20 times, so the ratio
+  moved between 1.16 and 1.55 on identical code. Both arms are warmed up and timed
+  over 200 repetitions now; the 1.5x bound is unchanged.

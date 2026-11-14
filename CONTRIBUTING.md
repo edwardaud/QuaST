@@ -40,16 +40,12 @@ julia --project=. test/runtests.jl
 ```
 
 `README.md` quotes about 35 minutes; the engineering record prices the same run at 40 to 75
-minutes depending on the machine. The suite has about 220 gate files, and the last recorded
-full-suite run reported 133 675 passed, 2 failed and 2 broken.
+minutes depending on the machine. The suite has 156 gate files, and the last recorded
+full-suite run reported 131 851 passed, 0 failed and 2 broken.
 
-The two failures are known: the two `interior_max >= 5` assertions in
-`test/t_g64_h5_highra_plume.jl` (G64). Both trees reach interior level 4 in the current
-code, and the gate reports 6 passed and 2 failed in 2 min 31 s here.
-`.github/workflows/gates.yml` does not run G64. The two broken entries are `@test_skip`
-calls in G209 and G214 that wait for `G209_STATE` and `G214_STATE`, checkpoints the
-repository does not ship. Any other failure, or a known failure that moves, is a
-regression.
+The suite currently reports no failures; the two `broken` entries are `@test_skip`
+calls in G209 and G214 that wait for checkpoints the repository does not ship.
+Any failure is a regression.
 
 ## House rules
 

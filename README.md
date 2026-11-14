@@ -90,7 +90,7 @@ julia --project=. test/runtests.jl                    # full suite, ~35 min
 julia --project=. test/run_gates.jl t_g229_default_balanced.jl   # one gate
 ```
 
-The suite is about 220 gate files and 133 600 assertions, covering bitwise regression pins,
+The suite is 156 gate files and 131 851 assertions, covering bitwise regression pins,
 benchmark values, invariants and accuracy classes.
 
 ## The ASPECT comparison

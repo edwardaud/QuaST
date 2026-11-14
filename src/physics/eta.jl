@@ -439,3 +439,32 @@ end
 
 semquad_dp_deta_T(T::Float64, y::Float64, edot::Float64, p::Float64,
                   pr::Params) = semquad_dp_deta_T(T, y, edot, p, 0.0, pr)
+
+# The SPD stabilisation factor of the visco-plastic Jacobian: ASPECT's
+# `Utilities::compute_spd_factor`, used by the variable-viscosity assembly.
+
+"""
+    spd_factor(eta, deta, edot, exx, ezz, exz, dxd, dzd, dexz; safety=0.9)
+
+Port of ASPECT `Utilities::compute_spd_factor`: returns alpha in (0,1] that
+scales the geometric Jacobian term so the effective viscous modulus stays SPD.
+`deta` is d eta / d edot; `(exx,ezz,exz)` is the full strain rate,
+`(dxd,dzd,dexz)` its deviator.
+"""
+function spd_factor(eta::Float64, deta::Float64, edot::Float64,
+                    exx::Float64, ezz::Float64, exz::Float64,
+                    dxd::Float64, dzd::Float64, dexz::Float64;
+                    safety::Float64=0.9)
+    (edot <= 1e-30 || abs(deta) <= 1e-30) && return 1.0
+    ee = exx^2 + ezz^2 + 2.0 * exz^2
+    dd = dxd^2 + dzd^2 + 2.0 * dexz^2
+    (ee <= 1e-30 || dd <= 1e-30) && return 1.0
+    bnorm = abs(deta) / edot * sqrt(dd)
+    bdot = deta / edot * (dxd * exx + dzd * ezz + 2.0 * dexz * exz)
+    norm_ab = sqrt(ee) * bnorm
+    norm_ab <= 1e-30 && return 1.0
+    one_minus = 1.0 - bdot / norm_ab
+    denom = one_minus^2 * norm_ab
+    denom <= safety * 2.0 * eta && return 1.0
+    return max(0.0, safety * (2.0 * eta) / denom)
+end

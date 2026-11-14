@@ -92,14 +92,21 @@ end
     @test nita < 200
 
     # --- the guard's cost: one division + one comparison per cycle ----------
-    # (20 solves each; the bound is loose on purpose, the measured cost in the
-    # audit is <0.01% of a cycle, i.e. inside the noise)
+    # A 200 us loop is dominated by scheduling noise, so both arms are warmed up
+    # and timed over enough repetitions that the guard's share is measurable
+    # rather than lost in a single run.  The 1.5x bound then says "the guard does
+    # not double the cost", which is the property worth pinning.
     local tg, to
-    tg = @elapsed for _ in 1:20
+    for _ in 1:5
+        QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200, restart=20,
+                              stagnation=1.2)
+        QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200, restart=20)
+    end
+    tg = @elapsed for _ in 1:200
         QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200,
                                   restart=20, stagnation=1.2)
     end
-    to = @elapsed for _ in 1:20
+    to = @elapsed for _ in 1:200
         QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200,
                                   restart=20)
     end
