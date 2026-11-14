@@ -75,8 +75,8 @@ CASE_OUT=out_julia/demo CASE_STEPS=4000 \
 ```
 
 `CASE_STEPS` is an absolute step number, so it must exceed the checkpoint's step or the driver
-runs zero steps and writes nothing. Repeat every stored setting the run used (`CASE_AMR`,
-`CASE_SYMMETRY`, `CASE_AMR_GATE`, `CASE_WALLMIN`, `CASE_LINEAR`); the restart guard aborts on a
+runs zero steps and writes nothing. Repeat every stored setting the run used (`CASE_SYMMETRY`,
+`CASE_AMR_GATE`, `CASE_WALLMIN`, `CASE_LINEAR`); the restart guard aborts on a
 mismatch and prints both values.
 
 ## How do I compare against ASPECT?

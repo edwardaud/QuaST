@@ -35,7 +35,7 @@ against ASPECT mixes `p = 4` with Q2, two wall resolutions and two adaptive mesh
 0.9 percent last-frame `Tmax` is the clean scalar. The commands that regenerate the 2b and
 blob records are in [examples.md](examples.md).
 
-The 2b level-3 row is the published energy-family record; `run_2b.jl` on this checkout prints
+The 2b level-3 row is the published energy-family record; `blankenbach_2b.jl` on this checkout prints
 the **pointwise wall** value instead, `Nu_top = 6.942798` and `Vrms = 170.962139`, which is
 +0.19 and -0.46 percent against the reference and inside the same level-3 scatter. Read the
 level-4 row when a percent-level `Nu` matters.
