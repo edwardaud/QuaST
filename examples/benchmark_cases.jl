@@ -165,13 +165,13 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
     series = Tuple{Float64,Float64,Float64}[]
     every = c.periodic ? 1 : 25
     cb = (st) -> begin
-        push!(series, (st.t, semquad_nu_walls(ss.su, st.qt, st.theta, c.pr)[1],
-                       semquad_mean_T(ss.su, st.qt, st.theta, c.pr)))
+        push!(series, (st.t, semquad_nu_walls(st.sq, st.qt, st.theta, c.pr)[1],
+                       semquad_mean_T(st.sq, st.qt, st.theta, c.pr)))
         st.step % every == 0 || return nothing
-        nt, _ = semquad_nu_walls(ss.su, st.qt, st.theta, c.pr)
+        nt, _ = semquad_nu_walls(st.sq, st.qt, st.theta, c.pr)
         @printf("  %s step %5d t=%.3e dt=%.2e Nu_top=%.5f Vrms=%.5f leaves=%d\n",
                 c.name, st.step, st.t, st.dt, nt,
-                semquad_vrms(ss.su, st.qt, st.ux, st.uz), length(st.qt.leaves))
+                semquad_vrms(st.sq, st.qt, st.ux, st.uz), length(st.qt.leaves))
         flush(stdout)
         return nothing
     end
@@ -204,8 +204,8 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
                                 max_level=max(level, wallmin),
                                 checkpoint_path=isempty(out) ? "" : joinpath(out, "$(c.name).h5"),
                                 checkpoint_every=500, verbose=true)
-    nt, nb = semquad_nu_walls(ss.su, st.qt, st.theta, c.pr)
-    vr = semquad_vrms(ss.su, st.qt, st.ux, st.uz)
+    nt, nb = semquad_nu_walls(st.ss.su, st.qt, st.theta, c.pr)
+    vr = semquad_vrms(st.ss.su, st.qt, st.ux, st.uz)
     wall = time() - t0
     @printf("\n[%s] steps=%d t=%.4e wall=%.0f s  Nu_top=%.6f Nu_bot=%.6f Vrms=%.6f  leaves=%d\n",
             c.name, st.steps, st.t, wall, nt, nb, vr, length(st.qt.leaves))
