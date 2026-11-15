@@ -190,7 +190,8 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
     st = run_semquad_simulation(qt, c.pr, th0; p=2, tstop=tstop, dt0=1.0e-4,
                                 cfl=cfl, dtmax=1.0e-2, dt_growth=1.05,
                                 maxpic=maxpic, pic_tol=1.0e-5,
-                                maxsteps=200_000, steady_tol=1.0e-6,
+                                maxsteps=200_000,
+                                steady_tol=parse(Float64, get(ENV, "CASE_STEADY", "1.0e-6")),
                                 steady_window=20, tmin=0.05, callback=cb,
                                 linear=:auto,
                                 # Wall refinement: the production rule forces
@@ -254,7 +255,9 @@ function main(args)
     level = length(args) >= 2 ? parse(Int, args[2]) : 5
     c = make_case(name)
     tstop = length(args) >= 3 ? parse(Float64, args[3]) : c.tstop
-    run_case(c; level=level, tstop=tstop)
+    out = get(ENV, "CASE_CKPT_DIR", "")
+    !isempty(out) && mkpath(out)
+    run_case(c; level=level, tstop=tstop, out=out)
 end
 
 main(ARGS)
