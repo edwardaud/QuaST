@@ -55,7 +55,10 @@ for case in ("1a", "1b", "1c", "2a", "2b")
     if final === nothing
         step_txt = last_step === nothing ? "no output yet" :
                    "at " * strip(split(last_step, r"\s+")[end - 4]) * ", still transient"
-        println("| $case (L$lvl) | $ra | $heat | $visc | — | $refnu | — | — | $refvr | — | running, $step_txt |")
+        # A log with the `aborted` marker was stopped on purpose, so it must not
+        # read as a run still in flight.
+        state = occursin("aborted", basename(path)) ? "aborted, $step_txt" : "running, $step_txt"
+        println("| $case (L$lvl) | $ra | $heat | $visc | — | $refnu | — | — | $refvr | — | $state |")
         continue
     end
     m = match(r"Nu_top=([-\d.eE+]+) Nu_bot=([-\d.eE+]+) Vrms=([-\d.eE+]+)", final)

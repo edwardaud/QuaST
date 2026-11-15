@@ -8,23 +8,25 @@ This page gives the short answer. The full record, with the conditions and the r
 
 The Blankenbach et al. (1989) family, run to a steady state on the quadtree solver. Each row is one converged run at one refinement level, so the table shows how the answer converges rather than quoting a single point. `Nu` is the top wall flux from the one-sided GLL gradient and `Vrms` the volume RMS velocity. A run counts as converged only when the top and bottom fluxes agree, which they must in a steady state with no internal heating.
 
-| Case | `Ra` | Viscosity | Level | `Nu` | Reference | Δ | `Vrms` | Δ |
-|---|---:|---|---:|---:|---:|---:|---:|---:|
-| 1a | $10^4$ | constant | 3 | 4.936942 | 4.884409 | +1.08% | 42.8638 | −0.00% |
-| 1a | $10^4$ | constant | 4 | 4.897925 | 4.884409 | +0.28% | 42.8616 | −0.01% |
-| 1a | $10^4$ | constant | 5 | 4.888163 | 4.884409 | **+0.08%** | 42.8724 | +0.02% |
-| 1b | $10^5$ | constant | 3 | 10.988574 | 10.534095 | +4.31% | 193.2127 | −0.00% |
-| 1b | $10^5$ | constant | 4 | 10.669987 | 10.534095 | **+1.29%** | 193.2139 | −0.00% |
-| 1c | $10^6$ | constant | 3 | 23.687756 | 21.972465 | +7.81% | 833.3367 | −0.08% |
-| 1c | $10^6$ | constant | 4 | 23.037486 | 21.972465 | **+4.85%** | 833.9917 | −0.00% |
-| 2a | $10^4$ | $\eta=e^{-\ln(10^3) T}$ | 3 | not converged | 10.066 | — | 474.63 | −1.21% |
-| 2b | $10^4$ | temperature and depth | 3 | 7.248805 | 6.9299 | +4.60% | 170.213 | −0.90% |
+| Case | `Ra` | Viscosity | Level | Leaves | `Nu` | Reference | Δ | `Vrms` | Δ |
+|---|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 1a | $10^4$ | constant | 3 | 1 024 | 4.936942 | 4.884409 | +1.08% | 42.8638 | −0.00% |
+| 1a | $10^4$ | constant | 4 | 4 096 | 4.897925 | 4.884409 | +0.28% | 42.8616 | −0.01% |
+| 1a | $10^4$ | constant | 5 | 16 384 | 4.888163 | 4.884409 | **+0.08%** | 42.8724 | +0.02% |
+| 1b | $10^5$ | constant | 3 | 1 024 | 10.988574 | 10.534095 | +4.31% | 193.2127 | −0.00% |
+| 1b | $10^5$ | constant | 4 | 4 096 | 10.669987 | 10.534095 | +1.29% | 193.2139 | −0.00% |
+| 1b | $10^5$ | constant | 5 | 16 384 | 10.568610 | 10.534095 | **+0.33%** | 193.2137 | −0.00% |
+| 1c | $10^6$ | constant | 3 | 1 024 | 23.687756 | 21.972465 | +7.81% | 833.3367 | −0.08% |
+| 1c | $10^6$ | constant | 4 | 4 096 | 23.037486 | 21.972465 | +4.85% | 833.9917 | −0.00% |
+| 1c | $10^6$ | constant | 5 | 16 384 | 22.315960 | 21.972465 | **+1.56%** | 834.0082 | +0.00% |
+| 2b | $10^4$ | temperature and depth | 3 | 640 | 7.248805 | 6.9299 | +4.60% | 170.213 | −0.90% |
+| 2a | $10^4$ | $\eta=e^{-\ln(10^3) T}$ | 3 | 1 024 | not converged | 10.066 | — | 474.63 | −1.21% |
 
-Read the 1a rows for the method. The error drops by a factor of 3.9 between level 3 and level 4, and by 3.5 between level 4 and level 5, against the factor of 4 a second-order element predicts. `Vrms` meanwhile sits at 0.01% on the coarsest level already. That contrast is why both columns are here: the velocity field is a large-scale quantity, while `Nu` is a one-sided gradient inside a boundary layer thinner than the wall element.
+Read the 1a rows for the method. The error drops by a factor of 3.9 between level 3 and level 4, and by 3.5 between level 4 and level 5, against the factor of 4 a second-order element predicts. 1b shows the same behavior with ratios of 3.3 and 3.9. `Vrms` meanwhile sits within 0.02% of the reference on every level. That contrast is why both columns are here: the velocity field is a large-scale quantity, while `Nu` is a one-sided gradient inside a boundary layer thinner than the wall element.
 
-The 2a row at level 3 says "not converged" for a reason. Its two wall fluxes disagree by 5.4% (`Nu_top = 10.455`, `Nu_bot = 11.024`), and with no internal heating they can only differ while the temperature field is still evolving. Quoting its `Nu` would repeat the mistake this table exists to prevent.
+Case 1c converges more slowly, 7.81% to 4.85% to 1.56%, a ratio of only 1.6 and then 3.1. Its Rayleigh number is $10^6$, a hundred times 1a's, so the wall boundary layer is thinner at the same leaf count and the wall element carries a larger share of the error at every level.
 
-Four runs were still in flight when this page was written: 1b level 5, 1c level 5, 2a level 4, and 2b level 4 with wall refinement. Their rows will replace or extend the entries above.
+Two cases are still open, and the reason is measured rather than assumed. 2a at level 3 is marked "not converged" on purpose: its two wall fluxes disagree by 5.4% (`Nu_top = 10.455`, `Nu_bot = 11.024`), and with no internal heating they can only differ while the temperature field is evolving. For 2b, uniform refinement does not help at all — level 3 gives +4.60% and a uniform level 4 gives +5.31% — while a wall-refined state reaches +0.26%. The wall refinement works, but at interior level 4 with walls at level 5 it needs 6 400 leaves for 2a and 4 000 for 2b, and after six hours both had advanced only 3% and 7% of the way to steady state. They were stopped, and the cheaper interior-3 with walls-at-4 configuration is the next thing to run.
 
 ### The 2b flux families
 
@@ -38,7 +40,7 @@ The 2b case has a published record at a wall-refined level-4 state, where the th
 | wall-refined L4 | steady CBF | 6.9325 | 6.9299 | +0.04% |
 | wall-refined L4 | energy | 6.9330 | 6.9299 | +0.05% |
 
-On the wall-refined state the three families span 0.22%. On a uniform coarse mesh they spread much wider, which is why the convergence table quotes the plain wall gradient and keeps the family comparison here. Uniform refinement alone does not close the gap: going from a uniform level 3 to a uniform level 4 changed `Nu` from +4.60% to +5.31% on this case, while wall refinement reached +0.26% with far fewer cells.
+On the wall-refined state the three families span 0.22%. On a uniform coarse mesh they spread much wider, which is why the convergence table quotes the plain wall gradient and keeps the family comparison here.
 
 ## Cross-code comparisons
 
