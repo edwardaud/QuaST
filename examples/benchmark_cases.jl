@@ -115,21 +115,26 @@ function make_case(name::String)
         # only when Ra / (eta_abs / eta0) matches, i.e. Ra_ours = 10 / eta0:
         # (eta0 = 1, Ra = 10) and (eta0 = 0.1, Ra = 100) are the consistent pairs.
         eta0 = parse(Float64, get(ENV, "CASE_ETA0", "0.1"))
+        # Ra and eta0 trade off: Ra / (eta/eta0) is what the equations see, so
+        # only a change that keeps eta0 fixed and moves Ra changes the physics.
+        # CASE_RA is that knob; the default is the ASPECT pairing.
+        ra = parse(Float64, get(ENV, "CASE_RA", string(10.0 / eta0)))
         law = TosiLaw(etaT=1.0e5, etaZ=1.0, eta_star=0.0, sigma_y=0.0,
                       eta_init=1.0e-1, eta0=eta0,
                       eta_min=1.0e-6, eta_max=10.0, z_is_depth=true)
         return Case(name, 1.0, 4, 4,
-                    Params(Ra=10.0 / eta0, H=0.0, eta_law=:tosi, tosi=law,
+                    Params(Ra=ra, H=0.0, eta_law=:tosi, tosi=law,
                            Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.01, 1.0, "")
     elseif name == "tosi5a"
         # ASPECT Tosi_Case5.prm: eta_z = 10, yield stress 4, eta* = 1e-3,
         # refinement 6 (64 x 64).  This case is a limit cycle, not a steady state.
         eta0 = parse(Float64, get(ENV, "CASE_ETA0", "0.1"))
+        ra = parse(Float64, get(ENV, "CASE_RA", string(10.0 / eta0)))
         law = TosiLaw(etaT=1.0e5, etaZ=10.0, eta_star=1.0e-3, sigma_y=4.0,
                       eta_init=1.0e-1, eta0=eta0,
                       eta_min=1.0e-6, eta_max=10.0, z_is_depth=true)
         return Case(name, 1.0, 4, 4,
-                    Params(Ra=10.0 / eta0, H=0.0, eta_law=:tosi, tosi=law,
+                    Params(Ra=ra, H=0.0, eta_law=:tosi, tosi=law,
                            Twall_top=0.0, Twall_bot=1.0, bc=:free), 0.01, 1.0, "", true)
     end
     error("unknown case $name; use 1a, 1b, 1c, 2a, 2b, tosi1 or tosi5a")
