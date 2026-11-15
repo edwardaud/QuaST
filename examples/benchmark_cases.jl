@@ -154,7 +154,11 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
         ux, uy, Tic = read_ic(c.ic_file)
         th0 = [ic_value(ux, uy, Tic, x, y) - (1.0 - y) for (x, y) in ss.su.coords]
     else
-        th0 = [roll(x, y, c.Lx, c.amp) for (x, y) in ss.su.coords]
+        # `roll` returns the full temperature; the solver advances the anomaly
+        # about the conductive base state.  Passing the full field as the anomaly
+        # is a perturbation of order one, which drives a violent startup and made
+        # the Tosi cases look unstable.
+        th0 = [roll(x, y, c.Lx, c.amp) - (1.0 - y) for (x, y) in ss.su.coords]
     end
     for (g, (_, y)) in enumerate(ss.su.coords)
         (y <= 1.0e-12 || y >= 1.0 - 1.0e-12) && (th0[g] = 0.0)
