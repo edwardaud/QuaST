@@ -225,6 +225,16 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
                 c.name, rn, 100 * (nt - rn) / rn, rv, 100 * (vr - rv) / rv)
     end
     if c.periodic && length(series) > 40
+        # Save the trajectory next to the log: a limit cycle is analysed from the
+        # series, and losing it means integrating again.
+        csv = joinpath(isempty(out) ? "." : out, "$(c.name)_series.csv")
+        open(csv, "w") do io
+            println(io, "t,Nu_top,meanT")
+            for (tt, nu, mt) in series
+                println(io, "$tt,$nu,$mt")
+            end
+        end
+        @printf("[%s] wrote %s (%d samples)\n", c.name, csv, length(series))
         report_cycle(c.name, series)
     end
     return st
@@ -246,8 +256,9 @@ function report_cycle(name::String, series)
     end
     i1, i2 = peaks[end - 1], peaks[end]
     period = tt[i2] - tt[i1]
-    lo, hi = minmax(nu[i1:i2]...)
-    tlo = minimum(series[i1:i2][:, 3]); thi = maximum(series[i1:i2][:, 3])
+    lo, hi = minimum(nu[i1:i2]), maximum(nu[i1:i2])
+    tlo = minimum(s[3] for s in series[i1:i2])
+    thi = maximum(s[3] for s in series[i1:i2])
     @printf("[%s] limit cycle: period=%.4f  Nu range=%.4f to %.4f  mean T range=%.4f to %.4f\n",
             name, period, lo, hi, tlo, thi)
     @printf("[%s] reference (Tosi Table 2): period=0.0792  Nu_top 2.6950 to 7.2792  mean T 0.6543 to 0.6722\n",
