@@ -9,15 +9,21 @@ const OUT = joinpath(ROOT, "docs", "dev", "FILES.md")
 
 const DIRS = ["src", "test", "examples", "benchmarks", "docs", "scripts",
               "aspect_runs", "data", ".github"]
-const ROOTFILES = ["README.md", "LICENSE", "CITATION.cff", "CONTRIBUTING.md",
-                   "CHANGELOG.md", "Project.toml", "Manifest.toml", ".gitignore"]
+# Every regular file at the repository root, so a new one cannot be forgotten.
+const ROOTFILES = sort([f for f in readdir(ROOT)
+                        if isfile(joinpath(ROOT, f)) && !startswith(f, "out_julia")])
 
 first_line(path) = try
+    # A Markdown page is described by its title even when the title is one word;
+    # source files are described by the first comment that says something.
+    md = endswith(path, ".md")
     for l in Iterators.take(eachline(path), 14)
         t = strip(l)
         if startswith(t, "#") && !startswith(t, "#!")
             d = strip(t, '#')
-            length(d) > 6 && return first(d, 150)
+            (md ? length(d) >= 3 : length(d) > 6) && return first(strip(d), 150)
+        elseif md && !isempty(t) && !startswith(t, "```") && !startswith(t, "|")
+            return first(strip(t), 150)
         end
     end
     m = match(r"\"\"\"\s*\n(.+)", read(path, String))

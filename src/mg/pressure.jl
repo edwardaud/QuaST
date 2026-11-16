@@ -168,7 +168,7 @@ MG-accelerated Newton).  Returns `(Fp, pscale)`:
 `(kind=:mass, F=...)`; `pscale` is the block scaling used by the caller.
 
 **The `S1` inner solve.**  `bfbt_s1_solve` selects how the two `F1` solves of the
-w-BFBT apply are carried out (see `src/semquad_s1solve.jl` and
+w-BFBT apply are carried out (see `src/mg/s1solve.jl` and
 docs/dev/MG.md):
 
 | value | the solve | measured |

@@ -4,7 +4,7 @@ using Test, QuaST, LinearAlgebra, SparseArrays
 # G185 / S3 stage 2: the energy kernel's optional-function paths are numerically
 # inert, and the per-step profile hook does not change the trajectory.
 #
-# The Stage-2 fix (`src/semquad.jl`, `_semquad_assemble_energy_block!`)
+# The Stage-2 fix (`src/physics/energy_assembly.jl`, `_semquad_assemble_energy_block!`)
 # replaces the `Union{Nothing,Function}` / `Union{Nothing,Vector}` field accesses
 # in the element loop with `::Float64`-asserted locals, because inference was
 # joining their values with `Any` and boxing the nv x nv loop (328M allocations,

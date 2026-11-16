@@ -90,7 +90,7 @@ are the strain-weakening field at the two BDF2 levels of the next step
 (docs/dev/PHYSICS.md §9); both are optional so an old checkpoint still loads.
 
 `cooldown` is the `AmrCooldown` hysteresis state of the balanced AMR cycle
-(`src/amr_balanced.jl`, docs/dev/AMR.md §3.5).  When supplied it is
+(`src/amr/cycle.jl`, docs/dev/AMR.md §3.5).  When supplied it is
 written as two integer datasets (`cooldown_no_refine`/`cooldown_no_coarsen`, one
 column per key: level, ix, iy, remaining cycles) and the integer attribute
 `cooldown_cycle`; they are **state**, not configuration, so they are deliberately

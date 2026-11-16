@@ -5,7 +5,7 @@ using Test, QuaST, LinearAlgebra
 #
 # The 8192-leaf realistic case found the hole: at 7498 leaves (N=31251,
 # saddle_dofs ~72k) `semquad_choose_linear` switches from `:direct` to the
-# matrix-free MG (src/semquadstokes.jl, then the >=60k rule, now the
+# matrix-free MG (then the >=60k rule, now the
 # >=20k rule), and the MG
 # solve on that non-uniform AMR tree returns MG-FGMRES relres=4.33 / a true
 # saddle residual of 7.28, so `run_semquad_simulation` aborted at step 75/76

@@ -145,7 +145,7 @@ CASE_BASE=$(basename -- "$CASE_DIR")
 [ -f "$JULIA_PROJECT/Project.toml" ] || { echo "not a julia project: $JULIA_PROJECT" >&2; exit 2; }
 
 # h5py is used read-only, to get the checkpoint step (the HDF5 attribute written
-# by src/semquad_checkpoint.jl) and its amr_every config entry.
+# by src/io/checkpoint.jl) and its amr_every config entry.
 if ! "$PY" -c 'import h5py' >/dev/null 2>&1; then
     if command -v python3 >/dev/null 2>&1 && python3 -c 'import h5py' >/dev/null 2>&1; then
         PY=python3

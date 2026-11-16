@@ -69,7 +69,7 @@ the energy equation, from ASPECT's entropy change of a phase transition
 with `gamma` the Clapeyron slope in Pa/K and `drho` the density jump.  ASPECT's
 `latent heat` heating model assembles `+rho T dS_A DGamma/Dt`, i.e. its
 coefficient of `+DGamma/Dt` is `L_A = T dS_A/(cp dT)`.  Our operator
-(`src/semquad.jl`, eq. 1005) writes the term as `-rho L DGamma/Dt`, so
+(`src/core/semquad.jl`, eq. 1005) writes the term as `-rho L DGamma/Dt`, so
 
     latent = -L_A = -T_abs * gamma * drho / (rho_ref^2 cp)
            = -T_abs * slope * drho * g * d / (rho_ref * cp * dT)
