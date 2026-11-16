@@ -63,6 +63,22 @@ The bottom flux does not agree. The difference is **-6.11%** (consistent-boundar
 
 The same-state test separates the operator from the history. ASPECT's state at `t_nd = 9.586e-4` was imported into the QuaST tree, and both codes advanced from it: `Nu_bot` agrees to **0.003%** and `Nu_top` to **0.000%**. So the two operators agree on a shared field, and the 6 to 9% gap is accumulated bottom-boundary-layer history. A provenance study prices five candidate mechanisms: the definition costs 0.7%, wall resolution at most about 1 point, artificial viscosity 7 to 15%, the realization 2 to 4% with the wrong sign, and phases are excluded. That leaves 85 to 90% attributed to the different bottom-layer structure of the two solutions, with the mechanism still open.
 
+## The Tosi family
+
+Tosi et al. (2015) extends the Blankenbach cases with a viscoplastic rheology. Case 1 has a temperature-dependent viscosity only and reaches a steady state. Case 5a adds a yield stress and settles into a limit cycle, so it is described by a period and a min/max pair rather than a single number. The reference values are the medians of the eleven participating codes, Table 2 of the paper.
+
+| Case | Quantity | Ours | Reference | Δ |
+|---|---|---:|---:|---:|
+| 1 | `Nu_top` | 3.4216 | 3.4298 | **−0.24%** |
+| 1 | `Vrms` | 249.53 | 251.80 | **−0.91%** |
+| 5a | period | 0.0783 | 0.0792 | **−1.1%** |
+| 5a | `Nu_top`, minimum | 2.6924 | 2.6950 | **−0.1%** |
+| 5a | `Nu_top`, maximum | 7.4889 | 7.2792 | +2.9% |
+| 5a | mean `T`, minimum | 0.6505 | 0.6543 | −0.6% |
+| 5a | mean `T`, maximum | 0.6686 | 0.6722 | −0.5% |
+
+Both cases land inside the spread the eleven codes reported for themselves, which is the resolution the benchmark can actually offer. Case 5a is the stronger result: a limit cycle is hard to hit by accident, and its period, amplitude and mean temperature all come out in the right place at once.
+
 ## The two Nusselt conventions
 
 Three discrete families measure the wall flux. Write $\theta$ for the temperature anomaly, $H$ for the internal heating, $h$ for the wall element height, and $\langle\cdot\rangle$ for the horizontal average.
@@ -93,7 +109,7 @@ It takes about 22 minutes on eight threads. Each gate pins its reference state a
 
 The validation covers a **two-dimensional Cartesian box** with free-slip or rigid walls and the Boussinesq mass form used by the benchmark and cross-code runs. It covers the shipped physics where that physics is exercised: composite isostress rheology, phase transitions with per-transition latent heat, internal heating, depth-dependent yielding, and strain weakening. The TALA/ALA reference state has its own self-consistency check. It does not cover three dimensions, a spherical shell, toroidal motion, plate boundaries, viscoelasticity, compressible MHD, or a free surface, and nothing in the performance record is measured in 3-D.
 
-The benchmark set is finite too. Within the Blankenbach family, 1a, 1b, 1c, 2a and 2b now have steady runs, though not all of them are refined far enough to quote at the percent level. The Tosi et al. (2015) law is implemented and tested against the paper's equations 6 to 8 (gates G119 and G124), but the benchmark cases themselves are not reproducible in this repository yet: the case-1 run drives a far too energetic initial transient, and case 5a is a limit cycle that needs a period measurement the current driver does not make. The state of both is recorded in section 2.4 of [the validation volume](../dev/VALIDATION.md) rather than reported as a number here. The blob is one 25-frame window, and the ASPECT comparison is one case, one rheology, and one direction of state import.
+The benchmark set is finite too. Within the Blankenbach family, 1a, 1b, 1c and 2a have converged steady runs and 2b is converged only on a coarse mesh, with the percent-level `Nu` still open. Both Tosi cases reproduce, but each at a single resolution and a single Rayleigh number. The blob is one 25-frame window, and the ASPECT comparison is one case, one rheology, and one direction of state import.
 
 There is also no mesh-convergence study of the realistic solution itself. The $O(h^2)$ error of the pointwise flux rests on the measured third derivative, and the bottom-flux difference is not decomposed. Within these limits the solver is trustworthy for Rayleigh–Bénard and plume experiments in a 2-D box at the resolutions and rheologies named in [the realistic-case volume](../dev/CASE_REALISTIC.md). Outside them, run a resolution check and a benchmark check before quoting a number. Convergence is necessary, and it does not by itself validate an answer.
 
