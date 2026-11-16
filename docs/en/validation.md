@@ -22,7 +22,7 @@ The Blankenbach et al. (1989) family, run to a steady state on the quadtree solv
 | 2b | $10^4$ | temperature and depth | 3 | 640 | 7.248805 | 6.9299 | +4.60% | 170.213 | −0.90% |
 | 2b | $10^4$ | temperature and depth | 3 + walls 4 | 1 120 | 7.212885 | 6.9299 | +4.08% | 170.633 | −0.65% |
 | 2b | $10^4$ | temperature and depth | 4 + walls 5 | 4 000 | 6.992620 | 6.9299 | **+0.90%** | 171.634 | −0.07% |
-| 2a | $10^4$ | $\eta=e^{-\ln(10^3) T}$ | 3 | 1 024 | not converged | 10.066 | — | 474.63 | −1.21% |
+| 2a | $10^4$ | $\eta=e^{-\ln(10^3) T}$ | 3 + walls 4 | 1 600 | 10.124814 | 10.066 | +0.58% | 479.695 | −0.15% |
 
 Read the 1a rows for the method. The error drops by a factor of 3.9 between level 3 and level 4, and by 3.5 between level 4 and level 5, against the factor of 4 a second-order element predicts. 1b shows the same behavior with ratios of 3.3 and 3.9. `Vrms` meanwhile sits within 0.02% of the reference on every level. That contrast is why both columns are here: the velocity field is a large-scale quantity, while `Nu` is a one-sided gradient inside a boundary layer thinner than the wall element.
 
@@ -30,7 +30,7 @@ Case 2b shows what wall refinement buys: the same interior mesh with the wall st
 
 Case 1c converges more slowly, 7.81% to 4.85% to 1.56%, a ratio of only 1.6 and then 3.1. Its Rayleigh number is $10^6$, a hundred times 1a's, so the wall boundary layer is thinner at the same leaf count and the wall element carries a larger share of the error at every level.
 
-Two cases are still open, and the reason is measured rather than assumed. 2a at level 3 is marked "not converged" on purpose: its two wall fluxes disagree by 5.4% (`Nu_top = 10.455`, `Nu_bot = 11.024`), and with no internal heating they can only differ while the temperature field is evolving. For 2b, uniform refinement does not help at all — level 3 gives +4.60% and a uniform level 4 gives +5.31% — while a wall-refined state reaches +0.26%. The wall refinement works, but at interior level 4 with walls at level 5 it needs 6 400 leaves for 2a and 4 000 for 2b, and after six hours both had advanced only 3% and 7% of the way to steady state. They were stopped, and the cheaper interior-3 with walls-at-4 configuration is the next thing to run.
+2a reaches +0.58% on `Nu_top` and −0.15% on `Vrms`, but its two wall fluxes still disagree by 4.0% (`Nu_top = 10.125`, `Nu_bot = 10.529`). With no internal heating they can only differ while the temperature field is evolving, so the row is quoted as a top-flux value and the state behind it is not fully steady. The bottom flux sits high in every case in this table that has one, Tosi case 1 included. For 2b, uniform refinement does not help at all — level 3 gives +4.60% and a uniform level 4 gives +5.31% — while a wall-refined state reaches +0.26%. The wall refinement works, but at interior level 4 with walls at level 5 it needs 6 400 leaves for 2a and 4 000 for 2b, and after six hours both had advanced only 3% and 7% of the way to steady state. They were stopped, and the cheaper interior-3 with walls-at-4 configuration is the next thing to run.
 
 ### The 2b flux families
 
