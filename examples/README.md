@@ -9,20 +9,22 @@ Run output is written under `out_julia/`, which git ignores.
 
 | Script | What it does |
 |---|---|
-| `amr_coarsen_gate_probe.jl` | Coarsening-gate probe for the balanced AMR policy (docs/dev/AMR.md §4.1). |
-| `blankenbach_2b.jl` | Blankenbach 1989 case 2b, ASPECT's setup (benchmarks/blankenbach/base_case2b.prm): |
-| `blankenbach_2b_cbf_ev.jl` | Blankenbach 2b: what does the consistent boundary flux (CBF) actually say on |
-| `blankenbach_2b_stretch.jl` | Blankenbach 2b on the STRETCHED single-root base (the original quadtree grid): |
-| `blankenbach_2b_time.jl` | Blankenbach (1989) 2b, **time-dependent**, on the square-cell grid (5x2 base). |
-| `blankenbach_2b_wall.jl` | Blankenbach 2b with **wall refinement** instead of uniform h-refinement: |
-| `calib_realistic_2d.jl` | Calibration of the composite (diffusion + dislocation) prefactors for the |
-| `case_realistic_2d.jl` | ============================================================================= |
-| `import_aspect_state.jl` | ============================================================================= |
-| `nu_cbf_compare.jl` | ============================================================================= |
-| `nusselt_audit.jl` | ============================================================================= |
-| `nusselt_wall_functional_test.jl` | What are the two wall functionals, exactly? |
-| `run_blob_kelly_1024.jl` | Produce the 25-frame blob baseline of docs/dev/VALIDATION.md §2.3. |
-| `validate_aspect_mapping.jl` | Validate the dimensional mapping of the QuaST `:composite` rheology onto |
-| `verify100_case.sh` | verify100_case.sh -- launch one arm of the three-arm verification run. |
-| `verify100_compare.jl` | verify100_compare.jl -- end-state comparison of the direct and MG arms, and |
-| `verify100_ic_check.jl` | verify100_ic_check.jl -- is the ASPECT card's t=0 state the same function as |
+| `case_realistic_2d.jl` | The production case: 2.5 x 1 box, composite rheology, two phase transitions with latent heat, adaptive mesh. Modes `smoke`, `short`, `spinup`, `resume`, `freeze`, `wallrefine`, `symseed`. |
+| `benchmark_cases.jl` | Every published benchmark in one entry point: Blankenbach 1a, 1b, 1c, 2a, 2b and Tosi cases 1 and 5a, each at a chosen level. |
+| `run_blob_kelly_1024.jl` | The 25-frame `Ra = 1e8` blob baseline, with per-frame SHA-256 rows. |
+| `calib_realistic_2d.jl` | Derivation of the composite rheology prefactors that `case_realistic_2d.jl` carries as literals. |
+| `import_aspect_state.jl` | Build a QuaST checkpoint from an ASPECT state, for the same-state comparison. |
+| `validate_aspect_mapping.jl` | Check the dimensional mapping of the `:composite` law onto ASPECT's `diffusion dislocation` model. |
+| `verify100_case.sh` | Launch one arm of the three-arm run (direct, multigrid, production) that shows the two linear paths agree. |
+| `verify100_compare.jl` | Compare the end states of those arms frame by frame. |
+| `verify100_ic_check.jl` | Check that the ASPECT card and the QuaST card start from the same function at `t = 0`. |
+| `nusselt_audit.jl` | Arbitration between the three wall-flux definitions against the scheme's own discrete budget. |
+| `nusselt_wall_functional_test.jl` | The algebra relating the pointwise and consistent-boundary-flux functionals on one wall element. |
+| `nu_cbf_compare.jl` | The earlier pointwise-versus-CBF comparison on the realistic card, kept as the provenance of that study. |
+| `amr_coarsen_gate_probe.jl` | Coarsening-gate probe for the balanced AMR policy (`docs/dev/AMR.md` section 4.1). |
+
+The benchmark variants that used to live here (`blankenbach_2b_time.jl`,
+`_stretch.jl`, `_wall.jl`, `_cbf_ev.jl`, and `blankenbach_2b.jl`) are gone.
+`benchmark_cases.jl` covers all of them: it starts from ASPECT's own initial
+field, takes the wall rule and the level as arguments, and reports the wall,
+CBF and energy families.

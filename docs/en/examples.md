@@ -13,7 +13,6 @@ The timings are wall clock on eight Julia threads, not CPU time. The direct solv
 | Example | Command | Wall clock, eight threads | What to check |
 |---|---|---|---|
 | Blankenbach 2b, steady | `benchmark_cases.jl 2b 3 0.2` | about 45 minutes | `Nu_top = Nu_bot` |
-| Blankenbach 2b, transient | `blankenbach_2b.jl 3 0.1` | 329 s | time-dependent output |
 | Blob | `run_blob_kelly_1024.jl` | about two minutes | `Tmax25` and the two digests |
 | Realistic case, smoke | `case_realistic_2d.jl smoke` | about two minutes the first time | `Nu_top = 5.999881` |
 | Programmatic run | `build_and_run.jl` | about 84 s the first time | `Nu_top = Nu_bot = 1.000783` |
@@ -66,24 +65,6 @@ CASE_WALLMIN=5 CASE_INITREF=1 julia --project=. --threads=8 examples/benchmark_c
 ```
 
 `CASE_WALLMIN` sets the minimum level for the wall strip and the wall rows, and `CASE_INITREF=1` runs one adaptation pass on the initial condition. On that wall-refined state the three Nusselt definitions — wall gradient, steady consistent boundary flux, and energy — give 6.9480, 6.9325 and 6.9330, a spread of 0.22%.
-
-### The transient version
-
-`examples/blankenbach_2b.jl` runs the same physics as a time-dependent problem with no steady-state test. It is useful for checking that the case starts and that the direct path works:
-
-```bash
-julia --project=. --threads=8 examples/blankenbach_2b.jl 3 0.1
-```
-
-The signature is `[level] [tstop] [ev]`, defaulting to `level = 3`, `tstop = 0.1` and `ev = 0.11`. On this machine, eight threads take 2 550 steps and 329 s, ending with
-
-```text
-level 3: cells=640 nodes=2673 t=0.100 steps=2550  Nu_top=7.9039 (+14.06%)  Vrms=143.64 (-16.37%)  Nu_bot=7.9960  umax=588.5  [329s]
-```
-
-At `t = 0.1` the state is still in its startup transient: `Nu_top` sits 14.06% above the reference and `Vrms` 16.37% below it, and neither wall flux has settled. Use this run to confirm that the example works, that the direct path is available and that the output formats are right, not to quote a percentage.
-
-Bitwise regression belongs to `t_g150_regression_snapshot`: a 5 x 2, level-2 mesh with entropy viscosity and CFL stepping, 20 steps from ASPECT's initial condition, pinning `Nu_top = 7.029996422723808`, `Nu_bot = 5.585292640587811` and `Vrms = 125.9039928721316` at a relative tolerance of `1e-6`.
 
 ## 2. The blob regression
 

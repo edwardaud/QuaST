@@ -13,7 +13,6 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 | 算例 | 命令 | 八线程墙钟 | 核对点 |
 |---|---|---|---|
 | Blankenbach 2b（稳态） | `benchmark_cases.jl 2b 3 0.2` | 约 45 分钟 | `Nu_top = Nu_bot` |
-| Blankenbach 2b（瞬态） | `blankenbach_2b.jl 3 0.1` | 329 s | 时间相关输出 |
 | blob | `run_blob_kelly_1024.jl` | 141 s | `Tmax25` 与两个摘要 |
 | 真实算例 smoke | `case_realistic_2d.jl smoke` | 首次约 2 分钟 | `Nu_top = 5.999881` |
 | 程序化运行 | `build_and_run.jl` | 首次约 84 s | `Nu_top = Nu_bot = 1.000783` |
@@ -66,24 +65,6 @@ CASE_WALLMIN=5 CASE_INITREF=1 julia --project=. --threads=8 examples/benchmark_c
 ```
 
 `CASE_WALLMIN` 指定壁面条带内与壁面行的最小层级，`CASE_INITREF=1` 让初值先做一轮自适应。壁面加密态上三种 `Nu` 定义（壁面梯度、稳态 CBF、能量族）分别是 6.9480、6.9325、6.9330，散布 0.22%。
-
-### 瞬态版本
-
-`examples/blankenbach_2b.jl` 是同一套物理的时间相关运行，不做稳态判定，适合检查算例能不能跑通：
-
-```bash
-julia --project=. --threads=8 examples/blankenbach_2b.jl 3 0.1
-```
-
-参数是 `[level] [tstop] [ev]`，默认 `level = 3`、`tstop = 0.1`、`ev = 0.11`。本机八线程跑 2 550 步、329 s，最后一行为
-
-```text
-level 3: cells=640 nodes=2673 t=0.100 steps=2550  Nu_top=7.9039 (+14.06%)  Vrms=143.64 (-16.37%)  Nu_bot=7.9960  umax=588.5  [329s]
-```
-
-`t = 0.1` 时状态还在启动瞬变里，`Nu_top` 比参考高 14.06%、`Vrms` 低 16.37%，两个壁面通量都还没进入稳态关系。它能验证算例可跑、直接路径可用、输出格式正确，但别拿它的百分比谈精度。
-
-逐位回归由 `t_g150_regression_snapshot` 负责：5 × 2、level-2 网格、EV 加 CFL，从 ASPECT 初值走 20 步，钉住 `Nu_top = 7.029996422723808`、`Nu_bot = 5.585292640587811`、`Vrms = 125.9039928721316`，相对容差 `1e-6`。
 
 ## 2. blob 回归
 

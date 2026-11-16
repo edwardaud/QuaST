@@ -13,4 +13,4 @@ used to check that ASPECT and QuaST agree on a case with a published answer.
 
 They are templates rather than finished cards: the mesh refinement and the boundary
 blocks are meant to be varied by whoever runs them. QuaST's side of the same cases
-is `examples/blankenbach_2b.jl` and the gates under `test/`.
+is `examples/benchmark_cases.jl` and the gates under `test/`.
