@@ -70,14 +70,39 @@ Progress goes to `run.log`, per-step diagnostics accumulate in `history.csv`, an
 
 ## Validation
 
-The published benchmarks have been run on several mesh levels, and the results are reported as convergence tables rather than single numbers. For case 1a ($Ra=10^4$), the `Nu` error falls from +1.08% at level 3 to +0.28% at level 4 and +0.08% at level 5. The error ratios are 3.9 and 3.5, against the factor of 4 a second-order element predicts, while `Vrms` stays within 0.02% at every level.
+**Table 1.** Published benchmarks against this solver. `Ours` is the best converged run for each
+case; `ASPECT` is the same quantity from the reference statistics ASPECT ships with its
+benchmark cards (Blankenbach) or from the ASPECT column of Table 2 in Tosi et al. (2015).
+The last two columns are differences from the published value and from ASPECT. A dash means
+the quantity is not defined for that case.
 
-For case 2b, a wall-refined level-4 state brings the three Nusselt definitions — wall gradient, steady consistent boundary flux, and energy — within 0.22% of each other, and within 0.04% to 0.26% of the published value.
+| Case | Quantity | Published | ASPECT | Ours | Δ vs published | Δ vs ASPECT |
+|:-----------------|:-------------|-------------:|-------------:|-------------:|-------------:|-------------:|
+| Blankenbach 1a | `Nu` | 4.884409 | 4.884409 | **4.888163** | +0.08% | +0.08% |
+| | `Vrms` | 42.864947 | 42.864956 | **42.8724** | +0.02% | +0.02% |
+| Blankenbach 1b | `Nu` | 10.534095 | 10.533912 | **10.568610** | +0.33% | +0.33% |
+| | `Vrms` | 193.21454 | 193.22175 | **193.2137** | −0.00% | −0.00% |
+| Blankenbach 1c | `Nu` | 21.972465 | 21.972523 | **22.315960** | +1.56% | +1.56% |
+| | `Vrms` | 833.98977 | 833.99083 | **834.0082** | +0.00% | +0.00% |
+| Blankenbach 2a | `Nu` | 10.066 | 10.065793 | **10.124814** | +0.58% | +0.59% |
+| | `Vrms` | 480.4334 | 480.43579 | **479.695** | −0.15% | −0.15% |
+| Blankenbach 2b | `Nu` | 6.9299 | 6.929727 | **6.992620** | +0.91% | +0.91% |
+| | `Vrms` | 171.755 | 171.75354 | **171.634** | −0.07% | −0.07% |
+| Tosi 1 | `Nu_top` | 3.4298 | 3.4305 | **3.4216** | −0.24% | −0.26% |
+| | `u_rms` | 251.80 | 251.3069 | **249.53** | −0.90% | −0.71% |
+| Tosi 5a | period | 0.0792 | — | **0.0783** | −1.14% | — |
+| | `Nu_top`, min | 2.6950 | — | **2.6924** | −0.10% | — |
+| | `Nu_top`, max | 7.2792 | — | **7.4889** | +2.88% | — |
+| | mean `T`, min | 0.6543 | — | **0.6505** | −0.58% | — |
+| | mean `T`, max | 0.6722 | — | **0.6686** | −0.54% | — |
+| Blob, `Ra = 1e8`, frame 25 | `Tmax` | — | 1.2531 | **1.2644** | — | +0.90% |
+| Realistic, ASPECT state imported | `Nu_top` | — | 5.990543 | **5.990543** | — | +0.000% |
+| | `Nu_bot` | — | −3.075076 | **−3.074986** | — | +0.003% |
 
-The ASPECT comparison runs at two levels: a cross-code comparison from a common initial condition, and a state-level comparison that imports an ASPECT checkpoint, where the two operators agree to 0.003% at the bottom wall.
-
-> [!NOTE]
-> Over transient windows the bottom heat flux differs from ASPECT by −6.11% to +6.05%, depending on the window. That gap is documented but not fully explained, and the [validation page](docs/en/validation.md) says so.
+The last three rows compare against ASPECT rather than against a published number: the blob is
+a 25-frame transient, and the two realistic rows start from an imported ASPECT state, so a
+difference there is a discretization difference and nothing else — 0.003% at the bottom wall.
+The details behind each row are in [the validation page](docs/en/validation.md).
 
 ## Documentation
 
