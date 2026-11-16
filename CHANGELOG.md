@@ -19,6 +19,43 @@ public release: earlier development happened in a private repository.
   `amr_policy = "balanced"` config key so files written before the removal still
   match the restart guard.
 
+### Added
+
+- `examples/benchmark_cases.jl`: one entry point per published case (Blankenbach 1a, 1b,
+  1c, 2a, 2b and Tosi 1, 5a), each at a chosen level, with the wall rule and the Rayleigh
+  number as environment knobs.
+- The validation pages report each benchmark as a convergence table with the level, the
+  leaf count and the difference from the published value, instead of a single number.
+- `scripts/run_benchmarks.sh` reproduces the whole campaign with the settings the published
+  benchmark cards use, and `scripts/benchmark_table.jl` turns its logs into table rows.
+- `scripts/check_docs.jl`, run in CI, catches the Markdown constructs that would leave a
+  formula rendered literally.
+
+### Changed
+
+- The user documentation was rewritten in both languages rather than translated, and the
+  internal layer labels were removed from every page, comment and gate header.
+- The benchmark drivers now start from ASPECT's own initial fields, which are close to the
+  steady state, and take `CASE_CFL` from the cards (`5.0` for the Blankenbach cases).
+
+### Fixed
+
+- The benchmark driver passed a full temperature as the anomaly when a case had no ASCII
+  field, which drove the Tosi cases into a violent startup.
+- The benchmark driver's diagnostics used the mesh from before an adaptation pass, so a
+  wall-refined run printed a Nusselt number unrelated to the state.
+- The wall rule was silently clipped when the tree depth equalled the interior level, so a
+  "wall-refined" run was a uniform mesh.
+- The limit-cycle analysis called `minmax` with a splatted slice and crashed after a case
+  had finished; the trajectory is now written to a CSV as well.
+
+### Removed
+
+- Sixteen one-off launcher scripts under `scripts/`, superseded by `run_benchmarks.sh`.
+- Five Blankenbach 2b example variants (`blankenbach_2b{,_time,_stretch,_wall,_cbf_ev}.jl`),
+  superseded by `benchmark_cases.jl`, and `examples/tosi_case5a_cycle.jl`, which the
+  ordinary driver reproduces.
+
 ## [0.1.0] - 2026-11-13
 
 ### Added
@@ -102,13 +139,14 @@ public release: earlier development happened in a private repository.
   the SPD stabilisation factor of the visco-plastic Jacobian, which the
   variable-viscosity assembly calls.
 - The 110 exported names that bound nothing in the package. `export` of a missing
-  name is legal Julia, so the whole the earlier structured-grid layer surface (`Mesh`, `make_mesh`, `DG1D`,
+  name is legal Julia, so the whole surface of the earlier structured-grid layer (`Mesh`, `make_mesh`, `DG1D`,
   `rt0`, the psi-omega spaces, `run_simulation`) was still advertised to users and
   failed only when they touched it. The export list is now generated from what the
   module actually defines: 309 names to 199.
 - Three ASCII initial conditions (`data/initial_temperature_case{1b,1c,2a}.txt`)
   whose only reader was a deleted gate, and `aspect_runs/realistic/compare.py`,
-  superseded by `compare_E.py`.
+  superseded by `compare_E.py`. The initial conditions came back later, in
+  `examples/data/`, as the benchmark drivers' starting fields.
 
 ### Fixed
 
