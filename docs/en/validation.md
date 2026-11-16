@@ -21,11 +21,12 @@ The Blankenbach et al. (1989) family, run to a steady state on the quadtree solv
 | 1c | $10^6$ | constant | 5 | 16 384 | 22.315960 | 21.972465 | **+1.56%** | 834.0082 | +0.00% |
 | 2b | $10^4$ | temperature and depth | 3 | 640 | 7.248805 | 6.9299 | +4.60% | 170.213 | −0.90% |
 | 2b | $10^4$ | temperature and depth | 3 + walls 4 | 1 120 | 7.212885 | 6.9299 | +4.08% | 170.633 | −0.65% |
+| 2b | $10^4$ | temperature and depth | 4 + walls 5 | 4 000 | 6.992620 | 6.9299 | **+0.90%** | 171.634 | −0.07% |
 | 2a | $10^4$ | $\eta=e^{-\ln(10^3) T}$ | 3 | 1 024 | not converged | 10.066 | — | 474.63 | −1.21% |
 
 Read the 1a rows for the method. The error drops by a factor of 3.9 between level 3 and level 4, and by 3.5 between level 4 and level 5, against the factor of 4 a second-order element predicts. 1b shows the same behavior with ratios of 3.3 and 3.9. `Vrms` meanwhile sits within 0.02% of the reference on every level. That contrast is why both columns are here: the velocity field is a large-scale quantity, while `Nu` is a one-sided gradient inside a boundary layer thinner than the wall element.
 
-Case 2b shows what wall refinement buys: the same interior mesh with the wall strip refined one level further moves from +4.60% to +4.08% at 1 120 leaves, and a level-4 interior with walls at 5 reaches +1.06% at 4 000 leaves.
+Case 2b shows what wall refinement buys: the same interior mesh with the wall strip refined one level further moves from +4.60% to +4.08% at 1 120 leaves, and a level-4 interior with walls at 5 reaches +0.90% at 4 000 leaves, where the two wall fluxes agree to 0.39%.
 
 Case 1c converges more slowly, 7.81% to 4.85% to 1.56%, a ratio of only 1.6 and then 3.1. Its Rayleigh number is $10^6$, a hundred times 1a's, so the wall boundary layer is thinner at the same leaf count and the wall element carries a larger share of the error at every level.
 
