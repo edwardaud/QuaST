@@ -102,7 +102,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt                      # noqa: E402
 from matplotlib.collections import LineCollection    # noqa: E402
-from matplotlib.colors import Normalize, to_rgba       # noqa: E402
+from matplotlib.colors import FuncNorm, Normalize, to_rgba       # noqa: E402
 from matplotlib.cm import ScalarMappable             # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1051,10 +1051,317 @@ def time_label(target, pick, src, interp):
                sigfig(src.times[hi]), src.describe(hi), w))
 
 
-def render_two_col(sources, labels, plan, norm, cmap, args, frames_dir, case,
-                   t0, t1, px_h):
-    """Write the 2-column stacks into frames_dir."""
-    panel_h = int(round(PX_COL / float(args.lx)))
+# ------------------------------------------------- clean three-column layout
+# What the README shows.  Two rows of three bare panels: the temperature field,
+# the temperature anomaly about the horizontal mean, and the mesh coloured by
+# refinement level.  The panels carry no axes, ticks or labels; the only
+# furniture is one bar under each of the first two columns and the level legend
+# under the third, all on one line.  Every number and symbol goes through
+# mathtext with the Computer Modern faces.
+CLEAN = dict(pad_x=44, pad_top=16, gap=26, band_gap=14,
+             cbar_h=16, cbar_label=26, bottom=10, title=20)
+PANEL_LABEL_POS = (0.014, 0.962)     # solver name, axes coordinates
+PANEL_TEXT_POS = (0.985, 0.032)      # diagnostics, axes coordinates
+THETA_CMAP = "RdBu_r"
+ETA_CMAP = "magma_r"
+ETA_GAMMA = 0.30                     # expands the soft end of the eta scale
+ETA_RANGE = (-3.0, 4.0)              # log10(eta/eta0), fixed for the clip
+
+
+def use_science_style():
+    """SciencePlots' look without a TeX installation.
+
+    The `science` style asks for `text.usetex`, and there is no LaTeX on this
+    machine, so it is applied and then TeX is switched off: mathtext with the
+    Computer Modern font set gives the same faces for the symbols that carry
+    subscripts or exponents.
+    """
+    try:
+        import scienceplots  # noqa: F401  (registers the style)
+        plt.style.use(["science"])
+    except Exception:
+        pass
+    plt.rcParams.update({
+        "text.usetex": False,
+        "mathtext.fontset": "cm",
+        "font.family": "serif",
+        "font.serif": ["DejaVu Serif"],
+        "axes.linewidth": 0.8,
+        "figure.facecolor": "white",
+        "savefig.facecolor": "white",
+        "savefig.bbox": "standard",     # the style asks for "tight"
+        "savefig.pad_inches": 0.0,
+    })
+
+
+def clean_geometry(px_w, n_rows, lx, n_cols=3):
+    """Pixel rectangles for the clean layout at canvas width `px_w`."""
+    g = CLEAN
+    col_w = (px_w - 2 * g["pad_x"] - (n_cols - 1) * g["gap"]) // n_cols
+    panel_h = int(round(col_w / float(lx)))
+    band_h = panel_h + g["band_gap"]
+    strip_h = g["cbar_h"] + g["cbar_label"] + g["title"] + g["bottom"]
+    px_h = g["pad_top"] + n_rows * band_h + strip_h
+    px_h += px_h % 2                        # h264 wants an even height
+    geo = dict(g)
+    geo.update(px_w=px_w, px_h=px_h, col_w=col_w, panel_h=panel_h,
+               band_h=band_h, strip_h=strip_h, n_cols=n_cols, lx=lx,
+               x0=[g["pad_x"] + k * (col_w + g["gap"]) for k in range(n_cols)])
+    return geo
+
+
+def sci(x, sig=3):
+    """A number as mathtext: a real exponent once it needs one, else 3 digits."""
+    if x is None:
+        return None
+    if x == 0.0:
+        return r"$0$"
+    if abs(x) >= 1.0e3 or abs(x) < 1.0e-2:
+        mant, exp = ("%.*e" % (sig - 1, x)).split("e")
+        if "." in mant:
+            mant = mant.rstrip("0").rstrip(".")
+        return r"$%s\times10^{%d}$" % (mant, int(exp))
+    return r"$%.*g$" % (sig, x)
+
+
+def eta_norm():
+    """A power-law norm over ETA_RANGE: full labels, most colour on the interior.
+
+    The viscosity spans nine decades but 95 % of the domain sits between -3 and
+    1; a linear scale spends almost all its colour on the stiff lid.  Forward and
+    inverse are both given so the colourbar can place its ticks.
+    """
+    lo, hi = ETA_RANGE
+    g = ETA_GAMMA
+    forward = lambda x: np.clip((np.asarray(x) - lo) / (hi - lo), 0.0, 1.0) ** g
+    inverse = lambda y: lo + (hi - lo) * np.clip(y, 0.0, 1.0) ** (1.0 / g)
+    return FuncNorm((forward, inverse), vmin=lo, vmax=hi)
+
+
+def temperature_anomaly(T):
+    """T minus its horizontal mean, averaged over x (rows of T are y)."""
+    return T - T.mean(axis=1, keepdims=True)
+
+
+def status_line2(st):
+    """Field diagnostics in mathtext, for the lower right of the T panel."""
+    parts = []
+    if st.get("nu") is not None:
+        parts.append(r"$\mathrm{Nu}_{\mathrm{top}} = %.2f$" % st["nu"])
+    if st.get("vrms") is not None:
+        parts.append(r"$V_{\mathrm{rms}} = %s$" % sci(st["vrms"]).strip("$"))
+    if st.get("tmax") is not None:
+        parts.append(r"$T_{\max} = %.3f$" % st["tmax"])
+    return "    ".join(parts)
+
+
+def status_line1(st):
+    """Mesh counts in mathtext, for the lower right of the mesh panel."""
+    n = "{:,}".format(int(st["n"])).replace(",", r"\,")
+    kind = r"\mathrm{%s}" % st["kind"]
+    if st["hi"] > st["lo"]:
+        lv = r"$\mathrm{levels}\ %d$–$%d$" % (st["lo"], st["hi"])
+    else:
+        lv = r"$\mathrm{level}\ %d$" % st["lo"]
+    out = r"$%s = %s$    " % (kind, n) + lv
+    if st.get("mesh_note"):
+        out += "    " + st["mesh_note"]
+    return out
+
+
+def status_line3(dT):
+    """Extremes of the anomaly shown, for the lower right of its panel."""
+    return (r"$\theta_{\min} = %.2f$    $\theta_{\max} = %+.2f$"
+            % (float(np.nanmin(dT)), float(np.nanmax(dT))))
+
+
+def status_line4(dE):
+    """Viscosity extremes in the panel's own units, for its lower right."""
+    return (r"$\log_{10}\eta_{\min} = %.2f$    $\log_{10}\eta_{\max} = %.2f$"
+            % (float(np.nanmin(dE)), float(np.nanmax(dE))))
+
+
+class CleanRow:
+    """One bare row: T, its anomaly, and the level-coloured mesh."""
+
+    def __init__(self, fig, geo, band, label, norm, cmap, norm_theta,
+                 norm_eta=None):
+        g = geo
+        self.norm, self.norm_theta, self.cmap = norm, norm_theta, cmap
+        self.norm_eta = norm_eta
+        self.im = self.im_t = self.im_e = self.lc_l = self.lc_r = None
+        y_top = g["px_h"] - (g["pad_top"] + band * g["band_h"])
+        y_bottom = y_top - g["panel_h"]
+        h = g["panel_h"] / g["px_h"]
+        axes = []
+        for k in range(g["n_cols"]):
+            ax = fig.add_axes([g["x0"][k] / g["px_w"], y_bottom / g["px_h"],
+                               g["col_w"] / g["px_w"], h])
+            ax.set_axis_off()             # no frame, no ticks, no labels
+            ax.set_xlim(0.0, g["lx"])
+            ax.set_ylim(0.0, 1.0)
+            axes.append(ax)
+        self.ax_t, self.ax_m = axes[0], axes[1]
+        self.ax_e = axes[2] if len(axes) == 4 else None
+        self.ax_mesh = axes[-1]
+        self.label = fig.text(
+            PANEL_LABEL_POS[0], PANEL_LABEL_POS[1], label,
+            transform=self.ax_t.transAxes, color="white", fontsize=19,
+            fontweight="bold", va="top", ha="left")
+        self.t_left = fig.text(
+            PANEL_TEXT_POS[0], PANEL_TEXT_POS[1], "",
+            transform=self.ax_t.transAxes, color="#111111", fontsize=12.5,
+            fontweight="bold", va="bottom", ha="right",
+            bbox=dict(facecolor="white", alpha=0.6, edgecolor="none",
+                      boxstyle="round,pad=0.36"))
+        self.t_mid = fig.text(
+            PANEL_TEXT_POS[0], PANEL_TEXT_POS[1], "",
+            transform=self.ax_m.transAxes, color="#111111", fontsize=12.5,
+            fontweight="bold", va="bottom", ha="right",
+            bbox=dict(facecolor="white", alpha=0.6, edgecolor="none",
+                      boxstyle="round,pad=0.36"))
+        self.t_eta = None
+        if self.ax_e is not None:
+            self.t_eta = fig.text(
+                PANEL_TEXT_POS[0], PANEL_TEXT_POS[1], "",
+                transform=self.ax_e.transAxes, color="#111111", fontsize=12.5,
+                fontweight="bold", va="bottom", ha="right",
+                bbox=dict(facecolor="white", alpha=0.6, edgecolor="none",
+                          boxstyle="round,pad=0.36"))
+        self.t_right = fig.text(
+            PANEL_TEXT_POS[0], PANEL_TEXT_POS[1], "",
+            transform=self.ax_mesh.transAxes, color="#111111", fontsize=12.5,
+            fontweight="bold", va="bottom", ha="right",
+            bbox=dict(facecolor="white", alpha=0.6, edgecolor="none",
+                      boxstyle="round,pad=0.36"))
+
+    def update(self, T, dT, quads, h, h_ref, text_left, text_mid, text_right,
+               dE=None, text_eta=""):
+        if self.im is None:
+            self.im = lr.draw_temperature(self.ax_t, T, None, self.ax_t.get_xlim()[1], 1.0)
+            self.im.set_cmap(self.cmap)
+            self.im_t = lr.draw_temperature(self.ax_m, dT, None,
+                                            self.ax_m.get_xlim()[1], 1.0)
+            self.im_t.set_cmap(THETA_CMAP)
+            if self.ax_e is not None and dE is not None:
+                self.im_e = lr.draw_temperature(self.ax_e, dE, None,
+                                                self.ax_e.get_xlim()[1], 1.0)
+                self.im_e.set_cmap(ETA_CMAP)
+        else:
+            self.im.set_data(T)
+            self.im_t.set_data(dT)
+            if self.im_e is not None and dE is not None:
+                self.im_e.set_data(dE)
+        self.im.set_clim(self.norm.vmin, self.norm.vmax)
+        self.im_t.set_clim(self.norm_theta.vmin, self.norm_theta.vmax)
+        if self.im_e is not None:
+            self.im_e.set_norm(self.norm_eta)
+        segs = quad_segments(quads)
+        if self.lc_l is None:
+            self.lc_l = LineCollection(segs, colors=WHITE["overlay"],
+                                       linewidths=0.12, alpha=0.35, zorder=2)
+            self.ax_t.add_collection(self.lc_l)
+        else:
+            self.lc_l.set_segments(segs)
+        lv = level_of(h, h_ref) if len(h) else np.zeros(0, dtype=int)
+        cols = np.repeat(np.array([to_rgba(LEVEL_COLOURS[k]) for k in lv],
+                                  dtype="float64").reshape(-1, 4), 4, axis=0)
+        if self.lc_r is None:
+            self.lc_r = LineCollection(segs, linewidths=0.45, zorder=2)
+            self.lc_r.set_color(cols)
+            self.ax_mesh.add_collection(self.lc_r)
+        else:
+            self.lc_r.set_segments(segs)
+            self.lc_r.set_color(cols)
+        self.t_left.set_text(text_left)
+        self.t_mid.set_text(text_mid)
+        self.t_right.set_text(text_right)
+        if self.t_eta is not None:
+            self.t_eta.set_text(text_eta)
+
+
+def build_clean_figure(labels, norm, cmap, geo, level_max, norm_theta,
+                       norm_eta=None):
+    use_science_style()
+    fig = plt.figure(figsize=(geo["px_w"] / DPI, geo["px_h"] / DPI), dpi=DPI)
+    fig.patch.set_facecolor("white")
+    rows = [CleanRow(fig, geo, b, lab, norm, cmap, norm_theta, norm_eta)
+            for b, lab in enumerate(labels)]
+    g = geo
+    strip_top = g["px_h"] - (g["pad_top"] + len(labels) * g["band_h"])
+    bar_y = (strip_top - g["cbar_h"]) / g["px_h"]
+    bar_h = g["cbar_h"] / g["px_h"]
+    title_y = (strip_top - g["cbar_h"] - g["cbar_label"] - 6.0) / g["px_h"]
+
+    def bar(k, mappable, norm_local, ticks, title):
+        cax = fig.add_axes([g["x0"][k] / g["px_w"], bar_y,
+                            g["col_w"] / g["px_w"], bar_h])
+        cb = fig.colorbar(mappable, cax=cax, orientation="horizontal")
+        cb.ax.tick_params(colors="#333333", labelsize=11, length=2.5, pad=2)
+        cb.outline.set_edgecolor(WHITE["cbar_edge"])
+        cb.outline.set_linewidth(0.8)
+        cb.set_ticks(ticks)
+        cb.set_ticklabels([r"$%.3g$" % t for t in ticks])
+        fig.text((g["x0"][k] + g["col_w"] / 2.0) / g["px_w"], title_y, title,
+                 color="#222222", fontsize=12, va="center", ha="center")
+
+    ticks_t = [norm.vmin] + [t for t in (0.5, 1.0, 1.5)
+                             if norm.vmin < t < norm.vmax] + [norm.vmax]
+    bar(0, ScalarMappable(norm=norm, cmap=cmap), norm, ticks_t, r"$T$")
+
+    lim = max(abs(norm_theta.vmin), abs(norm_theta.vmax))
+    tt = [-0.8 * lim, -0.4 * lim, 0.0, 0.4 * lim, 0.8 * lim]
+    bar(1, ScalarMappable(norm=norm_theta, cmap=THETA_CMAP), norm_theta, tt,
+        r"$\theta = T - \langle T\rangle_x$")
+
+    if g["n_cols"] == 4:
+        lo, hi = ETA_RANGE
+        ticks_e = [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0]
+        bar(2, ScalarMappable(norm=norm_eta, cmap=ETA_CMAP),
+            None, ticks_e, r"$\log_{10}\eta$")
+
+    # each entry is a swatch plus its label, so centring has to account for the
+    # label width; measure one entry once and lay the row out from that
+    swatch, gap = 26.0, 5.0
+    fig.canvas.draw()
+    rend = fig.canvas.get_renderer()
+    probe = fig.text(0.0, 0.0, r"$L_{%d}$" % level_max, fontsize=11)
+    label_w = probe.get_window_extent(rend).width
+    probe.remove()
+    item = swatch + gap + label_w + 26.0        # swatch, label, breathing room
+    total = (level_max + 1) * item - 26.0
+    x0 = g["x0"][-1] + g["col_w"] / 2.0 - total / 2.0
+    y = strip_top - g["cbar_h"] / 2.0
+    for k in range(level_max + 1):
+        x = x0 + k * item
+        fig.add_artist(plt.Rectangle((x / g["px_w"], (y - 5.5) / g["px_h"]),
+                                     swatch / g["px_w"], 11.0 / g["px_h"],
+                                     transform=fig.transFigure,
+                                     facecolor=LEVEL_COLOURS[k],
+                                     edgecolor=WHITE["spine"], linewidth=0.6))
+        fig.text((x + swatch + gap) / g["px_w"], y / g["px_h"],
+                 r"$L_{%d}$" % k, color="#222222", fontsize=11,
+                 va="center", ha="left")
+    return fig, rows, geo
+
+
+def eta_image(src, pick, args):
+    """The viscosity image for one row at one target."""
+    import eta_panel
+    idx = pick["index"]
+    if src.kind == "our":
+        fr = src.frames[idx]
+        ng = int(fr["ng"])
+        return eta_panel.our_eta_grid(src.frames_dir, int(fr["step"]), src.lx,
+                                      ng, ng)
+    return eta_panel.aspect_eta_grid(src.sol_dir, src.index[idx], src.lx,
+                                     src.nx, src.nz)
+
+
+def render_two_col(sources, labels, plan, norm, cmap, args, frames_dir, case, t0, t1,
+                   px_h=None):
+    """The clean layout: write frames_dir/f_%05d.png, or one still."""
+    lx = args.lx
     h_ref, h_min = 0.0, float("inf")
     for j, src in enumerate(sources):
         if args.interp == "linear":
@@ -1074,34 +1381,58 @@ def render_two_col(sources, labels, plan, norm, cmap, args, frames_dir, case,
     if not np.isfinite(h_min):
         h_min = h_ref
     level_max = int(level_of(np.array([h_min]), h_ref)[0])
-    print("[three_row] 2-column: coarsest cell h = %s (L0 = %.0f km), "
-          "levels 0..%d, columns %d px, panel %d px tall, band %d px"
-          % (sigfig(h_ref), h_ref * D / 1000.0, level_max, PX_COL, panel_h,
-             px_h // len(labels)), flush=True)
-    header = ("%s  |  t = [%s, %s]  |  %d frames @ %g fps  |  T %s"
-              % (case, sigfig(t0), sigfig(t1), len(plan), args.fps,
-                 "interpolated" if args.interp == "linear" else "nearest frame"))
-    print("[three_row] header: %s" % header, flush=True)
-    fig, views = build_two_col_figure(labels, norm, cmap, header, px_h,
-                                      panel_h, level_max, h_ref, args.lx)
+
+    # one anomaly range for the whole clip, from a sample of the plan
+    sample_vals = []
+    for k in range(0, len(plan), max(1, len(plan) // 12)):
+        for j, src in enumerate(sources):
+            T, _, _ = sample_temperature(src, plan[k]["picks"][j], args.interp)
+            d = temperature_anomaly(T)
+            sample_vals.append(np.abs(d).ravel()[::7])
+    vals = np.concatenate(sample_vals) if sample_vals else np.array([0.1])
+    peak = float(np.percentile(vals, 99.0))
+    peak = max(0.05, np.ceil(peak * 20.0) / 20.0)
+    norm_theta = Normalize(vmin=-peak, vmax=peak)
+    print("[three_row] anomaly fixed at +-%.2f, T at %.3f..%.3f"
+          % (peak, norm.vmin, norm.vmax), flush=True)
+
+    n_cols = 4 if args.eta else 3
+    geo = clean_geometry(args.px_w, len(labels), lx, n_cols=n_cols)
+    print("[three_row] clean layout: %d x %d px, columns %d px, panel %d px, "
+          "levels 0..%d" % (geo["px_w"], geo["px_h"], geo["col_w"],
+                            geo["panel_h"], level_max), flush=True)
+    norm_eta = eta_norm() if args.eta else None
+    fig, rows, geo = build_clean_figure(labels, norm, cmap, geo, level_max,
+                                        norm_theta, norm_eta)
     t_start = time.time()
     for k, fr in enumerate(plan):
-        for j, (view, pick) in enumerate(zip(views, fr["picks"])):
+        for j, (row, pick) in enumerate(zip(rows, fr["picks"])):
             src = sources[j]
             T, mesh_i, note = sample_temperature(src, pick, args.interp)
             quads, h = src.cells(mesh_i)
             st = src.status(mesh_i, h_ref)
             if note:
                 st = dict(st, mesh_note=note)
-            view.update(T, quads, h, h_ref,
-                        time_label(fr["target"], pick, src, args.interp),
-                        status_text(st))
-        path = os.path.join(frames_dir, "f_%05d.png" % k)
-        fig.savefig(path, dpi=DPI, facecolor=fig.get_facecolor())
-        if not args.quiet and (k % 10 == 0 or k == len(plan) - 1):
-            print("[three_row] frame %d/%d  %s  (%.1f s elapsed)"
-                  % (k + 1, len(plan), os.path.basename(path),
-                     time.time() - t_start), flush=True)
+            dT = temperature_anomaly(T)
+            dE = None
+            if args.eta:
+                dE = eta_image(src, pick, args)
+            row.update(T, dT, quads, h, h_ref, status_line2(st),
+                       status_line3(dT), status_line1(st), dE,
+                       status_line4(dE) if dE is not None else "")
+        if args.still:
+            if k == args.still_index:
+                fig.savefig(args.still, dpi=DPI, facecolor=fig.get_facecolor())
+                print("[three_row] still -> %s" % args.still, flush=True)
+                plt.close(fig)
+                raise SystemExit(0)
+        else:
+            path = os.path.join(frames_dir, "f_%05d.png" % k)
+            fig.savefig(path, dpi=DPI, facecolor=fig.get_facecolor())
+            if not args.quiet and (k % 10 == 0 or k == len(plan) - 1):
+                print("[three_row] frame %d/%d  %s  (%.1f s elapsed)"
+                      % (k + 1, len(plan), os.path.basename(path),
+                         time.time() - t_start), flush=True)
     plt.close(fig)
 
 
@@ -1144,6 +1475,20 @@ def main(argv=None):
                          "the one-column behaviour); linear: blend the two "
                          "bracketing temperature fields, mesh from the nearest "
                          "frame (two-column mode)")
+    ap.add_argument("--eta", action="store_true",
+                    help="add the log10(viscosity) panel between the anomaly and "
+                         "the mesh, rebuilt from each code's own state")
+    ap.add_argument("--px-w", type=int, default=1920,
+                    help="canvas width in pixels (default 1920); a 3-column "
+                         "layout at 2400 keeps the panels legible after a "
+                         "downscale to a README GIF")
+    ap.add_argument("--layout", choices=["clean", "classic"], default="clean",
+                    help="the 2-column layout was replaced by the three-panel "
+                         "clean one; the flag is accepted for old commands")
+    ap.add_argument("--still", default=None, metavar="PATH",
+                    help="write one PNG at --still-index instead of the frames")
+    ap.add_argument("--still-index", type=int, default=-1,
+                    help="which target to draw for --still (default: the middle)")
     ap.add_argument("--columns", type=int, choices=[1, 2], default=1,
                     help="1: one panel per row (temperature + mesh); 2: a second "
                          "panel per row with the mesh only, coloured by refinement "
@@ -1227,6 +1572,8 @@ def main(argv=None):
     px_w, px_h = canvas_px(len(labels),
                             PX_ROW_2COL if args.columns == 2 else PX_ROW)
     case = args.case or os.path.basename(stem)
+    if args.still and args.still_index < 0:
+        args.still_index = len(plan) // 2 if "plan" in dir() else 0
     if args.columns == 2:
         render_two_col(sources, labels, plan, norm, cmap, args, frames_dir,
                        case, t0, t1, px_h)

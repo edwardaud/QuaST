@@ -389,12 +389,34 @@ function write_frame!(fw::FrameWriter, st, pr)
     # health check of the brief)
     ed = semquad_strain_rate_field(s, st.ux, st.uz)
     emin = Inf; emax = -Inf; nclip = 0
+    # log10(eta) per velocity node, kept for the renderer: the viscosity field is
+    # the one thing in this case that the temperature does not show
+    logeta = Vector{Float32}(undef, length(ed))
     for g in eachindex(ed)
         y = s.coords[g][2]
         Tn = Tbar(y, pr.H) + st.theta[g]
         v, cl = eta_composite_at(Tn, ed[g], y, pr)
+        logeta[g] = Float32(log10(v))
         emin = min(emin, v); emax = max(emax, v)
         nclip += cl ? 1 : 0
+    end
+    open(joinpath(fw.dir, @sprintf("frame_%05d_eta.bin", st.step)), "w") do io
+        write(io, logeta)
+    end
+    open(joinpath(fw.dir, @sprintf("frame_%05d_speed.bin", st.step)), "w") do io
+        speed = Vector{Float32}(undef, length(ed))
+        for g in eachindex(ed)
+            speed[g] = Float32(hypot(st.ux[g], st.uz[g]))
+        end
+        write(io, speed)
+    end
+    open(joinpath(fw.dir, @sprintf("frame_%05d_nodes.bin", st.step)), "w") do io
+        nodes = Vector{Float32}(undef, 2 * length(ed))
+        for g in eachindex(ed)
+            nodes[2 * g - 1] = Float32(s.coords[g][1])
+            nodes[2 * g] = Float32(s.coords[g][2])
+        end
+        write(io, nodes)
     end
     nlev = length(unique(lf[1] for lf in s.leaves))
     umax = maximum(hypot.(st.ux, st.uz))

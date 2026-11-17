@@ -106,7 +106,11 @@ The details behind each row are in [the validation page](docs/en/validation.md).
 
 ![The same case solved by QuaST and by ASPECT, side by side](docs/assets/verify7000_mg_vs_aspect.gif)
 
-One case, two codes, one time window. Columns: the temperature field, the temperature anomaly about the horizontal mean, and the mesh itself coloured by refinement level. Rows: this solver's matrix-free multigrid on top, ASPECT underneath. Both start from the same state and cover $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , on shared colour scales that do not move during the clip, so what separates the rows is the discretization: square leaves at levels 1 to 5 with wall refinement against ASPECT's levels 2 to 4 on a finer interior. The middle column is what the field alone hides. The two anomalies reach the same extremes ($\theta\_{\min} = -0.89$ against $-0.90$) while the plumes are visibly thinner in ours, which is the resolution difference and not a difference in amplitude. Each panel's own numbers sit in its lower right corner. The clip is 120 rendered frames from 534 solver frames against 940 ASPECT frames, played at 8 frames per second.
+One case, two codes, one time window. Four columns: the temperature field, its anomaly about the horizontal mean, the viscosity on a logarithmic scale, and the mesh itself coloured by refinement level. The top row is this solver's matrix-free multigrid, the bottom row ASPECT, both from the same state, over $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , with colour scales that do not move during the clip.
+
+The third column is the one worth stopping on. The case is built around a composite diffusion-dislocation law, so the viscosity is the physics, and it is invisible in the temperature panel: a stiff lid of $\log\_{10}\eta = 4$ , a soft interior near $-2.6$ , and thin weak conduits down the plume stems. Both codes place every one of those features in the same place; ours are thinner because 9 976 leaves are spent where they matter, against ASPECT's 27 460 uniform cells. ASPECT's own saved viscosity is the unclipped value and runs to $10^{141}$ Pa s, so that panel is rebuilt from ASPECT's temperature and velocity with the shared law, which is the same code path the solver uses (checked against it to $5 \times 10^{-15}$).
+
+The clip is 120 rendered frames from 534 solver frames against 940 ASPECT frames, played at 8 frames per second.
 
 ## Documentation
 
