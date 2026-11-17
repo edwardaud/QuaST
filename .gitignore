@@ -14,6 +14,8 @@ frames/
 *.gif
 *.png
 !docs/figures/*.png
+# the animation the README shows is part of the documentation, not an output
+!docs/assets/*.gif
 
 # Julia
 *.cov

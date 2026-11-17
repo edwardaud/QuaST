@@ -104,13 +104,13 @@ a 25-frame transient, and the two realistic rows start from an imported ASPECT s
 difference there is a discretization difference and nothing else — 0.003% at the bottom wall.
 The details behind each row are in [the validation page](docs/en/validation.md).
 
-![The same case solved by QuaST and by ASPECT, side by side](docs/assets/verify7000_mg_vs_aspect.gif)
+![One case solved by QuaST and by ASPECT, side by side](docs/assets/quast_vs_aspect_realistic.gif)
 
-One case, two codes, one time window. Four columns: the temperature field, its anomaly about the horizontal mean, the viscosity on a logarithmic scale, and the mesh itself coloured by refinement level. The top row is this solver's matrix-free multigrid, the bottom row ASPECT, both from the same state, over $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , with colour scales that do not move during the clip.
+**The same case, two codes.** The clip runs one case twice: the 2.5 x 1 realistic card, with a composite diffusion-dislocation rheology, two phase transitions with latent heat, internal heating and an adaptive mesh. The top row is QuaST's matrix-free multigrid, the bottom row ASPECT. Both start from the same state and cover $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , with colour scales that do not move during the clip.
 
-The third column is the one worth stopping on. The case is built around a composite diffusion-dislocation law, so the viscosity is the physics, and it is invisible in the temperature panel: a stiff lid of $\log\_{10}\eta = 4$ , a soft interior near $-2.6$ , and thin weak conduits down the plume stems. Both codes place every one of those features in the same place; ours are thinner because 9 976 leaves are spent where they matter, against ASPECT's 27 460 uniform cells. ASPECT's own saved viscosity is the unclipped value and runs to $10^{141}$ Pa s, so that panel is rebuilt from ASPECT's temperature and velocity with the shared law, which is the same code path the solver uses (checked against it to $5 \times 10^{-15}$).
+From left to right: temperature, its anomaly about the horizontal mean, logarithmic viscosity, and the mesh coloured by refinement level. The third column is worth stopping on, because the viscosity is the physics of this case and the temperature panel does not show it. Both codes place the stiff lid, the soft interior and the narrow conduits down the plume stems in the same places; the conduits are thinner in ours, whose 9 976 leaves follow them, than in ASPECT's 27 460 uniform cells. The numbers printed under each panel are that frame's own values.
 
-The clip is 120 rendered frames from 534 solver frames against 940 ASPECT frames, played at 8 frames per second.
+The clip is 120 rendered frames taken from 485 solver frames against 940 ASPECT frames.
 
 ## Documentation
 
