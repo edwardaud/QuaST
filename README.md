@@ -106,7 +106,7 @@ The details behind each row are in [the validation page](docs/en/validation.md).
 
 ![The same case solved by QuaST and by ASPECT, side by side](docs/assets/verify7000_mg_vs_aspect.gif)
 
-One case, two codes, one time window. Left column: the temperature field. Right column: the mesh itself, coloured by refinement level. Top row: this solver's matrix-free multigrid. Bottom row: ASPECT. Both start from the same state and cover $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , on a shared colour scale, so what separates the rows is the discretization: square leaves at levels 1 to 5 with wall refinement against ASPECT's levels 2 to 4 on a finer interior. The plumes form and sink in step in both. The clip is 120 rendered frames taken from 534 solver frames against 940 ASPECT frames, played at 8 frames per second.
+One case, two codes, one time window. Left column: the temperature field. Right column: the mesh itself, coloured by refinement level. Top row: this solver's matrix-free multigrid. Bottom row: ASPECT. Both start from the same state and cover $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , on a shared colour scale, so what separates the rows is the discretization: square leaves at levels 1 to 5 with wall refinement against ASPECT's levels 2 to 4 on a finer interior. The plumes form and sink in step in both. The numbers printed under each row are instantaneous: the two rows are separate integrations, and the RMS velocity in this window swings by a factor of fifteen, so a single frame can show a twenty percent gap while the two codes agree to a few percent over the window. The clip is 120 rendered frames taken from 534 solver frames against 940 ASPECT frames, played at 8 frames per second.
 
 ## Documentation
 
