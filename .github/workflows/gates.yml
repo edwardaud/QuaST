@@ -7,10 +7,11 @@ name: gates
 #
 # It takes about 22 minutes on eight threads, so the runner is given 90.
 
+# Automatic runs are off.  The suite takes about 22 minutes on eight threads, so a
+# run on every push spends the whole Actions allowance on edits that cannot move a
+# number.  Start one deliberately from the Actions tab or with
+# `gh workflow run gates`, or locally with `julia --project=. test/runtests.jl`.
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 concurrency:

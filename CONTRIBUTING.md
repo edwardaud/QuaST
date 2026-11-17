@@ -28,10 +28,13 @@ One gate, in its own Julia process:
 julia --project=. test/run_gates.jl t_g229_default_balanced.jl
 ```
 
-`run_gates.jl` accepts several gate files and includes them in one process, which is how
-`.github/workflows/gates.yml` runs its groups, and it exits non-zero when a gate fails. A
-gate is usually seconds to a couple of minutes of work plus Julia startup; G229 measured
-1 min 40 s wall on this checkout.
+`run_gates.jl` accepts several gate files and includes them in one process, and it exits
+non-zero when a gate fails. A gate is usually seconds to a couple of minutes of work plus
+Julia startup; G229 measured 1 min 40 s wall on this checkout.
+
+CI does not run on every push. `.github/workflows/gates.yml` is manual dispatch only: the
+suite costs about 22 minutes of runner time, so it is started when a change warrants it,
+from the Actions tab or with `gh workflow run gates`.
 
 The full suite:
 

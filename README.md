@@ -14,7 +14,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/edwardaud/QuaST/actions/workflows/gates.yml"><img alt="Gates" src="https://github.com/edwardaud/QuaST/actions/workflows/gates.yml/badge.svg"></a>
   <img alt="Julia" src="https://img.shields.io/badge/Julia-1.12-9558B2?logo=julia&logoColor=white">
   <img alt="Tests" src="https://img.shields.io/badge/tests-131%20851%20assertions-brightgreen">
   <img alt="Docs" src="https://img.shields.io/badge/docs-English%20%7C%20中文-blue">
