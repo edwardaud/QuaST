@@ -489,6 +489,8 @@ The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `s
 | `yield_c`, `yield_phi`, `yield_taumax` | `Inf`, 0, `Inf` | Yield surface off. |
 | `weak_f`, `weak_eps_ref` | 1, 0 | Strain weakening off. |
 | `rho_heating`, `rho_cp` | false, false | Density-weighted heating off. |
+| `side_thermal`, `Twall_left`, `Twall_right` | `:insulating` | The side walls are insulating (zero normal flux). `:fixed` instead holds them at the two physical temperatures, using the same `Twall - Tbar` convention as the top and bottom walls. |
+| `H_half_life` | `Inf` | Radiogenic heating held constant. A finite value decays it as `H 2^(-t/H_half_life)`, in the code's time unit; requires the Picard time loop. |
 | `Di`, `heating_adiabatic`, `heating_dissipation` | 0, false, false | Dissipation and adiabatic heating off. |
 | `refstate`, `deviatoric` | `nothing`, false | Conductive base state, full strain rate. |
 | `Twall_top`, `Twall_bot` | 0, 1 | Wall temperatures. |

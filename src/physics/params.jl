@@ -51,6 +51,13 @@ meaning**; mixing them up silently changes the viscosity by orders of magnitude)
 struct Params
     Ra::Float64
     H::Float64
+    # Half-life of the radiogenic heating, in the code's time unit.  `Inf` keeps
+    # `H` constant, the historical path bit for bit.  The source decays as
+    # `H * 2^(-t/half_life)`, the form ASPECT's `Radioactive decay` subsection
+    # uses with per-isotope half-lives.  The conductive base state `Tbar` keeps
+    # the initial `H`, so `T = Tbar + theta` stays exact and only the source
+    # decays.
+    H_half_life::Float64
     eta_law::Symbol       # :const, :expT, :expTz or :arrhenius
     deta_T::Float64
     eta_b::Float64        # :expTz temperature prefactor b (ASPECT "Viscosity temperature prefactor")
@@ -70,6 +77,13 @@ struct Params
     eta_soft::Float64     # smooth-floor width; 0 = hard clip
     div_penalty::Float64  # gamma * int (div u)(div v); 0 = off
     eta_custom::Union{Nothing,Function}   # eta(x,z), overrides the T law in Stokes
+    # Multiplicative factor on the viscosity *after* the law: `eta_new =
+    # eta * eta_multiplier(x, z)`.  `nothing` leaves every law untouched, bit for
+    # bit.  This is the weak-zone hook: a line or rectangle of reduced viscosity
+    # becomes `eta_multiplier = weak_zone_factor(...)`, without reimplementing the
+    # law, which is how ASPECT's `weak zone` plugin is used next to a material
+    # model rather than instead of it.
+    eta_multiplier::Union{Nothing,Function}
     rho_heating::Bool     # add -T*H to the energy source (rho=(1-T) heating)
     rho_cp::Bool          # weight M and C by rho=1-T (ASPECT rho*cp LHS)
     tosi::Union{Nothing,TosiLaw}  # :tosi viscoplastic law (absolute units + eta0)
@@ -82,6 +96,13 @@ struct Params
     compress_gamma::Float64  # gamma factor of that term
     Twall_top::Float64    # physical wall temperature (top); theta_wall = Twall - Tad
     Twall_bot::Float64    # physical wall temperature (bottom)
+    # Side walls: `:insulating` is the historical natural boundary (zero normal
+    # flux), and `:fixed` replaces it with the physical temperatures below.  The
+    # two knobs are separate so a run cannot change its side-wall physics by
+    # setting a temperature and forgetting the switch.
+    side_thermal::Symbol  # :insulating (default) or :fixed
+    Twall_left::Float64   # physical wall temperature (x = 0), used by :fixed
+    Twall_right::Float64  # physical wall temperature (x = Lx), used by :fixed
     deviatoric::Bool      # use eps - (1/3) div u I in the stress and shear heating
     latent_L::Float64     # nondimensional latent heat L/(cp dT) of the phase transitions
     latent_mode::Symbol   # :global (latent_L for every transition) or :per_phase
@@ -113,7 +134,8 @@ struct Params
     weak_mode::Symbol       # :rate or :linear (ASPECT accumulation)
 end
 
-function Params(; Ra::Real=1.0e4, H::Real=0.0, eta_law::Symbol=:const,
+function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
+                eta_law::Symbol=:const,
                 deta_T::Real=1.0, eta_b::Real=0.0, eta_c::Real=0.0,
                 eta_E::Real=0.0, eta_T0::Real=0.0,
                 yield_c::Real=Inf, yield_phi::Real=0.0,
@@ -123,13 +145,16 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, eta_law::Symbol=:const,
                 eta_min::Real=-Inf, eta_max::Real=Inf,
                 bc::Symbol=:free, supg::Real=0.0, eta_soft::Real=0.0,
                 div_penalty::Real=0.0,
-                eta_custom=nothing, rho_heating::Bool=false,
+                eta_custom=nothing, eta_multiplier=nothing,
+                rho_heating::Bool=false,
                 rho_cp::Bool=false, tosi=nothing,
                 Di::Real=0.0, heating_adiabatic::Bool=false,
                 heating_dissipation::Bool=false, refstate=nothing,
                 rho_ref_weight::Bool=false,
                 compress_p::Bool=false, compress_gamma::Real=1.0,
                 Twall_top::Real=0.0, Twall_bot::Real=1.0,
+                side_thermal::Symbol=:insulating,
+                Twall_left::Real=0.0, Twall_right::Real=0.0,
                 deviatoric::Bool=false, latent_L::Real=0.0,
                 latent_mode::Symbol=:global,
                 comp_Ad::Real=0.0, comp_Ed::Real=0.0, comp_Vd::Real=0.0,
@@ -255,17 +280,19 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, eta_law::Symbol=:const,
         isfinite(eta_min) ||
             throw(ArgumentError("yielding requires a finite eta_min"))
     end
-    Params(Float64(Ra), Float64(H), eta_law, Float64(deta_T),
+    Params(Float64(Ra), Float64(H), Float64(H_half_life), eta_law,
+           Float64(deta_T),
            Float64(eta_b), Float64(eta_c), Float64(eta_E), Float64(eta_T0),
            Float64(yield_c), Float64(yield_phi), Float64(yield_taumax),
            Float64(yield_eps_min), Float64(yield_damper),
            Float64(eta_const),
            Float64(eta_min), Float64(eta_max), bc, Float64(supg),
-           Float64(eta_soft), Float64(div_penalty), eta_custom,
+           Float64(eta_soft), Float64(div_penalty), eta_custom, eta_multiplier,
            rho_heating, rho_cp, tosi, Float64(Di),
            heating_adiabatic, heating_dissipation, refstate, rho_ref_weight,
            compress_p, Float64(compress_gamma),
-           Float64(Twall_top), Float64(Twall_bot), deviatoric,
+           Float64(Twall_top), Float64(Twall_bot), side_thermal,
+           Float64(Twall_left), Float64(Twall_right), deviatoric,
            Float64(latent_L), latent_mode,
            Float64(comp_Ad), Float64(comp_Ed), Float64(comp_Vd),
            Float64(comp_As), Float64(comp_Es), Float64(comp_Vs),

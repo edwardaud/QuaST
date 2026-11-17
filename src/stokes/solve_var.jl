@@ -462,8 +462,8 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     mg_threads >= 1 || throw(ArgumentError("mg_threads must be >= 1"))
     mg_diag in (:constrained, :lumped) ||
         throw(ArgumentError("mg_diag must be :constrained or :lumped"))
-    mass_form in (:anelastic, :rho_div, :boussinesq) ||
-        throw(ArgumentError("mass_form must be :anelastic, :rho_div or :boussinesq"))
+    mass_form in (:anelastic, :boussinesq) ||
+        throw(ArgumentError("mass_form must be :anelastic or :boussinesq"))
     schur_precond in (:none, :mass) ||
         throw(ArgumentError("schur_precond must be :none or :mass"))
     assemble_threads >= 1 ||
@@ -588,8 +588,6 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # reference state and the adiabatic heating term (King 2010 then cools and
     # its energy budget does not close).  The momentum pressure term stays the
     # unweighted -int p div v, so Bm = Bref while Bc carries the density.
-    # `mass_form=:rho_div` keeps the historical single rho-weighted matrix for
-    # both blocks so the old behaviour stays regression-testable.
     # `mass_form=:boussinesq` is the **TALA** continuity equation `div u = 0`:
     # the reference density enters the buoyancy only, not the mass conservation
     # (ASPECT's `truncated anelastic liquid approximation`).  It is the
@@ -598,20 +596,15 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # requested, so the default path is unchanged.
     Bm = Bref
     Bc = Bref
-    if mass_rho !== nothing && mass_form !== :boussinesq
-        if mass_form === :anelastic
-            # derivative of the density profile at the quadrature points
-            drho = mass_drho === nothing ? (y -> begin
-                hd = 1.0e-6
-                yp = min(y + hd, 1.0); ym = max(y - hd, 0.0)
-                (mass_rho(yp) - mass_rho(ym)) / (yp - ym)
-            end) : mass_drho
-            Bc = semquad_stokes_B(ss, qt; rho_fun=mass_rho, drho_fun=drho)
-        else
-            Bc = semquad_stokes_B(ss, qt; rho_fun=mass_rho)
-            Bm = Bc
-        end
-        linear === :schur_cg && mass_form === :anelastic &&
+    if mass_rho !== nothing && mass_form === :anelastic
+        # derivative of the density profile at the quadrature points
+        drho = mass_drho === nothing ? (y -> begin
+            hd = 1.0e-6
+            yp = min(y + hd, 1.0); ym = max(y - hd, 0.0)
+            (mass_rho(yp) - mass_rho(ym)) / (yp - ym)
+        end) : mass_drho
+        Bc = semquad_stokes_B(ss, qt; rho_fun=mass_rho, drho_fun=drho)
+        linear === :schur_cg &&
             throw(ArgumentError("mass_form=:anelastic makes the saddle system " *
                                 "nonsymmetric (Bm != Bc'); use linear=:direct"))
     end

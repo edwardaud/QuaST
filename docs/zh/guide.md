@@ -233,6 +233,8 @@ $$
 | `yield_phi` | 0 | 关闭摩擦角。 |
 | `weak_eps_ref` | 0 | 关闭应变弱化。 |
 | `rho_heating`、`rho_cp` | `false` | 关闭密度加权加热。 |
+| `side_thermal`、`Twall_left`、`Twall_right` | `:insulating` | 侧壁绝热（法向通量为零）。取 `:fixed` 时两侧壁分别固定为给定物理温度，约定与顶/底壁相同：`Twall - Tbar`。 |
+| `H_half_life` | `Inf` | 放射性生热保持恒定。取有限值时按 `H·2^(-t/H_half_life)` 衰减，时间单位与代码一致；只能用 Picard 时间推进。 |
 | `Di` | 0 | 关闭耗散加热与绝热加热。 |
 | `refstate` | `nothing` | 不使用参考态。 |
 | `deviatoric` | `false` | 不做偏量投影。 |

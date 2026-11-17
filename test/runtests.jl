@@ -159,5 +159,8 @@ using QuaST
     include("t_g228_card_mg_tol.jl")
     include("t_g229_default_balanced.jl")
     include("t_g230_default_auto.jl")
+    include("t_g231_heating_decay.jl")
+    include("t_g232_weak_zone.jl")
+    include("t_g233_side_temperature.jl")
 end
 

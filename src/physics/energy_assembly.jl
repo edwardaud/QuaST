@@ -56,7 +56,22 @@ struct SemQuadEnergyCfg
     eta_fun::Union{Nothing,Function}
     rho_ref::Union{Nothing,Function}
     phases::Vector{PhaseTransition}
+    # Multiplier on the radiogenic source `H`, so a heating rate can decay in
+    # time without rebuilding the operator: 1.0 is the constant-`H` path.
+    heating_scale::Float64
 end
+
+# The 21-argument form predates `heating_scale`: callers that build the config by
+# position (gates do, to drive the leaf kernels directly) keep working, and get
+# the constant-`H` source.  Internal callers use the 22-argument form.
+SemQuadEnergyCfg(pr, ux, uz, theta, theta_lat, rho_heating, rho_cp, ev,
+                 ev_cmax, ev_alpha, ev_timestep, evg, theta_prev, dt,
+                 ev_field, ev_out, heating_adiabatic, heating_dissipation,
+                 eta_fun, rho_ref, phases) =
+    SemQuadEnergyCfg(pr, ux, uz, theta, theta_lat, rho_heating, rho_cp, ev,
+                     ev_cmax, ev_alpha, ev_timestep, evg, theta_prev, dt,
+                     ev_field, ev_out, heating_adiabatic, heating_dissipation,
+                     eta_fun, rho_ref, phases, 1.0)
 
 function _semquad_energy_buf_alloc(nleaf::Int, nv::Int, N::Int)
     IM = Int[]; JM = Int[]; VM = Float64[]
@@ -131,6 +146,7 @@ function _semquad_assemble_energy_block!(buf::SemQuadEnergyBuf,
     theta = cfg.theta
     theta_lat = cfg.theta_lat
     rho_heating = cfg.rho_heating
+    heating_scale = cfg.heating_scale
     rho_cp = cfg.rho_cp
     ev = cfg.ev
     ev_cmax = cfg.ev_cmax
@@ -266,7 +282,8 @@ function _semquad_assemble_energy_block!(buf::SemQuadEnergyBuf,
             # profile, (alpha g/cp)^2 Tad for the exponential adiabat).
             src += semquad_base_laplacian(pr, y)
             if rho_heating
-                src -= Tq * pr.H
+                # `heating_scale` is 1.0 unless the driver is decaying `H`.
+                src -= Tq * pr.H * heating_scale
             end
             if pr.Di > 0.0 && (heating_adiabatic || heating_dissipation)
                 # Velocity gradients at this quadrature point (gx/gz are the
@@ -463,6 +480,7 @@ function assemble_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
                                  eta_fun::Union{Nothing,Function}=nothing,
                                  rho_ref::Union{Nothing,Function}=nothing,
                                  phases::Vector{PhaseTransition}=PhaseTransition[],
+                                 heating_scale::Float64=1.0,
                                  assemble_threads::Int=1)
     advection in (:galerkin, :skew, :conservative) ||
         throw(ArgumentError("advection must be galerkin, skew or conservative"))
@@ -500,7 +518,8 @@ function assemble_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
     cfg = SemQuadEnergyCfg(pr, ux, uz, theta, theta_lat, rho_heating, rho_cp,
                            ev, ev_cmax, ev_alpha, ev_timestep, evg, theta_prev,
                            dt, ev_field, ev_out, heating_adiabatic,
-                           heating_dissipation, eta_fun, rho_ref, phases)
+                           heating_dissipation, eta_fun, rho_ref, phases,
+                           heating_scale)
     asm = _semquad_assemble_energy_blocks(
         _semquad_asm_thread_count(assemble_threads), cfg, sq, fd, leaves)
     IM = asm.IM; JM = asm.JM; VM = asm.VM

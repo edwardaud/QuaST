@@ -248,8 +248,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                             ":expTz, :arrhenius, :tosi or :composite"))
     steady_window >= 1 ||
         throw(ArgumentError("steady_window must be >= 1"))
-    mass_form in (:anelastic, :rho_div, :boussinesq) ||
-        throw(ArgumentError("mass_form must be :anelastic, :rho_div or :boussinesq"))
+    mass_form in (:anelastic, :boussinesq) ||
+        throw(ArgumentError("mass_form must be :anelastic or :boussinesq"))
     # Forwarded verbatim to `solve_semquad_stokes_var`; validated here so a typo
     # fails before the setup work instead of inside the first Stokes solve.
     linear in (:direct, :schur_cg, :mg, :lagged, :auto) ||
@@ -346,6 +346,16 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # Settings that change the trajectory.  They are stored in the checkpoint
     # and validated on restart, so a resumed run cannot silently continue with
     # a different AMR/physics/time-integration setup.
+    # A decaying heating rate needs a time-dependent path: the steady solvers and
+    # the per-step Newton tangent assemble the source in their own places, and a
+    # steady state of a decaying source does not exist.  Refusing is better than
+    # integrating a source the residual does not see.
+    if isfinite(pr.H_half_life)
+        (pic_mode === :picard && mass_form in (:boussinesq, :anelastic)) ||
+            throw(ArgumentError("H_half_life requires pic_mode=:picard; the " *
+                                "steady and Newton paths hold H constant"))
+    end
+
     run_config = Dict{String,Any}(
         "amr_every" => amr_every,
         "refine_frac" => refine_frac, "coarsen_frac" => coarsen_frac,
@@ -376,7 +386,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # historical path bit for bit).  It can change the answer of a failing
         # solve, so a restart must not switch it silently; old checkpoints do
         # not carry the key and are read as `none` by the guard below.
-        "stokes_scaling" => stokes_scaling)
+        "stokes_scaling" => stokes_scaling,
+        # A decaying heating rate changes the trajectory as much as any of the
+        # above; old checkpoints do not carry the key and skip the comparison.
+        "H_half_life" => pr.H_half_life,
+        # A weak zone is part of the rheology; a restart must not lose it.  The
+        # key stores only whether one is set, because a function has no value to
+        # compare; a user who changes it is told to start a fresh run.
+        "eta_multiplier" => pr.eta_multiplier === nothing ? "none" : "custom",
+        # The side walls are part of the physics of the run.
+        "side_thermal" => pr.side_thermal,
+        "Twall_left" => pr.Twall_left, "Twall_right" => pr.Twall_right)
     # The shape and normalisation of the viscosity law change the trajectory just
     # as much as the AMR settings, so they are validated too (only for :tosi;
     # the other laws are fully described by their Params fields).
@@ -762,6 +782,14 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         else
             eta_fun = (x, y) -> semquad_eta_at(sq, th, x, y, pr, leaves)
         end
+        # Weak-zone hook: one multiplicative factor on whatever the law returned,
+        # so no law has to know about it.  `nothing` (the default) leaves the
+        # closure untouched, bit for bit.
+        if pr.eta_multiplier !== nothing
+            base_eta = eta_fun
+            mulf = pr.eta_multiplier
+            eta_fun = (x, y) -> base_eta(x, y) * mulf(x, y)
+        end
         eta_for_energy = eta_fun
         # Buoyancy.  With a reference state this is the TALA/ALA form
         # rho(y) alpha(y) (T - Tad) instead of the full T: the hydrostatic part of
@@ -1098,6 +1126,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             # `lat_theta_used` is the temperature at which this sweep evaluates
             # the latent apparent capacity; the optional exact-residual
             # diagnostic (`extdiag`) rebuilds the operator with the same value.
+            # Radiogenic decay: the source is evaluated at the end of the step,
+            # which is the time level the BDF2 residual sits on.  `t` is the
+            # start-of-step time and is advanced at the end of the loop.
+            heat_scale = isfinite(pr.H_half_life) ?
+                exp(-log(2.0) * (t + dt) / pr.H_half_life) : 1.0
             lat_theta_used = latent_scheme === :lagged ? nothing : theta_iter
             theta_new = solve_semquad_energy(sq, qt, pr, theta_old, theta_prev,
                                              ux, uz, dt, dt_prev, step == 0;
@@ -1108,7 +1141,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                              ev_out=ev_field,
                                              eta_fun=eta_for_energy,
                                              phases=phases,
-                                             latent_theta=lat_theta_used)
+                                             latent_theta=lat_theta_used,
+                                             heating_scale=heat_scale)
             tprof !== nothing && (tprof[3] += (time_ns() - tp) / 1.0e9)
             change = norm(theta_new - theta_iter) / max(norm(theta_new), 1.0e-30)
             # `pic_reject` can undo this sweep; the chi iterate of the state the

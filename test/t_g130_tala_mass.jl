@@ -49,14 +49,11 @@ using SparseArrays
     @test maximum(abs, Ban * u) < 1.0e-5
     @test maximum(abs, Brho * u) > 1.0e-4    # the two constraints differ
 
-    # (5) legacy :rho_div keeps the historical single rho-weighted matrix
-    res2 = run_semquad_simulation(qt, pr, theta0;
+    # (5) the removed third form is rejected rather than silently accepted
+    @test_throws ArgumentError run_semquad_simulation(qt, pr, theta0;
         p=2, tstop=3 * dt, dt0=dt, dtmax=dt, dtmin=1.0e-16,
         amr_every=0, ev=0.0, advection=:skew, linear=:direct,
         maxpic=1, pic_tol=1.0e-6, verbose=false, mass_form=:rho_div)
-    u2 = vcat(res2.ux, res2.uz)
-    @test maximum(abs, Brho * u2) < 1.0e-5
-    @test maximum(abs, Ban * u2) > 1.0e-4
 
     # (6) with rho = 1 the stratified path reduces to the constant one
     B1 = semquad_stokes_B(res.ss, res.qt; rho_fun=y -> 1.0)

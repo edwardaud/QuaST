@@ -31,6 +31,18 @@ public release: earlier development happened in a private repository.
 - `scripts/check_docs.jl`, run in CI, catches the Markdown constructs that would leave a
   formula rendered literally.
 
+### Added
+
+- `Params.eta_multiplier` scales whatever the viscosity law returned, and
+  `weak_zone_factor` builds the factor of a straight weak zone: the cheap
+  stand-in for a plate boundary, next to the law rather than instead of it.
+- `Params.side_thermal = :fixed` holds the side walls at `Twall_left` and
+  `Twall_right` instead of insulating them; `:insulating` stays the default.
+- `Params.H_half_life` decays the radiogenic source as `H 2^(-t/H_half_life)`, the
+  form ASPECT's `Radioactive decay` subsection uses. `Inf` keeps the constant rate
+  bit for bit; the Newton and steady paths refuse a finite value because they
+  assemble the source themselves. Gate G231 pins the exact scaling.
+
 ### Changed
 
 - The user documentation was rewritten in both languages rather than translated, and the

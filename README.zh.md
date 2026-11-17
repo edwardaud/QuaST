@@ -125,7 +125,7 @@ julia --project=. test/runtests.jl                             # 全量，约 22
 julia --project=. test/run_gates.jl t_g229_default_balanced.jl # 单个 gate
 ```
 
-套件包含 156 个 gate 文件、131 851 条断言，覆盖逐位回归、基准值、不变量与精度类别。CI 跑全量。
+套件包含 157 个 gate 文件、131 906 条断言，覆盖逐位回归、基准值、不变量与精度类别。CI 按需手动运行。
 
 ## 与 ASPECT 对照
 

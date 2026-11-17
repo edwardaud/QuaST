@@ -38,11 +38,13 @@ function solve_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
                               ux::Vector{Float64}, uz::Vector{Float64},
                               dt::Float64, dt_prev::Float64, firststep::Bool;
                               advection::Symbol=:galerkin,
+                              heating_scale::Float64=1.0,
                               ev::Float64=0.0, ev_cmax::Float64=0.052,
                               ev_alpha::Int=2, ev_timestep::Int=0,
                               ev_out::Union{Nothing,Vector{Float64}}=nothing,
                               eta_fun::Union{Nothing,Function}=nothing,
                               flux_top::Union{Nothing,Float64}=nothing,
+                              flux_side::Union{Nothing,Float64}=nothing,
                               flux_bot::Union{Nothing,Float64}=nothing,
                               phases::Vector{PhaseTransition}=PhaseTransition[],
                               latent_theta::Union{Nothing,Vector{Float64}}=nothing,
@@ -75,9 +77,14 @@ function solve_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
                                          ev_alpha=ev_alpha,
                                          ev_timestep=ev_timestep,
                                          evg=evg, theta_prev=theta_nm1,
-                                         dt=dt_prev, ev_out=ev_out_used)
+                                         dt=dt_prev, ev_out=ev_out_used,
+                                         heating_scale=heating_scale)
     fixed = Dict{Int,Float64}()
+    side_fixed = pr.side_thermal === :fixed
+    side_fixed && flux_side !== nothing &&
+        throw(ArgumentError("side_thermal=:fixed and flux_side are exclusive"))
     for g in 1:sq.N
+        x = sq.coords[g][1]
         y = sq.coords[g][2]
         # theta_wall = Twall - Tad: zero for the Boussinesq base (Tad = Tbar,
         # Twall = 1 at the bottom and 0 at the top), non-zero once a reference
@@ -87,6 +94,12 @@ function solve_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
             (fixed[g] = pr.Twall_bot - semquad_base_T(pr, y))
         y >= 1.0 - 1.0e-14 && flux_top === nothing &&
             (fixed[g] = pr.Twall_top - semquad_base_T(pr, y))
+        if side_fixed
+            x <= 1.0e-14 &&
+                (fixed[g] = pr.Twall_left - semquad_base_T(pr, y))
+            x >= sq.Lx - 1.0e-14 &&
+                (fixed[g] = pr.Twall_right - semquad_base_T(pr, y))
+        end
     end
     if flux_top !== nothing || flux_bot !== nothing
         flux_top !== nothing && flux_bot !== nothing &&
