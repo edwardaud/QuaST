@@ -110,8 +110,6 @@ Both rows solve the same 2.5 x 1 card: free-slip walls, `T` from 0 at the top wa
 
 The four columns are temperature, its anomaly about the horizontal mean, $\log\_{10}\eta$ , and the mesh coloured by refinement level. Viscosity covers seven decades here: $10^{-3}$ inside the plume conduits, $10^{4}$ at the clamp under the cold lid. Both rows put the lid, the interior and the conduits at the same depths. The conduits are narrower in ours, where 9 976 leaves follow them, than in ASPECT's 27 460 uniform cells. The numbers under each panel are that frame's own.
 
-120 frames, rendered from 485 solver frames and 940 ASPECT frames.
-
 ## Documentation
 
 Every page carries a language switch. The full set starts at [docs/](docs/README.md).
