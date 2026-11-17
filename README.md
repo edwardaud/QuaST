@@ -104,13 +104,13 @@ a 25-frame transient, and the two realistic rows start from an imported ASPECT s
 difference there is a discretization difference and nothing else — 0.003% at the bottom wall.
 The details behind each row are in [the validation page](docs/en/validation.md).
 
-![One case solved by QuaST and by ASPECT, side by side](docs/assets/quast_vs_aspect_realistic.gif)
+![One case solved by QuaST and by ASPECT](docs/assets/quast_vs_aspect_realistic.gif)
 
-**The same case, two solvers.** The clip runs one case twice, and both solvers read the same card: a 2.5 x 1 box with four free-slip walls, $T = 0$ on the top wall and $T = 1$ on the bottom, Rayleigh number $\mathrm{Ra} = 10^{5}$ , internal heating $H = 10$ , and a viscosity that varies with temperature and stress through a composite diffusion-dislocation law ($n = 3$, $E\_d = 12$, $E\_s = 17$, isostress partition, clamped to $[10^{-4}, 10^{4}]\,\eta\_0$ ). Two phase transitions sit at the 410 and 660 km equivalents, at $y = 0.87$ and $y = 0.78$ , each with its Clapeyron slope and latent heat. The top row is QuaST's matrix-free multigrid, the bottom row ASPECT; both start from the same state and cover $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , with colour scales that do not move during the clip.
+Both rows solve the same 2.5 x 1 card: free-slip walls, `T` from 0 at the top wall to 1 at the bottom, `Ra = 1e5`, internal heating `H = 10`, and a viscosity that depends on temperature and stress through a composite diffusion-dislocation law (`n = 3`, `E_d = 12`, `E_s = 17`, isostress partition, clamped to `[1e-4, 1e4] eta_0`). Two phase transitions sit at the 410 and 660 km equivalents. The top row is QuaST's matrix-free multigrid, the bottom row ASPECT, both from the same initial state over $t\_{nd} = 10^{-6}$ to $3.2 \times 10^{-4}$ , on colour scales that hold still for the whole clip.
 
-From left to right: temperature, its anomaly about the horizontal mean, logarithmic viscosity, and the mesh coloured by refinement level. The third column is worth stopping on, because the rheology is the physics of this case and the temperature panel does not show it. The viscosity spans seven decades here, from $10^{-3}$ in the conduits to the $10^{4}$ clamp under the cold lid, and both solvers put every feature in the same place: the stiff lid, the soft interior near $10^{-2.6}$ , and the narrow weak conduits down the plume stems. The conduits are thinner in ours, whose 9 976 leaves follow them, than in ASPECT's 27 460 uniform cells. The numbers printed under each panel are that frame's own values.
+The four columns are temperature, its anomaly about the horizontal mean, $\log\_{10}\eta$ , and the mesh coloured by refinement level. Viscosity covers seven decades here: $10^{-3}$ inside the plume conduits, $10^{4}$ at the clamp under the cold lid. Both rows put the lid, the interior and the conduits at the same depths. The conduits are narrower in ours, where 9 976 leaves follow them, than in ASPECT's 27 460 uniform cells. The numbers under each panel are that frame's own.
 
-The clip is 120 rendered frames taken from 485 solver frames against 940 ASPECT frames.
+120 frames, rendered from 485 solver frames and 940 ASPECT frames.
 
 ## Documentation
 
