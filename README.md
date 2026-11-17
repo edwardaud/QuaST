@@ -22,7 +22,7 @@
 
 QuaST solves the incompressible Boussinesq or anelastic Stokes and energy equations with Taylor–Hood elements of degree $p$ and $p-1$ on Gauss–Legendre–Lobatto nodes. The mesh is a quadtree held at 2:1 balance, hanging nodes are eliminated by exact constraints rather than penalties, time stepping is BDF2, and the mesh adapts by trading error against a fixed leaf count. The Stokes saddle is solved either by sparse direct factorization or by matrix-free geometric multigrid, and `:auto` picks between them from the saddle size and the viscosity contrast.
 
-This is a research code for two dimensions. It does not do three dimensions, plate boundaries, viscoelasticity, or compressible MHD.
+This is a research code for two dimensions on a Cartesian box. It has no spherical shell, no plate boundaries, no elasticity or viscoelasticity, and no magnetic fields.
 
 ## Install
 
