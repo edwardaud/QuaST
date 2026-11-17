@@ -45,8 +45,7 @@ Ten steps of the realistic card, about two minutes including compilation:
 CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
-> [!WARNING]
-> Set `CASE_OUT` every time. Without it the card writes into `out_julia/case_realistic`, which may already hold a run you care about.
+**Set `CASE_OUT` every time.** Without it the card writes into `out_julia/case_realistic`, which may already hold a run you care about.
 
 A production spin-up, about two hours on eight threads:
 

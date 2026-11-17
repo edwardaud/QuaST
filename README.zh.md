@@ -45,8 +45,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
-> [!WARNING]
-> 每次都要设 `CASE_OUT`。不设的时候结果会写进 `out_julia/case_realistic`，那里可能存着你在意的运行数据。
+**每次都要设 `CASE_OUT`。** 不设的时候结果会写进 `out_julia/case_realistic`，那里可能存着你在意的运行数据。
 
 生产规模的预积分，八线程约两小时：
 

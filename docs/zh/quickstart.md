@@ -85,8 +85,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=2000 \
 
 回调会主动 flush，所以重定向出来的日志最多滞后 100 步。
 
-> [!NOTE]
-> `auto_fallbacks` 上升不是故障：每次回退只是把一次 Stokes 求解换成直接法，运行照常继续。
+**`auto_fallbacks` 上升不是故障。** 每次回退只是把一次 Stokes 求解换成直接法，运行照常继续。
 
 `frames/frame_meta.csv` 是第二个实时窗口，每存完一帧就 flush，所以每 5 步前进一次。每帧一行，列为
 
@@ -118,8 +117,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=4000 \
 - `resume` 把结果写到 `$CASE_OUT/resume.h5`。所以下一次续算要么显式指定这个路径，要么又回到旧的 `spinup.h5`。不带参数时它读 `$CASE_OUT/spinup.h5`。
 - 续算沿用检查点里记录的设置。常规续算不必再设任何变量；如果之前改过某个 `CASE_*` 旋钮，这次必须设成同一个值，否则被配置守卫拒绝（第 6 节）。
 
-> [!WARNING]
-> `CASE_OUT` 一定要设，而且用绝对路径。默认值是仓库内的 `out_julia/case_realistic`，可能残留着更早一次预积分的文件：写进去会覆盖 `history.csv`、覆盖步号相同的帧、向 `frame_meta.csv` 追加行。建议每次运行用一个独立目录，冒烟和测试用临时路径。
+**`CASE_OUT` 一定要设，而且用绝对路径。**默认值是仓库内的 `out_julia/case_realistic`，可能残留着更早一次预积分的文件：写进去会覆盖 `history.csv`、覆盖步号相同的帧、向 `frame_meta.csv` 追加行。建议每次运行用一个独立目录，冒烟和测试用临时路径。
 
 ## 5. 三个必须弄明白的旋钮
 
