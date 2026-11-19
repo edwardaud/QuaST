@@ -24,22 +24,16 @@ The same five pages exist in `zh/`.
 
 ## The engineering record
 
-| Volume | What it records |
-|---|---|
-| [SOLVER.md](dev/SOLVER.md) | The equations, elements, constraints, time step and linear paths the code implements, and where their limits are |
-| [PHYSICS.md](dev/PHYSICS.md) | Each physical ingredient as the code assembles it, and what the term was measured to do |
-| [AMR.md](dev/AMR.md) | How leaves are marked, balanced and moved, and what one adaptation pass costs |
-| [MG.md](dev/MG.md) | How the matrix-free multigrid works, which optimization stages paid off, where the defaults come from |
-| [MG_LITERATURE.md](dev/MG_LITERATURE.md) | What mature codes do for each multigrid lever, with sources, and what each claim cost to verify |
-| [PERFORMANCE.md](dev/PERFORMANCE.md) | Where a step's time goes, why a solve is direct or multigrid at a given size, the crossover table |
-| [VALIDATION.md](dev/VALIDATION.md) | Benchmarks, wall-flux conventions, cross-code comparisons, and the conditions they hold under |
-| [CASE_REALISTIC.md](dev/CASE_REALISTIC.md) | The realistic 2.5 x 1 card, how the production runs were launched, and what they produced |
-| [VIDEOS.md](dev/VIDEOS.md) | How the three-row comparison clips are rendered, and what they are meant to show |
-| [BUG_LEDGER.md](dev/BUG_LEDGER.md) | Which defects were found, how each one surfaced, what caused it, and which gate now pins it |
-| [HANDOFF.md](dev/HANDOFF.md) | Where the project stands, what is open, the runbook, and the rules the project learned the hard way |
-| [FILES.md](dev/FILES.md) | Every file in the repository, one line each |
+The engineering record is a **local** volume set. It records how each part of the
+code came to be, which defects were found and how, what each measurement cost, and
+where the project stands. It is not part of the published documentation: it lives
+in `docs/dev/` on the development machine and is not tracked by this repository.
 
-[AUDIT.md](dev/AUDIT.md) is a frozen snapshot of the tree at commit 1747345, taken before the earlier structured-grid layer was removed. It records what was there and why it went.
+If you are working on the code and have that directory, the volumes are the ones
+the source comments cite by name: `SOLVER.md`, `PHYSICS.md`, `AMR.md`, `MG.md`,
+`VALIDATION.md`, `CASE_REALISTIC.md`, `VIDEOS.md`, `BUG_LEDGER.md`, `HANDOFF.md`,
+`PERFORMANCE.md`, `FILES.md`. Without it, the user guides above stand on their own:
+every number a user needs is in them or in the tests.
 
 ## Where to start
 

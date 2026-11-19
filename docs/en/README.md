@@ -12,4 +12,4 @@ Five pages for users. The Chinese set mirrors every one of them.
 | [Validation](validation.md) | The benchmark convergence, the ASPECT comparison, the two Nusselt conventions, and where validation stops |
 | [FAQ](faq.md) | The questions that come up while using it |
 
-The Chinese set is [../zh/](../zh/README.md). The engineering record, which is a log rather than a manual, is [../dev/](../dev/README.md). The map of the source tree is [../architecture.md](../architecture.md).
+The Chinese set is [../zh/](../zh/README.md). The engineering record, which is a log rather than a manual, is ../dev/. The map of the source tree is [../architecture.md](../architecture.md).

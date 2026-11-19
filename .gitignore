@@ -32,3 +32,6 @@ Manifest.toml.bak
 # python
 __pycache__/
 *.pyc
+
+# the engineering record stays local: not for the public repository
+docs/dev/

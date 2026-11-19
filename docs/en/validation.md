@@ -2,7 +2,7 @@
 
 # Validation: what this solver has been checked against
 
-This page gives the short answer. The full record, with the conditions and the run behind every number, is in [the validation volume](../dev/VALIDATION.md); the realistic case has its own [volume](../dev/CASE_REALISTIC.md). The solver has been checked at three levels. Analytic and constitutive tests confirm that the operator is the operator it claims to be. Published benchmark solutions confirm that the whole pipeline lands on published numbers. A code-to-code comparison with ASPECT measures how far two defensible discretizations can part on the same physics. The first two say the implementation is right; the third says how much the answer moves when the discretization changes.
+This page gives the short answer. The full record, with the conditions and the run behind every number, is in the validation volume; the realistic case has its own volume. The solver has been checked at three levels. Analytic and constitutive tests confirm that the operator is the operator it claims to be. Published benchmark solutions confirm that the whole pipeline lands on published numbers. A code-to-code comparison with ASPECT measures how far two defensible discretizations can part on the same physics. The first two say the implementation is right; the third says how much the answer moves when the discretization changes.
 
 ## Steady benchmarks
 
@@ -56,7 +56,7 @@ The same-state rows are the sharp test. Both codes start from the same imported 
 
 ### The ASPECT run behind those numbers
 
-The comparison runs ASPECT 2.5.0-pre at commit `340c0d018` on the same 2.5 x 1 case, with the same composite rheology, the same initial condition, and no tuned parameter; sections 5 and 6 of [the validation volume](../dev/VALIDATION.md) record the setup. The top flux, which is the box's total heat loss, agrees to **0.005 to 0.9 percent** over `t_nd = 1e-3 .. 5e-3`, with a cross-correlation of at least 0.994 at every lag.
+The comparison runs ASPECT 2.5.0-pre at commit `340c0d018` on the same 2.5 x 1 case, with the same composite rheology, the same initial condition, and no tuned parameter; sections 5 and 6 of the validation volume record the setup. The top flux, which is the box's total heat loss, agrees to **0.005 to 0.9 percent** over `t_nd = 1e-3 .. 5e-3`, with a cross-correlation of at least 0.994 at every lag.
 
 The bottom flux carries the two solutions' different bottom-boundary-layer history, so it is quoted with its window: **-6.11%** (consistent-boundary-flux family) or **-8.44%** (gradient family) over `t_nd = 1e-6 .. 1e-3`, crossing zero at `1.42e-3`, and **+6.05% / +5.83%** over the later window.
 
@@ -108,6 +108,6 @@ It takes about 22 minutes on eight threads. Each gate pins its reference state a
 
 The validation covers a two-dimensional Cartesian box with free-slip or rigid walls and the Boussinesq mass form used by the benchmark and cross-code runs. It covers the shipped physics where that physics is exercised: composite isostress rheology, phase transitions with per-transition latent heat, internal heating, depth-dependent yielding, and strain weakening. The TALA/ALA reference state has its own self-consistency check.
 
-For studies in this geometry and this physics, the numbers above are the accuracy to expect, and [the realistic-case volume](../dev/CASE_REALISTIC.md) records the resolutions and rheologies at which they were measured. Three dimensions, a spherical shell, toroidal motion, plate boundaries, elasticity and viscoelasticity, magnetic fields and a free surface lie outside what this code implements, and nothing in the performance record is measured in 3-D.
+For studies in this geometry and this physics, the numbers above are the accuracy to expect, and the realistic-case volume records the resolutions and rheologies at which they were measured. Three dimensions, a spherical shell, toroidal motion, plate boundaries, elasticity and viscoelasticity, magnetic fields and a free surface lie outside what this code implements, and nothing in the performance record is measured in 3-D.
 
 Before quoting a number in a new regime, run a resolution check on the quantity you intend to quote. Convergence is necessary, and it does not by itself validate an answer.

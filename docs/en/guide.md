@@ -359,7 +359,7 @@ after constraint and boundary elimination, factorizes it with UMFPACK, and check
 
 ### 4.2 The multigrid path
 
-The multigrid path is a block-triangular preconditioner for flexible GMRES: a geometric V-cycle for the velocity block, with h-coarsening of at least 1.5 per level, damped-Jacobi smoothing, and every level built from the leaf-local matrix-free apply; and a three-factor w-BFBT approximation of the pressure Schur complement. FGMRES restarts every 100 iterations and is capped at 500, stopping on the true reduced-saddle residual against `mg_tol`. The case passes `mg_tol = 1e-8` , five orders below its `stokes_tol = 1e-3` ; the library default is `1e-10` . The iteration counts and timings behind these constants are in [the solver volume](../dev/SOLVER.md) section 4.
+The multigrid path is a block-triangular preconditioner for flexible GMRES: a geometric V-cycle for the velocity block, with h-coarsening of at least 1.5 per level, damped-Jacobi smoothing, and every level built from the leaf-local matrix-free apply; and a three-factor w-BFBT approximation of the pressure Schur complement. FGMRES restarts every 100 iterations and is capped at 500, stopping on the true reduced-saddle residual against `mg_tol`. The case passes `mg_tol = 1e-8` , five orders below its `stokes_tol = 1e-3` ; the library default is `1e-10` . The iteration counts and timings behind these constants are in the solver volume section 4.
 
 ### 4.3 The `:auto` rule
 
@@ -609,4 +609,4 @@ Disk is dominated by frames: about 0.8 MB each, a 512 KB `T.bin` plus a mesh CSV
 
 ## 9. The engineering record
 
-The measurements behind the defaults, the defects found along the way, the optimization work, and the validation against benchmarks and ASPECT are kept in [the engineering record](../dev/). Start with [the solver volume](../dev/SOLVER.md) for solver measurements, [the AMR volume](../dev/AMR.md) for the adaptive policy, and [the validation volume](../dev/VALIDATION.md) for the validation record.
+The measurements behind the defaults, the defects found along the way, the optimization work, and the validation against benchmarks and ASPECT are kept in the engineering record. Start with the solver volume for solver measurements, the AMR volume for the adaptive policy, and the validation volume for the validation record.

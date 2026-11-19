@@ -576,4 +576,4 @@ ArgumentError: restart configuration mismatch in /path/resume.h5:
 
 ## 7. 工程记录
 
-默认值背后的测量、开发中发现的缺陷、性能优化过程，以及对基准和 ASPECT 的验证，都保存在[工程记录](../dev/)，也就是 `docs/dev/` 目录。
+默认值背后的测量、开发中发现的缺陷、性能优化过程，以及对基准和 ASPECT 的验证，都保存在工程记录，也就是 `docs/dev/` 目录。

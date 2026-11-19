@@ -105,7 +105,10 @@
 #   latent heat latent_L = L/(cp dT) = 0.11 (from L = T (dP/dT) (drho/rho^2):
 #   0.094 for the 410, 0.131 for the 660; the code has a single L).
 # Numerics
-#   Ra = 1e5, p = 2, max_level = 7 (leaf 1/256), max_leaves = 10000,
+#   Ra = 1e5 (CASE_RA overrides), p = 2, max_level = 7 (leaf 1/256),
+#   max_leaves = 10000, dt0/dtmax/dtmin = 1e-6/5e-5/1e-9 (CASE_DT* override),
+#   comp_Ad/comp_As = 1.6240183119e5 / 2.6796419238e-1 (CASE_COMP_* override),
+#   eta_min/eta_max = 1e-4 / 1e4 (CASE_ETA_MIN/MAX override),
 #   amr_every = 5, refine_frac = 0.2,
 #   amr_coarsen_gate = true, amr_hysteresis = 1,
 #   coarsen_frac = 0.05, symmetry = :none
@@ -142,18 +145,32 @@ const LX, CX, CY   = 2.5, 5, 2          # box [0,2.5]x[0,1], square leaves
 # docs/dev/CASE_REALISTIC.md §7 is a one-line command; the defaults are the card.
 const MAXLEV       = parse(Int, get(ENV, "CASE_MAXLEV", "7"))   # leaf 1/256
 const MAXLEAVES    = parse(Int, get(ENV, "CASE_MAXLEAVES", "10000"))
+const DT0          = parse(Float64, get(ENV, "CASE_DT0", "1.0e-6"))
+const DTMAX        = parse(Float64, get(ENV, "CASE_DTMAX", "5.0e-5"))
+const DTMIN        = parse(Float64, get(ENV, "CASE_DTMIN", "1.0e-9"))
 const PORD         = 2
-const RA           = 1.0e5
+# `CASE_RA` exists so the same card can be re-run at another Rayleigh number
+# without editing it (the Ra = 1e7 pilot).  The default is the card's own value.
+const RA           = parse(Float64, get(ENV, "CASE_RA", "1.0e5"))
 const HHEAT        = 10.0
-const COMP_AD      = 1.6240183119e5
-const COMP_AS      = 2.6796419238e-1
+# The two prefactors carry the units of 1/eta0, and eta0 is fixed by Ra
+# (`Ra = rho g alpha dT d^3 / (eta0 kappa)`).  A run at another Ra must therefore
+# rescale them by `Ra / Ra_new` to keep the *dimensional* material constants
+# fixed; `CASE_COMP_AD` / `CASE_COMP_AS` are that hook, and the defaults are the
+# card's own values.
+const COMP_AD      = parse(Float64, get(ENV, "CASE_COMP_AD", "1.6240183119e5"))
+const COMP_AS      = parse(Float64, get(ENV, "CASE_COMP_AS", "2.6796419238e-1"))
 const COMP_ED      = 12.0
 const COMP_ES      = 17.0
 const COMP_N       = 3.0
 const ETA_T0       = 0.5
 const COMP_EPS_MIN = 1.0e-12
-const ETA_MIN      = 1.0e-4
-const ETA_MAX      = 1.0e4
+# `eta_min` is a *physical* bound (rocks have a floor), not only a numerical
+# guard: at high Ra the composite law drives the dislocation branch toward it and
+# the material turns effectively isoviscous, which removes the feature the card
+# is about.  `CASE_ETA_MIN/MAX` let a high-Ra variant state that bound explicitly.
+const ETA_MIN      = parse(Float64, get(ENV, "CASE_ETA_MIN", "1.0e-4"))
+const ETA_MAX      = parse(Float64, get(ENV, "CASE_ETA_MAX", "1.0e4"))
 const SLOPE410     = 0.032
 const SLOPE660     = -0.032
 const WIDTH_PT     = 0.025
@@ -479,7 +496,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     t0 = time()
     res = run_semquad_simulation(qt, pr, theta0;
         p=PORD, tstop=Inf, maxsteps=maxsteps,
-        dt0=1.0e-6, dtmax=5.0e-5, dtmin=1.0e-9, cfl=0.5, dt_growth=1.05,
+        dt0=DT0, dtmax=DTMAX, dtmin=DTMIN, cfl=0.5, dt_growth=1.05,
         maxpic=1, pic_tol=1.0e-6, pic_mode=:picard,
         amr_every=amr_every,
         refine_frac=0.2, coarsen_frac=COARSEN_FRAC,

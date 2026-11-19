@@ -8,7 +8,7 @@ Four runs you can start immediately. Each comes with its command, the physics it
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-The timings are wall clock on eight Julia threads, not CPU time. The direct solver is serial inside the process, so a run on that path leaves seven threads idle. The measurement records and their conditions are in [the validation volume](../dev/VALIDATION.md) and [the realistic-case volume](../dev/CASE_REALISTIC.md).
+The timings are wall clock on eight Julia threads, not CPU time. The direct solver is serial inside the process, so a run on that path leaves seven threads idle. The measurement records and their conditions are in the validation volume and the realistic-case volume.
 
 | Example | Command | Wall clock, eight threads | What to check |
 |---|---|---|---|

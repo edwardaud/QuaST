@@ -42,7 +42,7 @@ There is no keyword for anything else. `Params.eta_custom` is stored but no solv
 
 ## Does it run in 3-D?
 
-No. The mesh is a two-dimensional quadtree, the elements are two-dimensional GLL tensor elements, and the Stokes solver is built for two velocity components and one pressure. The repository has no 3-D path and no 3-D measurement. Section 8 of [the performance volume](../dev/PERFORMANCE.md) says "nothing measured" in its 3-D column, and the thresholds do not transfer anyway: a `p = 2` hexahedral leaf has 27 nodes against 9 in two dimensions.
+No. The mesh is a two-dimensional quadtree, the elements are two-dimensional GLL tensor elements, and the Stokes solver is built for two velocity components and one pressure. The repository has no 3-D path and no 3-D measurement. Section 8 of the performance volume says "nothing measured" in its 3-D column, and the thresholds do not transfer anyway: a `p = 2` hexahedral leaf has 27 nodes against 9 in two dimensions.
 
 ## How many threads should I use?
 
@@ -74,7 +74,7 @@ CASE_OUT=out_julia/demo CASE_STEPS=4000 \
 
 ## How do I compare against ASPECT?
 
-Use `aspect_runs/realistic/`, run ASPECT 2.5.0-pre with the `realistic_composite` plugin, and convert with the scale set and rheology mapping in section 5.1 of [the validation volume](../dev/VALIDATION.md). Compare `Nu_top` first: it agrees to 0.005 to 0.9 percent over `t_nd = 1e-3 .. 5e-3`. Quote `Nu_bot` with its window, because the difference is -6.11 percent over `1e-6 .. 1e-3` and +6.05 percent over `1e-3 .. 5e-3`. For a state-level check, import an ASPECT checkpoint with `examples/import_aspect_state.jl`; the two operators then agree to 0.003 percent at the bottom wall.
+Use `aspect_runs/realistic/`, run ASPECT 2.5.0-pre with the `realistic_composite` plugin, and convert with the scale set and rheology mapping in section 5.1 of the validation volume. Compare `Nu_top` first: it agrees to 0.005 to 0.9 percent over `t_nd = 1e-3 .. 5e-3`. Quote `Nu_bot` with its window, because the difference is -6.11 percent over `1e-6 .. 1e-3` and +6.05 percent over `1e-3 .. 5e-3`. For a state-level check, import an ASPECT checkpoint with `examples/import_aspect_state.jl`; the two operators then agree to 0.003 percent at the bottom wall.
 
 ## How do I cite it?
 
