@@ -124,6 +124,7 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        LAST_MIRROR_CLOSE, semquad_enforce_leaf_budget!, LAST_BUDGET_PASS, SemQuad,
        make_semquad, semquad_constraints, assemble_semquad_poisson, transfer_semquad,
        semquad_mass, semquad_gradient_jump, semquad_velocity_jump,
+       semquad_combined_jump,
        assemble_semquad_energy,
        assemble_semquad_energy_latent_jvp, SemStokes, make_semstokes, solve_semquad_stokes,
        solve_semquad_stokes_var, assemble_semquad_pressure_mass, SemQuadKOp, SemQuadKWork,

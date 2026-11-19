@@ -104,9 +104,11 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         # velocity error that a smooth temperature cannot (PHASE1.md 1.1).
         eta = indicator === :velocity ?
               semquad_velocity_jump(sq, qt, ux, uz) :
+              indicator === :both ?
+              semquad_combined_jump(sq, qt, theta, ux, uz) :
               indicator === :theta ?
               semquad_gradient_jump(sq, qt, theta) :
-              throw(ArgumentError("indicator must be :theta or :velocity"))
+              throw(ArgumentError("indicator must be :theta, :velocity or :both"))
 
         protect = Set{NTuple{3,Int}}()
         # (c') Only the first/last leaf rows are protected: the strip's minimum

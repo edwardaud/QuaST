@@ -338,8 +338,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
     wall_min_level >= 0 || throw(ArgumentError("wall_min_level must be >= 0"))
     0.0 < wall_strip < 0.5 || throw(ArgumentError("wall_strip must be in (0, 0.5)"))
-    amr_indicator in (:theta, :velocity) ||
-        throw(ArgumentError("amr_indicator must be :theta or :velocity"))
+    amr_indicator in (:theta, :velocity, :both) ||
+        throw(ArgumentError("amr_indicator must be :theta, :velocity or :both"))
     symmetry in (:none, :x) ||
         throw(ArgumentError("symmetry must be :none or :x"))
     amr_hysteresis >= 0 ||
@@ -565,6 +565,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         length(qt.leaves) < max_leaves || break
         eta = amr_indicator === :velocity ?
               semquad_velocity_jump(sq, qt, ux, uz) :
+              amr_indicator === :both ?
+              semquad_combined_jump(sq, qt, theta, ux, uz) :
               semquad_gradient_jump(sq, qt, theta)
         protect = Set{NTuple{3,Int}}()
         for lf in qt.leaves

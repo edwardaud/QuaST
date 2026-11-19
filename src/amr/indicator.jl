@@ -164,6 +164,37 @@ function semquad_velocity_jump(sq::SemQuad, qt::Quadtree,
     return jx
 end
 """
+    semquad_combined_jump(sq, qt, theta, ux, uz)
+
+The velocity jump is rescaled to the theta jump's total and the two are averaged,
+so the result carries **theta's absolute scale**.  That matters: the AMR cycle also
+has an absolute representation guard (`coarsen_theta_tol`), so an indicator that
+is merely normalized to unit total would fall below it everywhere and the cycle
+would coarsen the mesh away -- which is exactly what happened when `:both` was
+first written as a normalized sum.
+
+`theta` alone is blind to a grid-scale velocity error (the high-Rayleigh-number
+case) and the velocity alone vanishes at t = 0, where the flow is at rest; the
+average keeps a non-zero floor from whichever field is non-zero.
+"""
+function semquad_combined_jump(sq::SemQuad, qt::Quadtree, theta::Vector{Float64},
+                               ux::Vector{Float64}, uz::Vector{Float64})
+    jt = semquad_gradient_jump(sq, qt, theta)
+    jv = semquad_velocity_jump(sq, qt, ux, uz)
+    st = 0.0
+    for v in values(jt); st += v; end
+    sv = 0.0
+    for v in values(jv); sv += v; end
+    st = st > 0.0 ? st : 1.0
+    # average, keeping theta's total: 0.5*(jt + (st/sv)*jv)
+    w = sv > 0.0 ? 0.5 * st / sv : 0.0
+    for lf in keys(jt)
+        jt[lf] = 0.5 * jt[lf] + w * get(jv, lf, 0.0)
+    end
+    return jt
+end
+
+"""
     semquad_gradient_jump(sq, qt, u)
 
 Per-leaf indicator `(h/2) * int_face [du.n]^2 ds` summed over interior faces,
