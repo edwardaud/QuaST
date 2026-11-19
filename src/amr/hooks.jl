@@ -88,7 +88,8 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                              top_wall_level::Int=0, top_wall_frac::Float64=0.5,
                              amr_cooldown::Union{Nothing,AmrCooldown}=nothing,
                              amr_hysteresis::Int=1,
-                             amr_coarsen_gate::Bool=true)
+                             amr_coarsen_gate::Bool=true,
+                             indicator::Symbol=:theta)
     passes >= 1 || throw(ArgumentError("passes must be >= 1"))
     amr_hysteresis >= 0 ||
         throw(ArgumentError("amr_hysteresis must be >= 0"))
@@ -98,7 +99,15 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
     nc = 0
     merged_total = 0
     for pass in 1:passes
-        eta = semquad_gradient_jump(sq, qt, theta)
+        # `indicator` selects what the jump estimator is applied to.  `:theta` is
+        # the historical field and the default; `:velocity` sees a grid-scale
+        # velocity error that a smooth temperature cannot (PHASE1.md 1.1).
+        eta = indicator === :velocity ?
+              semquad_velocity_jump(sq, qt, ux, uz) :
+              indicator === :theta ?
+              semquad_gradient_jump(sq, qt, theta) :
+              throw(ArgumentError("indicator must be :theta or :velocity"))
+
         protect = Set{NTuple{3,Int}}()
         # (c') Only the first/last leaf rows are protected: the strip's minimum
         # level is guaranteed by `refine_wall_to_min!` below, and the absolute

@@ -174,6 +174,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 symmetry::Symbol=:none,
                                 amr_hysteresis::Int=1,
                                 amr_coarsen_gate::Bool=true,
+                                # :theta (default, historical) or :velocity; see
+                                # docs/dev/PHASE1.md 1.1
+                                amr_indicator::Symbol=:theta,
                                 transfer_mode::Symbol=:nodal,
                                 initial_refine::Int=0,
                                 theta_ic::Union{Nothing,Function}=nothing,
@@ -335,6 +338,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
     wall_min_level >= 0 || throw(ArgumentError("wall_min_level must be >= 0"))
     0.0 < wall_strip < 0.5 || throw(ArgumentError("wall_strip must be in (0, 0.5)"))
+    amr_indicator in (:theta, :velocity) ||
+        throw(ArgumentError("amr_indicator must be :theta or :velocity"))
     symmetry in (:none, :x) ||
         throw(ArgumentError("symmetry must be :none or :x"))
     amr_hysteresis >= 0 ||
@@ -372,6 +377,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # so a restart must not switch it silently either; old checkpoints do not
         # carry the key and skip the comparison, like every key added later.
         "amr_coarsen_gate" => amr_coarsen_gate,
+        "amr_indicator" => amr_indicator,
         "hotspot_weight" => hotspot_weight, "hotspot_frac" => hotspot_frac,
         "hotspot_min_level" => hotspot_min_level, "hotspot_mode" => hotspot_mode,
         "hotspot_zmin" => hotspot_zmin, "zero_side_eta" => zero_side_eta,
@@ -557,7 +563,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         SEMQUAD_AMR_COOLDOWN[] = AmrCooldown()
         for pass in 1:initial_refine
         length(qt.leaves) < max_leaves || break
-        eta = semquad_gradient_jump(sq, qt, theta)
+        eta = amr_indicator === :velocity ?
+              semquad_velocity_jump(sq, qt, ux, uz) :
+              semquad_gradient_jump(sq, qt, theta)
         protect = Set{NTuple{3,Int}}()
         for lf in qt.leaves
             if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
@@ -1373,7 +1381,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 hotspot_mode=hotspot_mode, hotspot_zmin=hotspot_zmin, zero_side_eta=zero_side_eta, side_strip=side_strip,
                 top_wall_level=top_wall_level, top_wall_frac=top_wall_frac,
                 amr_hysteresis=amr_hysteresis,
-                amr_coarsen_gate=amr_coarsen_gate)
+                amr_coarsen_gate=amr_coarsen_gate,
+                indicator=amr_indicator)
             sq = ss.su
             # The weakening field lives on the scalar space, so it follows the
             # same transfer as theta (no wall Dirichlet data: `zero_walls=false`).

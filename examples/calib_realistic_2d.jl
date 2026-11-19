@@ -48,7 +48,9 @@ const CY     = 2
 const PMAX   = 7        # max_level (leaf size 1/256 at the finest level)
 const PORD   = 2        # polynomial order
 const HHEAT  = 10.0     # internal-heating number (source H of the theta eq.)
-const RA     = 1.0e5
+# The calibration is Ra-dependent: the reference strain rate it measures and the
+# prefactors it solves for both follow the run's Ra.  `CALIB_RA` selects the case.
+const RA     = parse(Float64, get(ENV, "CALIB_RA", "1.0e5"))
 
 # Unit-branch viscosities at (T, z = ZC, edot = edot_ref), normalised to 1 at
 # (TC, ZC): eta_d = exp(ED*(1/T_nd - 1/T_ndc)), eta_s likewise with ES/NEXP.

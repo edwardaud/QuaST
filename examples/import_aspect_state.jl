@@ -57,9 +57,9 @@ import HDF5
 # ---- the card (mirrors examples/case_realistic_2d.jl) ------------------
 const LX, CX, CY = 2.5, 5, 2
 const PORD       = 2
-const RA         = 1.0e5
+const RA         = parse(Float64, get(ENV, "IMPORT_RA", "1.0e5"))
 const HHEAT      = 10.0
-const MAXLEV     = 7
+const MAXLEV     = parse(Int, get(ENV, "IMPORT_MAXLEV", "7"))
 const COMP_AD    = 1.6240183119e5
 const COMP_AS    = 2.6796419238e-1
 const COMP_ED    = 12.0
@@ -264,7 +264,7 @@ function build_tree(a::AspField; max_leaves::Int=10000, wall_min::Int=5,
                     wall_strip::Float64=0.1, refine_frac::Float64=0.2,
                     coarsen_frac::Float64=0.05, coarsen_tol::Float64=1.0e-2,
                     max_passes::Int=40, amr_max_level::Int=MAXLEV,
-                    verbose::Bool=true)
+                    symmetry::Symbol=:none, verbose::Bool=true)
     qt = make_initial_tree()
     nl = length(qt.leaves)
     hist = Int[]
@@ -277,17 +277,18 @@ function build_tree(a::AspField; max_leaves::Int=10000, wall_min::Int=5,
         amr_cycle_balanced!(qt, eta; refine_frac=refine_frac,
                             coarsen_frac=coarsen_frac,
                             max_level=amr_max_level,
-                            max_leaves=max_leaves, symmetry=:x)
-        refine_wall_to_min!(qt, wall_min; strip=wall_strip, symmetry=:x)
-        mirror_close!(qt; max_level=amr_max_level)
-        balance!(qt; symmetry=:x)
+                            max_leaves=max_leaves, symmetry=symmetry)
+        refine_wall_to_min!(qt, wall_min; strip=wall_strip, symmetry=symmetry)
+        symmetry === :x && mirror_close!(qt; max_level=amr_max_level)
+        balance!(qt; symmetry=symmetry)
         eta_cap = copy(eta)
         for lf in qt.leaves
             get!(eta_cap, lf, 0.0)
         end
         merged, ok = semquad_enforce_leaf_budget!(qt, eta_cap;
                         max_leaves=max_leaves,
-                        protect=wall_protect(qt, wall_strip), symmetry=:x)
+                        protect=wall_protect(qt, wall_strip),
+                        symmetry=symmetry)
         push!(hist, length(qt.leaves))
         verbose && @printf("  [import] AMR pass %2d: %d -> %d leaves (merged %d, budget=%s)\n",
                            pass, nl, length(qt.leaves), merged, ok)
@@ -449,6 +450,7 @@ function main()
     else
         qt, theta, ux, uz, nwall = build_tree(a; max_leaves=max_leaves,
             wall_min=wall_min, wall_strip=wall_strip,
+            symmetry=Symbol(get(ENV, "IMPORT_SYMMETRY", "none")),
             coarsen_tol=haskey(args, "coarsen-tol") ? parse(Float64, args["coarsen-tol"]) : 1.0e-2,
             max_passes=haskey(args, "max-passes") ? parse(Int, args["max-passes"]) : 40,
             amr_max_level=haskey(args, "amr-max-level") ? parse(Int, args["amr-max-level"]) : MAXLEV,

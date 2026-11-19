@@ -138,6 +138,32 @@ function _semquad_subface_derivs(sq::SemQuad, L::NTuple{3,Int}, R::NTuple{3,Int}
 end
 
 """
+    semquad_velocity_jump(sq, qt, ux, uz)
+
+Per-leaf indicator built from the gradient jump of the *velocity*, the sum of the
+two components' jumps.  The default `semquad_gradient_jump` on `theta` sees the
+thermal boundary layers but not a velocity field that oscillates on the grid
+scale while the temperature stays smooth, which is what happens at high Rayleigh
+number (docs/dev/PHASE1.md).  This indicator is the same estimator applied to a
+field that carries that error.
+
+`sx` and `sz` are the velocity components on the scalar node layout of `sq`
+(the Q2 space of the same tree), so no interpolation is needed.
+"""
+function semquad_velocity_jump(sq::SemQuad, qt::Quadtree,
+                               ux::Vector{Float64}, uz::Vector{Float64})
+    length(ux) == sq.N || throw(ArgumentError("ux has $(length(ux)) entries, " *
+                                              "mesh has $(sq.N) dofs"))
+    length(uz) == sq.N || throw(ArgumentError("uz has $(length(uz)) entries, " *
+                                              "mesh has $(sq.N) dofs"))
+    jx = semquad_gradient_jump(sq, qt, ux)
+    jz = semquad_gradient_jump(sq, qt, uz)
+    for (lf, v) in jx
+        jx[lf] = v + get(jz, lf, 0.0)
+    end
+    return jx
+end
+"""
     semquad_gradient_jump(sq, qt, u)
 
 Per-leaf indicator `(h/2) * int_face [du.n]^2 ds` summed over interior faces,

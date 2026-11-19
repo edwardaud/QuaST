@@ -140,7 +140,13 @@
 using QuaST, Printf, LinearAlgebra
 
 # ------------------------------------------------------------------ card ----
-const LX, CX, CY   = 2.5, 5, 2          # box [0,2.5]x[0,1], square leaves
+# Box geometry.  The card is the 2.5 x 1 realistic case; `CASE_LX/CX/CY` exist so a
+# square-box variant (the 1 x 1 probe at Ra = 1e8) can be run without editing it.
+# Keep `LX/CX == 1/CY` or the leaves stop being square, which the AMR rules and the
+# wall strip assume.
+const LX           = parse(Float64, get(ENV, "CASE_LX", "2.5"))
+const CX           = parse(Int, get(ENV, "CASE_CX", "5"))
+const CY           = parse(Int, get(ENV, "CASE_CY", "2"))
 # max_level / max_leaves are overridable only so the resolution check of
 # docs/dev/CASE_REALISTIC.md §7 is a one-line command; the defaults are the card.
 const MAXLEV       = parse(Int, get(ENV, "CASE_MAXLEV", "7"))   # leaf 1/256
@@ -216,6 +222,8 @@ const WALL_STRIP   = parse(Float64, get(ENV, "CASE_WALLSTRIP", "0.1"))
 # run always gets forward coarsening, budget exchange, hysteresis and the 2:1
 # gate.  The hysteresis cooldown is `CASE_HYST` AMR cycles (default 1).
 const AMR_HYST     = parse(Int, get(ENV, "CASE_HYST", "1"))
+# :theta (default) or :velocity; see docs/dev/PHASE1.md 1.1
+const AMR_IND      = Symbol(get(ENV, "CASE_INDICATOR", "theta"))
 # x-mirror closure of the AMR passes (`symmetry=:x`).  The default is `none`,
 # the production card (docs/dev/CASE_REALISTIC.md §1.5): `none` switches the
 # pair-strict mirror rule off.  Under `:x` a quartet is merged only together
@@ -485,7 +493,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     # Only an opt-in run records it, so the checkpoints of the default card stay
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
-    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING)
+    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND)
     @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.1f Es=%.1f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)
@@ -502,7 +510,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
         refine_frac=0.2, coarsen_frac=COARSEN_FRAC,
         max_leaves=MAXLEAVES, max_level=MAXLEV, symmetry=SYMMETRY,
         wall_min_level=WALL_MIN, wall_strip=WALL_STRIP,
-        amr_hysteresis=AMR_HYST,
+        amr_hysteresis=AMR_HYST, amr_indicator=AMR_IND,
         amr_coarsen_gate=AMR_GATE == 1,
         transfer_mode=:nodal,
         advection=:skew, ev=EV_COEF, ev_cmax=0.052, ev_alpha=2,
