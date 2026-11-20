@@ -198,6 +198,46 @@ function main()
             comp_Ad, comp_As, ED, ES, NEXP)
     @printf("      eta_T0=%.2f comp_eps_min=1e-12 comp_rule=:isostress  edot_ref=%.4e\n",
             T0, edot_ref)
+
+    # ---------------------------------------------------- physical magnitudes
+    # The prefactors only mean something together with the viscosity they imply.
+    # `eta0` is what Ra fixes (eta0 = rho g alpha dT d^3 / (Ra kappa)); the card's
+    # reference point is T = 0.5, so eta(0.5) is eta0 by construction and the
+    # number a paper would quote is the *interior* one.  Print all of them, and
+    # the clip census over the strain-rate range the run actually visits, because a
+    # law that sits on a bound has no structure left whatever its prefactors.
+    scale = (rho=3300.0, g=9.81, alpha=3.0e-5, dT=1000.0, d=2.9e6, kappa=1.0e-6)
+    eta0 = scale.rho * scale.g * scale.alpha * scale.dT * scale.d^3 /
+           (RA * scale.kappa)
+    pr_ref = Params(Ra=RA, H=HHEAT, eta_law=:composite, comp_rule=:isostress,
+                    comp_n=NEXP, comp_Ed=ED, comp_Es=ES, comp_Ad=comp_Ad,
+                    comp_As=comp_As, comp_eps_min=1.0e-12, eta_T0=T0,
+                    eta_min=1.0e-4, eta_max=1.0e4, bc=:free)
+    eta_int_nd, _ = eta_composite_at(1.75, edot_ref, 0.5, pr_ref)
+    @printf("\nphysical magnitudes (d=%.2e m, kappa=%.1e m^2/s, Ra=%.1e):\n",
+            scale.d, scale.kappa, RA)
+    @printf("  eta0 at the calibration point (T=0.5) = %.3e Pa s   [mantle 1e21]\n",
+            eta0)
+    @printf("  eta at the interior temperature T=1.75 = %.3e Pa s   [mantle 1e19-1e20]\n",
+            eta0 * eta_int_nd)
+    @printf("  eta at the stiff end (clip)            = %.3e Pa s   [lithosphere 1e23-1e25]\n",
+            eta0 * 1.0e4)
+    @printf("  contrast lid/interior                  = %.1e            [mantle 1e3-1e5]\n",
+            1.0e4 / eta_int_nd)
+    # split the census by which bound is hit: a stiff lid on eta_max is the
+    # intended physics, a soft interior on eta_min means the law is saturated
+    for f in (1.0, 1.0e2, 1.0e3, 1.0e4, 1.0e5)
+        nmax = 0; nmin = 0; ntot = 0
+        for i in 1:61
+            T = 2.6 * (i - 1) / 60
+            e, _ = eta_composite_at(T, f * edot_ref, 0.5, pr_ref)
+            ntot += 1
+            nmax += e >= 1.0e4 * (1.0 - 1.0e-12) ? 1 : 0
+            nmin += e <= 1.0e-4 * (1.0 + 1.0e-12) ? 1 : 0
+        end
+        @printf("  clip census at edot = %.0e x edot_ref: max %d/%d, min %d/%d\n",
+                f, nmax, ntot, nmin, ntot)
+    end
 end
 
 main()
