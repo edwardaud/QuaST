@@ -37,6 +37,10 @@ $$
 
 where $u\_x$ and $u\_y$ are the two velocity components. Temperature is $T=0$ at the top wall and $T=1$ at the bottom wall; the side walls are insulating.
 
+The condition can be set per wall. `bc = :free` (the default) applies free slip to all four; `bc = :rigid` applies no slip to all four, which fixes the tangential component as well and sets it from the wall-velocity closures $u\_{Dx}(x,y)$ , $u\_{Dy}(x,y)$ . `wall_bc` overrides one wall at a time, in the order `(xminus, xplus, yminus, yplus)`, with entries `:same` (follow `bc`), `:free` or `:rigid`. The card exposes it as `CASE_WALL_BC=rigid,rigid,free,free`.
+
+Because the wall-velocity closures are functions of position and the walls sit at different $y$ (or $x$), a spatially varying wall velocity needs no extra API: $u\_{Dx}=Uy$ with `bc = :rigid` drives a lid at $U$ over a resting floor and reproduces the Couette solution $u=(Uy,0)$ to $10^{-10}$ , which gate G238 pins. The only assignment the single closure cannot express is one that disagrees at a corner, where continuity forbids a disagreement anyway.
+
 ### 1.2 The equations
 
 Nondimensional Boussinesq momentum, continuity and energy:

@@ -167,5 +167,6 @@ using QuaST
     include("t_g236_wall_constraints.jl")
     include("t_g237_steady_wall_bc.jl")
     include("t_g238_prescribed_wall.jl")
+    include("t_g239_calibration.jl")
 end
 
