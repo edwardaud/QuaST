@@ -143,7 +143,13 @@ function main()
     @printf("=== composite prefactor calibration (docs/dev/CASE_REALISTIC.md §3) ===\n")
     @printf("fixed: n=%.1f eta_T0=%.2f comp_Ed=%.2f comp_Es=%.2f Vd=Vs=0\n",
             NEXP, T0, ED, ES)
-    edot_ref = precursor_edot()
+    # `CALIB_EDOT` overrides the precursor.  It exists because at high Ra the
+    # *run* visits strain rates orders of magnitude above the constant-viscosity
+    # precursor's, so calibrating at the precursor rate puts the law's knee far
+    # below where the flow actually lives and the interior sits on `eta_min`
+    # (docs/dev/PHASE1.md, the Ra = 1e8 account).
+    edot_env = get(ENV, "CALIB_EDOT", "")
+    edot_ref = isempty(edot_env) ? precursor_edot() : parse(Float64, edot_env)
     # round to 3 significant digits so the card is reproducible by hand
     edot_ref = round(edot_ref; sigdigits=3)
     @printf("edot_ref (rounded) = %.6e\n", edot_ref)
