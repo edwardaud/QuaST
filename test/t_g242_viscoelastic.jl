@@ -60,4 +60,19 @@ using Test, QuaST
 
     nearly = _run(1.0e3, 1.0e3)     # G*dt = 1e6 >> eta ~ 1: viscous
     @test all(isfinite, nearly.ux)
+
+    # 4. the effective viscosity is exactly one backward-Euler step of the Maxwell
+    # relaxation.  For a constant strain rate the stress obeys
+    #     dsigma/dt = 2*G*edot - sigma/tau,        tau = eta/G,
+    # whose backward-Euler update from zero stress is
+    #     sigma_1 = 2*G*edot*dt / (1 + dt/tau),
+    # and 2*eta_eff*edot must equal it.  This is the mathematical content of the
+    # ASPECT `viscoelastic` benchmark (a block in simple shear relaxes to
+    # 2*eta*edot with time constant tau), and it pins the convention our closure
+    # follows rather than merely its limits.
+    for dt in (0.01, 0.1, 1.0, 10.0)
+        tau = eta / G
+        sigma_be = 2 * G * 1.0 * dt / (1 + dt / tau)
+        @test isapprox(2 * eff(dt) * 1.0, sigma_be; rtol=1.0e-12)
+    end
 end
