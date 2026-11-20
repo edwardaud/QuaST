@@ -166,30 +166,26 @@ end
 """
     semquad_combined_jump(sq, qt, theta, ux, uz)
 
-The velocity jump is rescaled to the theta jump's total and the two are averaged,
-so the result carries **theta's absolute scale**.  That matters: the AMR cycle also
-has an absolute representation guard (`coarsen_theta_tol`), so an indicator that
-is merely normalized to unit total would fall below it everywhere and the cycle
-would coarsen the mesh away -- which is exactly what happened when `:both` was
-first written as a normalized sum.
+The two jump estimators **added as they are**, `jt + jv`, with no rescaling.
 
-`theta` alone is blind to a grid-scale velocity error (the high-Rayleigh-number
-case) and the velocity alone vanishes at t = 0, where the flow is at rest; the
-average keeps a non-zero floor from whichever field is non-zero.
+`theta` alone is blind to a grid-scale velocity error, which is the high-Rayleigh
+number case; the velocity alone vanishes at t = 0, where the flow is at rest, so
+the cycle refines barely at all and the mesh stays coarse.  The plain sum has the
+right limit at both ends: at rest it is exactly the theta indicator, and once the
+flow develops the velocity term contributes wherever the velocity field is rough.
+
+No normalization is involved.  An earlier version rescaled the velocity part to
+theta's total, which makes a negligible velocity field contribute half of the
+*shape* and reproduces the `:velocity` collapse; the historical
+`coarsen_theta_tol` guard that motivated that rescaling no longer exists in the
+balanced cycle (it was a parameter of the removed classic policy).
 """
 function semquad_combined_jump(sq::SemQuad, qt::Quadtree, theta::Vector{Float64},
                                ux::Vector{Float64}, uz::Vector{Float64})
     jt = semquad_gradient_jump(sq, qt, theta)
     jv = semquad_velocity_jump(sq, qt, ux, uz)
-    st = 0.0
-    for v in values(jt); st += v; end
-    sv = 0.0
-    for v in values(jv); sv += v; end
-    st = st > 0.0 ? st : 1.0
-    # average, keeping theta's total: 0.5*(jt + (st/sv)*jv)
-    w = sv > 0.0 ? 0.5 * st / sv : 0.0
-    for lf in keys(jt)
-        jt[lf] = 0.5 * jt[lf] + w * get(jv, lf, 0.0)
+    for (lf, v) in jv
+        jt[lf] = get(jt, lf, 0.0) + v
     end
     return jt
 end

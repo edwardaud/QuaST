@@ -56,15 +56,15 @@ using Test, QuaST, LinearAlgebra
     # (c) the combined indicator: normalized sum, non-vanishing at rest
     jc = semquad_combined_jump(sq, qt, th, ux, uz)
     jt = semquad_gradient_jump(sq, qt, th)
-    st = sum(values(jt)); sv = sum(values(jv))
     for lf in keys(jc)
-        @test isapprox(jc[lf], 0.5 * jt[lf] + 0.5 * (st / sv) * jv[lf]; rtol=1.0e-12, atol=0.0)
+        @test isapprox(jc[lf], jt[lf] + jv[lf]; rtol=1.0e-12, atol=0.0)
     end
-    @test isapprox(sum(values(jc)), sum(values(jt)); rtol=1.0e-10)
+    @test isapprox(sum(values(jc)), sum(values(jt)) + sum(values(jv)); rtol=1.0e-10)
+    # at rest the combined indicator *is* the theta one, exactly: the cycle then
+    # cannot collapse the mesh, which is the :velocity failure mode
     zero_u = zeros(sq.N)
     jc0 = semquad_combined_jump(sq, qt, th, zero_u, zero_u)
-    @test isapprox(sum(values(jc0)), 0.5 * st; rtol=1.0e-10)
-    @test any(>(0.0), values(jc0))
+    @test jc0 == jt
 
     # (d) the guard
     for bad in (:bogus, :Theta)
