@@ -168,5 +168,7 @@ using QuaST
     include("t_g237_steady_wall_bc.jl")
     include("t_g238_prescribed_wall.jl")
     include("t_g239_calibration.jl")
+    include("t_g240_mixed_amr.jl")
+    include("t_g241_card_wall_bc.jl")
 end
 
