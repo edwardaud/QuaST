@@ -224,6 +224,23 @@ const WALL_STRIP   = parse(Float64, get(ENV, "CASE_WALLSTRIP", "0.1"))
 const AMR_HYST     = parse(Int, get(ENV, "CASE_HYST", "1"))
 # :theta (default) or :velocity; see docs/dev/PHASE1.md 1.1
 const AMR_IND      = Symbol(get(ENV, "CASE_INDICATOR", "theta"))
+# Per-wall velocity condition, `(xminus, xplus, yminus, yplus)`.  `CASE_WALL_BC` is
+# a comma-separated list of `same|free|rigid`; `same` follows `CASE_BC` (the card's
+# single `bc`).  Empty means all `:same`, i.e. the historical behaviour.
+const WALL_BC     = begin
+    raw = strip(get(ENV, "CASE_WALL_BC", ""))
+    if isempty(raw)
+        (:same, :same, :same, :same)
+    else
+        parts = Tuple(Symbol(strip(v)) for v in split(raw, ','))
+        length(parts) == 4 ||
+            error("CASE_WALL_BC needs four comma-separated entries " *
+                  "(xminus,xplus,yminus,yplus), got \"$raw\"")
+        all(w -> w in (:same, :free, :rigid), parts) ||
+            error("CASE_WALL_BC entries must be same, free or rigid, got \"$raw\"")
+        parts
+    end
+end
 # x-mirror closure of the AMR passes (`symmetry=:x`).  The default is `none`,
 # the production card (docs/dev/CASE_REALISTIC.md §1.5): `none` switches the
 # pair-strict mirror rule off.  Under `:x` a quartet is merged only together
@@ -342,7 +359,8 @@ function make_params()
                   comp_Vd=0.0, comp_Vs=0.0, comp_n=COMP_N,
                   comp_Tcut=0.0, comp_eps_min=COMP_EPS_MIN,
                   eta_T0=ETA_T0, eta_min=ETA_MIN, eta_max=ETA_MAX,
-                  bc=:free, latent_L=LATENT_L, latent_mode=LATENT_MODE,
+                  bc=:free, wall_bc=WALL_BC,
+                  latent_L=LATENT_L, latent_mode=LATENT_MODE,
                   # everything below is the round-1 "off" default, written out
                   # so the card is explicit:
                   yield_c=Inf, yield_phi=0.0, yield_taumax=Inf,
@@ -493,7 +511,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     # Only an opt-in run records it, so the checkpoints of the default card stay
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
-    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND)
+    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","))
     @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.1f Es=%.1f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)
