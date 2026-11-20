@@ -132,7 +132,8 @@ function semquad_dp_stokes_newton(sq::SemQuad, qt::Quadtree, ss::SemStokes,
             sysJ = merge(sysJ, (Kred=sysJ.Kred .+ (1.0 / ptc_delta) .* Mred_ptc,))
         end
         solver = _semquad_newton_saddle(ss, qt, ss.p, pr.bc, pr.deviatoric,
-                                        eta_fun, sysJ; linear=linear)
+                                        eta_fun, sysJ; linear=linear,
+                                        wall_bc=pr.wall_bc)
         return solver, sysJ
     end
     # --- Picard warm-up (ASPECT's "pre-Newton nonlinear iterations") ---------
@@ -377,7 +378,8 @@ function semquad_dp_steady_step(sq::SemQuad, qt::Quadtree, ss::SemStokes,
                                        geo_spd_safety=spd_safety, dp_u=u,
                                        dp_pfield=pv, dp_coef=deta_p)
     solver = _semquad_newton_saddle(ss, qt, ss.p, pr.bc, pr.deviatoric, eta_fun,
-                                    sys_jac; linear=linear)
+                                    sys_jac; linear=linear,
+                                    wall_bc=pr.wall_bc)
     return (theta=theta_new, u=inner.u, p=inner.p, eta=inner.eta,
             parts=parts, inner_iters=inner.iters,
             inner_converged=inner.converged, dt=dt, advection=advection,

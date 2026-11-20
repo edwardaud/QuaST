@@ -165,5 +165,6 @@ using QuaST
     include("t_g234_velocity_indicator.jl")
     include("t_g235_wall_bc.jl")
     include("t_g236_wall_constraints.jl")
+    include("t_g237_steady_wall_bc.jl")
 end
 

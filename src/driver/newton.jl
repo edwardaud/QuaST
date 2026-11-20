@@ -242,10 +242,12 @@ function semquad_steady_step(sq::SemQuad, qt::Quadtree, ss::SemStokes,
     z2 = (x, y) -> 0.0
     sys = solve_semquad_stokes_var(ss, qt, eta, z2, fz, z2, z2;
                                    bc=pr.bc, linear=:direct,
+                                   wall_bc=pr.wall_bc,
                                    deviatoric=false, assemble_only=true)
     nf = size(sys.Kred, 1)
     nfp = size(sys.Bs, 1)
     solver = _semquad_newton_saddle(ss, qt, ss.p, pr.bc, false, eta, sys;
+                                    wall_bc=pr.wall_bc,
                                     linear=linear, tol=newton_tol,
                                     maxit=newton_maxit, restart=newton_restart,
                                     mg_cycles=mg_cycles, mg_smoother=mg_smoother,
