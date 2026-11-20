@@ -163,5 +163,6 @@ using QuaST
     include("t_g232_weak_zone.jl")
     include("t_g233_side_temperature.jl")
     include("t_g234_velocity_indicator.jl")
+    include("t_g235_wall_bc.jl")
 end
 

@@ -132,6 +132,12 @@ struct Params
     weak_eps_ref::Float64   # reference (end) plastic strain; <= 0 = off
     weak_heal_time::Float64 # healing time tau_heal; Inf = no healing
     weak_mode::Symbol       # :rate or :linear (ASPECT accumulation)
+    # Per-wall velocity condition, in the order (xminus, xplus, yminus, yplus).
+    # `:same` means "follow `bc`", which is the default and therefore bit-identical
+    # to the historical single-`bc` behaviour; `:free`/`:rigid` override one wall.
+    # A mixed tuple is only accepted with `linear=:direct` until the multigrid
+    # constraint operator carries the tuple (docs/dev/PHASE1.md 1.3 step 2).
+    wall_bc::NTuple{4,Symbol}
 end
 
 function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
@@ -144,6 +150,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 eta_const::Real=1.0,
                 eta_min::Real=-Inf, eta_max::Real=Inf,
                 bc::Symbol=:free, supg::Real=0.0, eta_soft::Real=0.0,
+                wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                 div_penalty::Real=0.0,
                 eta_custom=nothing, eta_multiplier=nothing,
                 rho_heating::Bool=false,
@@ -177,6 +184,11 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
         throw(ArgumentError("tosi=... requires eta_law=:tosi"))
     end
     bc in (:free, :rigid) || throw(ArgumentError("bc must be :free or :rigid"))
+    length(wall_bc) == 4 ||
+        throw(ArgumentError("wall_bc must have four entries (xminus, xplus, " *
+                            "yminus, yplus)"))
+    all(w -> w in (:same, :free, :rigid), wall_bc) ||
+        throw(ArgumentError("wall_bc entries must be :same, :free or :rigid"))
     eta_soft >= 0 || throw(ArgumentError("eta_soft must be >= 0"))
     div_penalty >= 0 || throw(ArgumentError("div_penalty must be >= 0"))
     if eta_law === :expT
@@ -300,7 +312,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            comp_rule,
            Float64(yield_c_grad), Float64(yield_mu_grad),
            Float64(weak_f), Float64(weak_eps_ref), Float64(weak_heal_time),
-           weak_mode)
+           weak_mode, NTuple{4,Symbol}(wall_bc))
 end
 
 @inline Tbar(z::Float64, H::Float64) = (1.0 - z) + 0.5 * H * z * (1.0 - z)

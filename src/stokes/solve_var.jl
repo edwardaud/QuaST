@@ -296,6 +296,16 @@ function _solve_semquad_stokes_var_fallback(ss::SemStokes, qt::Quadtree,
     return res
 end
 
+"""
+    _wall_index(dir)
+
+Position of a wall in `Params.wall_bc`, ordered `(xminus, xplus, yminus, yplus)`.
+"""
+_wall_index(dir::Symbol) = dir === :xminus ? 1 :
+                           dir === :xplus ? 2 :
+                           dir === :yminus ? 3 : 4
+
+
 function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,
                                   fx::Function, fz::Function,
@@ -312,6 +322,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   dp_pfield::Union{Nothing,Vector{Float64}}=nothing,
                                   dp_coef::Union{Nothing,Function}=nothing,
                                   bc::Symbol=:rigid, linear::Symbol=:direct,
+                                  wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                                   stokes_accept_tol::Float64=Inf,
                                   stokes_lost_tol::Float64=SEMSTOKES_LOST_TOL,
                                   stokes_scaling::Symbol=:none,
@@ -617,6 +628,10 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         uids = su.elem[lf]
         for dir in (:xminus, :xplus, :yminus, :yplus)
             has_no_face_neighbor(qt, lf, dir) || continue
+            # per-wall condition: :same follows the global c; this is what
+            # keeps the historical single-c runs bit-identical
+            wbc = (wall_bc[_wall_index(dir)] === :same ? bc : wall_bc[_wall_index(dir)])
+            rigid_wall = wbc === :rigid
             if dir === :xminus || dir === :xplus
                 iF = dir === :xminus ? 1 : n
                 xf = dir === :xplus ? x0 + hx : x0
@@ -624,7 +639,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                     yv = y0 + 0.5 * (su.xi[j] + 1.0) * hy
                     g = uids[(j - 1) * n + iF]
                     fixed[g] = uDx(xf, yv)
-                    bc === :rigid && (fixed[nu + g] = uDz(xf, yv))
+                    rigid_wall && (fixed[nu + g] = uDz(xf, yv))
                 end
             else
                 jF = dir === :yminus ? 1 : n
@@ -633,7 +648,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                     xv = x0 + 0.5 * (su.xi[i] + 1.0) * hx
                     g = uids[(jF - 1) * n + i]
                     fixed[nu + g] = uDz(xv, yf)
-                    bc === :rigid && (fixed[g] = uDx(xv, yf))
+                    rigid_wall && (fixed[g] = uDx(xv, yf))
                 end
             end
         end

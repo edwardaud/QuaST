@@ -340,6 +340,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     0.0 < wall_strip < 0.5 || throw(ArgumentError("wall_strip must be in (0, 0.5)"))
     amr_indicator in (:theta, :velocity, :both) ||
         throw(ArgumentError("amr_indicator must be :theta, :velocity or :both"))
+    # a mixed per-wall condition is refused until the multigrid constraint
+    # operator carries the tuple (docs/dev/PHASE1.md 1.3 step 2)
+    if any(w -> w !== :same, pr.wall_bc) && linear !== :direct
+        throw(ArgumentError("a mixed wall_bc requires linear=:direct until the " *
+                            "multigrid constraint operator carries the tuple"))
+    end
     symmetry in (:none, :x) ||
         throw(ArgumentError("symmetry must be :none or :x"))
     amr_hysteresis >= 0 ||
@@ -838,6 +844,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                                   compress_block=compress_block_fun(ss, qt, pr),
                                                   deviatoric=pr.deviatoric,
                                                   bc=pr.bc, linear=linear,
+                                                  wall_bc=pr.wall_bc,
                                                   stokes_scaling=stokes_scaling,
                                                   auto_fallback_tol=stokes_tol,
                                                   stokes_accept_tol=stokes_tol,
