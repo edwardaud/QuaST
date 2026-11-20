@@ -850,6 +850,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                                   deviatoric=pr.deviatoric,
                                                   bc=pr.bc, linear=linear,
                                                   wall_bc=pr.wall_bc,
+                                                  wall_u=pr.wall_u,
                                                   stokes_scaling=stokes_scaling,
                                                   auto_fallback_tol=stokes_tol,
                                                   stokes_accept_tol=stokes_tol,

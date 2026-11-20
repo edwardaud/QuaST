@@ -90,6 +90,13 @@ struct Params
     # every law bit-identical.  This relaxes the instantaneous elastic stress at the
     # current dt instead of carrying a stress history; the history form is 2b.
     shear_modulus::Float64
+    # Per-wall *tangential* velocity, `(xminus, xplus, yminus, yplus)`; `nothing`
+    # falls back to the global `uDx`/`uDz` closures, which is the historical
+    # behaviour.  The normal component still comes from `uDx`/`uDz`, so a wall with a
+    # prescribed tangential value must also be `:rigid` in `wall_bc`.  This is what
+    # makes a lid-driven cavity expressible: the top wall's tangential value no
+    # longer forces the x-walls' normal velocity (docs/dev/PHASE2.md 2a cross-check).
+    wall_u::NTuple{4,Union{Nothing,Function}}
     rho_heating::Bool     # add -T*H to the energy source (rho=(1-T) heating)
     rho_cp::Bool          # weight M and C by rho=1-T (ASPECT rho*cp LHS)
     tosi::Union{Nothing,TosiLaw}  # :tosi viscoplastic law (absolute units + eta0)
@@ -158,6 +165,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 bc::Symbol=:free, supg::Real=0.0, eta_soft::Real=0.0,
                 wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                 shear_modulus::Real=0.0,
+                wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 div_penalty::Real=0.0,
                 eta_custom=nothing, eta_multiplier=nothing,
                 rho_heating::Bool=false,
@@ -310,7 +318,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            Float64(eta_const),
            Float64(eta_min), Float64(eta_max), bc, Float64(supg),
            Float64(eta_soft), Float64(div_penalty), eta_custom, eta_multiplier,
-           Float64(shear_modulus),
+           Float64(shear_modulus), NTuple{4,Union{Nothing,Function}}(wall_u),
            rho_heating, rho_cp, tosi, Float64(Di),
            heating_adiabatic, heating_dissipation, refstate, rho_ref_weight,
            compress_p, Float64(compress_gamma),

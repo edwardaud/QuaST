@@ -323,6 +323,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   dp_coef::Union{Nothing,Function}=nothing,
                                   bc::Symbol=:rigid, linear::Symbol=:direct,
                                   wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
+                                  wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                                   stokes_accept_tol::Float64=Inf,
                                   stokes_lost_tol::Float64=SEMSTOKES_LOST_TOL,
                                   stokes_scaling::Symbol=:none,
@@ -639,7 +640,9 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                     yv = y0 + 0.5 * (su.xi[j] + 1.0) * hy
                     g = uids[(j - 1) * n + iF]
                     fixed[g] = uDx(xf, yv)
-                    rigid_wall && (fixed[nu + g] = uDz(xf, yv))
+                    tang = wall_u[_wall_index(dir)]
+                    rigid_wall && (fixed[nu + g] =
+                                   tang === nothing ? uDz(xf, yv) : tang(xf, yv))
                 end
             else
                 jF = dir === :yminus ? 1 : n
@@ -648,7 +651,9 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                     xv = x0 + 0.5 * (su.xi[i] + 1.0) * hx
                     g = uids[(jF - 1) * n + i]
                     fixed[nu + g] = uDz(xv, yf)
-                    rigid_wall && (fixed[g] = uDx(xv, yf))
+                    tang = wall_u[_wall_index(dir)]
+                    rigid_wall && (fixed[g] =
+                                   tang === nothing ? uDx(xv, yf) : tang(xv, yf))
                 end
             end
         end
