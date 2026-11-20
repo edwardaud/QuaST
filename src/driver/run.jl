@@ -800,6 +800,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             mulf = pr.eta_multiplier
             eta_fun = (x, y) -> base_eta(x, y) * mulf(x, y)
         end
+        # Maxwell relaxation in the effective-viscosity form.  The step enters, so
+        # the closure is rebuilt every step; `shear_modulus <= 0` (the default)
+        # skips it and leaves the law bit-identical.
+        if pr.shear_modulus > 0.0
+            base_ve = eta_fun
+            Gv = pr.shear_modulus
+            eta_fun = (x, y) -> begin
+                e = base_ve(x, y)
+                1.0 / (1.0 / e + 1.0 / (Gv * dt))
+            end
+        end
         eta_for_energy = eta_fun
         # Buoyancy.  With a reference state this is the TALA/ALA form
         # rho(y) alpha(y) (T - Tad) instead of the full T: the hydrostatic part of

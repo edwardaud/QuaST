@@ -84,6 +84,12 @@ struct Params
     # law, which is how ASPECT's `weak zone` plugin is used next to a material
     # model rather than instead of it.
     eta_multiplier::Union{Nothing,Function}
+    # Maxwell viscoelasticity in the effective-viscosity form (ASPECT's
+    # `viscoelastic`, docs/dev/PHASE2.md 2a): with the shear modulus `G` and the
+    # step `dt`, eta_eff = 1/(1/eta + 1/(G*dt)).  `G <= 0` disables it and leaves
+    # every law bit-identical.  This relaxes the instantaneous elastic stress at the
+    # current dt instead of carrying a stress history; the history form is 2b.
+    shear_modulus::Float64
     rho_heating::Bool     # add -T*H to the energy source (rho=(1-T) heating)
     rho_cp::Bool          # weight M and C by rho=1-T (ASPECT rho*cp LHS)
     tosi::Union{Nothing,TosiLaw}  # :tosi viscoplastic law (absolute units + eta0)
@@ -151,6 +157,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 eta_min::Real=-Inf, eta_max::Real=Inf,
                 bc::Symbol=:free, supg::Real=0.0, eta_soft::Real=0.0,
                 wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
+                shear_modulus::Real=0.0,
                 div_penalty::Real=0.0,
                 eta_custom=nothing, eta_multiplier=nothing,
                 rho_heating::Bool=false,
@@ -184,6 +191,9 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
         throw(ArgumentError("tosi=... requires eta_law=:tosi"))
     end
     bc in (:free, :rigid) || throw(ArgumentError("bc must be :free or :rigid"))
+    (isfinite(shear_modulus) && shear_modulus >= 0.0) ||
+        throw(ArgumentError("shear_modulus must be finite and >= 0 (0 disables " *
+                            "the viscoelastic relaxation)"))
     length(wall_bc) == 4 ||
         throw(ArgumentError("wall_bc must have four entries (xminus, xplus, " *
                             "yminus, yplus)"))
@@ -300,6 +310,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            Float64(eta_const),
            Float64(eta_min), Float64(eta_max), bc, Float64(supg),
            Float64(eta_soft), Float64(div_penalty), eta_custom, eta_multiplier,
+           Float64(shear_modulus),
            rho_heating, rho_cp, tosi, Float64(Di),
            heating_adiabatic, heating_dissipation, refstate, rho_ref_weight,
            compress_p, Float64(compress_gamma),
