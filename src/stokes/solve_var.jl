@@ -836,6 +836,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # rediscretisation (see make_semquad_mg).
         mg_operator === :matrixfree && (coarse = :rediscretize)
         mg = make_semquad_mg(ss, qt, p, bc, deviatoric, eta_fun, Kred;
+                             wall_bc=wall_bc,
                              cycles=mg_cycles, smoother=smoother,
                              coarse_operator=coarse, operator=mg_operator,
                              coarsen_layers=mg_coarsen_layers,

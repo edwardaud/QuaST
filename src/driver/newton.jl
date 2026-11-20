@@ -94,6 +94,7 @@ Returns a named tuple with `solve(b)` plus the factorisation/hierarchy.
 """
 function _semquad_newton_saddle(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                                 deviatoric::Bool, eta_fun::Function, sys;
+                                wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                                 linear::Symbol=:direct,
                                 tol::Float64=1.0e-8, maxit::Int=500,
                                 restart::Int=100,
@@ -156,6 +157,7 @@ function _semquad_newton_saddle(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
         # available as `mg_operator=:sparse`.
         mg_operator === :matrixfree && (coarse = :rediscretize)
         mg = make_semquad_mg(ss, qt, p, bc, deviatoric, eta_fun, Kred;
+                             wall_bc=wall_bc,
                              cycles=mg_cycles, smoother=smoother,
                              coarse_operator=coarse, operator=mg_operator)
         # NB: with a Kp block the pressure Schur approximation is built from the

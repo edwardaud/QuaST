@@ -47,6 +47,14 @@ using Test, QuaST, LinearAlgebra
     @test all(isfinite, d.ux)
     @test d.ux != a.ux
     @test d.ux != f.ux
-    @test_throws ArgumentError _run(:rigid; wall_bc=(:rigid, :free, :free, :free),
-                                    linear=:mg)
+    # (d) the multigrid carries the tuple: it must land on the same solution the
+    # direct factorisation gives for the same mixed configuration
+    base = QuaST.LAST_AUTO_FALLBACK[].count
+    m = _run(:rigid; wall_bc=(:rigid, :free, :free, :free), linear=:mg)
+    # the multigrid must actually have run: a silent fallback to the direct
+    # factorisation would make the agreement below vacuous
+    @test QuaST.LAST_AUTO_FALLBACK[].count == base
+    @test all(isfinite, m.ux)
+    du = maximum(abs, m.ux .- d.ux) / max(maximum(abs, d.ux), 1.0e-30)
+    @test du < 1.0e-6
 end

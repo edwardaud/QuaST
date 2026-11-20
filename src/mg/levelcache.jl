@@ -59,15 +59,16 @@ struct SemQuadMGLevelKey
     Lx::Float64
     bc::Symbol
     deviatoric::Bool
+    wall_bc::NTuple{4,Symbol}
 end
 
 Base.:(==)(a::SemQuadMGLevelKey, b::SemQuadMGLevelKey) =
     a.idx == b.idx && a.nleaf == b.nleaf && a.stamp == b.stamp &&
     a.p == b.p && a.nx0 == b.nx0 && a.ny0 == b.ny0 && a.Lx == b.Lx &&
-    a.bc === b.bc && a.deviatoric == b.deviatoric
+    a.bc === b.bc && a.deviatoric == b.deviatoric && a.wall_bc == b.wall_bc
 Base.hash(k::SemQuadMGLevelKey, h::UInt) =
     hash(k.stamp, hash(k.idx, hash(k.nleaf, hash(k.p, hash(k.bc,
-                                                        hash(k.Lx, h))))))
+              hash(k.wall_bc, hash(k.Lx, h)))))))
 
 function Base.show(io::IO, k::SemQuadMGLevelKey)
     print(io, "SemQuadMGLevelKey(level=", k.idx, ", leaves=", k.nleaf,
@@ -218,7 +219,8 @@ end
 """`Cu` of one coarse level, via the reduced (`:mg`) or the historical
 K-forming (`:full`) assembly (see `make_semquad_mg`'s `geom_assembly`)."""
 function _semquad_mg_level_Cu(q::Quadtree, s::SemStokes, bc::Symbol,
-                              deviatoric::Bool, geom_assembly::Symbol)
+                              deviatoric::Bool, geom_assembly::Symbol;
+                              wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same))
     z2 = (x, y) -> 0.0
     one1 = (x, y) -> 1.0
     if geom_assembly === :minimal
@@ -229,6 +231,7 @@ function _semquad_mg_level_Cu(q::Quadtree, s::SemStokes, bc::Symbol,
         # so this is bitwise the full assembly's `Cu` (G220).
         asm = solve_semquad_stokes_var(s, q, one1, z2, z2, z2, z2;
                                        bc=bc, deviatoric=deviatoric,
+                                       wall_bc=wall_bc,
                                        linear=:mg, mg_operator=:matrixfree,
                                        assemble_only=:mg)
     else
@@ -236,6 +239,7 @@ function _semquad_mg_level_Cu(q::Quadtree, s::SemStokes, bc::Symbol,
         # and the bitwise gate, not for production.
         asm = solve_semquad_stokes_var(s, q, one1, z2, z2, z2, z2;
                                        bc=bc, deviatoric=deviatoric,
+                                       wall_bc=wall_bc,
                                        assemble_only=true)
     end
     return SparseMatrixCSC{Float64,Int}(sparse(asm.Cu))

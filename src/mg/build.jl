@@ -1,6 +1,7 @@
 # Build the geometric multigrid hierarchy: coarsen the tree, assemble each level and factor the coarsest.
 function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
                               bc::Symbol, deviatoric::Bool;
+                              wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                               coarsen_layers::Int=1,
                               coarsen_factor::Float64=1.0,
                               coarse_direct_max::Int=0,
@@ -11,7 +12,7 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
         throw(ArgumentError("MG coarse_direct_max must be >= 0"))
     geom_assembly in (:minimal, :full) ||
         throw(ArgumentError("MG geom_assembly must be :minimal or :full"))
-    key = (p, qt.nx0, qt.ny0, qt.Lx, bc, deviatoric,
+    key = (p, qt.nx0, qt.ny0, qt.Lx, bc, deviatoric, wall_bc,
            length(qt.leaves), hash(qt.leaves),
            coarsen_layers, coarsen_factor, coarse_direct_max, geom_assembly)
     if haskey(SEMQUAD_MG_CACHE, key)
@@ -44,7 +45,7 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
         lv = nothing
         if cacheable && reuse
             lkey = SemQuadMGLevelKey(idx, nleaf, stamps[idx], p, q.nx0, q.ny0,
-                                     q.Lx, bc, deviatoric)
+                                     q.Lx, bc, deviatoric, wall_bc)
             got = get(SEMQUAD_MG_CACHE, lkey, nothing)
             if got isa SemQuadMGLevel
                 lv = got
@@ -62,7 +63,8 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
                                         "to the finest MG tree"))
                 fine_Cu
             else
-                _semquad_mg_level_Cu(q, s, bc, deviatoric, geom_assembly)
+                _semquad_mg_level_Cu(q, s, bc, deviatoric, geom_assembly;
+                                     wall_bc=wall_bc)
             end
             lv = SemQuadMGLevel(idx, nleaf, stamps[idx], q, s, Cu,
                                 size(Cu, 2), _mg_free_rows(Cu, 2 * s.su.N),
@@ -72,7 +74,7 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
                 push!(stats.last_rebuilt, idx)
                 reuse && _semquad_mg_level_cache_put!(
                     SemQuadMGLevelKey(idx, nleaf, stamps[idx], p, q.nx0, q.ny0,
-                                      q.Lx, bc, deviatoric), lv)
+                                      q.Lx, bc, deviatoric, wall_bc), lv)
             end
         end
         levels[idx] = lv
@@ -236,7 +238,8 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                          fine_Cu::Union{Nothing,SparseMatrixCSC{Float64,Int}}=nothing,
                          geom_assembly::Symbol=:minimal,
                          fine_mfop::Union{Nothing,SemQuadKOp}=nothing,
-                         fine_mfeta::Union{Nothing,AbstractVector{Float64}}=nothing)
+                         fine_mfeta::Union{Nothing,AbstractVector{Float64}}=nothing,
+                         wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same))
     smoother in (:jacobi, :sgs) ||
         throw(ArgumentError("MG smoother must be :jacobi or :sgs"))
     coarse_operator in (:rediscretize, :galerkin) ||
@@ -267,7 +270,7 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
     operator === :sparse && (fine_mfop !== nothing || fine_mfeta !== nothing) &&
         throw(ArgumentError("fine_mfop/fine_mfeta need operator=:matrixfree"))
     _t_build0 = time_ns()
-    geo = _semquad_mg_geometry(ss, qt, p, bc, deviatoric;
+    geo = _semquad_mg_geometry(ss, qt, p, bc, deviatoric; wall_bc=wall_bc,
                                coarsen_layers=coarsen_layers,
                                coarsen_factor=coarsen_factor,
                                coarse_direct_max=coarse_direct_max,
