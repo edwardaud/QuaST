@@ -175,5 +175,6 @@ using QuaST
     include("t_g244_maxwell_step.jl")
     include("t_g245_config_guard.jl")
     include("t_g246_stress_state.jl")
+    include("t_g247_elastic_coupling.jl")
 end
 

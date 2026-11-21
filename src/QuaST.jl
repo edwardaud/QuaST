@@ -149,7 +149,7 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        semquad_dp_deta_T, semquad_steady_newton, yield_active, semquad_yield_stress,
        semquad_strain_rate_at, weak_active, semquad_weak_factor, semquad_yield_cohesion,
        weak_zone_factor,
-       maxwell_stress_step, maxwell_stress_exact,
+       maxwell_stress_step, maxwell_stress_exact, maxwell_force_stress,
        semquad_yield_friction, semquad_plastic_strain_rate,
        semquad_plastic_strain_rate_field, semquad_weakening_parts,
        semquad_weakening_source_g, semquad_weakening_jvp, solve_semquad_weakening,

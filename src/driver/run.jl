@@ -64,8 +64,11 @@ and the nodal material viscosity `eta`.  The kernel is the already-gated
 [`maxwell_stress_step`](@ref) from `src/physics/viscoelastic.jl`; this helper
 only maps it over the nodes and the three components.
 
-The state is *not* used by the momentum equation in this change -- there is no
-`div(tau)` force term -- so it cannot feed back into the trajectory.
+The state is advanced after the momentum solve of the step (so the next step's
+Stokes solve sees `tau^n`, never a same-step update): the driver adds
+`div(a tau^n)` to that solve's right-hand side (2b step 2), where
+`a = eta/(eta + G dt)` is the part of the backward-Euler stress the effective
+viscosity does not already carry, see [`maxwell_force_stress`](@ref).
 """
 function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
                                   txy::Vector{Float64}, sq::SemQuad,
@@ -220,9 +223,12 @@ Returns a named tuple with the final state and history rows
 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, nleaves]` (plus the opt-in columns
 described above; `history_extra` names them).  `txx`/`tyy`/`txy` are the nodal
 Maxwell stress-history components (`nothing` unless `pr.shear_modulus > 0`;
-docs/dev/PHASE2.md 2b step 1): state that is advanced once per step, transferred
-on AMR and checkpointed, but **not** used by the momentum equation in this
-change (no `div(tau)` force term).
+docs/dev/PHASE2.md 2b): state that is advanced once per step, transferred on AMR
+and checkpointed.  With `shear_modulus > 0` the previous step's stress also
+drives the momentum through the 2b elastic force term `div(a tau^n)` (2b step 2;
+see `maxwell_force_stress`), so its history feeds the velocity trajectory.  With
+`shear_modulus == 0` no elastic path exists at all and the run is bit-identical
+to the pre-2b one.
 """
 function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64};
                                 p::Int=2, tstop::Float64=1.0e-3,
@@ -781,14 +787,14 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         end
         chi_iter = copy(chi)
     end
-    # Maxwell stress history (2b step 1): three Q2 nodal tensor components
-    # `txx`, `tyy`, `txy` on the same scalar layout as `chi`.  `nothing` when
+    # Maxwell stress history (2b): three Q2 nodal tensor components `txx`,
+    # `tyy`, `txy` on the same scalar layout as `chi`.  `nothing` when
     # `pr.shear_modulus <= 0` (the default), in which case every stress-history
     # code path is skipped and the run is bit-identical to the pre-2b behaviour.
-    # They are advanced once per step by `_advance_maxwell_stress!` below and
-    # carried through AMR and the checkpoint exactly like `chi`; the momentum
-    # equation does **not** see them (no `div(tau)` force term in this change,
-    # docs/dev/PHASE2.md 2b step 1).
+    # They are advanced once per step by `_advance_maxwell_stress!` below, and
+    # the previous step's value drives the momentum solve through the elastic
+    # force term `div(a tau^n)` (2b step 2); they are carried through AMR and the
+    # checkpoint exactly like `chi`.
     stress = pr.shear_modulus > 0.0
     txx = nothing
     tyy = nothing
@@ -923,6 +929,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # Maxwell relaxation in the effective-viscosity form.  The step enters, so
         # the closure is rebuilt every step; `shear_modulus <= 0` (the default)
         # skips it and leaves the law bit-identical.
+        elastic_stress = nothing
         if pr.shear_modulus > 0.0
             # The stress history (2b step 1) relaxes on the *material* Maxwell
             # time eta/G, so keep the law before the softening below.
@@ -933,6 +940,16 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 e = base_ve(x, y)
                 1.0 / (1.0 / e + 1.0 / (Gv * dt))
             end
+            # 2b step 2: the elastic force term of *this* solve.  The updated
+            # Maxwell stress is `tau^{n+1} = 2 eta_eff eps^{n+1} + a tau^n` with
+            # `a = eta/(eta+G dt)`; the effective-viscosity part is already in the
+            # operator, and `a tau^n` is the explicit load `div(a tau^n)`.  `txx`
+            # still holds `tau^n` here: the advance happens after this step's
+            # momentum, so a same-step update can never feed back (G247 (d)).
+            # The material viscosity is sampled from the same closure the stress
+            # advance uses at the end of the step (`eta_base_probe[]`).
+            elastic_stress = maxwell_force_stress(
+                txx, tyy, txy, _nodal_eta(base_ve, sq), dt, Gv)
         end
         eta_for_energy = eta_fun
         # Buoyancy.  With a reference state this is the TALA/ALA form
@@ -971,6 +988,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                                   mass_drho=mass_drho_fun(pr),
                                                   compress_block=compress_block_fun(ss, qt, pr),
                                                   deviatoric=pr.deviatoric,
+                                                  elastic_stress=elastic_stress,
                                                   bc=pr.bc, linear=linear,
                                                   wall_bc=pr.wall_bc,
                                                   wall_u=pr.wall_u,
@@ -1032,8 +1050,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # (needed by the Drucker-Prager yield stress); the 2-argument call is kept
     # for a state whose pressure is not available (then p = 0 at the quadrature
     # points, which is only meaningful for a pressure-independent yield).
-    function newton_make_eta(th::Vector{Float64}, ufull::Vector{Float64},
-                             pfull::Union{Nothing,Vector{Float64}}=nothing)
+    # `newton_make_eta_law` is the raw law; the public factory below adds the 2a
+    # softening when `shear_modulus > 0` (the Newton residual must be assembled
+    # with `eta_eff`, like the Picard sweeps it continues from).
+    function newton_make_eta_law(th::Vector{Float64}, ufull::Vector{Float64},
+                                 pfull::Union{Nothing,Vector{Float64}}=nothing)
         lvs = Set(sq.leaves)
         Nn = sq.N
         uxv = ufull[1:Nn]
@@ -1075,6 +1096,15 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         eta_f = (x, y) -> eta_at(T_at(x, y), y, pr)[1]
         dT_f = (x, y) -> deta_dT_at(T_at(x, y), y, pr)
         return eta_f, dT_f, nothing
+    end
+
+    # 2a softening for the Newton path: `eta_eff = 1/(1/eta + 1/(G dt))`, with the
+    # chain rule on every derivative closure (see `_ve_soften_eta_factory`).
+    # `G = 0` returns the raw law unchanged, bit for bit.
+    function newton_make_eta(th::Vector{Float64}, ufull::Vector{Float64},
+                             pfull::Union{Nothing,Vector{Float64}}=nothing)
+        mk = newton_make_eta_law(th, ufull, pfull)
+        return _ve_soften_eta_factory(mk, pr.shear_modulus, dt)
     end
 
     SEMQUAD_STEP_PROFILE[] = profile_steps ? Any[] : nothing
@@ -1219,6 +1249,22 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 # residual, started from the Stokes solution of this first
                 # sweep.  The analytic tangents are built by
                 # `semquad_step_newton` from the viscosity factory.
+                # 2b step 2: the Newton's momentum residual carries the same
+                # lagged elastic force `a tau^n` as the Picard sweep it starts
+                # from (`tau = txx/tyy/txy` still holds the previous step's
+                # stress).  The material viscosity of the start state sets `a`,
+                # and it is frozen with the load for the step, exactly like the
+                # load itself; the stiffness inside the Newton uses the softened
+                # `newton_make_eta`, so this is the same backward-Euler split.
+                ve_elastic = if pr.shear_modulus > 0.0
+                    eta_mat = newton_make_eta_law(theta_iter, vcat(ux, uz),
+                                                  pv)[1]
+                    maxwell_force_stress(txx, tyy, txy,
+                                         _nodal_eta(eta_mat, sq), dt,
+                                         pr.shear_modulus)
+                else
+                    nothing
+                end
                 nrs = semquad_step_newton(ss, qt, pr, theta_prev, theta_iter,
                                           ux, uz, pv, newton_make_eta;
                                           dt=dt, dt_prev=dt_prev,
@@ -1233,6 +1279,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                           geo_spd_safety=newton_geo_safety,
                                           phases=phases,
                                           latent_scheme=latent_scheme,
+                                          elastic_stress=ve_elastic,
                                           chi=chi_iter, chi_n=chi,
                                           chi_nm1=chi_prev,
                                           verbose=verbose)
@@ -1376,15 +1423,23 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             chi_prev = chi
             chi = clamp.(chi_iter, 0.0, 1.0)
         end
-        # Maxwell stress history (2b step 1): one backward-Euler step with the
-        # velocity of the step that just converged, on the mesh it was solved on
-        # (the AMR block below transfers the result, exactly like `chi`).  The
-        # material viscosity is sampled at the nodes from the closure of the
-        # last flow solve, before the 2a effective-viscosity softening, so
-        # tau_M = eta/G is the material Maxwell time.  `dt` is this step's step
-        # (updated by the CFL block at `it == 1`), the same one the energy solve
-        # used.  Nothing reads these fields back: the momentum equation is
-        # unchanged in this commit.
+        # Maxwell stress history (2b): one backward-Euler step with the velocity
+        # of the step that just converged, on the mesh it was solved on (the AMR
+        # block below transfers the result, exactly like `chi`).  The material
+        # viscosity is sampled at the nodes from the closure of the last flow
+        # solve, before the 2a effective-viscosity softening, so tau_M = eta/G is
+        # the material Maxwell time.  `dt` is this step's step (updated by the
+        # CFL block at `it == 1`), the same one the energy solve used.
+        #
+        # This is deliberately *after* the converged momentum solve: the step's
+        # Stokes solve used `a tau^{n-1}` (the elastic force assembled in
+        # `solve_flow!`), and the result here is `tau^n`, which only the *next*
+        # step's momentum will see.  Advancing before the momentum solve (or
+        # re-solving after this line) would feed a same-step elastic stress back
+        # into its own momentum; G247 (d) reconstructs both sides of the step and
+        # would catch it.  The energy solve of a Picard sweep happens before this
+        # line, inside the iteration, but the energy equation reads neither tau
+        # nor the elastic load, so the momentum order is what the coupling needs.
         if stress && eta_base_probe[] !== nothing
             eta_nodes = _nodal_eta(eta_base_probe[], sq)
             _advance_maxwell_stress!(txx, tyy, txy, sq, ux, uz, dt, eta_nodes,
@@ -1694,8 +1749,10 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             qt=qt, ss=ss,
             ux=ux, uz=uz, pv=pv, avg=avg, steady=steady,
             weak=weak, chi=chi, chi_prev=chi_prev,
-            # Maxwell stress history (2b step 1): `nothing` unless
-            # `shear_modulus > 0`.  State only; no force term reads them.
+            # Maxwell stress history (2b): `nothing` unless
+            # `shear_modulus > 0`.  Advanced once per step and, with
+            # `shear_modulus > 0`, the previous step's value drives the next
+            # Stokes solve through the elastic force term.
             txx=txx, tyy=tyy, txy=txy)
 end
 

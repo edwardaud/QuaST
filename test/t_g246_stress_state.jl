@@ -209,8 +209,17 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     @test rb.theta == rc.theta && rb.ux == rc.ux && rb.uz == rc.uz
     @test rb.txx == rc.txx && rb.tyy == rc.tyy && rb.txy == rc.txy
 
-    # ---- (e) an old file (no stress datasets) loads with `nothing`, and the
-    # trajectory is unchanged because the momentum does not see the stress ----
+    # ---- (e) an old file (no stress datasets) loads with `nothing` and the
+    # history restarts from zero; since 2b step 2 the momentum *does* see the
+    # stress, so that missing history changes the trajectory ----
+    # (2b step 2 amendment: this block used to assert `theta`/`ux`/`uz` equality
+    # against the full-checkpoint restart, on the strength of "the momentum does
+    # not see the stress".  The elastic force term `div(a tau^n)` makes that
+    # premise false by construction -- a dependent old-format restart now has a
+    # different momentum equation -- so the equality is replaced by the
+    # difference that the coupling predicts.  The step-1 contract this sub-test
+    # was written for -- the old file loads with `nothing`, the history restarts
+    # from zero, and every field stays finite -- is unchanged.)
     ck_old = joinpath(mktempdir(), "g246_ck_old.h5")
     cp(ck, ck_old; force=true)
     h5open(ck_old, "r+") do f
@@ -221,13 +230,15 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     ld_old = load_semquad_state(ck_old)
     @test ld_old.txx === nothing && ld_old.tyy === nothing && ld_old.txy === nothing
     rb_old = g246_run(prG; nsteps=6, restart_from=ck_old)
-    @test rb_old.theta == rc.theta
-    @test rb_old.ux == rc.ux && rb_old.uz == rc.uz
     @test all(isfinite, rb_old.txx)
-    # ... while the stress history itself *did* restart from zero (non-vacuity:
-    # the two restarts differ only in the field the momentum is supposed to
-    # ignore; a `div(tau)` term would have made the trajectories differ).
+    # the stress history itself restarted from zero ...
     @test !(rb_old.txx == rc.txx)
+    # ... and because `a = eta/(eta+G dt)` is ~0.91 at this card (G*dt = 0.1,
+    # eta = 1), the absent history is visible in the flow and the temperature.
+    # A full-checkpoint restart is still bit-identical (`rb == rc` above), so the
+    # difference is caused only by the missing stress state.
+    @test !(rb_old.theta == rc.theta)
+    @test !(rb_old.ux == rc.ux) && !(rb_old.uz == rc.uz)
 
     # ---- (f) an AMR cycle in the middle of the run ----------------------
     # The band is the analytic bound of the recursion, |tau| <= 2 eta max|edot|.

@@ -75,7 +75,8 @@ function _semquad_step_residual_ctx(ss::SemStokes, qt::Quadtree, pr::Params,
                                     latent_scheme::Symbol=:implicit,
                                     chi::Union{Nothing,Vector{Float64}}=nothing,
                                     chi_n::Union{Nothing,Vector{Float64}}=nothing,
-                                    chi_nm1::Union{Nothing,Vector{Float64}}=nothing)
+                                    chi_nm1::Union{Nothing,Vector{Float64}}=nothing,
+                                    elastic_stress::Union{Nothing,NTuple{3,Vector{Float64}}}=nothing)
     latent_scheme in (:implicit, :lagged) ||
         throw(ArgumentError("latent_scheme must be :implicit or :lagged"))
     sq = ss.su
@@ -109,6 +110,7 @@ function _semquad_step_residual_ctx(ss::SemStokes, qt::Quadtree, pr::Params,
           solve_semquad_stokes_var(ss, qt, eta_fun, z2, fz, z2, z2;
                                    bc=pr.bc, linear=:direct,
                                    deviatoric=pr.deviatoric,
+                                   elastic_stress=elastic_stress,
                                    assemble_only=true,
                                    geo_u=deta_eps_fun === nothing ? nothing : ufull,
                                    geo_coef=deta_eps_fun,
@@ -116,6 +118,7 @@ function _semquad_step_residual_ctx(ss::SemStokes, qt::Quadtree, pr::Params,
           solve_semquad_stokes_var(ss, qt, eta_fun, z2, fz, z2, z2;
                                    bc=pr.bc, linear=:direct,
                                    deviatoric=pr.deviatoric,
+                                   elastic_stress=elastic_stress,
                                    assemble_only=true,
                                    geo_u=deta_eps_fun === nothing ? nothing : ufull,
                                    geo_coef=deta_eps_fun,
@@ -452,6 +455,7 @@ function semquad_step_newton(ss::SemStokes, qt::Quadtree, pr::Params,
                              chi::Union{Nothing,Vector{Float64}}=nothing,
                              chi_n::Union{Nothing,Vector{Float64}}=nothing,
                              chi_nm1::Union{Nothing,Vector{Float64}}=nothing,
+                             elastic_stress::Union{Nothing,NTuple{3,Vector{Float64}}}=nothing,
                              verbose::Bool=false)
     sq = ss.su
     N = sq.N
@@ -474,7 +478,8 @@ function semquad_step_newton(ss::SemStokes, qt::Quadtree, pr::Params,
         dt_prev=dt_prev, firststep=firststep, advection=advection, ev=ev,
         ev_cmax=ev_cmax, ev_alpha=ev_alpha, ev_timestep=ev_timestep,
         geo_spd_safety=geo_spd_safety, phases=phases,
-        latent_scheme=latent_scheme, chi=cv, chi_n=chi_n, chi_nm1=chi_nm1)
+        latent_scheme=latent_scheme, chi=cv, chi_n=chi_n, chi_nm1=chi_nm1,
+        elastic_stress=elastic_stress)
     c = ctx(theta, ufull, pfull, chi_v)
     wS = max(norm(c.sys.fr), 1.0e-30)
     wC = max(norm(c.sys.Bs) * norm(c.sys.Cu' * ufull), 1.0e-30)

@@ -52,6 +52,14 @@ non-symmetric: the momentum block is `Bt + Kp_red` while the constraint rows
 have no pressure dependence.  Both options are only implemented for
 `deviatoric=false`, and both default to "off", which keeps the assembly bit
 identical to the historical one.
+`elastic_stress` adds the 2b elastic force term: `nothing` (the default) leaves
+the load vector untouched; a `(txx, tyy, txy)` tuple of nodal Q2 stress
+components adds `-int tau : eps(v)` to the velocity rows, i.e. the weak form of
+`div(tau)` as a body force.  The driver passes `a*tau^n`, the part of the
+previous step's deviatoric stress not already carried by the effective viscosity
+(`maxwell_force_stress`).  The same quadrature loop and basis as the `2 eta
+eps(u):eps(v)` stiffness are used, so a uniform stress assembles to no load and
+the term is exact for the Q2 interpolant of the nodal field (G247).
 
 The direct branch checks its reduced residual and retries with a `1e-12 *
 max|diag(S)|` diagonal shift when the unshifted LU is unstable (wall-refined
@@ -321,6 +329,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   dp_u::Union{Nothing,Vector{Float64}}=nothing,
                                   dp_pfield::Union{Nothing,Vector{Float64}}=nothing,
                                   dp_coef::Union{Nothing,Function}=nothing,
+                                  elastic_stress::Union{Nothing,NTuple{3,Vector{Float64}}}=nothing,
                                   bc::Symbol=:rigid, linear::Symbol=:direct,
                                   wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                                   wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
@@ -367,6 +376,18 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         throw(ArgumentError("stokes_scaling must be :none or :equilibrated"))
     (geo_u === nothing) == (geo_coef === nothing) ||
         throw(ArgumentError("geo_u and geo_coef must be given together"))
+    if elastic_stress !== nothing
+        # 2b step 2: `elastic_stress` is the previous step's deviatoric stress
+        # (already relaxed by `a = eta/(eta+G dt)`), a nodal Q2 tensor field on
+        # the velocity space.  It enters the load vector as `-int tau:eps(v)`;
+        # all three components must live on the velocity nodes.
+        for i in 1:3
+            length(elastic_stress[i]) == ss.su.N ||
+                throw(ArgumentError("elastic_stress component $i has " *
+                                    "$(length(elastic_stress[i])) entries, " *
+                                    "the velocity space has $(ss.su.N)"))
+        end
+    end
     if geo_u !== nothing
         length(geo_u) == 2 * ss.su.N ||
             throw(ArgumentError("geo_u has $(length(geo_u)) entries, expected $(2 * ss.su.N)"))
@@ -573,7 +594,8 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # but is *not* bitwise equal to the serial one (different summation order),
     # which is why the default stays 1.
     asm_cfg = SemQuadAsmCfg(a2, deviatoric, mf_path, geo_u, geo_coef,
-                            geo_spd_safety, dp_u, dp_pfield, dp_coef)
+                            geo_spd_safety, dp_u, dp_pfield, dp_coef,
+                            elastic_stress)
     asm = _semquad_assemble_blocks(
         _semquad_asm_thread_count(assemble_threads), asm_cfg, su, sp,
         eta_fun, fx, fz, fd, pleaves)

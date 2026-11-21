@@ -64,7 +64,12 @@ end
 # NEWTON_AUDIT.md).  With the parameter the call is concrete, `gc::Float64` and
 # the loop is monomorphic; the arithmetic (and therefore the result) is
 # unchanged, G202 pins it bitwise against the pre-fix worktree.
-struct SemQuadAsmCfg{G,D}
+#
+# `elastic` is the same kind of type parameter: `nothing` (the default and every
+# `shear_modulus = 0` run) makes the 2b elastic-force branch below compile out
+# entirely, so the historical load vector is untouched bit for bit; when it is a
+# 3-tuple of nodal Q2 stress components the branch is monomorphic too.
+struct SemQuadAsmCfg{G,D,E}
     a2::Float64
     deviatoric::Bool
     mf_path::Bool
@@ -74,7 +79,16 @@ struct SemQuadAsmCfg{G,D}
     dp_u::Union{Nothing,Vector{Float64}}
     dp_pfield::Union{Nothing,Vector{Float64}}
     dp_coef::D
+    elastic::E
 end
+
+# The historical 9-argument positional form (G181/G188/G202 build it): no
+# elastic force term, i.e. the pre-2b-coupling assembly.
+SemQuadAsmCfg(a2::Float64, deviatoric::Bool, mf_path::Bool,
+              geo_u, geo_coef, geo_spd_safety::Float64, dp_u, dp_pfield,
+              dp_coef) =
+    SemQuadAsmCfg(a2, deviatoric, mf_path, geo_u, geo_coef, geo_spd_safety,
+                  dp_u, dp_pfield, dp_coef, nothing)
 
 function _semquad_asm_buf(nleaf::Int, nv::Int, npq::Int, Nu2::Int;
                           has_K::Bool, has_geo::Bool, has_dp::Bool)
@@ -136,6 +150,7 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
     dp_u = cfg.dp_u
     dp_pfield = cfg.dp_pfield
     dp_coef = cfg.dp_coef
+    elastic = cfg.elastic
     IK = buf.IK; JK = buf.JK; VK = buf.VK
     IB = buf.IB; JB = buf.JB; VB = buf.VB
     IG = buf.IG; JG = buf.JG; VG = buf.VG
@@ -186,6 +201,32 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
             for k in 1:nv
                 floc[k] += w * fxv * phi[k]
                 floc[nv + k] += w * fzv * phi[k]
+            end
+            # 2b step 2: the elastic force term, `-int tau : eps(v)` with the
+            # nodal previous-step stress field (`a tau^n`, scaled by the driver).
+            # It reuses this quadrature loop and the same velocity basis the
+            # stiffness above uses: `tau` is evaluated at the Gauss point with
+            # the Q2 interpolation and contracted with the basis gradients,
+            #     tau : eps(v) = tau_xx dv_x/dx + tau_yy dv_y/dy
+            #                    + tau_xy (dv_x/dy + dv_y/dx),
+            # so the x-test row is `-(tau_xx gx_k + tau_xy gz_k)` and the y row
+            # `-(tau_yy gz_k + tau_xy gx_k)`.  A uniform stress therefore
+            # produces no load (`div tau = 0`: integration by parts makes it a
+            # boundary term, and the test functions vanish on the Dirichlet
+            # boundary) -- G247 checks that, and the body-force equivalence that
+            # fixes the sign.  `elastic === nothing` compiles this out.
+            if elastic !== nothing
+                txx_q = 0.0; tyy_q = 0.0; txy_q = 0.0
+                @inbounds for k in 1:nv
+                    p_k = phi[k]
+                    txx_q += elastic[1][uids[k]] * p_k
+                    tyy_q += elastic[2][uids[k]] * p_k
+                    txy_q += elastic[3][uids[k]] * p_k
+                end
+                @inbounds for k in 1:nv
+                    floc[k] -= w * (txx_q * gx[k] + txy_q * gz[k])
+                    floc[nv + k] -= w * (tyy_q * gz[k] + txy_q * gx[k])
+                end
             end
             # Local stiffness block.  Four independent accumulations over the
             # (k, l) pairs.  The *inner* loop index is `k`, so every
