@@ -22,6 +22,10 @@ using Printf
 # needs come first, and the laws that *take* a `SemQuad` come after it.
 # ---------------------------------------------------------------------------
 
+# The physics revision is a behaviour version, not a parameter: a bare constant
+# with no dependencies, so it comes before every file that reads it.
+include("physics/revision.jl")
+
 # -- physics: parameter types and the material laws that define them ---------
 include("physics/tosi_law.jl")
 include("physics/refstate.jl")
@@ -157,6 +161,7 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        semquad_plastic_strain_rate_field, semquad_weakening_parts,
        semquad_weakening_source_g, semquad_weakening_jvp, solve_semquad_weakening,
        semquad_weak_stats, semquad_visco_plastic_eta, semquad_strain_rate_field,
+       PHYSICS_REVISION,
        blend_field, semquad_deta_dp, semquad_deta_dp_eps, semquad_deta_chi,
        picard_diverging, picard_adapt_relax, amr_cycle_balanced!, AmrCooldown,
        SEMQUAD_AMR_COOLDOWN, LAST_AMR_BALANCED, assemble_semquad_velocity_mass,

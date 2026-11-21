@@ -180,5 +180,6 @@ using QuaST
     include("t_g249_stress_projection.jl")
     include("t_g250_corotation.jl")
     include("t_g251_variable_dt.jl")
+    include("t_g252_physics_revision.jl")
 end
 

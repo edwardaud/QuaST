@@ -303,7 +303,19 @@ which is the historical restart behaviour.  The trajectory-affecting
 settings (AMR cadence and fractions, wall/hotspot rules, advection, EV, Picard
 controls, cfl, dtmax/dtmin) are stored with the state; a restart raises
 `ArgumentError` listing every setting that differs from the live run, so a
-resumed run cannot silently continue with another configuration.  The cooldown
+resumed run cannot silently continue with another configuration.  The *physics*
+is versioned separately from its parameter values:
+`run_config["physics_revision"]` records `PHYSICS_REVISION` (the single source
+of truth is `src/physics/revision.jl`, whose comment is the dated changelog),
+because a commit can change the behaviour of unchanged parameters (958af5e
+projected the Maxwell stress update onto the deviatoric strain rate, 8c27a02
+added the co-rotational term).  A checkpoint whose stored revision differs is
+refused, since its stress history was produced by the other update.  A
+checkpoint with no `physics_revision` key (every file written before the marker
+existed) is resumed with a warning that says whether it carries a Maxwell stress
+history -- the only state the revision change can affect -- because refusing
+would invalidate every historical checkpoint, including the `shear_modulus = 0`
+ones whose physics is unchanged.  The cooldown
 is state, not configuration, and is not part of that comparison.
 `phases` adds the phase-transition buoyancy and the latent heat (docs/dev/PHYSICS.md
 §7).  The latent coefficients come from `Params.latent_mode`: `:global` (the
@@ -670,6 +682,14 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # must not switch them silently.  The guard below tolerates keys an older
     # checkpoint does not carry (`haskey(run_config, k) || continue`), so adding
     # these does not invalidate existing files.
+    # The physics revision is a *behaviour* version, not a parameter value:
+    # 958af5e and 8c27a02 changed what the same `shear_modulus` means by
+    # changing the Maxwell stress update, which no value comparison can see.
+    # `PHYSICS_REVISION` is the single source of truth; its changelog is
+    # `src/physics/revision.jl`.  The restart guard below refuses a file from
+    # another revision and warns for a file that predates the key (it is
+    # compared there with its own message, not by the generic loop).
+    run_config["physics_revision"] = PHYSICS_REVISION
     run_config["shear_modulus"] = pr.shear_modulus
     run_config["wall_bc"] = join(string.(pr.wall_bc), ",")
     run_config["latent_L"] = pr.latent_L
@@ -700,10 +720,72 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # absolute, so they must be larger than the values stored in the file.
     restart = isempty(restart_from) ? nothing : load_semquad_state(restart_from)
     if restart !== nothing
+        # ------------------------------------------------------------------
+        # Physics revision.  `run_config` compares *values*, and the two commits
+        # that made the Maxwell stress update deviatoric (958af5e) and
+        # co-rotational (8c27a02) changed the behaviour of unchanged parameter
+        # values: a checkpoint from before them carries a stress history
+        # produced by a different update.  `PHYSICS_REVISION`
+        # (`src/physics/revision.jl`, which holds the dated changelog) is the
+        # marker for such changes, so a stored revision that differs from it
+        # refuses the restart.  This check is deliberately independent of
+        # `shear_modulus`: the revision is a property of the *physics code*, not
+        # of one switch, and a state written by another revision is not a state
+        # this one is known to continue.
+        stored_rev = get(restart.config, "physics_revision", nothing)
+        if stored_rev === nothing
+            # Every checkpoint written before this key existed lands here.  A
+            # refusal would invalidate all of them, including the files whose
+            # physics cannot be affected (`shear_modulus = 0` carries no stress
+            # history at all, and neither does a file without the stress
+            # datasets), and there is nothing to migrate against: the HDF5 state
+            # has no marker for "already checked under this revision".  So warn
+            # -- naming whether *this* file carries a stress history, which is
+            # the state the revision change affects -- and resume.  The warning
+            # is what makes the continuation non-silent; G252 pins its text,
+            # that the resumed trajectory is bit-identical to the
+            # uninterrupted one, and the refusal below.
+            has_stress = restart.txx !== nothing || restart.tyy !== nothing ||
+                         restart.txy !== nothing
+            effect = has_stress ?
+                "It carries a Maxwell stress history (txx/tyy/txy) that was " *
+                "advanced by the older update; resuming continues that history " *
+                "under the current update." :
+                "It carries no Maxwell stress history, so there is no stored " *
+                "stress state for the revision change to affect."
+            @warn "checkpoint $(restart_from) predates physics revision " *
+                  "tracking: it has no `physics_revision` key.  The current " *
+                  "physics is revision $(PHYSICS_REVISION) (the Maxwell stress " *
+                  "update became deviatoric in 958af5e and co-rotational in " *
+                  "8c27a02).  $(effect)  Resuming under revision " *
+                  "$(PHYSICS_REVISION)."
+        else
+            stored_num = tryparse(Float64, stored_rev)
+            if stored_num === nothing || stored_num != Float64(PHYSICS_REVISION)
+                shown = stored_num === nothing ? stored_rev :
+                        (isinteger(stored_num) ? string(Int(stored_num)) :
+                         string(stored_num))
+                throw(ArgumentError("checkpoint $restart_from was written " *
+                    "under physics revision $shown, but this code is physics " *
+                    "revision $(PHYSICS_REVISION): the physics changed between " *
+                    "revision $shown and revision $(PHYSICS_REVISION) (the " *
+                    "Maxwell stress update was made deviatoric in 958af5e and " *
+                    "co-rotational in 8c27a02), so the stored state -- in " *
+                    "particular a Maxwell stress history -- is not compatible " *
+                    "with the update that would continue it.  Refusing the " *
+                    "restart: resume from a checkpoint written by physics " *
+                    "revision $(PHYSICS_REVISION), or replay the run from the " *
+                    "beginning."))
+            end
+        end
         if !isempty(restart.config)
             mism = String[]
             for (k, v) in restart.config
                 haskey(run_config, k) || continue
+                # The revision has its own comparison and message above; the
+                # generic value loop must not also reject a non-canonical
+                # spelling of the same number (e.g. "2" against "2.0").
+                k == "physics_revision" && continue
                 s = config_value_string(run_config[k])
                 s == v || push!(mism, "$k: checkpoint=$v, current=$s")
             end
