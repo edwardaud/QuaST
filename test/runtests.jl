@@ -172,5 +172,6 @@ using QuaST
     include("t_g241_card_wall_bc.jl")
     include("t_g242_viscoelastic.jl")
     include("t_g243_per_wall_values.jl")
+    include("t_g244_maxwell_step.jl")
 end
 
