@@ -86,6 +86,47 @@ function semquad_strain_rate_components(sq::SemQuad, ux::Vector{Float64},
 end
 
 """
+    semquad_spin_component(sq, ux, uz)
+
+Nodal off-diagonal component of the **spin** (the antisymmetric part of the
+velocity gradient) on the scalar layout of `sq`:
+
+    wxy = W_xy = (du_x/dy - du_z/dx) / 2,     W = (grad v - grad v^T)/2.
+
+It is the companion of [`semquad_strain_rate_components`](@ref) -- the symmetric
+part is the strain rate -- and the co-rotational Maxwell stress update needs
+both from the same velocity: `_advance_maxwell_stress!` calls these two
+accessors on the same `(ux, uz)`, so the driving strain rate and the spin of a
+step can never come from different velocity fields.  Same element-local loop and
+stretched-box scaling (`leaf_hx` for the x derivative, `leaf_hy` for the y one)
+as the strain-rate components.
+
+The sign convention is the one the update is gated with: for a counter-clockwise
+rigid rotation `u = (-Omega*y, Omega*x)` this returns `-Omega`, and the
+co-rotational term `dt (W tau - tau W)` then rotates the stress with the
+material (test/t_g250_corotation.jl).
+"""
+function semquad_spin_component(sq::SemQuad, ux::Vector{Float64},
+                                uz::Vector{Float64})
+    n = sq.p + 1
+    wxy = zeros(Float64, sq.N)
+    for lf in sq.leaves
+        fx = 2.0 / leaf_hx(sq, lf[1])
+        fy = 2.0 / leaf_hy(sq, lf[1])
+        ids = sq.elem[lf]
+        for j in 1:n, i in 1:n
+            dux_dy = 0.0; duz_dx = 0.0
+            for a in 1:n
+                dux_dy += sq.D[j, a] * ux[ids[(a - 1) * n + i]]
+                duz_dx += sq.D[i, a] * uz[ids[(j - 1) * n + a]]
+            end
+            wxy[ids[(j - 1) * n + i]] = 0.5 * (dux_dy * fy - duz_dx * fx)
+        end
+    end
+    return wxy
+end
+
+"""
     blend_field(prev, new, relax)
 
 Convex blend `(1-relax) prev + relax new`; `relax == 1` returns `new` exactly

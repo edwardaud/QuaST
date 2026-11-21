@@ -49,13 +49,26 @@ end
 """
     _advance_maxwell_stress!(txx, tyy, txy, sq, ux, uz, dt, eta, G)
 
-One backward-Euler Maxwell step for the three nodal tensor components of the
-viscoelastic stress state (docs/dev/PHASE2.md "2b: the design"):
+One backward-Euler step of the **objective** (co-rotational, Jaumann) Maxwell
+stress for the three nodal tensor components of the viscoelastic stress state
+(docs/dev/PHASE2.md "2b: the design").  The equation is
 
-    tau_ij^{n+1} = maxwell_stress_step(tau_ij^n, ehat_ij, dt, eta, G),
+    dtau/dt = 2 G ehat + (W tau - tau W) - tau / tau_M,     tau_M = eta / G,
 
-driven by the **deviatoric** strain rate of the step's velocity `(ux, uz)` on
-`sq`:
+and its backward-Euler step with the step's velocity `(ux, uz)` is
+
+    tau^{n+1} = (tau^n + 2 G dt ehat + dt (W tau^n - tau^n W)) / (1 + dt/tau_M)
+              = maxwell_stress_step(maxwell_stress_corotate(tau^n, wxy, dt),
+                                    ehat, dt, eta, G),
+
+i.e. the already-gated scalar kernel [`maxwell_stress_step`](@ref) applied to the
+co-rotated old stress [`maxwell_stress_corotate`](@ref).  The `W` term is what
+makes the stress objective: without it the tensor does not rotate with the
+material, which is wrong for every large-strain flow (all mantle convection).
+`W` is evaluated at the current just-solved velocity, with the stress lagged at
+`tau^n` -- the same lagged numerator as ASPECT's `viscoelastic` update.
+
+The driving strain rate is the **deviatoric** one,
 
     ehat_ij = eps_ij - (1/3) tr(eps) delta_ij,     tr(eps) = exx + ezz,
 
@@ -83,6 +96,35 @@ the backward-Euler split then describe the same tensor; G249 pins that, and the
 G246 stress-state gate -- written with the pre-fix raw mapping -- had to move
 its expected components to `ehat`.
 
+The spin component `wxy = W_xy = (du_x/dy - du_z/dx)/2` is sampled from the same
+step velocity by [`semquad_spin_component`](@ref), so the strain rate and the
+spin of a step can never come from different velocity fields.  With
+`W = [0 wxy; -wxy 0]` the co-rotated components are
+
+    xx:  txx + 2 dt wxy txy,
+    yy:  tyy - 2 dt wxy txy,
+    xy:  txy + dt wxy (tyy - txx),
+
+and the shear sign is the one that rotates the material the right way (the
+derivation is in [`maxwell_stress_corotate`](@ref); G250 pins it against
+`W*T - T*W` and against the analytic rigid-rotation solution).  The in-plane
+trace and the implied `tau_zz` are invariant under the term, so no deviatoric
+projection is applied to it and the stored triple stays closed.
+
+The fixed point of the recursion moves with the term: it is
+
+    tau = 2 eta ehat + tau_M (W tau - tau W),
+
+the Jaumann steady stress, not `2 eta ehat`.  That is real co-rotational
+physics -- in a steady rotational flow the principal axes of the stress are
+rotated away from those of the strain rate -- and the shift is `O(tau_M |W|)`,
+which is why the former `2 eta ehat` fixed-point assertions of G247/G249 had to
+be re-expressed when the term landed while their *velocity* assertions (the
+material-viscosity fixed point, `eta_eff + a eta = eta`) stayed.  For a
+rotation-free flow the discrete spin is round-off only, so the update agrees
+with the spin-free one to round-off; if `wxy` is exactly zero it is the same
+operation for operation (G250).
+
 The out-of-plane normal stress `tau_zz` is **not stored**.  Trace zero makes it
 implied,
 
@@ -103,7 +145,13 @@ The state is advanced after the momentum solve of the step (so the next step's
 Stokes solve sees `tau^n`, never a same-step update): the driver adds
 `div(a tau^n)` to that solve's right-hand side (2b step 2), where
 `a = eta/(eta + G dt)` is the part of the backward-Euler stress the effective
-viscosity does not already carry, see [`maxwell_force_stress`](@ref).
+viscosity does not already carry, see [`maxwell_force_stress`](@ref).  That
+lagged load is the one place the update's rotation increment is not carried
+(the exact split would load `a (tau^n + dt (W tau^n - tau^n W))`); the scope
+choice and its order are documented on [`maxwell_force_stress`](@ref).
+
+`G <= 0` is the disabled convention (`shear_modulus = 0`): the state is left
+untouched and nothing is computed, not even the rotation.
 """
 function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
                                   txy::Vector{Float64}, sq::SemQuad,
@@ -117,7 +165,12 @@ function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
         throw(ArgumentError("Maxwell stress fields have lengths " *
                             "($(length(txx)), $(length(tyy)), " *
                             "$(length(txy))), mesh needs $(sq.N)"))
+    # `G <= 0` is off, not "elastic with zero modulus": the scalar kernel would
+    # return its input, but the co-rotational increment is not scaled by G and
+    # would still rotate the state.  Keep the disabled path from touching it.
+    G <= 0.0 && return nothing
     eps = semquad_strain_rate_components(sq, ux, uz)
+    wxy = semquad_spin_component(sq, ux, uz)
     @inbounds for g in eachindex(txx)
         # Deviatoric projection (the Maxwell stress has zero trace).  The
         # out-of-plane normal strain is zero in plane strain but contributes its
@@ -126,9 +179,14 @@ function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
         # tau_zz argument and the code evidence that the force term never needs
         # it).
         tr = eps.exx[g] + eps.ezz[g]
-        txx[g] = maxwell_stress_step(txx[g], eps.exx[g] - tr / 3.0, dt, eta[g], G)
-        tyy[g] = maxwell_stress_step(tyy[g], eps.ezz[g] - tr / 3.0, dt, eta[g], G)
-        txy[g] = maxwell_stress_step(txy[g], eps.exz[g], dt, eta[g], G)
+        # Objective part: rotate the old stress with the material before the
+        # backward-Euler relaxation (`maxwell_stress_corotate` has the component
+        # derivation; the xy sign is the one that is easy to get backwards).
+        rxx, ryy, rxy = maxwell_stress_corotate(txx[g], tyy[g], txy[g],
+                                                wxy[g], dt)
+        txx[g] = maxwell_stress_step(rxx, eps.exx[g] - tr / 3.0, dt, eta[g], G)
+        tyy[g] = maxwell_stress_step(ryy, eps.ezz[g] - tr / 3.0, dt, eta[g], G)
+        txy[g] = maxwell_stress_step(rxy, eps.exz[g], dt, eta[g], G)
     end
     return nothing
 end

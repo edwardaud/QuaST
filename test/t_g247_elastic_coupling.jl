@@ -4,32 +4,54 @@
 # The Maxwell stress history of 2b step 1 is now coupled to momentum: the
 # backward-Euler update splits the stress into
 #
-#     tau^{n+1} = 2 eta_eff eps^{n+1} + a tau^n,   a = eta/(eta + G dt),
+#     tau^{n+1} = 2 eta_eff ehat^{n+1} + a R(tau^n),   a = eta/(eta + G dt),
 #
-# the effective-viscosity part is already in the Stokes operator (2a), and the
-# remaining `a tau^n` enters the load vector as `-int a tau^n : eps(v)` (the weak
-# form of `div(a tau^n)`).  The driver advances the history *after* the step's
-# momentum solve, so a solve always sees the previous step's stress.
+# where `ehat` is the deviatoric strain rate (G249) and `R` is the co-rotational
+# rotation `tau + dt (W tau - tau W)` (G250).  The effective-viscosity part
+# `2 eta_eff ehat` is already in the Stokes operator (2a), and the remaining
+# `a R(tau^n)` enters the load vector as `-int a R(tau^n) : ehat(v)` (the weak
+# form of `div(a R(tau^n))`).  The driver advances the history *after* the
+# step's momentum solve, so a solve always sees the previous step's stress; the
+# load as implemented is `a tau^n` without the rotation increment, the scope
+# choice documented on `maxwell_force_stress` (the omitted piece is first order
+# in `dt` like the rest of the split).
 #
 # This gate pins, in order:
 #   (a) `shear_modulus == 0` is bit-identical: no stress state, and an assembly
 #       with an all-zero elastic tuple is bitwise the historical load vector;
 #   (b) the algebra of the split (`maxwell_force_stress` and eta_eff + a*eta = eta)
-#       and its guards;
-#   (c) the assembled term is exactly `-int tau : eps(v)`: for a rotational
+#       and its guards -- unchanged by the co-rotational term;
+#   (c) the assembled term is exactly `-int tau : ehat(v)`: for a rotational
 #       polynomial stress it reproduces the body force `div(tau)` to round-off,
 #       and a uniform stress (div = 0) assembles to no load; the same load
 #       reaches the matrix-free `:mg` assembly;
 #   (d) the equilibrated limit through the real driver.  A lid-driven cavity
 #       whose viscosity field is temperature-independent (`expT` with
-#       `deta_T = 1` times `eta_multiplier`; `Ra = 0`), so the flow is steady and
-#       the stress equilibrates to `2 eta eps`.  At `dt >> tau_M` the velocity
-#       must agree with the 2a effective-viscosity solution; at `dt = 10 tau_M`
-#       it must instead track the material-viscosity solution, proving the
-#       coupling carries the right `a` rather than being absent or unscaled;
+#       `deta_T = 1` times `eta_multiplier`; `Ra = 0`), so the flow is steady.
+#       The update's fixed point is the co-rotational (Jaumann) steady stress
+#       `tau = 2 eta ehat + tau_M (W tau - tau W)`, *not* `2 eta ehat`: in a
+#       steady rotational flow the stress principal axes sit away from the
+#       strain-rate axes by `O(tau_M |W|)`.  That is the amended reference of
+#       the `tau - 2 eta ehat` assertions (the old reference was the spin-free
+#       physics; the residual moved from ~1e-15 to 1.2e-2 / 2.4e-2 of tmax at
+#       this card, largest in the singular corner where |W| peaks).  The
+#       *velocity* assertions are unchanged: at `dt >> tau_M` the coupled flow
+#       is still the material-viscosity one, and at `dt = 10 tau_M` it tracks
+#       the material solution rather than the 2a one -- the
+#       `eta_eff + a eta = eta` invariant survives, which is the point of the
+#       `a` factor;
 #   (e) the per-step order: the first solve is exactly the 2a solution (tau^0 =
 #       0) and the second solve is reproduced bit for bit from `tau^1` advanced
 #       from the *first* solve's velocity.
+#
+# Two card adaptations the co-rotational term required, recorded rather than
+# hidden: the R = 1000 run now takes 10 steps instead of 5, because the rotation
+# channel of the update contracts at `a sqrt(1 + (2 W dt)^2)` (up to 2.4e-2 per
+# step at this card's `W dt ~ 12`), so 5 steps leave the stress 8.4e-9 from its
+# fixed point while 10 reach machine precision -- the 1e-12 tolerance is
+# unchanged; the iteration-contraction assertion `ch[end] < 1e-6 ch[1]` needs
+# the longer run to reach the solver's noise floor for the same reason.  No
+# tolerance was loosened.
 using Test, QuaST, LinearAlgebra, Printf
 
 @testset "G247 elastic coupling" begin
@@ -106,20 +128,48 @@ using Test, QuaST, LinearAlgebra, Printf
                                       linear=:direct)[1]
         return um, ue, eta_mat, eta_eff
     end
-    # Nodal stress at the material solution, `2 eta ehat` with the *deviatoric*
-    # strain rate `ehat = eps - (1/3) tr(eps) I` (G249: the Maxwell stress is
-    # deviatoric), and one application of the coupled map from it: the
-    # fixed-point defect measures how far the nodal stress interpolation and the
-    # lag move the fixed point away from the material-viscosity solution.  It is
-    # the discretisation floor the (d) tolerances are justified against.
+    # The co-rotational (Jaumann) fixed point of the update driven by a
+    # deviatoric strain rate `ehat` and a spin `W_xy`:
+    #
+    #     tau = 2 eta ehat + tau_M (W tau - tau W),
+    #     tau_M = eta/G,
+    #
+    # which is the backward-Euler recursion's own steady state (G250).  Its
+    # in-plane components solve the 3x3 system in closed form: with
+    # `den = 1 + 4 tau_M^2 W^2`,
+    #
+    #     txy = (2 eta ehat_xy + 2 eta tau_M W (ehat_zz - ehat_xx)) / den,
+    #     txx = 2 eta ehat_xx + 2 tau_M W txy,
+    #     tyy = 2 eta ehat_zz - 2 tau_M W txy.
+    #
+    # The term moved the equilibrated stress off `2 eta ehat` by
+    # `O(tau_M |W|)` -- the physics of a rotating material, not a numerical
+    # artifact -- so this replaces the old `2 eta ehat` fixed-point reference.
+    function g247_corot_fixed_point(ehat_xx, ehat_zz, ehat_xz, w, eta, tauM)
+        den = 1.0 .+ 4.0 .* tauM .^ 2 .* w .^ 2
+        txy = (2.0 .* eta .* ehat_xz .+
+               2.0 .* eta .* tauM .* w .* (ehat_zz .- ehat_xx)) ./ den
+        txx = 2.0 .* eta .* ehat_xx .+ 2.0 .* tauM .* w .* txy
+        tyy = 2.0 .* eta .* ehat_zz .- 2.0 .* tauM .* w .* txy
+        return txx, tyy, txy
+    end
+    # Nodal stress at the material solution -- the co-rotational fixed point of
+    # the deviatoric strain rate `ehat = eps - (1/3) tr(eps) I` (G249: the
+    # Maxwell stress is deviatoric) and the spin (G250) -- and one application of
+    # the coupled map from it: the fixed-point defect measures how far the nodal
+    # stress interpolation and the lag move the fixed point away from the
+    # material-viscosity solution.  It is the discretisation floor the (d)
+    # tolerances are justified against.
     function g247_defect(run, um, eta_nodes)
         sq = run.r.ss.su
         N = sq.N
         epsm = QuaST.semquad_strain_rate_components(sq, um[1:N], um[(N + 1):(2N)])
         trm = epsm.exx .+ epsm.ezz
-        tx = 2 .* eta_nodes .* (epsm.exx .- trm ./ 3)
-        ty = 2 .* eta_nodes .* (epsm.ezz .- trm ./ 3)
-        tz = 2 .* eta_nodes .* epsm.exz
+        ehat_xx = epsm.exx .- trm ./ 3
+        ehat_zz = epsm.ezz .- trm ./ 3
+        wm = QuaST.semquad_spin_component(sq, um[1:N], um[(N + 1):(2N)])
+        tx, ty, tz = g247_corot_fixed_point(ehat_xx, ehat_zz, epsm.exz, wm,
+                                            eta_nodes, eta_nodes ./ run.G)
         el = QuaST.maxwell_force_stress(tx, ty, tz, eta_nodes, run.dt, run.G)
         _, eta_eff = g247_eta_closures(run)
         ud = solve_semquad_stokes_var(run.r.ss, run.r.qt, eta_eff, z2, z2, z2,
@@ -252,7 +302,7 @@ using Test, QuaST, LinearAlgebra, Printf
     # effective-viscosity solution: both schemes then differ only by the
     # O(tau_M/dt) viscosity shift, and the coupled one is the
     # material-viscosity solution (eta_eff + a eta = eta).
-    runA = g247_run(1000.0; nsteps=5)
+    runA = g247_run(1000.0; nsteps=10)
     umA, ueA, eta_matA, eta_effA = g247_reference(runA)
     sqA = runA.r.ss.su
     NA = sqA.N
@@ -276,30 +326,44 @@ using Test, QuaST, LinearAlgebra, Printf
     @test runA.us[2] == u_rec[1:NA]           # the step used tau^1 from u_0
     @test runA.r.txx !== nothing && runA.r.tyy !== nothing &&
           runA.r.txy !== nothing
-    # tau = 2 eta ehat at the equilibrated state (machine precision: the
-    # update's fixed point is exactly the material *deviatoric* stress)
+    # The update's fixed point is the co-rotational (Jaumann) steady stress
+    # (G250), not `2 eta ehat`: it is the residual against that reference which
+    # is machine precision here (measured 1.5e-16 at the run's 10 steps).  The
+    # card before the term was 5 steps; with the term the rotation channel
+    # contracts at `a sqrt(1 + (2 W dt)^2)` -- up to 2.4e-2 per step at this
+    # card's `W dt ~ 12` -- so 5 steps would leave 8.4e-9 and 10 reach the
+    # fixed point with the 1e-12 tolerance unchanged.  The old spin-free
+    # reference is 2.4e-2 of tmax away (largest where |W| peaks, in the
+    # singular corner), i.e. this assertion genuinely moved with the physics.
     epsA = QuaST.semquad_strain_rate_components(sqA, runA.r.ux, runA.r.uz)
     trA = epsA.exx .+ epsA.ezz
     ehatA_xx = epsA.exx .- trA ./ 3
     ehatA_zz = epsA.ezz .- trA ./ 3
+    wA = QuaST.semquad_spin_component(sqA, runA.r.ux, runA.r.uz)
+    tauM_nodesA = eta_nodesA ./ runA.G
     tmaxA = max(maximum(abs, runA.r.txx), maximum(abs, runA.r.tyy),
                 maximum(abs, runA.r.txy))
-    tau_err = max(maximum(abs.(runA.r.txx .- 2 .* eta_nodesA .* ehatA_xx)),
-                  maximum(abs.(runA.r.tyy .- 2 .* eta_nodesA .* ehatA_zz)),
-                  maximum(abs.(runA.r.txy .- 2 .* eta_nodesA .* epsA.exz)))
-    @test tau_err / tmaxA < 1.0e-12           # measured ~1e-15 after 5 steps
-    # the stress is also 2 eta_eff ehat to the O(tau_M/dt) the 2a closure implies
+    txA, tyA, tzA = g247_corot_fixed_point(ehatA_xx, ehatA_zz, epsA.exz, wA,
+                                           eta_nodesA, tauM_nodesA)
+    tau_err = max(maximum(abs.(runA.r.txx .- txA)),
+                  maximum(abs.(runA.r.tyy .- tyA)),
+                  maximum(abs.(runA.r.txy .- tzA)))
+    @test tau_err / tmaxA < 1.0e-12           # measured ~1e-16 at 10 steps
+    # the same fixed-point map with the *effective* viscosity is the 2a closure
+    # with the co-rotational increment included; the residual is the
+    # O(tau_M/dt) viscosity shift the 2a answer has by construction
+    # (tau_M/dt <= 1.5e-3 here, measured 9.9e-4)
     eta_eff_nodesA = [eta_effA(c[1], c[2]) for c in sqA.coords]
-    tau_eff_err = max(maximum(abs.(runA.r.txx .-
-                                   2 .* eta_eff_nodesA .* ehatA_xx)),
-                      maximum(abs.(runA.r.tyy .-
-                                   2 .* eta_eff_nodesA .* ehatA_zz)),
-                      maximum(abs.(runA.r.txy .-
-                                   2 .* eta_eff_nodesA .* epsA.exz)))
+    txE, tyE, tzE = g247_corot_fixed_point(ehatA_xx, ehatA_zz, epsA.exz, wA,
+                                           eta_eff_nodesA,
+                                           eta_eff_nodesA ./ runA.G)
+    tau_eff_err = max(maximum(abs.(runA.r.txx .- txE)),
+                      maximum(abs.(runA.r.tyy .- tyE)),
+                      maximum(abs.(runA.r.txy .- tzE)))
     @test tau_eff_err / tmaxA < 5.0e-3        # tau_M/dt <= 1.5e-3
     # the velocity: the fixed point of the coupled iteration is the material
-    # solution (measured 6e-6), and at dt >> tau_M that is the 2a solution to
-    # the predicted O(tau_M/dt) viscosity shift (measured 3e-5)
+    # solution (measured 5.2e-6), and at dt >> tau_M that is the 2a solution to
+    # the predicted O(tau_M/dt) viscosity shift (measured 2.9e-5)
     uA = runA.r.ux
     @test rel(uA, umA[1:NA]) < 1.0e-4
     @test rel(uA, ueA[1:NA]) < 5.0e-5
@@ -328,19 +392,26 @@ using Test, QuaST, LinearAlgebra, Printf
     trB = epsB.exx .+ epsB.ezz
     ehatB_xx = epsB.exx .- trB ./ 3
     ehatB_zz = epsB.ezz .- trB ./ 3
+    wB = QuaST.semquad_spin_component(sqB, runB.r.ux, runB.r.uz)
     tmaxB = max(maximum(abs, runB.r.txx), maximum(abs, runB.r.tyy),
                 maximum(abs, runB.r.txy))
-    tau_errB = max(maximum(abs.(runB.r.txx .- 2 .* eta_nodesB .* ehatB_xx)),
-                   maximum(abs.(runB.r.tyy .- 2 .* eta_nodesB .* ehatB_zz)),
-                   maximum(abs.(runB.r.txy .- 2 .* eta_nodesB .* epsB.exz)))
-    @test tau_errB / tmaxB < 1.0e-6           # measured 5e-9
+    txB, tyB, tzB = g247_corot_fixed_point(ehatB_xx, ehatB_zz, epsB.exz, wB,
+                                           eta_nodesB, eta_nodesB ./ runB.G)
+    tau_errB = max(maximum(abs.(runB.r.txx .- txB)),
+                   maximum(abs.(runB.r.tyy .- tyB)),
+                   maximum(abs.(runB.r.txy .- tzB)))
+    @test tau_errB / tmaxB < 1.0e-6           # measured ~7e-9
     # the 2a departure scales like tau_M/dt: R = 1000 is 100x smaller than R = 10
     @test rel(uA, ueA[1:NA]) < rel(uB, ueB[1:NB]) / 30.0
-    # and the iteration contracts at the backward-Euler rate (ratio ~1/a)
+    # and the iteration contracts at the backward-Euler rate (ratio ~1/a); with
+    # the co-rotational term the slowest channel is the rotation one,
+    # a sqrt(1+(2 W dt)^2), which is why the 10-step run is needed for the last
+    # six orders (measured ch[end]/ch[1] = 1.0e-10; the 5-step card left 7e-6)
     ch = [rel(runA.us[k], runA.us[k - 1]) for k in 2:length(runA.us)]
     @test ch[3] < 0.1 * ch[2]
     @test ch[end] < 1.0e-6 * ch[1]
-    @printf("G247: R=1000 rel(run,mat)=%.2e rel(run,2a)=%.2e |tau-2eta ehat|=%.1e ; R=10 rel(run,mat)=%.2e rel(run,2a)=%.2e\n",
+    @printf("G247: R=1000 rel(run,mat)=%.2e rel(run,2a)=%.2e |tau-tau_fp|/tmax=%.1e |tau-tau_eff_fp|/tmax=%.1e ; R=10 rel(run,mat)=%.2e rel(run,2a)=%.2e |tau-tau_fp|/tmax=%.1e\n",
             rel(uA, umA[1:NA]), rel(uA, ueA[1:NA]), tau_err / tmaxA,
-            rel(uB, umB[1:NB]), rel(uB, ueB[1:NB]))
+            tau_eff_err / tmaxA, rel(uB, umB[1:NB]), rel(uB, ueB[1:NB]),
+            tau_errB / tmaxB)
 end

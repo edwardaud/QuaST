@@ -2,22 +2,36 @@
 #
 # Three Q2 nodal components `txx`, `tyy`, `txy` are carried through the run the
 # same way the weakening field `chi` is: allocated (or restart-loaded), advanced
-# once per step with the already-gated `maxwell_stress_step`, transferred on an
-# AMR cycle and written to / read from the checkpoint.  The enable switch is
+# once per step with the gated stress kernels, transferred on an AMR cycle and
+# written to / read from the checkpoint.  The enable switch is
 # `pr.shear_modulus > 0`; with `G = 0` (the default) the state is `nothing` and
 # every stress-history code path is skipped, so existing runs are bit-identical.
+#
+# The update is the **objective** (co-rotational) Maxwell step (G250):
+#
+#     tau^{n+1} = maxwell_stress_step(corotate(tau^n, W_xy, dt), ehat, dt, eta, G),
+#
+# i.e. the old stress is rotated with the material by `dt (W tau - tau W)`
+# before the backward-Euler relaxation.  This gate's prescribed fields are not
+# rotation-free, so its fixed-strain-rate reference, its driver reconstruction
+# and its mesh band all had to be re-expressed in the co-rotational form when
+# the term landed; that move is recorded in the comments at each site (the old
+# spin-free `maxwell_stress_exact` values are quoted there for comparison).
+# The `G = 0` and checkpoint invariants are untouched.
 #
 # This gate pins:
 #   (a) `G = 0` carries no state, writes no checkpoint dataset, and two
 #       constructions of the default run are bit-identical;
-#   (b) at a *fixed* non-zero strain rate the three fields follow
-#       `maxwell_stress_exact` to the first-order tolerance, with the
-#       **deviatoric** tensor mapping `txx <- ehat_xx`, `tyy <- ehat_zz`,
-#       `txy <- ehat_xz` (G249: the Maxwell stress is deviatoric, so the
-#       update projects `eps - (1/3) tr(eps) I`; the pre-fix raw mapping is
-#       what this block used to expect, and it was wrong);
+#   (b) at a *fixed* non-zero strain rate and a fixed spin the three fields
+#       follow `maxwell_stress_exact_corotational` (the analytic objective
+#       curve) to the first-order tolerance, with the **deviatoric** tensor
+#       mapping `txx <- ehat_xx`, `tyy <- ehat_zz`, `txy <- ehat_xz` (G249: the
+#       Maxwell stress is deviatoric, so the update projects
+#       `eps - (1/3) tr(eps) I`; the pre-fix raw mapping is what this block
+#       used to expect, and it was wrong);
 #   (c) the driver advances them once per step with that step's velocity, dt,
-#       G and material viscosity (reconstructed exactly from the callbacks);
+#       G, material viscosity and spin (reconstructed exactly from the
+#       callbacks: the composition order is pinned bit for bit);
 #   (d) a checkpoint round trip is bit-exact for the fields and a restart
 #       continues the trajectory bit-identically;
 #   (e) an old-format file without the datasets loads with `nothing`, and a
@@ -83,13 +97,23 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
 
     # ---- (b) fixed strain rate: the analytic Maxwell curve, component-wise
     # A linear velocity field is exactly representable by the p = 2 space, so
-    # its strain-rate components are the prescribed constants at *every* node.
-    # The update is driven by the deviatoric strain rate (G249), and this
-    # field's trace is *not* zero: tr = a + e = 0.18, so the projected components
-    # are 0.24 and -0.18, not 0.3 and -0.12.  (This field was believed to be
-    # solenoidal when the block was written; it never was -- and even a truly
-    # solenoidal field would not have exposed the missing projection here,
-    # because the reference below was computed with the same raw mapping.)
+    # its strain-rate components and its spin are the prescribed constants at
+    # *every* node.  The update is driven by the deviatoric strain rate (G249),
+    # and this field's trace is *not* zero: tr = a + e = 0.18, so the projected
+    # components are 0.24 and -0.18, not 0.3 and -0.12.  (This field was
+    # believed to be solenoidal when the block was written; it never was -- and
+    # even a truly solenoidal field would not have exposed the missing
+    # projection here, because the reference below was computed with the same
+    # raw mapping.)
+    #
+    # The field also rotates: W_xy = (du_x/dy - du_z/dx)/2 = (b - d)/2 = 0.3, so
+    # the reference is the *objective* curve
+    # `maxwell_stress_exact_corotational`, not the spin-free
+    # `maxwell_stress_exact`.  The move when G250's term landed is recorded
+    # here: at t = tau_M the analytic components were 0.606836, -0.455127,
+    # 0.505696 without the term and are 0.611870, -0.460161, 0.500333 with it
+    # (0.8-1.1% of the value), which is far outside the 2e-3 tolerance below --
+    # the old reference was the physics of the non-objective update.
     qb = g246_tree(1)
     ssb = make_semstokes(qb, 2)
     sqb = ssb.su
@@ -100,6 +124,9 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     @test maximum(abs.(epsb.exx .- a)) < 1.0e-12
     @test maximum(abs.(epsb.ezz .- e)) < 1.0e-12
     @test maximum(abs.(epsb.exz .- 0.5 * (b + d))) < 1.0e-12
+    w_b = 0.5 * (b - d)                          # constant W_xy = 0.3
+    @test maximum(abs.(QuaST.semquad_spin_component(sqb, uxb, uzb) .- w_b)) <
+          1.0e-12
     tr_b = a + e
     exx_b, ezz_b, exz_b = a - tr_b / 3, e - tr_b / 3, 0.5 * (b + d)
     eta_b = 2.0
@@ -115,9 +142,8 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
         end
         return txx, tyy, txy
     end
-    ref = (maxwell_stress_exact(tauM_b, exx_b, eta_b, G_b),
-           maxwell_stress_exact(tauM_b, ezz_b, eta_b, G_b),
-           maxwell_stress_exact(tauM_b, exz_b, eta_b, G_b))
+    ref = maxwell_stress_exact_corotational(tauM_b, exx_b, ezz_b, exz_b, w_b,
+                                            eta_b, G_b)
     # the deviatoric reference is measurably away from the pre-fix raw one, so
     # the tolerance below is not satisfied by the old mapping (G249 (a))
     @test abs(maxwell_stress_exact(tauM_b, a, eta_b, G_b) - ref[1]) >
@@ -151,11 +177,12 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
 
     # ---- (c) the driver advances the fields once per step ----------------
     # Reconstruct the update from the callback state of every step: the
-    # strain-rate components of that step's velocity, that step's dt, eta = 1
-    # and G, *projected to their deviatoric part* (G249: the update is driven by
-    # ehat = eps - (1/3) tr(eps) I with tr = exx + ezz).  Exact equality pins
-    # the whole wiring (velocity level, dt, eta, one step per time step, all
-    # three components, projection).
+    # strain-rate components and the spin of that step's velocity, that step's
+    # dt, eta = 1 and G, with the deviatoric projection of the strain rate (G249:
+    # ehat = eps - (1/3) tr(eps) I with tr = exx + ezz) and the co-rotational
+    # rotation of the old stress by `dt (W tau - tau W)` (G250).  Exact equality
+    # pins the whole wiring (velocity level, dt, eta, one step per time step,
+    # all three components, projection, spin accessor, composition order).
     G_d = 1.0e3
     prG = const_pr(G=G_d)
     uxs = Vector{Vector{Float64}}()
@@ -172,14 +199,16 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     rd_tz = zeros(length(rd.txx))
     for k in 1:4
         epsk = QuaST.semquad_strain_rate_components(rd.ss.su, uxs[k], uzs[k])
+        wsk = QuaST.semquad_spin_component(rd.ss.su, uxs[k], uzs[k])
         for g in eachindex(rd_tx)
             trk = epsk.exx[g] + epsk.ezz[g]
-            rd_tx[g] = maxwell_stress_step(rd_tx[g], epsk.exx[g] - trk / 3,
+            rxx, ryy, rxy = maxwell_stress_corotate(rd_tx[g], rd_ty[g],
+                                                    rd_tz[g], wsk[g], dts[k])
+            rd_tx[g] = maxwell_stress_step(rxx, epsk.exx[g] - trk / 3,
                                            dts[k], 1.0, G_d)
-            rd_ty[g] = maxwell_stress_step(rd_ty[g], epsk.ezz[g] - trk / 3,
+            rd_ty[g] = maxwell_stress_step(ryy, epsk.ezz[g] - trk / 3,
                                            dts[k], 1.0, G_d)
-            rd_tz[g] = maxwell_stress_step(rd_tz[g], epsk.exz[g], dts[k], 1.0,
-                                           G_d)
+            rd_tz[g] = maxwell_stress_step(rxy, epsk.exz[g], dts[k], 1.0, G_d)
         end
     end
     @test rd_tx == rd.txx && rd_ty == rd.tyy && rd_tz == rd.txy
@@ -204,14 +233,16 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
         p2z = zeros(length(r2.txx))
         for k in 1:3
             ek = QuaST.semquad_strain_rate_components(r2.ss.su, u2[k], z2[k])
+            wk = QuaST.semquad_spin_component(r2.ss.su, u2[k], z2[k])
             for g in eachindex(p2x)
                 trk = ek.exx[g] + ek.ezz[g]
-                p2x[g] = maxwell_stress_step(p2x[g], ek.exx[g] - trk / 3,
+                rxx, ryy, rxy = maxwell_stress_corotate(p2x[g], p2y[g],
+                                                        p2z[g], wk[g], dt2[k])
+                p2x[g] = maxwell_stress_step(rxx, ek.exx[g] - trk / 3,
                                              dt2[k], 1.0, G_d)
-                p2y[g] = maxwell_stress_step(p2y[g], ek.ezz[g] - trk / 3,
+                p2y[g] = maxwell_stress_step(ryy, ek.ezz[g] - trk / 3,
                                              dt2[k], 1.0, G_d)
-                p2z[g] = maxwell_stress_step(p2z[g], ek.exz[g], dt2[k], 1.0,
-                                             G_d)
+                p2z[g] = maxwell_stress_step(rxy, ek.exz[g], dt2[k], 1.0, G_d)
             end
         end
         @test all(isfinite, r2.txx) && maximum(abs, r2.txx) > 0.0

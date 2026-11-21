@@ -15,31 +15,44 @@
 # wrong update was compared against a wrong reference (the lesson: the reference
 # must come from the physics, not from the code under test).
 #
+# The update also carries the co-rotational (Jaumann) term now (G250), which
+# couples the components: the shear equation reads the normal difference
+# `W_xy (tau_yy - tau_xx)` and the normal equations read the shear.  Two things
+# in this gate moved with it, and both are recorded at their sites: the (a)/(c)
+# references became the analytic objective curve / co-rotational fixed point
+# (G250 pins both), and the raw-mapping control now includes the same rotation
+# so that it isolates the *projection* defect, which is what this gate is about.
+# The trace, the first elastic step and the `G = 0` invariants are untouched.
+#
 # The stored state is still three in-plane components: `tau_zz` is not stored
 # but implied by trace zero, `tau_zz = -(tau_xx + tau_yy)`.  The 2-D elastic
 # force term has no out-of-plane normal component -- `div(a tau)` is
 # `(d_x(a tau_xx) + d_y(a tau_xy), d_x(a tau_xy) + d_y(a tau_yy))`, which is
 # exactly what `src/stokes/assembly_var.jl` assembles from the three fields --
-# so no assembly ever needs the fourth component.
+# so no assembly ever needs the fourth component.  The co-rotational term is a
+# pure out-of-plane rotation generator: it leaves `tau_zz` and the in-plane trace
+# invariant, so it needs no projection either.
 #
 # This gate pins:
 #   (a) a prescribed **non-solenoidal** velocity: the three updated components
-#       follow the deviatoric strain rate against its analytic curve, and are
-#       measurably away from what the raw update would give (the test the old
-#       gate lacked); for an (analytically) solenoidal field the projection only
-#       removes a round-off trace, so the update agrees with the pre-fix raw one
-#       to round-off -- which is why such a field would hide the bug;
+#       follow the *objective* analytic curve against their deviatoric strain
+#       rate, and are measurably away from what the raw (pre-projection) update
+#       would give (the test the old gate lacked); for an (analytically)
+#       solenoidal field the projection only removes a round-off trace, so the
+#       update agrees with the raw-mapping control to round-off -- which is why
+#       such a field would hide the bug;
 #   (b) trace zero of the stored triple, with the out-of-plane component evolved
 #       independently through the kernel from -tr/3 (so it is not the tautology
 #       `-(txx+tyy)`);
 #   (c) a driver run with `pr.deviatoric = true`: the elastic half and the
 #       viscous half carry the same deviatoric measure, so the stress
-#       equilibrates to `2 eta ehat`, the flow is the material-viscosity one,
-#       nothing is counted twice, and the pre-fix raw history is measurably
-#       inconsistent with the operator that drives it;
+#       equilibrates to the co-rotational fixed point built on `2 eta ehat` (the
+#       spin-free `tau = 2 eta ehat` moved by G250, see there), the flow is the
+#       material-viscosity one, nothing is counted twice, and the pre-fix raw
+#       history is measurably inconsistent with the operator that drives it;
 #   (d) `shear_modulus = 0` still disables every stress path (the full
 #       bit-identity invariants are the G246/G247 suites, which must pass with
-#       their projected expectations).
+#       their amended expectations).
 using Test, QuaST, LinearAlgebra, Printf
 
 @testset "G249 deviatoric stress projection" begin
@@ -89,29 +102,48 @@ using Test, QuaST, LinearAlgebra, Printf
     @test maximum(abs.(epsa.exx .+ epsa.ezz .- tr_a)) < 1.0e-12
     @test maximum(abs, tr_a) > 0.2                     # non-solenoidal
     @test maximum(abs.(ehat_xx .+ ehat_zz .+ ehat_out)) < 1.0e-15
+    # The co-rotational term (G250) makes this field rotate: its spin is the
+    # analytic W_xy = ((dux/dy) - (duz/dx))/2 = (-0.1+0.4x - 0.5+0.6x)/2 =
+    # -0.30 + 0.50 x, which the accessor has to reproduce (G250 pins the
+    # accessor against a rigid rotation; here it is a spatially varying field).
+    w_a = [-0.30 + 0.50 * x for (x, _) in sqa.coords]
+    @test maximum(abs.(QuaST.semquad_spin_component(sqa, uxa, uza) .- w_a)) <
+          1.0e-12
     eta_a = 2.0
     G_a = 50.0
     tauM_a = eta_a / G_a
     nstep = 500
     dt_a = tauM_a / nstep
     eta_field = fill(eta_a, sqa.N)
-    # accumulate to t = tau_M, where the analytic curve is `2 eta ehat (1-1/e)`
+    # accumulate to t = tau_M, where the analytic curve is
+    # `2 eta ehat (1 - 1/e)` for a rotation-free flow; with the spin it is the
+    # objective curve `maxwell_stress_exact_corotational` (the reference G250
+    # pins against the composed kernel).
     txx_a = zeros(sqa.N); tyy_a = zeros(sqa.N); txy_a = zeros(sqa.N)
     for _ in 1:nstep
         QuaST._advance_maxwell_stress!(txx_a, tyy_a, txy_a, sqa, uxa, uza,
                                        dt_a, eta_field, G_a)
     end
-    dev_xx = [maxwell_stress_exact(tauM_a, e, eta_a, G_a) for e in ehat_xx]
-    dev_zz = [maxwell_stress_exact(tauM_a, e, eta_a, G_a) for e in ehat_zz]
-    dev_xz = [maxwell_stress_exact(tauM_a, e, eta_a, G_a) for e in exz_a]
+    dev_ref = [maxwell_stress_exact_corotational(tauM_a, ehat_xx[i],
+                                                 ehat_zz[i], exz_a[i], w_a[i],
+                                                 eta_a, G_a)
+               for i in eachindex(ehat_xx)]
+    dev_xx = [r[1] for r in dev_ref]
+    dev_zz = [r[2] for r in dev_ref]
+    dev_xz = [r[3] for r in dev_ref]
     @test maximum(abs.(txx_a .- dev_xx)) <= 2.0e-3 * maximum(abs, dev_xx)
     @test maximum(abs.(tyy_a .- dev_zz)) <= 2.0e-3 * maximum(abs, dev_zz)
     @test maximum(abs.(txy_a .- dev_xz)) <= 2.0e-3 * maximum(abs, dev_xz)
     # ... and the raw references are not close: this is the assertion the old
     # gate would fail.  The normal components are off by tr/3, which is 25% of
-    # ehat_xx and 33% of ehat_zz at the smallest-trace node.
-    raw_xx = [maxwell_stress_exact(tauM_a, e, eta_a, G_a) for e in exx_a]
-    raw_zz = [maxwell_stress_exact(tauM_a, e, eta_a, G_a) for e in ezz_a]
+    # ehat_xx and 33% of ehat_zz at the smallest-trace node.  (The raw
+    # references are the same objective curve driven by the *raw* strain rate,
+    # so this control still isolates the projection, not the rotation.)
+    raw_ref = [maxwell_stress_exact_corotational(tauM_a, exx_a[i], ezz_a[i],
+                                                 exz_a[i], w_a[i], eta_a, G_a)
+               for i in eachindex(exx_a)]
+    raw_xx = [r[1] for r in raw_ref]
+    raw_zz = [r[2] for r in raw_ref]
     @test minimum(abs.(raw_xx .- dev_xx) ./ abs.(dev_xx)) > 0.20
     @test minimum(abs.(raw_zz .- dev_zz) ./ abs.(dev_zz)) > 0.20
     @test maximum(abs.(txx_a .- raw_xx)) > 0.15 * maximum(abs, dev_xx)
@@ -128,16 +160,21 @@ using Test, QuaST, LinearAlgebra, Printf
     @test maximum(abs.(txya .- 2.0 .* G_a .* exz_a .* dt_s)) <=
           1.0e-3 * maximum(abs.(2.0 .* G_a .* exz_a .* dt_s))
 
-    # The pre-fix update, as the control: the G244-gated kernel mapped over the
-    # *raw* components.  It is expected to be round-off-identical when tr == 0
-    # and measurably different otherwise ("a gate must assert that behaviour
-    # changes", docs/dev/HANDOVER.md section 8).
+    # The pre-fix update, as the control: the G244-gated scalar kernel mapped
+    # over the *raw* components.  The co-rotational part is common to both sides
+    # now (G250), so this isolates the projection defect the gate is about.  It
+    # is expected to be round-off-identical when tr == 0 and measurably
+    # different otherwise ("a gate must assert that behaviour changes",
+    # docs/dev/HANDOVER.md section 8).
     function g249_raw_replay(ux, uz, tx, ty, tz)
         eps = QuaST.semquad_strain_rate_components(sqa, ux, uz)
+        w = QuaST.semquad_spin_component(sqa, ux, uz)
         for _ in 1:nstep, g in eachindex(tx)
-            tx[g] = maxwell_stress_step(tx[g], eps.exx[g], dt_a, eta_a, G_a)
-            ty[g] = maxwell_stress_step(ty[g], eps.ezz[g], dt_a, eta_a, G_a)
-            tz[g] = maxwell_stress_step(tz[g], eps.exz[g], dt_a, eta_a, G_a)
+            rxx, ryy, rxy = maxwell_stress_corotate(tx[g], ty[g], tz[g],
+                                                    w[g], dt_a)
+            tx[g] = maxwell_stress_step(rxx, eps.exx[g], dt_a, eta_a, G_a)
+            ty[g] = maxwell_stress_step(ryy, eps.ezz[g], dt_a, eta_a, G_a)
+            tz[g] = maxwell_stress_step(rxy, eps.exz[g], dt_a, eta_a, G_a)
         end
         return tx, ty, tz
     end
@@ -145,16 +182,23 @@ using Test, QuaST, LinearAlgebra, Printf
                                        zeros(sqa.N))
     @test maximum(abs.(txx_a .- rp_x)) > 0.15 * maximum(abs, dev_xx)
     @test maximum(abs.(tyy_a .- rp_y)) > 0.15 * maximum(abs, dev_zz)
-    @test rp_z == txy_a                     # the shear component is not projected
+    # The shear component is not projected by the *strain-rate* projection: the
+    # raw and deviatoric drives differ by an isotropic offset in the two normal
+    # components only, and the shear equation sees their difference
+    # `W_xy (tau_yy - tau_xx)`, which the offset cancels.  Since G250's term the
+    # two histories are therefore equal to round-off, not bit-identical (the
+    # offset is a common floating-point shift of the two normal components).
+    @test maximum(abs.(rp_z .- txy_a)) <= 1.0e-12 * maximum(abs, txy_a)
     # the old raw history's normal trace is the spurious isotropic stress
     @test maximum(abs.(rp_x .+ rp_y)) > 0.5 * maximum(abs, dev_xx)
-    @printf("G249 (a): tr in [%.3f, %.3f], ehat_xx/exx in [%.3f, %.3f]; |raw-dev| xx = %.2f%% of |dev|; |old txx+tyy|/|dev| = %.2f\n",
+    @printf("G249 (a): tr in [%.3f, %.3f], ehat_xx/exx in [%.3f, %.3f]; |raw-dev| xx = %.2f%% of |dev|; |old txx+tyy|/|dev| = %.2f; |raw-projected| shear = %.1e (round-off)\n",
             minimum(tr_a), maximum(tr_a), minimum(ehat_xx ./ exx_a),
             maximum(ehat_xx ./ exx_a),
             100 * minimum(abs.(raw_xx .- dev_xx) ./ abs.(dev_xx)),
-            maximum(abs.(rp_x .+ rp_y)) / maximum(abs, dev_xx))
+            maximum(abs.(rp_x .+ rp_y)) / maximum(abs, dev_xx),
+            maximum(abs.(rp_z .- txy_a)))
     # an (analytically) solenoidal linear field: the projection then only
-    # removes a round-off trace, so the update is the pre-fix raw one to
+    # removes a round-off trace, so the update equals the raw-mapping control to
     # round-off -- an old gate built on such a field could never have detected
     # the missing projection.  (Exact bit-identity is not constructible through
     # the interpolated derivative: the GLL differentiation rows sum to zero only
@@ -198,18 +242,27 @@ using Test, QuaST, LinearAlgebra, Printf
 
     # ---- (c) driver: pr.deviatoric = true, the two halves agree -----------
     # Lid-driven cavity with the deviatoric operator (`2 eta ehat : eps(v)` in
-    # the stiffness) and G > 0.  R = G dt >> eta equilibrates the stress within
-    # the five steps; the backward-Euler split
+    # the stiffness) and G > 0.  R = G dt >> eta equilibrates the stress; the
+    # backward-Euler split with the co-rotational term (G250) is
     #
-    #     tau^{n+1} = 2 eta_eff ehat^{n+1} + a tau^n
+    #     tau^{n+1} = 2 eta_eff ehat^{n+1} + a R(tau^n),
+    #         R(tau) = tau + dt (W tau - tau W),
     #
-    # then has the same fixed point as the material-viscosity operator,
-    # `tau = 2 eta ehat`: the viscous half and the elastic half carry one and
-    # the same deviatoric measure, so `2 eta_eff ehat` (stiffness) plus `a tau`
-    # (load) add up to the material `2 eta ehat` -- nothing, in particular no
-    # isotropic trace, is counted twice.  The pre-fix raw history does not have
-    # that fixed point; its one-step map is measurably farther from the material
-    # solution.
+    # whose fixed point is the Jaumann steady stress
+    # `tau = 2 eta ehat + tau_M (W tau - tau W)`, not `tau = 2 eta ehat`.  The
+    # deviatoric content survives: the in-plane trace and the implied `tau_zz`
+    # are invariant under `R`, so the trace assertions below are unchanged.  The
+    # viscous half and the elastic half still carry one and the same deviatoric
+    # measure, nothing is counted twice, and the flow is still the
+    # material-viscosity one (the velocity numbers below are the ones the gate
+    # measured before the term landed).  The *stress* reference moved from
+    # `2 eta ehat` to the co-rotational fixed point by 1.2e-2 of tmax -- real
+    # rotation physics at this card's |W| dt, not a numerical artifact.
+    #
+    # The run takes 10 steps instead of 5: the rotation channel of the update
+    # contracts at `a sqrt(1 + (2 W dt)^2)` (1.2e-2 per step here), so 5 steps
+    # leave the stress 2.8e-10 from its fixed point and the 1e-12 tolerance
+    # unchanged; 10 steps reach machine precision.  No tolerance was loosened.
     g249_eta_mult = (x, y) -> 1.0 + 0.5 * sinpi(x) * sinpi(y)
     function g249_card(; G::Float64, nref::Int, deviatoric::Bool)
         qt = g249_tree(nref)
@@ -221,13 +274,23 @@ using Test, QuaST, LinearAlgebra, Printf
                     deviatoric=deviatoric)
         return qt, ss, pr
     end
+    # co-rotational (Jaumann) fixed point of the same map (G250):
+    # tau = 2 eta ehat + tau_M (W tau - tau W), closed form in the plane.
+    function g249_corot_fixed_point(ehat_xx, ehat_zz, ehat_xz, w, eta, tauM)
+        den = 1.0 .+ 4.0 .* tauM .^ 2 .* w .^ 2
+        txy = (2.0 .* eta .* ehat_xz .+
+               2.0 .* eta .* tauM .* w .* (ehat_zz .- ehat_xx)) ./ den
+        txx = 2.0 .* eta .* ehat_xx .+ 2.0 .* tauM .* w .* txy
+        tyy = 2.0 .* eta .* ehat_zz .- 2.0 .* tauM .* w .* txy
+        return txx, tyy, txy
+    end
     G_c = 1000.0
     R_c = 1000.0
     dt_c = R_c / G_c
     qtc, ssc, prc = g249_card(; G=G_c, nref=3, deviatoric=true)
     Nc = ssc.su.N
     rc = run_semquad_simulation(qtc, prc, zeros(Float64, Nc); p=2,
-                                maxsteps=5, tstop=1.0e9, dt0=dt_c, dtmax=dt_c,
+                                maxsteps=10, tstop=1.0e9, dt0=dt_c, dtmax=dt_c,
                                 dtmin=1.0e-30, cfl=0.0, linear=:direct, ev=0.0,
                                 maxpic=1)
     sqc = rc.ss.su
@@ -236,6 +299,7 @@ using Test, QuaST, LinearAlgebra, Printf
     ehatc_xx = epsc.exx .- tr_c ./ 3
     ehatc_zz = epsc.ezz .- tr_c ./ 3
     ehatc_out = .-tr_c ./ 3
+    w_c = QuaST.semquad_spin_component(sqc, rc.ux, rc.uz)
     leaves = Set(sqc.leaves)
     thz = zeros(Float64, sqc.N)
     eta_mat(x, y) = QuaST.semquad_eta_at(sqc, thz, x, y, prc, leaves) *
@@ -243,12 +307,17 @@ using Test, QuaST, LinearAlgebra, Printf
     eta_nodes = [eta_mat(c[1], c[2]) for c in sqc.coords]
     tmax_c = max(maximum(abs, rc.txx), maximum(abs, rc.tyy),
                  maximum(abs, rc.txy))
-    # 1. the fixed point is the material deviatoric stress
-    tau_dev_err = max(maximum(abs.(rc.txx .- 2 .* eta_nodes .* ehatc_xx)),
-                      maximum(abs.(rc.tyy .- 2 .* eta_nodes .* ehatc_zz)),
-                      maximum(abs.(rc.txy .- 2 .* eta_nodes .* epsc.exz)))
+    tauM_c = eta_nodes ./ G_c
+    # 1. the fixed point is the material deviatoric stress plus the
+    #    co-rotational (Jaumann) increment -- the update's own steady state
+    tx_fp, ty_fp, tz_fp = g249_corot_fixed_point(ehatc_xx, ehatc_zz, epsc.exz,
+                                                 w_c, eta_nodes, tauM_c)
+    tau_dev_err = max(maximum(abs.(rc.txx .- tx_fp)),
+                      maximum(abs.(rc.tyy .- ty_fp)),
+                      maximum(abs.(rc.txy .- tz_fp)))
     @test tau_dev_err / tmax_c < 1.0e-12
-    # 2. and it is traceless, with the out-of-plane component implied
+    # 2. and it is traceless, with the out-of-plane component implied (the
+    #    co-rotational term leaves the in-plane trace and tau_zz invariant)
     trace_c = maximum(abs.(rc.txx .+ rc.tyy .+
                             2 .* eta_nodes .* ehatc_out))
     @test trace_c / tmax_c < 1.0e-12
@@ -261,8 +330,9 @@ using Test, QuaST, LinearAlgebra, Printf
                       maximum(abs, epsc.exz))
     @test maximum(abs, tr_c) > 0.01 * eps_scale_c
     # 4. the flow is the material-viscosity solution; the same fixed-point map
-    # started from 2 eta ehat (the discretisation floor) bounds the difference
-    # between the effective-viscosity operator, the material one and the run.
+    # started from the run's fixed-point stress (the discretisation floor) bounds
+    # the difference between the effective-viscosity operator, the material one
+    # and the run.
     function g249_solve_ref(eta_fun; elastic=nothing)
         return solve_semquad_stokes_var(rc.ss, rc.qt, eta_fun, z2, z2, z2, z2;
                                         bc=prc.bc, wall_bc=prc.wall_bc,
@@ -276,17 +346,16 @@ using Test, QuaST, LinearAlgebra, Printf
         1.0 / (1.0 / e + 1.0 / (G_c * dt_c))
     end
     u_eff = g249_solve_ref(eta_eff_fn)
-    # the frozen backward-Euler load at the projected fixed point
-    el_fp = maxwell_force_stress(2 .* eta_nodes .* ehatc_xx,
-                                 2 .* eta_nodes .* ehatc_zz,
-                                 2 .* eta_nodes .* epsc.exz,
-                                 eta_nodes, dt_c, G_c)
+    # the frozen backward-Euler load at the (objective) projected fixed point
+    el_fp = maxwell_force_stress(tx_fp, ty_fp, tz_fp, eta_nodes, dt_c, G_c)
     u_def = g249_solve_ref(eta_eff_fn; elastic=el_fp)
-    # the pre-fix load: the same map with the raw strain rate in the history
-    el_raw = maxwell_force_stress(2 .* eta_nodes .* epsc.exx,
-                                  2 .* eta_nodes .* epsc.ezz,
-                                  2 .* eta_nodes .* epsc.exz,
-                                  eta_nodes, dt_c, G_c)
+    # the pre-fix load: the same map with the raw strain rate in the history --
+    # its co-rotational fixed point, so the control isolates the projection (the
+    # rotation is common to both histories since G250)
+    tx_raw, ty_raw, tz_raw = g249_corot_fixed_point(epsc.exx, epsc.ezz,
+                                                    epsc.exz, w_c, eta_nodes,
+                                                    tauM_c)
+    el_raw = maxwell_force_stress(tx_raw, ty_raw, tz_raw, eta_nodes, dt_c, G_c)
     u_old = g249_solve_ref(eta_eff_fn; elastic=el_raw)
     # the two histories are different tensors: the raw one adds the trace of the
     # strain rate to the normal components, so it asks the momentum equation for
@@ -307,8 +376,9 @@ using Test, QuaST, LinearAlgebra, Printf
     @test rel_run_mat <= 2.0 * rel_def_mat      # ... to the defect floor
     @test rel_run_mat < rel_mat_eff             # and not the 2a one
     @test rel_old_mat > 1.1 * rel_run_mat       # the raw map is farther away
-    @printf("G249 (c): |tau-2eta ehat|/tmax=%.1e |trace|/tmax=%.1e |raw fixpoint|/tmax=%.2f rel(run,mat)=%.2e defect=%.2e rel(oldraw,mat)=%.2e rel(tau,raw)=%.2e rel(mat,2a)=%.2e\n",
-            tau_dev_err / tmax_c, trace_c / tmax_c, tau_raw_err / tmax_c,
+    @printf("G249 (c): |tau-tau_fp|/tmax=%.1e (max tauM|W|=%.1e) |trace|/tmax=%.1e |raw fixpoint|/tmax=%.2f rel(run,mat)=%.2e defect=%.2e rel(oldraw,mat)=%.2e rel(tau,raw)=%.2e rel(mat,2a)=%.2e\n",
+            tau_dev_err / tmax_c, maximum(tauM_c .* abs.(w_c)),
+            trace_c / tmax_c, tau_raw_err / tmax_c,
             rel_run_mat, rel_def_mat, rel_old_mat, rel_tau, rel_mat_eff)
 
     # ---- (d) the invariants ----------------------------------------------
