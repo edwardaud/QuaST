@@ -321,6 +321,15 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   mass_rho::Union{Nothing,Function}=nothing,
                                   mass_form::Symbol=:anelastic,
                                   mass_drho::Union{Nothing,Function}=nothing,
+                                  # Density hook (`Params.rho_multiplier`, G248)
+                                  # on the anelastic mass constraint: the
+                                  # assembled density becomes
+                                  # `mass_rho(y)*mass_rho_mult(x,y)` and its
+                                  # gradient is differentiated consistently, so
+                                  # `Bc` is the Galerkin form of
+                                  # `div(mass_rho*mass_rho_mult*u) = 0`.
+                                  # `nothing` (default) leaves `Bc` bit-identical.
+                                  mass_rho_mult::Union{Nothing,Function}=nothing,
                                   compress_block::Union{Nothing,AbstractMatrix}=nothing,
                                   deviatoric::Bool=false,
                                   geo_u::Union{Nothing,Vector{Float64}}=nothing,
@@ -637,7 +646,8 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
             yp = min(y + hd, 1.0); ym = max(y - hd, 0.0)
             (mass_rho(yp) - mass_rho(ym)) / (yp - ym)
         end) : mass_drho
-        Bc = semquad_stokes_B(ss, qt; rho_fun=mass_rho, drho_fun=drho)
+        Bc = semquad_stokes_B(ss, qt; rho_fun=mass_rho, drho_fun=drho,
+                              rho_mult=mass_rho_mult)
         linear === :schur_cg &&
             throw(ArgumentError("mass_form=:anelastic makes the saddle system " *
                                 "nonsymmetric (Bm != Bc'); use linear=:direct"))

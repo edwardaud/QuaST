@@ -238,7 +238,10 @@ function semquad_steady_step(sq::SemQuad, qt::Quadtree, ss::SemStokes,
     end
     leaves = Set(qt.leaves)
     eta = (x, y) -> semquad_eta_at(sq, theta, x, y, pr, leaves)
-    fz = (x, y) -> pr.Ra * QuaST._semquad_eval_at(sq, theta, x, y, leaves)
+    # Density hook (G248): `nothing` keeps the historical `Ra * theta` load.
+    fz = theta_buoyancy_load(pr,
+                             (x, y) -> QuaST._semquad_eval_at(sq, theta, x, y,
+                                                              leaves))
     z2 = (x, y) -> 0.0
     sys = solve_semquad_stokes_var(ss, qt, eta, z2, fz, z2, z2;
                                    bc=pr.bc, linear=:direct,
@@ -267,7 +270,7 @@ function semquad_steady_step(sq::SemQuad, qt::Quadtree, ss::SemStokes,
                                  ev_timestep=ev_timestep)
     ur = parts.Ar \ (parts.Cfree' * (parts.rhs - parts.A * parts.u0))
     theta_new = parts.u0 + parts.Cfree * ur
-    Mv = assemble_semquad_pressure_mass(ss.su)
+    Mv = buoyancy_mass_matrix(ss.su, pr)
     return (theta=theta_new, u=u, p=pv, parts=parts, sys=sys, solver=solver,
             Mv=Mv, nf=nf, nfp=nfp, dt=dt, advection=advection,
             ev=ev, ev_cmax=ev_cmax, ev_alpha=ev_alpha,

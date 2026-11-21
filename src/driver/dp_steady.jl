@@ -71,6 +71,9 @@ function semquad_dp_stokes_newton(sq::SemQuad, qt::Quadtree, ss::SemStokes,
     pleaves = Set(ss.sp.leaves)
     z2 = (x, y) -> 0.0
     evalth(th, x, y) = QuaST._semquad_eval_at(sq, th, x, y, leaves)
+    # Buoyancy load with the density hook (G248); without a multiplier this is
+    # exactly the historical `(x, y) -> pr.Ra * evalth(theta, x, y)` closure.
+    fz_theta = theta_buoyancy_load(pr, (x, y) -> evalth(theta, x, y))
     # --- start state: the isoviscous (viscous-branch) Stokes solution ---------
     u = zeros(Float64, 2N)
     p = zeros(Float64, np)
@@ -78,8 +81,7 @@ function semquad_dp_stokes_newton(sq::SemQuad, qt::Quadtree, ss::SemStokes,
         u .= u_init
     else
         eta_v = (x, y) -> eta_at(Tbar(y, pr.H) + evalth(theta, x, y), y, pr)[1]
-        fz = (x, y) -> pr.Ra * evalth(theta, x, y)
-        u, p, _, _, _ = solve_semquad_stokes_var(ss, qt, eta_v, z2, fz, z2, z2;
+        u, p, _, _, _ = solve_semquad_stokes_var(ss, qt, eta_v, z2, fz_theta, z2, z2;
                                                  bc=pr.bc, linear=:direct,
                                                  deviatoric=pr.deviatoric)
     end
@@ -96,7 +98,7 @@ function semquad_dp_stokes_newton(sq::SemQuad, qt::Quadtree, ss::SemStokes,
     end
     function residual(u, p)
         eta_fun = stokes_eta(u, p)
-        fz_r = (x, y) -> pr.Ra * evalth(theta, x, y)
+        fz_r = fz_theta
         sys = solve_semquad_stokes_var(ss, qt, eta_fun, z2, fz_r, z2, z2;
                                        bc=pr.bc, linear=:direct,
                                        deviatoric=pr.deviatoric,
@@ -140,7 +142,7 @@ function semquad_dp_stokes_newton(sq::SemQuad, qt::Quadtree, ss::SemStokes,
     # The viscous start can be orders of magnitude away from the yielded
     # solution; a few lagged Picard sweeps bring the state into the Newton
     # basin before the SPD-stabilised Newton takes over.
-    fz = (x, y) -> pr.Ra * evalth(theta, x, y)
+    fz = fz_theta
     for _ in 1:picard_warmup
         eta_fun = stokes_eta(u, p)
         u, p, _, _, _ = solve_semquad_stokes_var(ss, qt, eta_fun, z2, fz, z2,
@@ -283,8 +285,9 @@ function semquad_dp_inner(sq::SemQuad, qt::Quadtree, ss::SemStokes,
         end
         u_new, p_new, _, _, _ = solve_semquad_stokes_var(
             ss, qt, eta_fun, (x, y) -> 0.0,
-            (x, y) -> pr.Ra * QuaST._semquad_eval_at(sq, theta, x, y,
-                                                         leaves),
+            theta_buoyancy_load(pr, (x, y) -> QuaST._semquad_eval_at(sq, theta,
+                                                                     x, y,
+                                                                     leaves)),
             (x, y) -> 0.0, (x, y) -> 0.0;
             bc=pr.bc, linear=linear, deviatoric=pr.deviatoric,
             schur_maxiter=schur_maxiter, schur_precond=schur_precond)
@@ -419,7 +422,7 @@ function semquad_dp_steady_jv(sq::SemQuad, qt::Quadtree, ss::SemStokes,
     dKu = sd.K * u
     nf = size(sys.Kred, 1)
     nfp = size(sys.Bs, 1)
-    Mv = assemble_semquad_pressure_mass(ss.su)
+    Mv = buoyancy_mass_matrix(ss.su, pr)
     df = vcat(zeros(Float64, N), pr.Ra * (Mv * v))
     rhs = sys.Cu' * (df - dKu)
     sol = step.solver.solve(vcat(rhs, zeros(Float64, nfp)))

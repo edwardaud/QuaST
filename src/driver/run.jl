@@ -468,6 +468,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # key stores only whether one is set, because a function has no value to
         # compare; a user who changes it is told to start a fresh run.
         "eta_multiplier" => pr.eta_multiplier === nothing ? "none" : "custom",
+        # The density hook changes the buoyancy (and, with a reference state,
+        # the anelastic mass constraint), so it is part of the physics a restart
+        # must not lose.  Same convention as `eta_multiplier`: a function has no
+        # value to compare, only whether one is set.
+        "rho_multiplier" => pr.rho_multiplier === nothing ? "none" : "custom",
         # The side walls are part of the physics of the run.
         "side_thermal" => pr.side_thermal,
         "Twall_left" => pr.Twall_left, "Twall_right" => pr.Twall_right)
@@ -958,15 +963,23 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # genuine fixed point (and the depth-dependent terms of the reference
         # state do not drive a spurious flow).  Without a reference state the
         # expression is unchanged, bit for bit.
+        # Density hook (G248): `rho_multiplier` multiplies the density where the
+        # buoyancy uses it; `nothing` keeps the historical closure and never
+        # evaluates it.  A uniform `c` is exactly `Ra -> Ra*c`.
+        rmul = pr.rho_multiplier
         fz = if pr.refstate === nothing
-            (x, y) -> pr.Ra * Tfun(x, y)
+            rmul === nothing ? ((x, y) -> pr.Ra * Tfun(x, y)) :
+                ((x, y) -> pr.Ra * rmul(x, y) * Tfun(x, y))
         else
             rs = pr.refstate
             # Tfun is already the perturbation theta = T - Tad, so the TALA
             # buoyancy rho alpha (T - Tad) is rho alpha theta; subtracting Tad
             # again here would be a double count.
-            (x, y) -> pr.Ra * semquad_rho(rs, y) * semquad_alpha(rs, y) *
-                      Tfun(x, y)
+            rmul === nothing ?
+                ((x, y) -> pr.Ra * semquad_rho(rs, y) * semquad_alpha(rs, y) *
+                           Tfun(x, y)) :
+                ((x, y) -> pr.Ra * semquad_rho(rs, y) * semquad_alpha(rs, y) *
+                           rmul(x, y) * Tfun(x, y))
         end
         # Phase transitions: the anomaly with respect to the base state adds a
         # buoyancy term; with no phases `fz` is used as is (bit identical).
@@ -986,6 +999,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                                   mass_rho=mass_rho_fun(pr),
                                                   mass_form=mass_form,
                                                   mass_drho=mass_drho_fun(pr),
+                                                  mass_rho_mult=pr.rho_multiplier,
                                                   compress_block=compress_block_fun(ss, qt, pr),
                                                   deviatoric=pr.deviatoric,
                                                   elastic_stress=elastic_stress,
@@ -1029,7 +1043,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # viscosity the Stokes solve used; using the end-of-step theta would mix
         # a new temperature with an old velocity and break Ra*W = U.
         tp = profile_steps ? time_ns() : 0
-        W_last, U_last = semquad_work_dissipation(sq, qt, pr, th, ux, uz, eta_fun)
+        W_last, U_last = semquad_work_dissipation(sq, qt, pr, th, ux, uz, eta_fun;
+                                                  rho_multiplier=pr.rho_multiplier)
         profile_steps && (work_ns[] = time_ns() - tp)
         bal_last = (pr.Ra * W_last - U_last) /
                    max(abs(pr.Ra * W_last), abs(U_last), 1.0e-300)

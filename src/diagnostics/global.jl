@@ -201,6 +201,10 @@ Volume integrals of the buoyancy work and the viscous dissipation,
 both in the nondimensional units of this solver (Ra multiplies the buoyancy, so the
 mechanical balance of the continuous problem is `Ra * W = U`).  `eta_fun(x,y)`
 must return the viscosity used by the Stokes solve at that point.
+`rho_multiplier` is the density hook (`Params.rho_multiplier`): when given, the
+density of `W` is `rho_bar(x,y) = rho(y) * rho_multiplier(x,y)`, the same
+density the buoyancy load uses, so `Ra*W = U` stays the balance of the solve;
+`nothing` (default) leaves the integral bit-identical.
 
 These are the `W` and `U` entries of Tosi et al. (2015), Table 2, where the
 dissipation is tabulated as `U/Ra` so that the two numbers are comparable.
@@ -208,7 +212,8 @@ dissipation is tabulated as `U/Ra` so that the two numbers are comparable.
 function semquad_work_dissipation(sq::SemQuad, qt::Quadtree, pr::Params,
                                   theta::Vector{Float64},
                                   ux::Vector{Float64}, uz::Vector{Float64},
-                                  eta_fun::Function)
+                                  eta_fun::Function;
+                                  rho_multiplier::Union{Nothing,Function}=nothing)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -247,6 +252,9 @@ function semquad_work_dissipation(sq::SemQuad, qt::Quadtree, pr::Params,
             # `--track-allocation=user`, semquaddiagnostics.jl:244).
             rho_w = (pr.refstate === nothing ? 1.0 :
                      semquad_rho(pr.refstate, y))::Float64
+            # Density hook: the buoyancy work must use the density the load used
+            # (a uniform multiplier c then gives W -> c*W, keeping Ra*W = U).
+            rho_multiplier === nothing || (rho_w *= rho_multiplier(x, y))
             W += w * rho_w * T * uzq
             exx = dux_dx
             ezz = duz_dy

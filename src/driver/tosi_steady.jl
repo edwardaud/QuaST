@@ -65,8 +65,9 @@ function semquad_tosi_inner(sq::SemQuad, qt::Quadtree, ss::SemStokes,
         end
         u_new, p_new, _, _, _ = solve_semquad_stokes_var(
             ss, qt, eta_fun, (x, y) -> 0.0,
-            (x, y) -> pr.Ra * QuaST._semquad_eval_at(sq, theta, x, y,
-                                                         leaves),
+            theta_buoyancy_load(pr, (x, y) -> QuaST._semquad_eval_at(sq, theta,
+                                                                     x, y,
+                                                                     leaves)),
             (x, y) -> 0.0, (x, y) -> 0.0;
             bc=pr.bc, linear=linear, deviatoric=pr.deviatoric,
             schur_maxiter=schur_maxiter, schur_precond=schur_precond)
@@ -190,7 +191,7 @@ function semquad_tosi_steady_jv(sq::SemQuad, qt::Quadtree, ss::SemStokes,
     dKu = sd.K * u
     nf = size(sys.Kred, 1)
     nfp = size(sys.Bs, 1)
-    Mv = assemble_semquad_pressure_mass(ss.su)
+    Mv = buoyancy_mass_matrix(ss.su, pr)
     df = vcat(zeros(Float64, N), pr.Ra * (Mv * v))
     rhs = sys.Cu' * (df - dKu)
     sol = step.solver.solve(vcat(rhs, zeros(Float64, nfp)))

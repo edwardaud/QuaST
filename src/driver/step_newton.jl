@@ -96,15 +96,27 @@ function _semquad_step_residual_ctx(ss::SemStokes, qt::Quadtree, pr::Params,
     eta_fun = mk[1]; deta_T_fun = mk[2]; deta_eps_fun = mk[3]
     dp_fun = length(mk) >= 4 ? mk[4] : nothing
     dchi_fun = length(mk) >= 5 ? mk[5] : nothing
+    # Buoyancy load with the density hook (G248): `theta_buoyancy_load` returns
+    # the historical `(x, y) -> Ra * theta` closure when
+    # `Params.rho_multiplier === nothing` (bit for bit) and multiplies the
+    # density when it is set.
+    th_at = (x, y) -> QuaST._semquad_eval_at(sq, theta, x, y, leaves)
     fz = if isempty(phases)
-        (x, y) -> pr.Ra * QuaST._semquad_eval_at(sq, theta, x, y, leaves)
+        theta_buoyancy_load(pr, th_at)
     else
         # θ-buoyancy plus the phase anomaly, exactly the driver's `fz`
         # (`semquad_phase_buoyancy` subtracts the base-state fraction).
-        (x, y) -> begin
-            th = QuaST._semquad_eval_at(sq, theta, x, y, leaves)
-            pr.Ra * th + semquad_phase_buoyancy(pr, phases, y, th)
-        end
+        m = pr.rho_multiplier
+        m === nothing ?
+            ((x, y) -> begin
+                 th = th_at(x, y)
+                 pr.Ra * th + semquad_phase_buoyancy(pr, phases, y, th)
+             end) :
+            ((x, y) -> begin
+                 th = th_at(x, y)
+                 pr.Ra * m(x, y) * th +
+                     semquad_phase_buoyancy(pr, phases, y, th)
+             end)
     end
     sys = dp_fun === nothing ?
           solve_semquad_stokes_var(ss, qt, eta_fun, z2, fz, z2, z2;
@@ -460,7 +472,7 @@ function semquad_step_newton(ss::SemStokes, qt::Quadtree, pr::Params,
     sq = ss.su
     N = sq.N
     leaves = Set(qt.leaves)
-    Mv = assemble_semquad_pressure_mass(sq)
+    Mv = buoyancy_mass_matrix(sq, pr)
     theta = copy(theta_n)
     ufull = vcat(copy(ux), copy(uz))
     pfull = copy(pv)

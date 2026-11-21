@@ -84,6 +84,20 @@ struct Params
     # law, which is how ASPECT's `weak zone` plugin is used next to a material
     # model rather than instead of it.
     eta_multiplier::Union{Nothing,Function}
+    # Multiplicative factor on the *density* wherever the buoyancy and the mass
+    # terms use it: `rho_new = rho * rho_multiplier(x, z)` (same signature as
+    # `eta_multiplier`).  `nothing` leaves every density path untouched, bit for
+    # bit.  This is the density half of the sticky-air hook: a light layer above
+    # `z_a` is `rho_multiplier = (x, z) -> z > z_a ? eps : 1.0` combined with a
+    # low-viscosity `eta_multiplier`, without reimplementing a material model
+    # (docs/dev/PHYSICS.md; ASPECT's sticky-air recipes).  It scales a density
+    # that is *already* in a term -- it does not add a compositional density
+    # anomaly, so with a Boussinesq/refstate buoyancy `Ra rho(y) alpha(y) theta`
+    # it acts on the thermal anomaly only (a temperature-neutral layer carries
+    # no buoyancy force); the phase-transition buoyancy
+    # (`semquad_phase_buoyancy`), which is its own density anomaly anchored to
+    # `rho0`, is not scaled.
+    rho_multiplier::Union{Nothing,Function}
     # Maxwell viscoelasticity in the effective-viscosity form (ASPECT's
     # `viscoelastic`, docs/dev/PHASE2.md 2a): with the shear modulus `G` and the
     # step `dt`, eta_eff = 1/(1/eta + 1/(G*dt)).  `G <= 0` disables it and leaves
@@ -168,6 +182,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 div_penalty::Real=0.0,
                 eta_custom=nothing, eta_multiplier=nothing,
+                rho_multiplier=nothing,
                 rho_heating::Bool=false,
                 rho_cp::Bool=false, tosi=nothing,
                 Di::Real=0.0, heating_adiabatic::Bool=false,
@@ -318,6 +333,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            Float64(eta_const),
            Float64(eta_min), Float64(eta_max), bc, Float64(supg),
            Float64(eta_soft), Float64(div_penalty), eta_custom, eta_multiplier,
+           rho_multiplier,
            Float64(shear_modulus), NTuple{4,Union{Nothing,Function}}(wall_u),
            rho_heating, rho_cp, tosi, Float64(Di),
            heating_adiabatic, heating_dissipation, refstate, rho_ref_weight,
