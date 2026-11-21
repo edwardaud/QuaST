@@ -492,6 +492,19 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         throw(ArgumentError("pic_div_factor must be > 1"))
     pic_mode in (:picard, :newton) ||
         throw(ArgumentError("pic_mode must be :picard or :newton"))
+    # The per-step Newton path builds its viscosity from the raw law plus the 2a
+    # viscoelastic softening; it does not apply `Params.eta_multiplier` (a weak
+    # zone, or any other multiplicative modification of the law).  A run that asks
+    # for both would therefore solve a *different* viscosity than the Picard path
+    # with the same card -- a wrong answer with no error.  Refuse instead.  The
+    # steady-state Newton entry points have the same gap; they are not reachable
+    # from here and are out of scope.
+    (pic_mode !== :newton || pr.eta_multiplier === nothing) ||
+        throw(ArgumentError("pic_mode=:newton does not apply Params.eta_multiplier " *
+                            "(the per-step Newton builds its viscosity from the raw " *
+                            "law plus the viscoelastic softening only), so a run with " *
+                            "both would differ from the Picard path with the same " *
+                            "card.  Use pic_mode=:picard, or drop eta_multiplier."))
     latent_scheme in (:implicit, :lagged) ||
         throw(ArgumentError("latent_scheme must be :implicit or :lagged"))
     0.0 <= weak_chi0 <= 1.0 ||
