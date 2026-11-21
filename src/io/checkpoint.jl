@@ -74,7 +74,8 @@ end
 """
     save_semquad_state(path, qt, theta, theta_prev, ux, uz, pv; t, dt, dt_prev,
                        step, p, config=Dict(), meta=Dict(), ev=nothing,
-                       weak=nothing, weak_prev=nothing, cooldown=nothing)
+                       weak=nothing, weak_prev=nothing, txx=nothing,
+                       tyy=nothing, txy=nothing, cooldown=nothing)
 
 Write an HDF5 checkpoint of the quadtree SEM state.
 
@@ -88,6 +89,10 @@ energy assembly, aligned with `sort(collect(qt.leaves))`; when omitted, no EV
 dataset is written (an EV-free run, or an old checkpoint).  `weak`/`weak_prev`
 are the strain-weakening field at the two BDF2 levels of the next step
 (docs/dev/PHYSICS.md §9); both are optional so an old checkpoint still loads.
+`txx`/`tyy`/`txy` are the three nodal Maxwell stress-history components
+(docs/dev/PHASE2.md 2b step 1); all three are optional and written only when the
+stress history is active, so an old checkpoint (and every `shear_modulus = 0`
+run) has none and loads with `nothing`.
 
 `cooldown` is the `AmrCooldown` hysteresis state of the balanced AMR cycle
 (`src/amr/cycle.jl`, docs/dev/AMR.md §3.5).  When supplied it is
@@ -119,6 +124,9 @@ function save_semquad_state(path::AbstractString, qt::Quadtree,
                             ev::Union{Nothing,AbstractVector{<:Real}}=nothing,
                             weak::Union{Nothing,AbstractVector{<:Real}}=nothing,
                             weak_prev::Union{Nothing,AbstractVector{<:Real}}=nothing,
+                            txx::Union{Nothing,AbstractVector{<:Real}}=nothing,
+                            tyy::Union{Nothing,AbstractVector{<:Real}}=nothing,
+                            txy::Union{Nothing,AbstractVector{<:Real}}=nothing,
                             cooldown::Union{Nothing,AmrCooldown}=nothing,
                             velocity_stale::Bool=false)
     leaves = sort(collect(qt.leaves))
@@ -139,6 +147,16 @@ function save_semquad_state(path::AbstractString, qt::Quadtree,
                                 "$(length(weak_prev)) entries, the state has " *
                                 "$(length(theta))"))
     end
+    # The three Maxwell stress-history components (2b step 1) are optional and
+    # live on the same scalar layout as `theta`; each is validated independently
+    # (the driver passes all three or none).
+    for (name, val) in (("txx", txx), ("tyy", tyy), ("txy", txy))
+        val === nothing && continue
+        length(val) == length(theta) ||
+            throw(ArgumentError("$name Maxwell stress field has " *
+                                "$(length(val)) entries, the state has " *
+                                "$(length(theta))"))
+    end
     L = Matrix{Int32}(undef, 3, nl)
     for (k, lf) in enumerate(leaves)
         L[1, k] = Int32(lf[1]); L[2, k] = Int32(lf[2]); L[3, k] = Int32(lf[3])
@@ -157,6 +175,11 @@ function save_semquad_state(path::AbstractString, qt::Quadtree,
         ev !== nothing && (f["ev"] = collect(Float64, ev))
         weak !== nothing && (f["weak"] = collect(Float64, weak))
         weak_prev !== nothing && (f["weak_prev"] = collect(Float64, weak_prev))
+        # Maxwell stress history (2b step 1); absent when the state is off, so
+        # an old checkpoint and a `shear_modulus = 0` run stay byte-identical.
+        txx !== nothing && (f["txx"] = collect(Float64, txx))
+        tyy !== nothing && (f["tyy"] = collect(Float64, tyy))
+        txy !== nothing && (f["txy"] = collect(Float64, txy))
         if cooldown !== nothing
             # Optional `:balanced` hysteresis state (empty dict -> no dataset).
             isempty(cooldown.no_refine) ||
@@ -270,14 +293,19 @@ end
 
 Read a checkpoint written by `save_semquad_state` and rebuild the quadtree from
 its leaf list.  Returns a named tuple `(qt, theta, theta_prev, ux, uz, pv, t,
-dt, dt_prev, step, p, config, ev, cooldown, velocity_stale)`.
+dt, dt_prev, step, p, config, ev, weak, weak_prev, txx, tyy, txy, cooldown,
+velocity_stale)`.
 
 `ev` is the elementwise entropy-viscosity field, or `nothing` for checkpoints
 written before it was recorded.  Old checkpoints that predate `nx0`/`ny0` are
 recovered by inferring the base cells from the leaves: this is what makes the
 multi-root 2b checkpoints (5x2 base) loadable.  A stretched single-root box
 whose `Lx` was not stored cannot be recovered and falls back to `Lx = 1`; new
-checkpoints always store `Lx`.  `cooldown` is the optional `AmrCooldown`
+checkpoints always store `Lx`.  `weak`/`weak_prev` are the two BDF2 levels of
+the strain-weakening field, or `nothing` when weakening is off or the file
+predates it.  `txx`/`tyy`/`txy` are the Maxwell stress-history components
+(docs/dev/PHASE2.md 2b step 1), or `nothing` when the stress state is off or the
+file predates it.  `cooldown` is the optional `AmrCooldown`
 hysteresis state of the balanced AMR cycle; a checkpoint without the cooldown
 datasets (every file written before the cooldown existed) returns an **empty**
 cooldown (`cycle == 0`), which is exactly the
@@ -357,6 +385,24 @@ function load_semquad_state(path::AbstractString)
             throw(ArgumentError("checkpoint previous weakening field has " *
                                 "$(length(weak_prev)) entries, the state has " *
                                 "$(length(read(f["theta"])))"))
+        # Maxwell stress history (2b step 1): absent from every checkpoint that
+        # predates it (and from every `shear_modulus = 0` run), which loads as
+        # `nothing`; the driver then starts the history from zero stress.
+        txx = haskey(f, "txx") ? read(f["txx"]) : nothing
+        txx === nothing || length(txx) == length(read(f["theta"])) ||
+            throw(ArgumentError("checkpoint txx Maxwell stress field has " *
+                                "$(length(txx)) entries, the state has " *
+                                "$(length(read(f["theta"])))"))
+        tyy = haskey(f, "tyy") ? read(f["tyy"]) : nothing
+        tyy === nothing || length(tyy) == length(read(f["theta"])) ||
+            throw(ArgumentError("checkpoint tyy Maxwell stress field has " *
+                                "$(length(tyy)) entries, the state has " *
+                                "$(length(read(f["theta"])))"))
+        txy = haskey(f, "txy") ? read(f["txy"]) : nothing
+        txy === nothing || length(txy) == length(read(f["theta"])) ||
+            throw(ArgumentError("checkpoint txy Maxwell stress field has " *
+                                "$(length(txy)) entries, the state has " *
+                                "$(length(read(f["theta"])))"))
         cfg = haskey(HDF5.attrs(f), "config") ?
               parse_config_string(HDF5.attrs(f)["config"]) : Dict{String,String}()
         cool = _load_cooldown(f)
@@ -377,6 +423,9 @@ function load_semquad_state(path::AbstractString)
          ev = ev,
          weak = weak,
          weak_prev = weak_prev,
+         txx = txx,
+         tyy = tyy,
+         txy = txy,
          cooldown = cool,
          velocity_stale = vstale)
     end

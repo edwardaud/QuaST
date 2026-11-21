@@ -31,6 +31,64 @@ const _SEMQUAD_ETA_CALLS = Ref(0)
 end
 
 """
+    _nodal_eta(eta_fun, sq)
+
+Sample the viscosity closure `eta_fun(x, y)` at the `sq` nodes, one value per
+scalar dof.  Used by the Maxwell stress-history update to give every node the
+*material* viscosity (the law before the 2a effective-viscosity softening), so
+its Maxwell time `eta/G` is the material one.
+"""
+function _nodal_eta(eta_fun::Function, sq::SemQuad)
+    eta = Vector{Float64}(undef, sq.N)
+    @inbounds for (g, (x, y)) in enumerate(sq.coords)
+        eta[g] = eta_fun(x, y)
+    end
+    return eta
+end
+
+"""
+    _advance_maxwell_stress!(txx, tyy, txy, sq, ux, uz, dt, eta, G)
+
+One backward-Euler Maxwell step for the three nodal tensor components of the
+viscoelastic stress state (docs/dev/PHASE2.md "2b: the design"):
+
+    tau_ij^{n+1} = maxwell_stress_step(tau_ij^n, eps_ij, dt, eta, G),
+
+with the strain-rate components of the step's velocity `(ux, uz)` on `sq`:
+
+    txx <- step(exx = dux/dx),
+    tyy <- step(ezz = duz/dy),
+    txy <- step(exz = (dux/dy + duz/dx)/2),
+
+and the nodal material viscosity `eta`.  The kernel is the already-gated
+[`maxwell_stress_step`](@ref) from `src/physics/viscoelastic.jl`; this helper
+only maps it over the nodes and the three components.
+
+The state is *not* used by the momentum equation in this change -- there is no
+`div(tau)` force term -- so it cannot feed back into the trajectory.
+"""
+function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
+                                  txy::Vector{Float64}, sq::SemQuad,
+                                  ux::Vector{Float64}, uz::Vector{Float64},
+                                  dt::Float64, eta::Vector{Float64},
+                                  G::Float64)
+    length(eta) == sq.N ||
+        throw(ArgumentError("eta node field has $(length(eta)) entries, mesh " *
+                            "needs $(sq.N)"))
+    (length(txx) == sq.N && length(tyy) == sq.N && length(txy) == sq.N) ||
+        throw(ArgumentError("Maxwell stress fields have lengths " *
+                            "($(length(txx)), $(length(tyy)), " *
+                            "$(length(txy))), mesh needs $(sq.N)"))
+    eps = semquad_strain_rate_components(sq, ux, uz)
+    @inbounds for g in eachindex(txx)
+        txx[g] = maxwell_stress_step(txx[g], eps.exx[g], dt, eta[g], G)
+        tyy[g] = maxwell_stress_step(tyy[g], eps.ezz[g], dt, eta[g], G)
+        txy[g] = maxwell_stress_step(txy[g], eps.exz[g], dt, eta[g], G)
+    end
+    return nothing
+end
+
+"""
     run_semquad_simulation(qt, pr, theta0; p=2, tstop, dt0, amr_every=0,
                            refine_frac=0.2, coarsen_frac=0.0, maxsteps=10000,
                            advection=:galerkin, cfl=0.0, verbose=false)
@@ -160,7 +218,11 @@ column changes `history.csv`'s layout, so
 output directory.
 Returns a named tuple with the final state and history rows
 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, nleaves]` (plus the opt-in columns
-described above; `history_extra` names them).
+described above; `history_extra` names them).  `txx`/`tyy`/`txy` are the nodal
+Maxwell stress-history components (`nothing` unless `pr.shear_modulus > 0`;
+docs/dev/PHASE2.md 2b step 1): state that is advanced once per step, transferred
+on AMR and checkpointed, but **not** used by the momentum equation in this
+change (no `div(tau)` force term).
 """
 function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64};
                                 p::Int=2, tstop::Float64=1.0e-3,
@@ -719,6 +781,52 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         end
         chi_iter = copy(chi)
     end
+    # Maxwell stress history (2b step 1): three Q2 nodal tensor components
+    # `txx`, `tyy`, `txy` on the same scalar layout as `chi`.  `nothing` when
+    # `pr.shear_modulus <= 0` (the default), in which case every stress-history
+    # code path is skipped and the run is bit-identical to the pre-2b behaviour.
+    # They are advanced once per step by `_advance_maxwell_stress!` below and
+    # carried through AMR and the checkpoint exactly like `chi`; the momentum
+    # equation does **not** see them (no `div(tau)` force term in this change,
+    # docs/dev/PHASE2.md 2b step 1).
+    stress = pr.shear_modulus > 0.0
+    txx = nothing
+    tyy = nothing
+    txy = nothing
+    if stress
+        # A checkpoint written before the stress history existed has none of the
+        # three datasets, so `restart.txx` is `nothing`: the history restarts
+        # from zero (the only self-consistent choice -- a file without it cannot
+        # supply it).  Every file this version writes carries all three.
+        any_stress = restart !== nothing &&
+                     (restart.txx !== nothing || restart.tyy !== nothing ||
+                      restart.txy !== nothing)
+        if any_stress
+            (restart.txx !== nothing && restart.tyy !== nothing &&
+             restart.txy !== nothing) ||
+                throw(ArgumentError("checkpoint has a partial Maxwell stress " *
+                                    "state: txx/tyy/txy must all be present"))
+            length(restart.txx) == sq.N ||
+                throw(ArgumentError("checkpoint txx stress field has " *
+                                    "$(length(restart.txx)) entries, mesh " *
+                                    "needs $(sq.N)"))
+            length(restart.tyy) == sq.N ||
+                throw(ArgumentError("checkpoint tyy stress field has " *
+                                    "$(length(restart.tyy)) entries, mesh " *
+                                    "needs $(sq.N)"))
+            length(restart.txy) == sq.N ||
+                throw(ArgumentError("checkpoint txy stress field has " *
+                                    "$(length(restart.txy)) entries, mesh " *
+                                    "needs $(sq.N)"))
+            txx = copy(restart.txx)
+            tyy = copy(restart.tyy)
+            txy = copy(restart.txy)
+        else
+            txx = zeros(Float64, sq.N)
+            tyy = zeros(Float64, sq.N)
+            txy = zeros(Float64, sq.N)
+        end
+    end
     edot_field = nothing
     eta_for_energy = nothing
     W_last = 0.0; U_last = 0.0; bal_last = 0.0
@@ -729,6 +837,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # only: the Stokes-failure line reports its eta range (docs/dev/CASE_REALISTIC.md
     # §13).  `nothing` before the first solve.
     eta_probe = Ref{Any}(nothing)
+    # The same closure *before* the 2a Maxwell effective-viscosity softening.
+    # The stress history (2b step 1) advances with the material viscosity, so
+    # its Maxwell time is eta/G and not the softened eta_eff/G; `_advance`
+    # samples this closure at the nodes after the step has converged.  Only set
+    # when `shear_modulus > 0` (the state is `nothing` otherwise).
+    eta_base_probe = Ref{Any}(nothing)
 
     function solve_flow!(; stokes_scaling::Symbol=:none)
         leaves = Set(sq.leaves)
@@ -810,6 +924,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # the closure is rebuilt every step; `shear_modulus <= 0` (the default)
         # skips it and leaves the law bit-identical.
         if pr.shear_modulus > 0.0
+            # The stress history (2b step 1) relaxes on the *material* Maxwell
+            # time eta/G, so keep the law before the softening below.
+            eta_base_probe[] = eta_fun
             base_ve = eta_fun
             Gv = pr.shear_modulus
             eta_fun = (x, y) -> begin
@@ -1259,6 +1376,20 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             chi_prev = chi
             chi = clamp.(chi_iter, 0.0, 1.0)
         end
+        # Maxwell stress history (2b step 1): one backward-Euler step with the
+        # velocity of the step that just converged, on the mesh it was solved on
+        # (the AMR block below transfers the result, exactly like `chi`).  The
+        # material viscosity is sampled at the nodes from the closure of the
+        # last flow solve, before the 2a effective-viscosity softening, so
+        # tau_M = eta/G is the material Maxwell time.  `dt` is this step's step
+        # (updated by the CFL block at `it == 1`), the same one the energy solve
+        # used.  Nothing reads these fields back: the momentum equation is
+        # unchanged in this commit.
+        if stress && eta_base_probe[] !== nothing
+            eta_nodes = _nodal_eta(eta_base_probe[], sq)
+            _advance_maxwell_stress!(txx, tyy, txy, sq, ux, uz, dt, eta_nodes,
+                                     pr.shear_modulus)
+        end
         # Keep a handle on the second BDF2 level of the step that just finished:
         # `theta_prev` is overwritten below, and the opt-in exact-residual
         # diagnostic needs theta^(n-1) (no copy; the array is not mutated).
@@ -1415,6 +1546,16 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                             zero_walls=false, qt_new=qt)
                 chi_iter = copy(chi)
             end
+            # The Maxwell stress history is a set of scalar fields on the same
+            # space, so it follows the same transfer as `chi` (2b step 1).
+            if stress
+                txx = transfer_semquad(old_sq, txx, sq; mode=transfer_mode,
+                                       zero_walls=false, qt_new=qt)
+                tyy = transfer_semquad(old_sq, tyy, sq; mode=transfer_mode,
+                                       zero_walls=false, qt_new=qt)
+                txy = transfer_semquad(old_sq, txy, sq; mode=transfer_mode,
+                                       zero_walls=false, qt_new=qt)
+            end
             ux = zeros(Float64, sq.N)
             uz = zeros(Float64, sq.N)
             pv = zeros(Float64, ss.sp.N)
@@ -1461,6 +1602,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                t=t, dt=dt, dt_prev=dt_prev, step=step, p=p,
                                config=run_config, meta=checkpoint_meta,
                                ev=ev_field, weak=chi, weak_prev=chi_prev,
+                               txx=txx, tyy=tyy, txy=txy,
                                cooldown=SEMQUAD_AMR_COOLDOWN[])
         end
 
@@ -1508,6 +1650,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                            t=t, dt=dt, dt_prev=dt_prev, step=step, p=p,
                            config=run_config, meta=checkpoint_meta,
                            ev=ev_field, weak=chi, weak_prev=chi_prev,
+                           txx=txx, tyy=tyy, txy=txy,
                            cooldown=SEMQUAD_AMR_COOLDOWN[],
                            velocity_stale=final_velocity_stale)
     end
@@ -1550,6 +1693,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     return (theta=theta, t=t, steps=step, history=hist, history_extra=hist_extra,
             qt=qt, ss=ss,
             ux=ux, uz=uz, pv=pv, avg=avg, steady=steady,
-            weak=weak, chi=chi, chi_prev=chi_prev)
+            weak=weak, chi=chi, chi_prev=chi_prev,
+            # Maxwell stress history (2b step 1): `nothing` unless
+            # `shear_modulus > 0`.  State only; no force term reads them.
+            txx=txx, tyy=tyy, txy=txy)
 end
 

@@ -39,6 +39,53 @@ function semquad_strain_rate_field(sq::SemQuad, ux::Vector{Float64},
 end
 
 """
+    semquad_strain_rate_components(sq, ux, uz)
+
+Nodal *components* of the strain-rate tensor of `(ux, uz)` on the scalar layout
+of `sq`, returned as the named tuple `(exx, ezz, exz)`:
+
+    exx = dux/dx,   ezz = duz/dy,   exz = (dux/dy + duz/dx)/2.
+
+Computed element-locally with each element's own derivative matrix, the same
+loop as [`semquad_strain_rate_field`](@ref), which only returns the second
+invariant `sqrt(0.5(exx^2+ezz^2+2exz^2))`.  The two would be redundant if the
+invariant were enough: the Maxwell stress history of docs/dev/PHASE2.md 2b
+carries the tensor components, so the shear one in particular needs `exz`.
+
+`semquad_strain_rate_field` scales *every* derivative with `leaf_hy` (written for
+the square mesh); the components here scale the x derivative with `leaf_hx` and
+the y derivative with `leaf_hy`, so they are also correct on a stretched box.
+On the square mesh `leaf_hx == leaf_hy` and the invariant of these components is
+the field above.
+"""
+function semquad_strain_rate_components(sq::SemQuad, ux::Vector{Float64},
+                                        uz::Vector{Float64})
+    n = sq.p + 1
+    exx = zeros(Float64, sq.N)
+    ezz = zeros(Float64, sq.N)
+    exz = zeros(Float64, sq.N)
+    for lf in sq.leaves
+        fx = 2.0 / leaf_hx(sq, lf[1])
+        fy = 2.0 / leaf_hy(sq, lf[1])
+        ids = sq.elem[lf]
+        for j in 1:n, i in 1:n
+            dux_dx = 0.0; dux_dy = 0.0; duz_dx = 0.0; duz_dy = 0.0
+            for a in 1:n
+                dux_dx += sq.D[i, a] * ux[ids[(j - 1) * n + a]]
+                dux_dy += sq.D[j, a] * ux[ids[(a - 1) * n + i]]
+                duz_dx += sq.D[i, a] * uz[ids[(j - 1) * n + a]]
+                duz_dy += sq.D[j, a] * uz[ids[(a - 1) * n + i]]
+            end
+            g = ids[(j - 1) * n + i]
+            exx[g] = dux_dx * fx
+            ezz[g] = duz_dy * fy
+            exz[g] = 0.5 * (dux_dy * fy + duz_dx * fx)
+        end
+    end
+    return (exx=exx, ezz=ezz, exz=exz)
+end
+
+"""
     blend_field(prev, new, relax)
 
 Convex blend `(1-relax) prev + relax new`; `relax == 1` returns `new` exactly

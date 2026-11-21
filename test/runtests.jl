@@ -174,5 +174,6 @@ using QuaST
     include("t_g243_per_wall_values.jl")
     include("t_g244_maxwell_step.jl")
     include("t_g245_config_guard.jl")
+    include("t_g246_stress_state.jl")
 end
 
