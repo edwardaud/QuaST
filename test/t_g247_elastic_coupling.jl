@@ -106,17 +106,19 @@ using Test, QuaST, LinearAlgebra, Printf
                                       linear=:direct)[1]
         return um, ue, eta_mat, eta_eff
     end
-    # Nodal stress at the material solution, `2 eta eps(u)`, and one application
-    # of the coupled map from it: the fixed-point defect measures how far the
-    # nodal stress interpolation and the lag move the fixed point away from the
-    # material-viscosity solution.  It is the discretisation floor the (d)
-    # tolerances are justified against.
+    # Nodal stress at the material solution, `2 eta ehat` with the *deviatoric*
+    # strain rate `ehat = eps - (1/3) tr(eps) I` (G249: the Maxwell stress is
+    # deviatoric), and one application of the coupled map from it: the
+    # fixed-point defect measures how far the nodal stress interpolation and the
+    # lag move the fixed point away from the material-viscosity solution.  It is
+    # the discretisation floor the (d) tolerances are justified against.
     function g247_defect(run, um, eta_nodes)
         sq = run.r.ss.su
         N = sq.N
         epsm = QuaST.semquad_strain_rate_components(sq, um[1:N], um[(N + 1):(2N)])
-        tx = 2 .* eta_nodes .* epsm.exx
-        ty = 2 .* eta_nodes .* epsm.ezz
+        trm = epsm.exx .+ epsm.ezz
+        tx = 2 .* eta_nodes .* (epsm.exx .- trm ./ 3)
+        ty = 2 .* eta_nodes .* (epsm.ezz .- trm ./ 3)
         tz = 2 .* eta_nodes .* epsm.exz
         el = QuaST.maxwell_force_stress(tx, ty, tz, eta_nodes, run.dt, run.G)
         _, eta_eff = g247_eta_closures(run)
@@ -245,9 +247,10 @@ using Test, QuaST, LinearAlgebra, Printf
         assemble_only=true)
 
     # ---- (d) the equilibrated limit through the driver -------------------
-    # R >> eta: dt = 1000 tau_M-ish.  The stress must reach 2 eta eps, and the
-    # flow must reproduce the 2a effective-viscosity solution: both schemes then
-    # differ only by the O(tau_M/dt) viscosity shift, and the coupled one is the
+    # R >> eta: dt = 1000 tau_M-ish.  The stress must reach 2 eta ehat with the
+    # deviatoric strain rate `ehat` (G249), and the flow must reproduce the 2a
+    # effective-viscosity solution: both schemes then differ only by the
+    # O(tau_M/dt) viscosity shift, and the coupled one is the
     # material-viscosity solution (eta_eff + a eta = eta).
     runA = g247_run(1000.0; nsteps=5)
     umA, ueA, eta_matA, eta_effA = g247_reference(runA)
@@ -273,21 +276,24 @@ using Test, QuaST, LinearAlgebra, Printf
     @test runA.us[2] == u_rec[1:NA]           # the step used tau^1 from u_0
     @test runA.r.txx !== nothing && runA.r.tyy !== nothing &&
           runA.r.txy !== nothing
-    # tau = 2 eta eps at the equilibrated state (machine precision: the update's
-    # fixed point is exactly the material stress)
+    # tau = 2 eta ehat at the equilibrated state (machine precision: the
+    # update's fixed point is exactly the material *deviatoric* stress)
     epsA = QuaST.semquad_strain_rate_components(sqA, runA.r.ux, runA.r.uz)
+    trA = epsA.exx .+ epsA.ezz
+    ehatA_xx = epsA.exx .- trA ./ 3
+    ehatA_zz = epsA.ezz .- trA ./ 3
     tmaxA = max(maximum(abs, runA.r.txx), maximum(abs, runA.r.tyy),
                 maximum(abs, runA.r.txy))
-    tau_err = max(maximum(abs.(runA.r.txx .- 2 .* eta_nodesA .* epsA.exx)),
-                  maximum(abs.(runA.r.tyy .- 2 .* eta_nodesA .* epsA.ezz)),
+    tau_err = max(maximum(abs.(runA.r.txx .- 2 .* eta_nodesA .* ehatA_xx)),
+                  maximum(abs.(runA.r.tyy .- 2 .* eta_nodesA .* ehatA_zz)),
                   maximum(abs.(runA.r.txy .- 2 .* eta_nodesA .* epsA.exz)))
     @test tau_err / tmaxA < 1.0e-12           # measured ~1e-15 after 5 steps
-    # the stress is also 2 eta_eff eps to the O(tau_M/dt) the 2a closure implies
+    # the stress is also 2 eta_eff ehat to the O(tau_M/dt) the 2a closure implies
     eta_eff_nodesA = [eta_effA(c[1], c[2]) for c in sqA.coords]
     tau_eff_err = max(maximum(abs.(runA.r.txx .-
-                                   2 .* eta_eff_nodesA .* epsA.exx)),
+                                   2 .* eta_eff_nodesA .* ehatA_xx)),
                       maximum(abs.(runA.r.tyy .-
-                                   2 .* eta_eff_nodesA .* epsA.ezz)),
+                                   2 .* eta_eff_nodesA .* ehatA_zz)),
                       maximum(abs.(runA.r.txy .-
                                    2 .* eta_eff_nodesA .* epsA.exz)))
     @test tau_eff_err / tmaxA < 5.0e-3        # tau_M/dt <= 1.5e-3
@@ -319,10 +325,13 @@ using Test, QuaST, LinearAlgebra, Printf
     @test rel(uB, umB[1:NB]) <= 2.0 * rel(udefectB, umB)
     @test rel(uB, ueB[1:NB]) > 1.0e-3         # measured 2.6e-3, 10x the 2a shift
     epsB = QuaST.semquad_strain_rate_components(sqB, runB.r.ux, runB.r.uz)
+    trB = epsB.exx .+ epsB.ezz
+    ehatB_xx = epsB.exx .- trB ./ 3
+    ehatB_zz = epsB.ezz .- trB ./ 3
     tmaxB = max(maximum(abs, runB.r.txx), maximum(abs, runB.r.tyy),
                 maximum(abs, runB.r.txy))
-    tau_errB = max(maximum(abs.(runB.r.txx .- 2 .* eta_nodesB .* epsB.exx)),
-                   maximum(abs.(runB.r.tyy .- 2 .* eta_nodesB .* epsB.ezz)),
+    tau_errB = max(maximum(abs.(runB.r.txx .- 2 .* eta_nodesB .* ehatB_xx)),
+                   maximum(abs.(runB.r.tyy .- 2 .* eta_nodesB .* ehatB_zz)),
                    maximum(abs.(runB.r.txy .- 2 .* eta_nodesB .* epsB.exz)))
     @test tau_errB / tmaxB < 1.0e-6           # measured 5e-9
     # the 2a departure scales like tau_M/dt: R = 1000 is 100x smaller than R = 10
@@ -331,7 +340,7 @@ using Test, QuaST, LinearAlgebra, Printf
     ch = [rel(runA.us[k], runA.us[k - 1]) for k in 2:length(runA.us)]
     @test ch[3] < 0.1 * ch[2]
     @test ch[end] < 1.0e-6 * ch[1]
-    @printf("G247: R=1000 rel(run,mat)=%.2e rel(run,2a)=%.2e |tau-2eta eps|=%.1e ; R=10 rel(run,mat)=%.2e rel(run,2a)=%.2e\n",
+    @printf("G247: R=1000 rel(run,mat)=%.2e rel(run,2a)=%.2e |tau-2eta ehat|=%.1e ; R=10 rel(run,mat)=%.2e rel(run,2a)=%.2e\n",
             rel(uA, umA[1:NA]), rel(uA, ueA[1:NA]), tau_err / tmaxA,
             rel(uB, umB[1:NB]), rel(uB, ueB[1:NB]))
 end

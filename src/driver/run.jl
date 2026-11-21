@@ -52,17 +52,52 @@ end
 One backward-Euler Maxwell step for the three nodal tensor components of the
 viscoelastic stress state (docs/dev/PHASE2.md "2b: the design"):
 
-    tau_ij^{n+1} = maxwell_stress_step(tau_ij^n, eps_ij, dt, eta, G),
+    tau_ij^{n+1} = maxwell_stress_step(tau_ij^n, ehat_ij, dt, eta, G),
 
-with the strain-rate components of the step's velocity `(ux, uz)` on `sq`:
+driven by the **deviatoric** strain rate of the step's velocity `(ux, uz)` on
+`sq`:
 
-    txx <- step(exx = dux/dx),
-    tyy <- step(ezz = duz/dy),
-    txy <- step(exz = (dux/dy + duz/dx)/2),
+    ehat_ij = eps_ij - (1/3) tr(eps) delta_ij,     tr(eps) = exx + ezz,
 
-and the nodal material viscosity `eta`.  The kernel is the already-gated
-[`maxwell_stress_step`](@ref) from `src/physics/viscoelastic.jl`; this helper
-only maps it over the nodes and the three components.
+i.e. the three components advanced are
+
+    txx <- step(ehat_xx = exx - tr/3),
+    tyy <- step(ehat_zz = ezz - tr/3),
+    txy <- step(ehat_xz = exz),
+
+with the nodal material viscosity `eta`.  In 2-D plane strain the out-of-plane
+normal strain is exactly zero, but it still enters the trace: the tensor being
+updated is the full 3-D one restricted to the plane, whose third normal
+deviatoric strain rate is `-tr/3`.  The projection belongs to this caller, not
+to the kernel: [`maxwell_stress_step`](@ref) is a scalar backward-Euler step
+gated on its own (G244), and the Maxwell stress is the *deviatoric* stress, so
+`ehat` is its input (G249).
+
+This is not a cosmetic correction.  The discrete trace of the solver's velocity
+is not zero even when the flow is incompressible, so feeding the raw tensor
+would accumulate a spurious isotropic stress; `div(a tau)` then realises that
+trace as a pressure-like load and every stress diagnostic inherits it.  The
+projection is also the strain-rate measure the viscous operator uses when
+`Params.deviatoric = true` (`K = int 2 eta ehat : eps(v)`), so both halves of
+the backward-Euler split then describe the same tensor; G249 pins that, and the
+G246 stress-state gate -- written with the pre-fix raw mapping -- had to move
+its expected components to `ehat`.
+
+The out-of-plane normal stress `tau_zz` is **not stored**.  Trace zero makes it
+implied,
+
+    tau_zz = -(tau_xx + tau_yy),
+
+which is what the deviatoric update driven by `-tr/3` produces (G249 checks the
+two agree; it is not defined as the negation of the stored sum).  The 2-D
+elastic force term never needs it: `div(a tau)` is
+
+    (d/dx(a tau_xx) + d/dy(a tau_xy),  d/dx(a tau_xy) + d/dy(a tau_yy)),
+
+and `src/stokes/assembly_var.jl` assembles exactly those two rows from the
+three in-plane components (the out-of-plane normal stress would contract with
+the identically zero out-of-plane velocity gradient); the Newton path uses the
+same assembler.  A fourth field would therefore be state no assembly reads.
 
 The state is advanced after the momentum solve of the step (so the next step's
 Stokes solve sees `tau^n`, never a same-step update): the driver adds
@@ -84,8 +119,15 @@ function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
                             "$(length(txy))), mesh needs $(sq.N)"))
     eps = semquad_strain_rate_components(sq, ux, uz)
     @inbounds for g in eachindex(txx)
-        txx[g] = maxwell_stress_step(txx[g], eps.exx[g], dt, eta[g], G)
-        tyy[g] = maxwell_stress_step(tyy[g], eps.ezz[g], dt, eta[g], G)
+        # Deviatoric projection (the Maxwell stress has zero trace).  The
+        # out-of-plane normal strain is zero in plane strain but contributes its
+        # 0 to the trace, so tr = exx + ezz and the implied third deviatoric
+        # normal strain rate is -tr/3 (not stored; the docstring has the
+        # tau_zz argument and the code evidence that the force term never needs
+        # it).
+        tr = eps.exx[g] + eps.ezz[g]
+        txx[g] = maxwell_stress_step(txx[g], eps.exx[g] - tr / 3.0, dt, eta[g], G)
+        tyy[g] = maxwell_stress_step(tyy[g], eps.ezz[g] - tr / 3.0, dt, eta[g], G)
         txy[g] = maxwell_stress_step(txy[g], eps.exz[g], dt, eta[g], G)
     end
     return nothing
@@ -224,11 +266,14 @@ Returns a named tuple with the final state and history rows
 described above; `history_extra` names them).  `txx`/`tyy`/`txy` are the nodal
 Maxwell stress-history components (`nothing` unless `pr.shear_modulus > 0`;
 docs/dev/PHASE2.md 2b): state that is advanced once per step, transferred on AMR
-and checkpointed.  With `shear_modulus > 0` the previous step's stress also
-drives the momentum through the 2b elastic force term `div(a tau^n)` (2b step 2;
-see `maxwell_force_stress`), so its history feeds the velocity trajectory.  With
-`shear_modulus == 0` no elastic path exists at all and the run is bit-identical
-to the pre-2b one.
+and checkpointed.  The tensor is the **deviatoric** stress: the update is driven
+by `ehat = eps - (1/3) tr(eps) I` (G249), so the out-of-plane normal stress is
+implied by trace zero, `tau_zz = -(tau_xx + tau_yy)`, rather than stored -- the
+2-D momentum equation never contains it.  With `shear_modulus > 0` the previous
+step's stress also drives the momentum through the 2b elastic force term
+`div(a tau^n)` (2b step 2; see `maxwell_force_stress`), so its history feeds the
+velocity trajectory.  With `shear_modulus == 0` no elastic path exists at all and
+the run is bit-identical to the pre-2b one.
 """
 function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64};
                                 p::Int=2, tstop::Float64=1.0e-3,
@@ -796,10 +841,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # `tyy`, `txy` on the same scalar layout as `chi`.  `nothing` when
     # `pr.shear_modulus <= 0` (the default), in which case every stress-history
     # code path is skipped and the run is bit-identical to the pre-2b behaviour.
-    # They are advanced once per step by `_advance_maxwell_stress!` below, and
-    # the previous step's value drives the momentum solve through the elastic
-    # force term `div(a tau^n)` (2b step 2); they are carried through AMR and the
-    # checkpoint exactly like `chi`.
+    # They are the *deviatoric* stress: `_advance_maxwell_stress!` projects the
+    # strain rate, and the out-of-plane normal stress is implied by trace zero
+    # (`tau_zz = -(tau_xx + tau_yy)`), not stored -- no assembly reads it.  They
+    # are advanced once per step, and the previous step's value drives the
+    # momentum solve through the elastic force term `div(a tau^n)` (2b step 2);
+    # they are carried through AMR and the checkpoint exactly like `chi`.
     stress = pr.shear_modulus > 0.0
     txx = nothing
     tyy = nothing

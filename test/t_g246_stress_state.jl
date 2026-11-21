@@ -11,8 +11,11 @@
 #   (a) `G = 0` carries no state, writes no checkpoint dataset, and two
 #       constructions of the default run are bit-identical;
 #   (b) at a *fixed* non-zero strain rate the three fields follow
-#       `maxwell_stress_exact` to the first-order tolerance, with the tensor
-#       mapping txx <- exx, tyy <- ezz, txy <- exz;
+#       `maxwell_stress_exact` to the first-order tolerance, with the
+#       **deviatoric** tensor mapping `txx <- ehat_xx`, `tyy <- ehat_zz`,
+#       `txy <- ehat_xz` (G249: the Maxwell stress is deviatoric, so the
+#       update projects `eps - (1/3) tr(eps) I`; the pre-fix raw mapping is
+#       what this block used to expect, and it was wrong);
 #   (c) the driver advances them once per step with that step's velocity, dt,
 #       G and material viscosity (reconstructed exactly from the callbacks);
 #   (d) a checkpoint round trip is bit-exact for the fields and a restart
@@ -81,6 +84,12 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     # ---- (b) fixed strain rate: the analytic Maxwell curve, component-wise
     # A linear velocity field is exactly representable by the p = 2 space, so
     # its strain-rate components are the prescribed constants at *every* node.
+    # The update is driven by the deviatoric strain rate (G249), and this
+    # field's trace is *not* zero: tr = a + e = 0.18, so the projected components
+    # are 0.24 and -0.18, not 0.3 and -0.12.  (This field was believed to be
+    # solenoidal when the block was written; it never was -- and even a truly
+    # solenoidal field would not have exposed the missing projection here,
+    # because the reference below was computed with the same raw mapping.)
     qb = g246_tree(1)
     ssb = make_semstokes(qb, 2)
     sqb = ssb.su
@@ -91,6 +100,8 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     @test maximum(abs.(epsb.exx .- a)) < 1.0e-12
     @test maximum(abs.(epsb.ezz .- e)) < 1.0e-12
     @test maximum(abs.(epsb.exz .- 0.5 * (b + d))) < 1.0e-12
+    tr_b = a + e
+    exx_b, ezz_b, exz_b = a - tr_b / 3, e - tr_b / 3, 0.5 * (b + d)
     eta_b = 2.0
     G_b = 50.0
     tauM_b = eta_b / G_b
@@ -104,10 +115,15 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
         end
         return txx, tyy, txy
     end
-    exx_b, ezz_b, exz_b = a, e, 0.5 * (b + d)
     ref = (maxwell_stress_exact(tauM_b, exx_b, eta_b, G_b),
            maxwell_stress_exact(tauM_b, ezz_b, eta_b, G_b),
            maxwell_stress_exact(tauM_b, exz_b, eta_b, G_b))
+    # the deviatoric reference is measurably away from the pre-fix raw one, so
+    # the tolerance below is not satisfied by the old mapping (G249 (a))
+    @test abs(maxwell_stress_exact(tauM_b, a, eta_b, G_b) - ref[1]) >
+          0.1 * abs(ref[1])
+    @test abs(maxwell_stress_exact(tauM_b, e, eta_b, G_b) - ref[2]) >
+          0.1 * abs(ref[2])
     # a uniform strain rate gives a uniform field: every node is the same value
     dt_b = tauM_b / 500
     txx1, tyy1, txy1 = g246_fixed(dt_b)
@@ -124,7 +140,7 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     e2 = err(tauM_b / 500)
     @test e2 < e1
     @test 1.5 < e1 / e2 < 2.5
-    # the elastic first step from rest is 2 G eps dt (dt << tau_M)
+    # the elastic first step from rest is 2 G ehat dt (dt << tau_M)
     dt_small = 1.0e-4 * tauM_b
     txxe = zeros(sqb.N); tyye = zeros(sqb.N); txye = zeros(sqb.N)
     QuaST._advance_maxwell_stress!(txxe, tyye, txye, sqb, uxb, uzb, dt_small,
@@ -136,8 +152,10 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     # ---- (c) the driver advances the fields once per step ----------------
     # Reconstruct the update from the callback state of every step: the
     # strain-rate components of that step's velocity, that step's dt, eta = 1
-    # and G.  Exact equality pins the whole wiring (velocity level, dt, eta,
-    # one step per time step, all three components).
+    # and G, *projected to their deviatoric part* (G249: the update is driven by
+    # ehat = eps - (1/3) tr(eps) I with tr = exx + ezz).  Exact equality pins
+    # the whole wiring (velocity level, dt, eta, one step per time step, all
+    # three components, projection).
     G_d = 1.0e3
     prG = const_pr(G=G_d)
     uxs = Vector{Vector{Float64}}()
@@ -155,10 +173,11 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
     for k in 1:4
         epsk = QuaST.semquad_strain_rate_components(rd.ss.su, uxs[k], uzs[k])
         for g in eachindex(rd_tx)
-            rd_tx[g] = maxwell_stress_step(rd_tx[g], epsk.exx[g], dts[k], 1.0,
-                                           G_d)
-            rd_ty[g] = maxwell_stress_step(rd_ty[g], epsk.ezz[g], dts[k], 1.0,
-                                           G_d)
+            trk = epsk.exx[g] + epsk.ezz[g]
+            rd_tx[g] = maxwell_stress_step(rd_tx[g], epsk.exx[g] - trk / 3,
+                                           dts[k], 1.0, G_d)
+            rd_ty[g] = maxwell_stress_step(rd_ty[g], epsk.ezz[g] - trk / 3,
+                                           dts[k], 1.0, G_d)
             rd_tz[g] = maxwell_stress_step(rd_tz[g], epsk.exz[g], dts[k], 1.0,
                                            G_d)
         end
@@ -186,10 +205,11 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
         for k in 1:3
             ek = QuaST.semquad_strain_rate_components(r2.ss.su, u2[k], z2[k])
             for g in eachindex(p2x)
-                p2x[g] = maxwell_stress_step(p2x[g], ek.exx[g], dt2[k], 1.0,
-                                             G_d)
-                p2y[g] = maxwell_stress_step(p2y[g], ek.ezz[g], dt2[k], 1.0,
-                                             G_d)
+                trk = ek.exx[g] + ek.ezz[g]
+                p2x[g] = maxwell_stress_step(p2x[g], ek.exx[g] - trk / 3,
+                                             dt2[k], 1.0, G_d)
+                p2y[g] = maxwell_stress_step(p2y[g], ek.ezz[g] - trk / 3,
+                                             dt2[k], 1.0, G_d)
                 p2z[g] = maxwell_stress_step(p2z[g], ek.exz[g], dt2[k], 1.0,
                                              G_d)
             end

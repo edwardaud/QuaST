@@ -177,5 +177,6 @@ using QuaST
     include("t_g246_stress_state.jl")
     include("t_g247_elastic_coupling.jl")
     include("t_g248_density_hook.jl")
+    include("t_g249_stress_projection.jl")
 end
 
