@@ -98,11 +98,20 @@ struct Params
     # (`semquad_phase_buoyancy`), which is its own density anomaly anchored to
     # `rho0`, is not scaled.
     rho_multiplier::Union{Nothing,Function}
-    # Maxwell viscoelasticity in the effective-viscosity form (ASPECT's
-    # `viscoelastic`, docs/dev/PHASE2.md 2a): with the shear modulus `G` and the
-    # step `dt`, eta_eff = 1/(1/eta + 1/(G*dt)).  `G <= 0` disables it and leaves
-    # every law bit-identical.  This relaxes the instantaneous elastic stress at the
-    # current dt instead of carrying a stress history; the history form is 2b.
+    # Maxwell viscoelasticity (ASPECT's `viscoelastic`, docs/dev/PHASE2.md 2a and
+    # 2b): the shear modulus `G` scales the elastic response in both the
+    # effective-viscosity closure eta_eff = 1/(1/eta + 1/(G*dt)) and the stress
+    # history tau^{n+1} = (corotate(tau^n) + 2 G dt ehat)/(1 + dt/tau_M),
+    # tau_M = eta/G.  Both use the driver's **actual** step `dt`, which is
+    # adaptive (CFL + growth limits); that is consistent, because backward Euler
+    # with the actual step converges to the analytic Maxwell curve at first order
+    # for any variable step sequence summing to the same time (G251), so a fixed
+    # elastic time step is not needed.  ASPECT's `Use fixed elastic time step`,
+    # `Fixed elastic time step` and `Use stress averaging` evaluate the elastic
+    # response on a chosen timescale instead of the numerical one; they are
+    # modelling options for special cases such as seismic cycles, not a
+    # consistency requirement, and are deliberately not implemented here (G251).
+    # `G <= 0` disables every viscoelastic term and leaves every law bit-identical.
     shear_modulus::Float64
     # Per-wall *tangential* velocity, `(xminus, xplus, yminus, yplus)`; `nothing`
     # falls back to the global `uDx`/`uDz` closures, which is the historical

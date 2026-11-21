@@ -179,5 +179,6 @@ using QuaST
     include("t_g248_density_hook.jl")
     include("t_g249_stress_projection.jl")
     include("t_g250_corotation.jl")
+    include("t_g251_variable_dt.jl")
 end
 

@@ -150,6 +150,25 @@ lagged load is the one place the update's rotation increment is not carried
 (the exact split would load `a (tau^n + dt (W tau^n - tau^n W))`); the scope
 choice and its order are documented on [`maxwell_force_stress`](@ref).
 
+The step `dt` is the driver's **actual numerical step for that step** -- the one
+the CFL/growth rule selected, which the energy solve and the returned history
+use too -- read from the argument on every call; there is no fixed elastic
+timescale in this update.  That is consistent: backward Euler has `O(dt^2)`
+local truncation error, so on any sequence of steps summing to the same time
+the stress converges to the analytic Maxwell curve `O(max dt)` and halving all
+steps halves the error, however the steps vary.  G251 integrates a uniform, a
+factor-10 alternating and a band-random step sequence to that analytic value
+(both the spin-free kernel and the composed update above) and measures the
+order, and its driver-level half replays a forced-varying-`dt` run's captured
+`(dt, velocity)` sequence through this function and reproduces the driver's
+stress bit for bit.  ASPECT's `Use fixed elastic time step`, `Fixed elastic
+time step` and `Use stress averaging` therefore have no counterpart here: they
+replace the numerical step by a chosen elastic timescale, which is a modelling
+decision (a seismic cycle, say) rather than a consistency requirement for an
+adaptive-step run.  We do not expose them because this update needs no such
+rescaling to be trustworthy, and a parameter that changes the elastic response
+without a case that needs it would be an unvalidated choice.
+
 `G <= 0` is the disabled convention (`shear_modulus = 0`): the state is left
 untouched and nothing is computed, not even the rotation.
 """
