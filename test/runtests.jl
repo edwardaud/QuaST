@@ -173,5 +173,6 @@ using QuaST
     include("t_g242_viscoelastic.jl")
     include("t_g243_per_wall_values.jl")
     include("t_g244_maxwell_step.jl")
+    include("t_g245_config_guard.jl")
 end
 

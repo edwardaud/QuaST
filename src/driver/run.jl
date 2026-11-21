@@ -471,6 +471,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # trajectory, so a restart must not switch them silently.  The phase list is
     # stored as a canonical string; old checkpoints without these keys simply
     # skip them (`haskey(run_config, k) || continue` below).
+    # Viscoelasticity and the per-wall tuple change the trajectory, so a restart
+    # must not switch them silently.  The guard below tolerates keys an older
+    # checkpoint does not carry (`haskey(run_config, k) || continue`), so adding
+    # these does not invalidate existing files.
+    run_config["shear_modulus"] = pr.shear_modulus
+    run_config["wall_bc"] = join(string.(pr.wall_bc), ",")
     run_config["latent_L"] = pr.latent_L
     run_config["latent_mode"] = pr.latent_mode
     run_config["latent_scheme"] = latent_scheme
