@@ -60,7 +60,16 @@
 #        card's energies (e.g. because the range was set back to [0.1, 0.9]
 #        with `CALIB_TTOP`/`CALIB_TBOT`), the solve keeps the card's numbers
 #        exactly: the default target then reproduces the existing calibration.
-# 5. Verifies everything against `eta_composite_at` itself (not against the
+# 5. Declares the **reference viscosity** the prefactors produce.  The value
+#    condition is eta(T=0.5, z=0.5, edot_ref) = 1, so in the units the material
+#    law returns the reference viscosity of this calibration is eta_ref = 1.
+#    That is exactly what `Params.eta_ref` expects (the default, and the card's
+#    CASE_ETA_REF default): Ra = rho g alpha dT d^3/(kappa eta_ref).  If the
+#    prefactors are rescaled, eta_ref must be rescaled with them -- multiplying
+#    comp_Ad and comp_As by 1/c multiplies every viscosity the law returns by c,
+#    so the same physical problem needs eta_ref = c; with eta_ref left at 1 the
+#    flow changes while Ra does not.
+# 6. Verifies everything against `eta_composite_at` itself (not against the
 #    hand-rolled algebra) and prints the variant's full parameter set and the
 #    environment command line that runs the card with it:
 #        CASE_COMP_ED=... CASE_COMP_ES=... CASE_COMP_AD=... CASE_COMP_AS=...
@@ -392,6 +401,30 @@ function main()
     printf("VERIFY rel. deviations: %.3e / %.3e\n", abs(e05 - 1.0),
             abs(c_oldwin - RATIO_REF) / RATIO_REF)
 
+    # ------------------------------------ the reference viscosity it declares
+    # The value condition above is the *definition* of the law's reference
+    # viscosity: the calibration forces eta = 1 at (T=0.5, z=0.5, edot_ref), and
+    # `Params.eta_ref` is exactly that number in the law's units.  Say it in the
+    # output, because it is what a card must carry when the law is rescaled.
+    printf("\n=== the reference viscosity this calibration declares ===\n")
+    printf("value condition: eta(T=%.2f, z=%.2f, edot_ref) = %.15e  (target 1)\n",
+            TC, ZC, e05)
+    printf("=> in the units the material law returns, the reference viscosity of\n")
+    printf("   these prefactors is eta_ref = 1.0.  That is the value Params.eta_ref\n")
+    printf("   expects (the library default) and the production card's CASE_ETA_REF\n")
+    printf("   default.  Ra is defined as rho g alpha dT d^3/(kappa eta_ref), so a\n")
+    printf("   card that rescales the law must rescale eta_ref with it:\n")
+    printf("     multiplying comp_Ad and comp_As by 1/c multiplies every viscosity\n")
+    printf("     the law returns by c (both creep branches and the isostress\n")
+    printf("     solution scale together), so the same physical problem needs\n")
+    printf("     eta_ref = c.\n")
+    printf("   Leaving eta_ref = 1 with the rescaled law keeps Ra at its old value\n")
+    printf("   while every physical viscosity -- and the interior Rayleigh number\n")
+    printf("   Ra/eta_interior -- moves by c.  That is the foot-gun the declaration\n")
+    printf("   closes.  The eta_min/eta_max bounds are absolute bounds in the law's\n")
+    printf("   units (applied before the normalisation), so a pure rescaling must\n")
+    printf("   rescale them too.\n")
+
     # ------------------------- step 2: the diagnostic, on the real range
     c_card = realised_contrast(ED0, ES0, AD0, AS0, edot_ref)   # full real range
     printf("\n=== realised contrast over the full range [%.3f, %.3f] ===\n",
@@ -448,6 +481,12 @@ function main()
             EDv, ESv, ADv, ASv, NEXP, T0)
     printf("  edot_ref = %.6e  z = %.2f  range = [%.3f, %.3f]  target = %.6e\n",
             edot_ref, ZC, TTOP, TBOT, TARGET)
+    # Both parameter sets satisfy the same value condition (eta = 1 at the
+    # calibration point), so both declare the same reference viscosity.
+    printf("  eta_ref = 1.0 for the card and for the variant: the value condition\n")
+    printf("  eta(%.2f, z=%.2f, edot_ref) = 1 sets the law's own reference, so no\n",
+            TC, ZC)
+    printf("  CASE_ETA_REF is needed for either parameter set.\n")
     printf("\nrun the card with the variant (environment, defaults unchanged):\n")
     printf("  CASE_COMP_ED=%.9f CASE_COMP_ES=%.9f CASE_COMP_AD=%.10e " *
             "CASE_COMP_AS=%.10e julia --project=. examples/case_realistic_2d.jl " *
@@ -494,11 +533,13 @@ function main()
 
     # ---------------------------------------------------- physical magnitudes
     # The prefactors only mean something together with the viscosity they imply.
-    # `eta0` is what Ra fixes (eta0 = rho g alpha dT d^3 / (Ra kappa)); the card's
-    # reference point is T = 0.5, so eta(0.5) is eta0 by construction and the
-    # number a paper would quote is the *interior* one.  Print all of them, and
-    # the clip census over the strain-rate range the run actually visits, because
-    # a law that sits on a bound has no structure left whatever its prefactors.
+    # `eta0` is what Ra fixes (eta0 = rho g alpha dT d^3 / (Ra kappa)): with
+    # eta_ref = 1 (the value condition above) eta0 is the *physical reference
+    # viscosity* Ra is defined with, so eta(0.5) is eta0 by construction and the
+    # number a paper would quote is the *interior* one: Ra_interior = Ra/eta_int.
+    # Print all of them, and the clip census over the strain-rate range the run
+    # actually visits, because a law that sits on a bound has no structure left
+    # whatever its prefactors.
     scale = (rho=3300.0, g=9.81, alpha=3.0e-5, dT=1000.0, d=2.9e6, kappa=1.0e-6)
     eta0 = scale.rho * scale.g * scale.alpha * scale.dT * scale.d^3 /
            (RA * scale.kappa)
@@ -506,10 +547,13 @@ function main()
     eta_int_nd, _ = eta_composite_at(1.75, edot_ref, 0.5, pr_ref)
     printf("\nphysical magnitudes (d=%.2e m, kappa=%.1e m^2/s, Ra=%.1e):\n",
             scale.d, scale.kappa, RA)
-    printf("  eta0 at the calibration point (T=0.5) = %.3e Pa s   [mantle 1e21]\n",
-            eta0)
+    printf("  eta_ref = 1.0 (the value condition above), so the physical\n")
+    printf("  reference viscosity Ra is defined with is eta0 = rho g alpha dT d^3/\n")
+    printf("  (Ra kappa) = %.3e Pa s   [mantle 1e21]\n", eta0)
     printf("  eta at the interior temperature T=1.75 = %.3e Pa s   " *
             "[mantle 1e19-1e20]\n", eta0 * eta_int_nd)
+    printf("  Ra based on the interior viscosity = Ra/eta_int = %.3e\n",
+            RA / eta_int_nd)
     printf("  eta at the stiff end (clip)            = %.3e Pa s   " *
             "[lithosphere 1e23-1e25]\n", eta0 * 1.0e4)
     printf("  contrast lid/interior                  = %.1e            " *

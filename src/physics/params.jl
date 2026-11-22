@@ -47,6 +47,36 @@ meaning**; mixing them up silently changes the viscosity by orders of magnitude)
   nondimensionalisation (see docs/dev/PHYSICS.md for the exact ASPECT mapping,
   including the factor 2 that ASPECT's `eta = stress/edot/2` convention puts
   into the prefactors).
+
+`eta_ref` (default `1.0`) is the **Rayleigh-number reference viscosity**, in the
+units the material law returns.  It states the convention the nondimensional
+equations have always used implicitly:
+
+    Ra = rho g alpha dT d^3 / (kappa eta_ref),
+
+and the time-stepping driver solves the momentum equation with
+`eta_law/eta_ref` wherever the law's viscosity enters -- through the weak-zone
+multiplier and the Maxwell effective-viscosity closure of the same wrapper chain.
+The default 1.0 is the historical convention and leaves every existing run
+bit-identical.  The point of the parameter is that a *rescaled law must be paired
+with the same rescaling of `eta_ref`*: multiplying both `comp_Ad` and `comp_As`
+by `1/c` multiplies every viscosity the law returns by `c` (both creep branches
+and the isostress solution scale together), so `eta_law/eta_ref` -- and the whole
+flow -- is unchanged only when `eta_ref` is also multiplied by `c`.  Rescaling
+the law and leaving `eta_ref = 1` keeps `Ra` at its old value while moving every
+physical viscosity by `c`: the same `Ra` then describes a different physical
+Rayleigh number.  The `eta_min`/`eta_max` bounds are absolute bounds in the
+law's units applied *before* this normalisation, so a pure law rescaling must
+rescale them too.
+
+`run_semquad_simulation` reports the convention (Ra, eta_ref, the normalised
+field range, the interior Rayleigh number, and -- when the card supplies its
+scale set -- the physical reference viscosity in Pa s) once at the first flow
+solve and once at the end of the run, whenever `eta_ref != 1`.  The default
+1.0 logs nothing.  The normalisation belongs to the Picard time-stepping path
+only: `pic_mode = :newton` and `steady_newton` build their viscosity from the
+raw law and therefore **refuse** `eta_ref != 1` rather than solve a different
+problem silently.
 """
 struct Params
     Ra::Float64
@@ -174,6 +204,12 @@ struct Params
     # A mixed tuple is only accepted with `linear=:direct` until the multigrid
     # constraint operator carries the tuple (docs/dev/PHASE1.md 1.3 step 2).
     wall_bc::NTuple{4,Symbol}
+    # Rayleigh-number reference viscosity, in the units the material law
+    # returns: `Ra` is defined as rho g alpha dT d^3/(kappa eta_ref) and the flow
+    # solve uses eta_law/eta_ref (the docstring above states the convention and
+    # why a rescaled law must rescale this with it).  Default 1.0 is the
+    # historical convention and skips the wrapper, bit for bit.
+    eta_ref::Float64
 end
 
 function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
@@ -209,7 +245,8 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 comp_eps_min::Real=1.0e-12, comp_rule::Symbol=:isostress,
                 yield_c_grad::Real=0.0, yield_mu_grad::Real=0.0,
                 weak_f::Real=1.0, weak_eps_ref::Real=0.0,
-                weak_heal_time::Real=Inf, weak_mode::Symbol=:rate)
+                weak_heal_time::Real=Inf, weak_mode::Symbol=:rate,
+                eta_ref::Real=1.0)
     eta_law in (:const, :expT, :expTz, :arrhenius, :tosi, :composite) ||
         throw(ArgumentError("eta_law must be :const, :expT, :expTz, " *
                             ":arrhenius, :tosi or :composite"))
@@ -226,6 +263,14 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
     (isfinite(shear_modulus) && shear_modulus >= 0.0) ||
         throw(ArgumentError("shear_modulus must be finite and >= 0 (0 disables " *
                             "the viscoelastic relaxation)"))
+    # The reference viscosity of the Rayleigh number must be a positive finite
+    # number in the law's units: it divides every law viscosity in the flow
+    # solve, so a zero or negative value has no physical meaning.
+    (isfinite(eta_ref) && eta_ref > 0.0) ||
+        throw(ArgumentError("eta_ref must be finite and > 0; it is the viscosity " *
+                            "the Rayleigh number is defined with, in the units " *
+                            "the material law returns (the historical default " *
+                            "is 1.0)"))
     length(wall_bc) == 4 ||
         throw(ArgumentError("wall_bc must have four entries (xminus, xplus, " *
                             "yminus, yplus)"))
@@ -356,7 +401,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            comp_rule,
            Float64(yield_c_grad), Float64(yield_mu_grad),
            Float64(weak_f), Float64(weak_eps_ref), Float64(weak_heal_time),
-           weak_mode, NTuple{4,Symbol}(wall_bc))
+           weak_mode, NTuple{4,Symbol}(wall_bc), Float64(eta_ref))
 end
 
 @inline Tbar(z::Float64, H::Float64) = (1.0 - z) + 0.5 * H * z * (1.0 - z)

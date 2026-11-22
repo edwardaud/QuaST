@@ -65,11 +65,16 @@ one per node), plus the number of samples sitting on a clamp bound
 (`eta_min`/`eta_max`, 1e-12 relative tolerance) and the sample count.  This is
 the diagnostic of the Stokes-failure line only: it runs once, on the path that
 is about to raise, and never touches the solver state.
+
+`eta_fun` is the closure the flow solve used, i.e. the material law divided by
+`Params.eta_ref` (G257); the clamp bounds are absolute bounds in the law's
+units, so they are divided by `eta_ref` too before the census.  `eta_ref = 1`
+(the default) is the historical call, bit for bit.
 """
 function semquad_eta_range(sq::SemQuad, eta_fun::Function, pr::Params)
     lo = Inf; hi = -Inf; nclip = 0
-    lo_tol = pr.eta_min * (1.0 + 1.0e-12)
-    hi_tol = pr.eta_max * (1.0 - 1.0e-12)
+    lo_tol = (pr.eta_min / pr.eta_ref) * (1.0 + 1.0e-12)
+    hi_tol = (pr.eta_max / pr.eta_ref) * (1.0 - 1.0e-12)
     for g in 1:sq.N
         (x, y) = sq.coords[g]
         e = eta_fun(x, y)

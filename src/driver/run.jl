@@ -306,6 +306,116 @@ function _maxwell_regime_message(r::NamedTuple, step::Int, t::Real,
                   "same problem plus memory.")
 end
 
+# ---------------------------------------------------------------------------
+# G257: the eta_ref convention.  `Params.eta_ref` is the viscosity the Rayleigh
+# number is defined with, in the units the material law returns: the driver
+# solves with `eta_law/eta_ref`, so a law rescaled by a constant `c` is the same
+# physical problem only when `eta_ref` is rescaled by `c` as well.  The helpers
+# below only *measure* one viscosity closure and build the run-start/end report;
+# no arithmetic result of the solve reads them.
+# ---------------------------------------------------------------------------
+
+"""
+    _eta_interior_band_mean(sq, qt, eta_fun; zlo=0.25, zhi=0.75)
+
+Arithmetic volume mean of the normalised viscosity closure `eta_fun` over the
+interior band `zlo <= z <= zhi` -- by default the middle half of the layer,
+which excludes both thermal boundary layers.  Gauss quadrature on the quadtree
+(the rule the volume diagnostics use), values outside the band skipped and the
+mean renormalised by the band volume.  `eta_fun` must be the closure the flow
+solve used, i.e. already divided by `Params.eta_ref`.
+"""
+function _eta_interior_band_mean(sq::SemQuad, qt::Quadtree, eta_fun::Function;
+                                 zlo::Float64=0.25, zhi::Float64=0.75)
+    p = sq.p
+    fd = make_fedata(p, p - 1)
+    num = 0.0; den = 0.0
+    for lf in qt.leaves
+        hx = leaf_hx(sq, lf[1]); hy = leaf_hy(sq, lf[1])
+        x0 = lf[2] * hx
+        y0 = lf[3] * hy
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            y = y0 + 0.5 * (fd.gl_x[qy] + 1.0) * hy
+            (zlo <= y <= zhi) || continue
+            w = 0.25 * hx * hy * fd.gl_w[qx] * fd.gl_w[qy]
+            x = x0 + 0.5 * (fd.gl_x[qx] + 1.0) * hx
+            num += w * eta_fun(x, y)
+            den += w
+        end
+    end
+    return num / den
+end
+
+"""
+    _eta_ref_field_stats(sq, qt, eta_fun, pr; zlo=0.25, zhi=0.75)
+
+The eta_ref-convention measurements of one viscosity closure: `min`/`max`/`nclip`
+of the nodal field (`semquad_eta_range`, in `eta_ref` units), the field contrast,
+the interior-band volume mean of [`_eta_interior_band_mean`](@ref) and the band
+bounds.  Diagnostic only: nothing here writes solver state.
+"""
+function _eta_ref_field_stats(sq::SemQuad, qt::Quadtree, eta_fun::Function,
+                              pr::Params; zlo::Float64=0.25, zhi::Float64=0.75)
+    r = semquad_eta_range(sq, eta_fun, pr)
+    interior = _eta_interior_band_mean(sq, qt, eta_fun; zlo=zlo, zhi=zhi)
+    return (min=r.min, max=r.max, nclip=r.nclip, n=r.n,
+            contrast=r.max / r.min, interior=interior, zlo=zlo, zhi=zhi)
+end
+
+"""
+    _eta_ref_message(pr, st, step, t, final, scale) -> String
+
+The G257 run report: what Rayleigh number the run solves, what reference
+viscosity it is defined with, the realised normalised field range, the interior
+Rayleigh number and -- when the card's dimensional scale set `scale` is
+available -- the physical reference viscosity in Pa s.  A pure string builder
+(every `@sprintf` format is a literal), so the gate can pin its wording and its
+numbers.  `scale === nothing` is the generic (dimensionless) run.
+"""
+function _eta_ref_message(pr::Params, st::NamedTuple, step::Int, t::Real,
+                          final::Bool, scale)
+    head = final ? "end of run" : "first flow solve"
+    body = string("Rayleigh-number reference viscosity (eta_ref convention; ",
+                  head, ", step ", step, ", t=", @sprintf("%.6e", t), "): ",
+                  "Ra = ", @sprintf("%.6e", pr.Ra),
+                  " is defined with eta_ref = ", @sprintf("%.6e", pr.eta_ref),
+                  " in the units the material law returns, i.e. ",
+                  "Ra = rho g alpha dT d^3/(kappa eta_ref); the flow solve ",
+                  "used eta/eta_ref wherever the law's viscosity enters.  ",
+                  "The normalised viscosity field of this state is eta/eta_ref ",
+                  "in [", @sprintf("%.6e", st.min), ", ",
+                  @sprintf("%.6e", st.max), "], contrast ",
+                  @sprintf("%.6e", st.contrast), ".  eta_interior = ",
+                  @sprintf("%.6e", st.interior),
+                  " is the arithmetic volume mean of eta/eta_ref over the ",
+                  "interior band ", @sprintf("%.3g", st.zlo), " <= z <= ",
+                  @sprintf("%.3g", st.zhi),
+                  " (the middle half of the layer, which excludes both wall ",
+                  "boundary layers), so Ra_interior = Ra/eta_interior = ",
+                  @sprintf("%.6e", pr.Ra / st.interior), ".  ")
+    if scale !== nothing
+        eta0 = scale.rho * scale.g * scale.alpha * scale.dT * scale.d^3 /
+               (pr.Ra * scale.kappa)
+        if isfinite(eta0) && eta0 > 0.0
+            unit = eta0 / pr.eta_ref
+            body = string(body,
+                          "With this card's scale set eta_0 = rho g alpha dT d^3/",
+                          "(Ra kappa) = ", @sprintf("%.6e", eta0),
+                          " Pa s is the physical viscosity Ra is defined with; ",
+                          "the law returns it at eta = eta_ref = ",
+                          @sprintf("%.6e", pr.eta_ref),
+                          " (one material-law unit = ", @sprintf("%.6e", unit),
+                          " Pa s, and the interior viscosity is ",
+                          @sprintf("%.6e", st.interior * unit), " Pa s).  ")
+        end
+    end
+    return string(body,
+                  "Quote Ra together with eta_ref: rescaling the material law ",
+                  "must be paired with the same rescaling of eta_ref, " *
+                  "otherwise Ra keeps its value while the physical Rayleigh ",
+                  "number moves.")
+end
+
 """
     run_semquad_simulation(qt, pr, theta0; p=2, tstop, dt0, amr_every=0,
                            refine_frac=0.2, coarsen_frac=0.0, maxsteps=10000,
@@ -475,6 +585,25 @@ only: the ranges are computed from the nodal viscosity field and step the stress
 update already uses, `regime_report=false` silences both records and leaves a
 run bit-identical (G255), and with `shear_modulus == 0` nothing is sampled or
 logged.  It is a separate record from the co-rotation validity report above.
+`Params.eta_ref` (default 1.0) is the **Rayleigh-number reference viscosity** in
+the units the material law returns (G257): the momentum equation is solved with
+`eta_law/eta_ref` wherever the law's viscosity enters -- the same wrapper chain
+that applies `eta_multiplier` and the Maxwell closure -- so the run's convention
+is `Ra = rho g alpha dT d^3/(kappa eta_ref)`.  Whenever `eta_ref != 1` the
+driver reports the convention once at the first flow solve and once at the end
+of the run: `Ra`, `eta_ref`, the normalised field `eta/eta_ref` range and
+contrast, `eta_interior` (the arithmetic volume mean over the interior band
+`0.25 <= z <= 0.75`, the middle half of the layer) and
+`Ra_interior = Ra/eta_interior`.  `eta_ref_scale` (default `nothing`) is the
+card's dimensional scale set as a `NamedTuple` with positive finite
+`rho, g, alpha, dT, d, kappa`; when given, the report also prints
+`eta_0 = rho g alpha dT d^3/(Ra kappa)` in Pa s -- the physical viscosity `Ra` is
+defined with -- and the physical interior viscosity.  The report is diagnostic
+only (it measures the closure the solve used; no arithmetic result depends on
+it), and with `eta_ref = 1.0` it logs nothing, so the historical runs stay
+bit-identical.  The normalisation is applied by the Picard time-stepping path
+only: `pic_mode = :newton` and `steady_newton` build their viscosity from the raw
+law and refuse `eta_ref != 1` instead of solving a different problem silently.
 Returns a named tuple with the final state and history rows
 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, nleaves]` (plus the opt-in columns
 described above; `history_extra` names them).  `txx`/`tyy`/`txy` are the nodal
@@ -576,6 +705,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 # and leaves the run bit-identical; silently
                                 # does nothing when `shear_modulus = 0`.
                                 regime_report::Bool=true,
+                                # G257: the card's dimensional scale set, used
+                                # only by the eta_ref report to print the
+                                # reference viscosity in Pa s.  `nothing` (the
+                                # default) keeps the report dimensionless.
+                                eta_ref_scale::Union{Nothing,NamedTuple}=nothing,
                                 stokes_tol::Float64=Inf,
                                 cfl_tol::Float64=Inf,
                                 tavg_start::Float64=Inf,
@@ -593,6 +727,20 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                             ":expTz, :arrhenius, :tosi or :composite"))
     steady_window >= 1 ||
         throw(ArgumentError("steady_window must be >= 1"))
+    # G257: the optional dimensional scale set of the eta_ref report.  It is
+    # only multiplied into physical viscosities (Pa s), but a malformed one
+    # would silently print a NaN/Inf, so validate it up front.
+    if eta_ref_scale !== nothing
+        (eta_ref_scale isa NamedTuple &&
+         all(k -> haskey(eta_ref_scale, k) && isfinite(eta_ref_scale[k]) &&
+                  eta_ref_scale[k] > 0.0,
+             (:rho, :g, :alpha, :dT, :d, :kappa))) ||
+            throw(ArgumentError("eta_ref_scale must be `nothing` or a NamedTuple " *
+                                "with positive finite entries rho, g, alpha, dT, " *
+                                "d, kappa (the dimensional scale set of the " *
+                                "card, used to report the reference viscosity in " *
+                                "Pa s)"))
+    end
     mass_form in (:anelastic, :boussinesq) ||
         throw(ArgumentError("mass_form must be :anelastic or :boussinesq"))
     # Forwarded verbatim to `solve_semquad_stokes_var`; validated here so a typo
@@ -645,6 +793,25 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                             "law plus the viscoelastic softening only), so a run with " *
                             "both would differ from the Picard path with the same " *
                             "card.  Use pic_mode=:picard, or drop eta_multiplier."))
+    # G257: same gap for the Rayleigh-number reference viscosity.  The Newton
+    # path builds its viscosity from the raw law; applying eta_ref only on the
+    # Picard path would make the two paths solve different problems.
+    (pic_mode !== :newton || pr.eta_ref == 1.0) ||
+        throw(ArgumentError("pic_mode=:newton does not apply Params.eta_ref " *
+                            "(the per-step Newton builds its viscosity from the " *
+                            "raw law, without the eta/eta_ref normalisation), so " *
+                            "a run with both would differ from the Picard path " *
+                            "with the same card.  Use pic_mode=:picard, or set " *
+                            "eta_ref = 1.0."))
+    # The steady-state hand-off at the end of the run has the same gap: the
+    # steady Newton entry points do not apply `Params.eta_ref` (that path is out
+    # of scope and untouched).  Refuse instead of solving a different problem.
+    (steady_newton === :none || pr.eta_ref == 1.0) ||
+        throw(ArgumentError("steady_newton=$(steady_newton) does not apply " *
+                            "Params.eta_ref: the steady-state entry points build " *
+                            "their viscosity from the raw law.  Set eta_ref = " *
+                            "1.0, or run the time-stepping path without the " *
+                            "steady hand-off."))
     latent_scheme in (:implicit, :lagged) ||
         throw(ArgumentError("latent_scheme must be :implicit or :lagged"))
     0.0 <= weak_chi0 <= 1.0 ||
@@ -844,6 +1011,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # compared there with its own message, not by the generic loop).
     run_config["physics_revision"] = PHYSICS_REVISION
     run_config["shear_modulus"] = pr.shear_modulus
+    # The Rayleigh-number reference viscosity divides every law viscosity in the
+    # flow solve, so it changes the trajectory like any other physics parameter
+    # (G257).  Old checkpoints do not carry the key and are resumed with the
+    # default 1.0, which is the historical behaviour; a new checkpoint records it.
+    run_config["eta_ref"] = pr.eta_ref
     run_config["wall_bc"] = join(string.(pr.wall_bc), ",")
     run_config["latent_L"] = pr.latent_L
     run_config["latent_mode"] = pr.latent_mode
@@ -1254,6 +1426,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # G = 0 run pays nothing and logs nothing.
     regime_last = nothing
     regime_reported = false
+    # eta_ref convention (G257): one report at the first flow solve and one at the
+    # end of the run, each a pure measurement of the closure the solve used.  With
+    # `Params.eta_ref == 1.0` (the historical convention) nothing is sampled and
+    # nothing is logged, so the default path stays bit-identical.
+    eta_ref_reported = Ref(false)
 
     function solve_flow!(; stokes_scaling::Symbol=:none)
         leaves = Set(sq.leaves)
@@ -1330,6 +1507,18 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             base_eta = eta_fun
             mulf = pr.eta_multiplier
             eta_fun = (x, y) -> base_eta(x, y) * mulf(x, y)
+        end
+        # G257: the Rayleigh-number reference viscosity.  `eta_ref` is the
+        # viscosity the Ra is defined with, in the units the law returns, so the
+        # flow solve uses eta/eta_ref in the same wrapper chain as the weak-zone
+        # multiplier and the Maxwell closure below: rescaling the law by c and
+        # eta_ref by c cancels exactly, while rescaling the law alone does not.
+        # `eta_ref == 1.0` (the default) skips the wrapper, so every historical
+        # run stays bit-identical.
+        if pr.eta_ref != 1.0
+            base_ref = eta_fun
+            eta_ref_value = pr.eta_ref
+            eta_fun = (x, y) -> base_ref(x, y) / eta_ref_value
         end
         # Maxwell relaxation in the effective-viscosity form.  The step enters, so
         # the closure is rebuilt every step; `shear_modulus <= 0` (the default)
@@ -1446,6 +1635,22 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             pv[g] = pp[g]
         end
         velocity_stale = false
+        # G257: the eta_ref convention, reported once at the first flow solve.
+        # Gated on `eta_ref != 1.0`, so every default-convention run logs exactly
+        # what it logged before.  The measurement samples the closure the solve
+        # used (post-solve velocity, start-of-step temperature); the pic_diag eta
+        # counters are saved and restored so it cannot change the reported clamp
+        # fraction of the run.
+        if pr.eta_ref != 1.0 && !eta_ref_reported[]
+            eta_ref_reported[] = true
+            calls_before = _SEMQUAD_ETA_CALLS[]
+            clamp_before = _SEMQUAD_ETA_CLAMP[]
+            stats = _eta_ref_field_stats(sq, qt, eta_fun, pr)
+            _SEMQUAD_ETA_CALLS[] = calls_before
+            _SEMQUAD_ETA_CLAMP[] = clamp_before
+            @info _eta_ref_message(pr, stats, step + 1, t, false,
+                                   eta_ref_scale)
+        end
         # Work and dissipation must be evaluated with the *same* temperature and
         # viscosity the Stokes solve used; using the end-of-step theta would mix
         # a new temperature with an old velocity and break Ra*W = U.
@@ -2161,6 +2366,16 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     final_velocity_stale = velocity_stale
     if velocity_stale && step > 0
         solve_flow!(stokes_scaling=stokes_scaling)
+    end
+
+    # G257: the eta_ref convention, once more at the end of the run, on the
+    # closure of the last flow solve (the final re-solve above has refreshed it if
+    # the last step was an AMR cycle).  The developed state's interior Rayleigh
+    # number is the quantity a reader lines a card up with a paper against.  The
+    # first report's flag also suppresses this one for a run that solved nothing.
+    if pr.eta_ref != 1.0 && eta_ref_reported[] && eta_probe[] !== nothing
+        stats = _eta_ref_field_stats(sq, qt, eta_probe[], pr)
+        @info _eta_ref_message(pr, stats, step, t, true, eta_ref_scale)
     end
 
     # Always leave a final checkpoint so a run that hits tstop/maxsteps can be

@@ -91,6 +91,22 @@
 #                                       WARNING: that cap changes the physical
 #                                       regime, see the knob's comment below and
 #                                       the guide's viscoelasticity section.
+#     CASE_ETA_REF                      the Rayleigh-number reference viscosity in
+#                                       the units the composite law returns
+#                                       (default 1.0, the calibrated card).  `Ra`
+#                                       is defined as `rho g alpha dT d^3/(kappa
+#                                       eta_ref)` and the flow solve uses
+#                                       `eta/eta_ref`; the calibration makes
+#                                       `eta = 1` at (T=0.5, z=0.5, edot_ref), so
+#                                       the card's own convention is exactly 1.0.
+#                                       A *rescaled* law must be paired with the
+#                                       same `CASE_ETA_REF`, otherwise `Ra` keeps
+#                                       its value while the physical Rayleigh
+#                                       number moves (see the knob's comment).
+#                                       `CASE_ETA_REF != 1` makes the driver print
+#                                       its convention report at run start and at
+#                                       the end of the run (field range, interior
+#                                       Rayleigh number, eta_0 in Pa s).
 #
 # Everything this file writes lives under CASE_OUT:
 #     run.log (created by the shell redirect), history.csv (at exit),
@@ -135,6 +151,18 @@
 #   nondimensional G) turns the Maxwell terms on; see the warning at the knob:
 #   `G dt` caps eta from above, so a G > 0 card runs a *different, softer*
 #   problem, not the same problem plus memory.
+# Rayleigh-number reference viscosity  eta_ref = 1.0 (CASE_ETA_REF): Ra is
+#   defined as rho g alpha dT d^3/(kappa eta_ref) and the flow solve uses
+#   eta/eta_ref wherever the law's viscosity enters.  The calibration's value
+#   condition makes eta = 1 at (T = 0.5, z = 0.5, edot_ref), so the law's own
+#   reference is 1 and the card's Ra = 1e5 is defined with eta_ref = 1, i.e. the
+#   physical viscosity at the calibration point.  This is the convention the
+#   calibration (`examples/calib_realistic_2d.jl`) declares; a rescaling of the
+#   prefactors must be paired with the same rescaling of eta_ref (a law
+#   multiplied by c needs eta_ref = c), otherwise Ra keeps its value while the
+#   physical Rayleigh number moves.  The card passes its dimensional scale set to
+#   the driver, so `CASE_ETA_REF != 1` also prints eta_0 = rho g alpha dT d^3/
+#   (Ra kappa) in Pa s.
 # Phase transitions (410 / 660 km equivalents, depth = 1-y)
 #   y0 = 0.87 : width 0.025, Clapeyron slope +0.032 (dz/dT), drho = +180,
 #               B = drho/(rho0 alpha0 dT) = 1.818
@@ -262,6 +290,41 @@ const SHEAR_MODULUS = begin
         G
     end
 end
+# Rayleigh-number reference viscosity (`Params.eta_ref`): the viscosity the
+# card's Ra is defined with, in the units the composite law returns.  `Ra` is
+# defined as rho g alpha dT d^3/(kappa eta_ref) and the flow solve uses
+# eta/eta_ref wherever the law's viscosity enters (the same wrapper chain as the
+# weak-zone multiplier and the Maxwell closure).
+#
+# The calibration makes eta(T=0.5, z=0.5, edot_ref) = 1, so the law's own
+# reference is exactly 1: the default 1.0 *declares* the convention the card has
+# always used implicitly, and leaves every number bit-identical.  The foot-gun
+# the declaration closes: rescaling the law's prefactors does not change `Ra`,
+# but it does change every physical viscosity.  Multiplying both `comp_Ad` and
+# `comp_As` by `1/c` multiplies every viscosity the law returns by `c`, so the
+# same physical problem needs `CASE_ETA_REF=c`; with `CASE_ETA_REF` left at 1 the
+# flow changes while `Ra` does not.  `eta_min`/`eta_max` are absolute bounds in
+# the law's units (applied before the normalisation), so a pure law rescaling
+# must rescale them too, or the bounds clip a different part of the field.
+# The knob is part of `run_config` (a checkpoint records it and a restart cannot
+# switch it silently), and `CASE_ETA_REF != 1` turns on the driver's convention
+# report: at the first flow solve and at the end of the run it prints the
+# normalised field range, eta_interior, Ra_interior and -- through the scale set
+# below -- eta_0 = rho g alpha dT d^3/(Ra kappa) in Pa s.
+const ETA_REF = begin
+    raw = strip(get(ENV, "CASE_ETA_REF", "1.0"))
+    v = parse(Float64, raw)
+    (isfinite(v) && v > 0.0) ||
+        error("CASE_ETA_REF must be finite and > 0 (it is the viscosity Ra " *
+              "is defined with, in the units the material law returns), got " *
+              "\"$raw\"")
+    v
+end
+# The dimensional scale set of the card (the ASPECT scale set of
+# docs/dev/PHYSICS.md §14.2): passed to the driver only so the eta_ref report
+# can print the physical reference viscosity.  It changes no number.
+const SCALE_SET = (rho=3300.0, g=9.81, alpha=3.0e-5, dT=1000.0, d=2.9e6,
+                   kappa=1.0e-6)
 const SLOPE410     = 0.032
 const SLOPE660     = -0.032
 const WIDTH_PT     = 0.025
@@ -444,6 +507,9 @@ function make_params()
                   comp_Vd=0.0, comp_Vs=0.0, comp_n=COMP_N,
                   comp_Tcut=0.0, comp_eps_min=COMP_EPS_MIN,
                   eta_T0=ETA_T0, eta_min=ETA_MIN, eta_max=ETA_MAX,
+                  # the Rayleigh-number reference viscosity (CASE_ETA_REF):
+                  # 1.0 declares the calibration's convention and is inert
+                  eta_ref=ETA_REF,
                   bc=:free, wall_bc=WALL_BC,
                   latent_L=LATENT_L, latent_mode=LATENT_MODE,
                   # the viscoelastic knob: 0.0 (the empty default) leaves every
@@ -519,7 +585,9 @@ function write_frame!(fw::FrameWriter, st, pr)
     Vr = semquad_vrms(s, st.qt, st.ux, st.uz)
     Tmean = semquad_mean_T(s, st.qt, st.theta, pr)
     # viscosity census at the velocity nodes (the "is eta clamped everywhere"
-    # health check of the brief)
+    # health check of the brief).  The values are divided by `ETA_REF`, i.e. they
+    # are the normalised viscosity the flow solve uses (G257): with the default
+    # ETA_REF = 1.0 this is bit-identical to the raw law census.
     ed = semquad_strain_rate_field(s, st.ux, st.uz)
     emin = Inf; emax = -Inf; nclip = 0
     # log10(eta) per velocity node, kept for the renderer: the viscosity field is
@@ -529,6 +597,7 @@ function write_frame!(fw::FrameWriter, st, pr)
         y = s.coords[g][2]
         Tn = Tbar(y, pr.H) + st.theta[g]
         v, cl = eta_composite_at(Tn, ed[g], y, pr)
+        v /= ETA_REF
         logeta[g] = Float32(log10(v))
         emin = min(emin, v); emax = max(emax, v)
         nclip += cl ? 1 : 0
@@ -589,7 +658,8 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
         "case" => "realistic_2d_round1", "Ra" => RA, "H" => HHEAT,
         "comp_Ad" => COMP_AD, "comp_As" => COMP_AS, "comp_Ed" => COMP_ED,
         "comp_Es" => COMP_ES, "comp_n" => COMP_N, "eta_T0" => ETA_T0,
-        "eta_min" => ETA_MIN, "eta_max" => ETA_MAX, "latent_L" => LATENT_L,
+        "eta_min" => ETA_MIN, "eta_max" => ETA_MAX, "eta_ref" => ETA_REF,
+        "latent_L" => LATENT_L,
         "latent_mode" => string(LATENT_MODE),
         "latent410" => ph[1].latent, "latent660" => ph[2].latent,
         "B410" => B410, "B660" => B660, "p" => PORD, "max_level" => MAXLEV,
@@ -601,7 +671,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     # Only an opt-in run records it, so the checkpoints of the default card stay
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
-    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s shear_modulus=%.3g\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), SHEAR_MODULUS)
+    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s eta_ref=%.6g shear_modulus=%.3g\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), ETA_REF, SHEAR_MODULUS)
     @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.6f Es=%.6f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)
@@ -625,6 +695,8 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
         linear=LIN_SOLVE, stokes_tol=STOKES_TOL, mg_tol=MG_TOL,
         stokes_scaling=STOKES_SCALING,
         mass_form=:boussinesq, phases=ph, latent_scheme=:implicit,
+        # the card's dimensional scale set: only the eta_ref report reads it
+        eta_ref_scale=SCALE_SET,
         callback=cb, verbose=true, profile_steps=false,
         restart_from=restart_from, checkpoint_path=checkpoint,
         checkpoint_every=200, checkpoint_meta=meta, extdiag=EXTDIAG)
