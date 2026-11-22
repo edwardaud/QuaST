@@ -244,6 +244,38 @@ $$
 | `deviatoric` | `false` | 不做偏量投影。 |
 | `mass_form` | `:boussinesq` | Boussinesq 质量守恒形式。 |
 
+### 1.8 黏弹性
+
+Maxwell 黏弹性默认关闭。 `Params.shear_modulus` 是无量纲弹性剪切模量 $G$ ，参数卡把它暴露为 `CASE_SHEAR_MODULUS`（不设置或留空表示 0，即关闭）。取正值时它做两件事：携带偏应力历史，并把流场求解实际看到的黏度换成有效黏度
+
+$$
+\eta_{\mathrm{eff}} = \frac{1}{1/\eta + 1/(G\,\Delta t)},
+\qquad
+\tau^{n+1} = \frac{\tau^{n} + 2G\,\Delta t\,\hat{\boldsymbol\varepsilon}^{\,n+1}}{1 + \Delta t/\tau_{\mathrm M}},
+\qquad
+\tau_{\mathrm M} = \eta/G .
+$$
+
+其中 $\tau$ 是偏应力， $\hat{\boldsymbol\varepsilon}$ 是它的偏应变率， $\tau\_{\mathrm M}$ 是 Maxwell 时间， $\Delta t$ 是该步实际走过的步长。上一步的应力以滞后载荷 $\nabla\cdot(a\tau^n)$ 进入动量方程，其中 $a=\eta/(\eta+G\Delta t)$ ，正是这一项让平衡后的黏弹流动回到**材料**黏度对应的流动。取 `shear_modulus = 0` 时上述各项全部不存在，不采样任何一个量，运行结果与纯黏性版本逐位相同。该值属于 `run_config` ，因此重启无法悄悄改变它。
+
+两个极限构成了全部行为：
+
+- $G\Delta t \gg \eta$ ：快速松弛区，步长比 Maxwell 时间长。应力在一步之内就松弛掉， $\eta\_{\mathrm{eff}} \approx \eta$ ，流动就是纯黏性流动，记忆不可见。
+- $G\Delta t \ll \eta$ ：弹性区， $\Delta t \ll \tau\_{\mathrm M}$ 。此时 $\eta\_{\mathrm{eff}} \approx G\Delta t$ ，黏度被弹性值封顶，最初几步的应力按 $2G\Delta t\,\hat{\varepsilon}$ 增长。
+
+**物理区域会改变。** 这个上限本身是正确的物理，但它意味着黏弹卡不等于同一条卡加上记忆：凡是远大于 $G\Delta t$ 的黏度都被压向 $G\Delta t$ ，于是材料对比度中较硬的一端被削掉，求解看到的对比度大约按最硬材料超出 $G\Delta t$ 的倍数塌缩。两个实测状态：
+
+- 演化成熟的生产状态（第 20 000 步， $\Delta t = 4.182\times10^{-7}$ ， $G\Delta t = 1.485$ ）：材料黏度对比 $3.3\times10^6$ ，实际有效对比约 $5\times10^2$ ，去掉了三到四个数量级；同一原因下实测一轮算例便宜了 33%。
+- 起步段 $\Delta t = 3.6\times10^{-8}$ 、 $G\Delta t = 0.129$ ：对比度从材料 $1.0\times10^7$ 塌到有效 $1.3\times10^2$ 。
+
+所以黏弹卡是一个**更软、也不同**的问题，它的诊断量不是它 `G = 0` 孪生卡的那一套。只要 `shear_modulus > 0` ，驱动会在第一个推进应力的步和运行结束时各报告一次：材料黏度范围与对比度、该步 `dt` 下的有效范围与对比度、 $G\Delta t/\eta$ 的范围，并用一行说明由此产生的对比度塌缩。 `shear_modulus = 0` 时什么都不打印。读 $G > 0$ 的算例之前，先登记预期的有效对比度。
+
+**代价。** 黏弹机制本身很便宜。在生产参数卡上实测约占一步的 1%（36.2 ms：节点上重新采样材料黏度 33.5 ms，应力更新 2.65 ms，弹性载荷 0.08 ms）；检查点因三个应力场精确增加 $3\times8\times N$ 字节，从 1.730 MB 到 2.679 MB，即 1.55 倍。总步时仍可能下降，上面那 33% 就是例子：那不是这个功能的代价，那是换了一个问题。
+
+**共转带。** Jaumann 旋转按整步的线性化 $1+\Delta t\,ad\_W$ 施加，而不是指数。它只在 $2|W|\min(\Delta t,\tau\_{\mathrm M})$ 很小时有效， `MAXWELL_COROTATION_BOUND` = 0.1 把「很小」量化。驱动每次运行报告 $2|W|\Delta t$ 、 $2\tau\_{\mathrm M}|W|$ 与逐步旋转的运行最大值，并在第一个越界的步警告一次；这条报告与上面的区域报告相互独立。运行不会中止：这是一个精度带，不是稳定性限制，把 `dt`（`dtmax`/`cfl`）调小即可回到带内。
+
+**应力历史不是什么。** 它是网格上携带的张量状态，不是自由表面，也不是地形。本代码没有运动的上边界：黏性空气密度钩子（`rho_multiplier`）让低密度顶层能够流动，但其界面停在 Euler 网格给定的位置，因此不会产生地表起伏。黏弹卡不是一个地形观测量。
+
 ## 2. 数值方法
 
 ### 2.1 网格
@@ -386,6 +418,7 @@ $$
 | `CASE_EV` | 0.11 | 浮点 | 熵黏性系数。 |
 | `CASE_LATENT` | `per_phase` | `per_phase`、`global` | 潜热系数：逐个相变计算，或两个相变共用历史值 `latent_L = 0.11` 。传入其他字符串会在构造 `Params` 时被拒绝。 |
 | `CASE_STOKES_SCALING` | `none` | `none`、`equilibrated` | 直接鞍点的平衡开关，只对本来会失败的求解生效，健康的求解不受影响。 |
+| `CASE_SHEAR_MODULUS` | 空（关闭） | 大于等于 0 的浮点 | Maxwell 黏弹性：无量纲弹性剪切模量 $G$ 。留空或取 0 表示关闭，运行结果逐位不变；取正值会改变有效黏度与物理区域，见 1.8 节。 |
 | `CASE_EXTDIAG` | 0 | 0、1 | 把精确能量恒等式残差 `resid_A` 追加到 `history.csv` 。它会改变列数，所以只接受全新的输出目录。 |
 
 `main()` 在做任何事之前就会拒绝无法识别的 `CASE_AMR_GATE`、`CASE_SYMMETRY` 或 `CASE_STOKES_SCALING` 。下面这些是字面量，不是可调项：
@@ -450,6 +483,8 @@ $$
 | `mg_tol`、`mg_threads` | 1e-10、1 | 1e-8、1（`auto`：`min(8, nthreads)`） | 多重网格的外层容差与线程数。 |
 | `mg_operator`、`mg_pressure_eta_tol` | `:matrixfree`、1.0 | 相同 | 多重网格的几何形式，以及压力块缓存的重建阈值。 |
 | `stokes_scaling` | `:none` | `CASE_STOKES_SCALING` | `:none` 或 `:equilibrated` ，只对直接路径有效。 |
+| `corotation_guard` | true | 默认 | 报告共转项的适用范围，越界时警告一次； `shear_modulus = 0` 时既不采样也不打印（见 1.8 节）。 |
+| `regime_report` | true | 默认 | 在第一个推进应力的步与运行结束时各报告一次 Maxwell 区域； `shear_modulus = 0` 时既不计算也不打印（见 1.8 节）。 |
 | `mass_form` | `:anelastic` | `:boussinesq` | 质量守恒形式。 |
 | `phases`、`latent_scheme` | `[]`、`:implicit` | 两个相变、`:implicit` | 相变与潜热耦合；`maxpic = 1` 时两种格式结果相同。 |
 | `restart_from` | `""` | 取决于模式 | 从哪个检查点重启。 |

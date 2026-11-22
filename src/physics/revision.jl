@@ -105,6 +105,6 @@ const PHYSICS_REVISION = 2
 # docstring or formatting edit), replace the hash and leave the revision alone.
 # The gate's failure message says the same thing.
 const PHYSICS_SOURCE_HASHES = (
-    "src/physics/viscoelastic.jl" => "faee822c54af970e",
+    "src/physics/viscoelastic.jl" => "8f74659f7243d42c",
     "src/driver/run.jl#_advance_maxwell_stress!" => "7a21e3fdc0ebf247",
 )

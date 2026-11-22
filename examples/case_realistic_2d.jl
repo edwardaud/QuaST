@@ -72,6 +72,16 @@
 #                                       predates the option and is read as
 #                                       `none`, so switching it on for such a
 #                                       checkpoint is refused.
+#     CASE_SHEAR_MODULUS                Maxwell viscoelasticity: the nondimensional
+#                                       shear modulus G.  Unset/empty (the
+#                                       default) or 0 is OFF and leaves every
+#                                       number bit-identical; a positive value
+#                                       turns on the stress history and the
+#                                       effective-viscosity cap
+#                                       `eta_eff = 1/(1/eta + 1/(G*dt))`.
+#                                       WARNING: that cap changes the physical
+#                                       regime, see the knob's comment below and
+#                                       the guide's viscoelasticity section.
 #
 # Everything this file writes lives under CASE_OUT:
 #     run.log (created by the shell redirect), history.csv (at exit),
@@ -97,6 +107,11 @@
 #       (i)  eta(T=0.5, z=0.5, edot_ref) = 1
 #       (ii) eta(T=0.1)/eta(T=0.9) at z=0.5, edot_ref = 1e4
 #   -> comp_Ad = 1.6240183119e5, comp_As = 2.6796419238e-1
+# Viscoelasticity  off (shear_modulus = 0): no stress history and no
+#   effective-viscosity change, bit for bit.  `CASE_SHEAR_MODULUS` (a positive
+#   nondimensional G) turns the Maxwell terms on; see the warning at the knob:
+#   `G dt` caps eta from above, so a G > 0 card runs a *different, softer*
+#   problem, not the same problem plus memory.
 # Phase transitions (410 / 660 km equivalents, depth = 1-y)
 #   y0 = 0.87 : width 0.025, Clapeyron slope +0.032 (dz/dT), drho = +180,
 #               B = drho/(rho0 alpha0 dT) = 1.818
@@ -177,6 +192,43 @@ const COMP_EPS_MIN = 1.0e-12
 # is about.  `CASE_ETA_MIN/MAX` let a high-Ra variant state that bound explicitly.
 const ETA_MIN      = parse(Float64, get(ENV, "CASE_ETA_MIN", "1.0e-4"))
 const ETA_MAX      = parse(Float64, get(ENV, "CASE_ETA_MAX", "1.0e4"))
+# Maxwell viscoelasticity (docs/dev/PHASE2.md 2a/2b): the nondimensional elastic
+# shear modulus G.  Empty/unset or 0 is OFF -- no stress history, no elastic
+# force term, no effective-viscosity change, and every number is bit-identical
+# to the card without the knob.  A positive G turns on the Maxwell stress
+# history and the 2a closure
+#
+#     eta_eff = 1/(1/eta + 1/(G*dt)),
+#
+# which is the harmonic mean of eta and G*dt: it caps the viscosity from above
+# at the elastic viscosity G*dt.
+#
+# !!! WARNING: that cap changes the *physical regime*, it is not "the same
+# problem plus memory".  Wherever eta >> G*dt the contrast is flattened.  At a
+# developed production state with G*dt = 1.485 the realised effective-viscosity
+# contrast was about 5e2 against a material 3.3e6 (step 2 of docs/dev/PHASE2.md):
+# three to four decades of viscosity contrast disappear and the Stokes solve
+# becomes *softer* (a measured run was 33% cheaper for that reason).  Register
+# the expected eta_eff contrast before trusting a G > 0 arm, and read the
+# driver's regime report (printed once at the first stress step and once at the
+# end of the run whenever shear_modulus > 0: material and effective ranges,
+# contrasts, G*dt/eta) as what the solve actually saw.  G is part of
+# `run_config`, so a restart cannot switch it silently; the stress history is a
+# tensor state carried on the mesh, NOT free-surface topography (this code has
+# no moving top boundary).  Public description: docs/en/guide.md and
+# docs/zh/guide.md, "viscoelasticity".
+const SHEAR_MODULUS = begin
+    raw = strip(get(ENV, "CASE_SHEAR_MODULUS", ""))
+    if isempty(raw)
+        0.0
+    else
+        G = parse(Float64, raw)
+        (isfinite(G) && G >= 0.0) ||
+            error("CASE_SHEAR_MODULUS must be finite and >= 0 " *
+                  "(0 or empty disables viscoelasticity), got \"$raw\"")
+        G
+    end
+end
 const SLOPE410     = 0.032
 const SLOPE660     = -0.032
 const WIDTH_PT     = 0.025
@@ -361,6 +413,11 @@ function make_params()
                   eta_T0=ETA_T0, eta_min=ETA_MIN, eta_max=ETA_MAX,
                   bc=:free, wall_bc=WALL_BC,
                   latent_L=LATENT_L, latent_mode=LATENT_MODE,
+                  # the viscoelastic knob: 0.0 (the empty default) leaves every
+                  # viscoelastic term off and the card bit-identical; a positive
+                  # value changes the effective viscosity, see the warning at
+                  # `SHEAR_MODULUS`.
+                  shear_modulus=SHEAR_MODULUS,
                   # everything below is the round-1 "off" default, written out
                   # so the card is explicit:
                   yield_c=Inf, yield_phi=0.0, yield_taumax=Inf,
@@ -511,7 +568,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     # Only an opt-in run records it, so the checkpoints of the default card stay
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
-    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","))
+    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s shear_modulus=%.3g\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), SHEAR_MODULUS)
     @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.1f Es=%.1f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)

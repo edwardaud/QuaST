@@ -243,6 +243,38 @@ where $L\_x=2.5$ is the box width. It vanishes on the top and bottom walls, as a
 
 Yielding and strain weakening are off (`yield_c = yield_taumax = Inf`, `yield_phi = 0`, `weak_eps_ref = 0`), as are density-weighted heating (`rho_heating = rho_cp = false`), dissipation and adiabatic heating (`Di = 0`), the reference state (`refstate = nothing`), the deviatoric projection (`deviatoric = false`), and the anelastic mass form (`mass_form = :boussinesq`).
 
+### 1.8 Viscoelasticity
+
+Maxwell viscoelasticity is off by default. `Params.shear_modulus` is the nondimensional elastic shear modulus $G$ , and the case exposes it as `CASE_SHEAR_MODULUS` (unset or empty means 0, i.e. off). A positive value does two things: it carries a deviatoric stress history, and it replaces the viscosity the flow solve sees by the effective viscosity
+
+$$
+\eta_{\mathrm{eff}} = \frac{1}{1/\eta + 1/(G\,\Delta t)},
+\qquad
+\tau^{n+1} = \frac{\tau^{n} + 2G\,\Delta t\,\hat{\boldsymbol\varepsilon}^{\,n+1}}{1 + \Delta t/\tau_{\mathrm M}},
+\qquad
+\tau_{\mathrm M} = \eta/G .
+$$
+
+Here $\tau$ is the deviatoric stress, $\hat{\boldsymbol\varepsilon}$ its deviatoric strain rate, $\tau\_{\mathrm M}$ the Maxwell time, and $\Delta t$ the step the run actually took. The previous step's stress enters the momentum equation as the lagged load $\nabla\cdot(a\tau^n)$ with $a=\eta/(\eta+G\Delta t)$ , which is what makes an equilibrated viscoelastic flow the *material*-viscosity flow. With `shear_modulus = 0` every one of these terms is absent, nothing is sampled, and the run is bit-identical to the purely viscous one. The value is part of `run_config`, so a restart cannot switch it silently.
+
+The two limits are the whole behavior:
+
+- $G\Delta t \gg \eta$ : the fast-relaxation regime, where the step is longer than the Maxwell time. The stress relaxes within a step, $\eta\_{\mathrm{eff}} \approx \eta$ , and the flow is the purely viscous one; the memory is invisible.
+- $G\Delta t \ll \eta$ : the elastic regime, where $\Delta t \ll \tau\_{\mathrm M}$ . Here $\eta\_{\mathrm{eff}} \approx G\Delta t$ , so the viscosity is capped at the elastic value and the first steps' stress grows like $2G\Delta t\,\hat{\varepsilon}$ .
+
+**The regime change.** That cap is correct physics, but it means a viscoelastic card is not its `G = 0` twin plus memory: every viscosity well above $G\Delta t$ is flattened toward $G\Delta t$ , so the stiff end of the material contrast is removed and the contrast the solve sees collapses by about the factor by which the stiffest material exceeds $G\Delta t$ . Two measured states:
+
+- At the developed production state (step 20 000, $\Delta t = 4.182\times10^{-7}$ , $G\Delta t = 1.485$ ) the material viscosity contrast was $3.3\times10^6$ and the realized effective contrast about $5\times10^2$ : three to four decades of contrast removed, and a measured arm ran 33% cheaper because of it.
+- At a start-up segment with $\Delta t = 3.6\times10^{-8}$ and $G\Delta t = 0.129$ the collapse was from a material $1.0\times10^7$ to an effective $1.3\times10^2$ .
+
+So a viscoelastic card is a *softer, different* problem, and its diagnostics are not those of its `G = 0` twin. Whenever `shear_modulus > 0` the driver reports the regime once at the first step that advances the stress and once at the end of the run: the material viscosity range and contrast, the effective range and contrast at that step's `dt`, the range of $G\Delta t/\eta$ , and one line stating the resulting contrast collapse. At `shear_modulus = 0` it prints nothing. Register the expected effective contrast before reading a $G > 0$ arm.
+
+**The cost.** The viscoelastic machinery itself is cheap. Measured on the production card, it costs about 1% of a step (36.2 ms: 33.5 ms resampling the material viscosity at the nodes, 2.65 ms the stress update, 0.08 ms the elastic load), and a checkpoint grows by exactly $3\times8\times N$ bytes for the three stress fields, 1.730 MB to 2.679 MB, that is 1.55x. The total step time can still fall, as the 33% above shows: that is not the price of the feature, it is the different problem.
+
+**The co-rotation band.** The Jaumann rotation is applied as the linearization $1+\Delta t\,ad\_W$ over the step, not as the exponential. It is valid while $2|W|\min(\Delta t,\tau\_{\mathrm M})$ is small, and `MAXWELL_COROTATION_BOUND` = 0.1 quantifies "small". The driver reports the run maxima of $2|W|\Delta t$ , $2\tau\_{\mathrm M}|W|$ and the per-step rotation once per run, and warns once at the first step outside the band; this report is separate from the regime report above. The run continues: it is an accuracy band, not a stability limit, so reduce `dt` (`dtmax`/`cfl`) to get back inside.
+
+**What the stress history is not.** It is a tensor state carried on the mesh, not a free surface and not topography. This code has no moving top boundary: the sticky-air density hook (`rho_multiplier`) lets a low-density top layer flow, but its interface stays where the Eulerian mesh puts it, so no surface relief emerges. A viscoelastic card is not a topographic observable.
+
 ## 2. The discretization
 
 ### 2.1 Mesh and spaces
@@ -406,6 +438,7 @@ Every knob is a `CASE_*` environment variable read when the script starts. The s
 | `CASE_EV` | 0.11 | float | Entropy-viscosity coefficient. |
 | `CASE_LATENT` | `per_phase` | `per_phase`, `global` | Latent coefficients: one per transition, or the single historical `latent_L = 0.11` for both. Any other value is rejected when `Params` is constructed. |
 | `CASE_STOKES_SCALING` | `none` | `none`, `equilibrated` | Equilibration of the direct saddle. It engages only on a solve that would otherwise fail, so a healthy solve is unchanged. |
+| `CASE_SHEAR_MODULUS` | empty (off) | float >= 0 | Maxwell viscoelasticity: the nondimensional elastic shear modulus $G$ . Empty or 0 is off and leaves the run bit-identical; a positive value changes the effective viscosity and the physical regime, as section 1.8 describes. |
 | `CASE_EXTDIAG` | 0 | 0, 1 (also `true`, `yes`, `on`) | Append the exact energy-identity residual `resid_A` to `history.csv`. It changes the column count, so it is accepted only in a new output directory. |
 
 `main()` rejects an unknown `CASE_AMR_GATE`, `CASE_SYMMETRY` or `CASE_STOKES_SCALING` before doing any work. The following are literals rather than knobs: `Ra = 1e5`, `H = 10`, `p = 2`, `stokes_tol = 1e-3`, `mg_tol = 1e-8`, `amr_every = 5`, `refine_frac = 0.2`, `dt0 = 1e-6`, `dtmax = 5e-5`, `dtmin = 1e-9`, `cfl = 0.5`, `dt_growth = 1.05`, `maxpic = 1`, `pic_tol = 1e-6`, `ev_cmax = 0.052`, `ev_alpha = 2`, `checkpoint_every = 200`, and the 256 x 256 frame grid.
@@ -463,6 +496,8 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `mg_operator`, `mg_vel_solver`, `mg_smoothing`, `mg_omega` | `:matrixfree`, `:vcycle`, `:auto`, `nothing` | defaults | Multigrid geometry, velocity solver and V-cycle schedule. |
 | `mg_pressure_eta_tol` | 1.0 | 1.0 | Rebuild threshold of the cached pressure block when the sampled viscosity drifts. |
 | `stokes_scaling` | `:none` | `CASE_STOKES_SCALING` | `:none` or `:equilibrated`, direct path only. |
+| `corotation_guard` | true | defaults | Report the validity band of the co-rotational term and warn once when the run leaves it; inert and free at `shear_modulus = 0` (section 1.8). |
+| `regime_report` | true | defaults | Report the Maxwell regime once at the first stress step and once at the end of the run; inert and free at `shear_modulus = 0` (section 1.8). |
 | `mass_form` | `:anelastic` | `:boussinesq` | Mass conservation form. |
 | `phases`, `latent_scheme` | `[]`, `:implicit` | two transitions, `:implicit` | Phase transitions and the latent coupling; the two schemes agree when `maxpic = 1`. |
 | `weak_chi0` | 0 | 0 | Initial strain-weakening field; active only when the `Params` weakening parameters are set. |
@@ -497,6 +532,7 @@ The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `s
 | `H_half_life` | `Inf` | Radiogenic heating held constant. A finite value decays it as `H 2^(-t/H_half_life)`, in the code's time unit; requires the Picard time loop. |
 | `Di`, `heating_adiabatic`, `heating_dissipation` | 0, false, false | Dissipation and adiabatic heating off. |
 | `refstate`, `deviatoric` | `nothing`, false | Conductive base state, full strain rate. |
+| `shear_modulus` | 0 | Maxwell elastic shear modulus $G$ ; 0 disables every viscoelastic term and leaves the run bit-identical (section 1.8). |
 | `Twall_top`, `Twall_bot` | 0, 1 | Wall temperatures. |
 
 `Params` also validates the law. `:composite` refuses a Drucker–Prager yield surface, `:tosi` refuses `yield_*` because it carries its own plastic branch, and `:arrhenius` needs `eta_T0 > 0`.

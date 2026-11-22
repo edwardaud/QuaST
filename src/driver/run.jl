@@ -277,6 +277,35 @@ function _corotation_band_report(steps::Int, two_w_dt::Real,
                            "inside the band", ".")
 end
 
+# G255: the Maxwell regime message builder.  Like the G254 pair above it is a
+# pure function returning a String, so every `@sprintf` format is a literal and
+# the gate can pin the wording.  It is deliberately a *separate* record from the
+# co-rotation report: one says what viscosity field the solve sees, the other
+# measures the accuracy of the rotation.
+function _maxwell_regime_message(r::NamedTuple, step::Int, t::Real,
+                                 dt::Real, G::Real, final::Bool)
+    collapse = r.material_contrast / r.effective_contrast
+    return string("Maxwell regime (G=", @sprintf("%.6e", G), ", ",
+                  final ? "end of run" : "first stress step",
+                  ", step ", step, ", t=", @sprintf("%.6e", t),
+                  ", dt=", @sprintf("%.6e", dt), "): material eta in [",
+                  @sprintf("%.6e", r.material_min), ", ",
+                  @sprintf("%.6e", r.material_max), "], contrast ",
+                  @sprintf("%.6e", r.material_contrast),
+                  "; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [",
+                  @sprintf("%.6e", r.effective_min), ", ",
+                  @sprintf("%.6e", r.effective_max), "], contrast ",
+                  @sprintf("%.6e", r.effective_contrast),
+                  "; G*dt/eta in [", @sprintf("%.6e", r.gdt_over_eta_min),
+                  ", ", @sprintf("%.6e", r.gdt_over_eta_max),
+                  "] -- G*dt caps eta_eff from above, so the contrast the ",
+                  "solve sees is ", @sprintf("%.3g", collapse), "x smaller (",
+                  @sprintf("%.2f", log10(collapse)),
+                  " decades removed): a viscoelastic card solves a softer, ",
+                  "different problem than its shear_modulus=0 twin, not the ",
+                  "same problem plus memory.")
+end
+
 """
     run_semquad_simulation(qt, pr, theta0; p=2, tstop, dt0, amr_every=0,
                            refine_frac=0.2, coarsen_frac=0.0, maxsteps=10000,
@@ -433,6 +462,19 @@ reduce `dt` (`dtmax`/`cfl`) to get back inside.  The keyword is diagnostic
 only: the maxima are accumulated from values the stress update already samples,
 no arithmetic result depends on them, and a run with the guard off is
 bit-identical (G254).  With `shear_modulus == 0` nothing is sampled or logged.
+`regime_report=true` (the default) reports the **Maxwell regime** when
+`shear_modulus > 0` (G255): once at the first step that has a stress update and
+once at the end of the run, the material viscosity range and contrast, the
+effective viscosity range and contrast at that step's `dt` (the 2a closure
+`eta_eff = 1/(1/eta + 1/(G dt))`), and the range of `G*dt/eta`.  The record ends
+with what the numbers mean: `G*dt` caps the effective viscosity from above, so
+the contrast the Stokes solve actually sees can be smaller than the material one
+by decades -- a viscoelastic card is a *softer, different* problem than its
+`shear_modulus = 0` twin, not the same problem plus memory.  This is diagnostic
+only: the ranges are computed from the nodal viscosity field and step the stress
+update already uses, `regime_report=false` silences both records and leaves a
+run bit-identical (G255), and with `shear_modulus == 0` nothing is sampled or
+logged.  It is a separate record from the co-rotation validity report above.
 Returns a named tuple with the final state and history rows
 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, nleaves]` (plus the opt-in columns
 described above; `history_extra` names them).  `txx`/`tyy`/`txy` are the nodal
@@ -525,6 +567,14 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 # arithmetic result depends on it); silently
                                 # does nothing when `shear_modulus = 0`.
                                 corotation_guard::Bool=true,
+                                # G255: report the material vs effective
+                                # viscosity regime (the contrast collapse of the
+                                # `eta_eff = 1/(1/eta + 1/(G dt))` cap) once at
+                                # the first stress step and once at the end.
+                                # Diagnostic only: `false` silences both records
+                                # and leaves the run bit-identical; silently
+                                # does nothing when `shear_modulus = 0`.
+                                regime_report::Bool=true,
                                 stokes_tol::Float64=Inf,
                                 cfl_tol::Float64=Inf,
                                 tavg_start::Float64=Inf,
@@ -1185,6 +1235,13 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     corot_band = (two_w_dt=0.0, two_taum_w=0.0, resolved_rotation=0.0)
     corot_band_steps = 0
     corot_band_warned = false
+    # Maxwell regime (G255): the material/effective viscosity ranges of the last
+    # stress step, so the end-of-run record repeats the same measurement as the
+    # first-step one.  `nothing` until a stress step has run; with
+    # `shear_modulus = 0` (or `regime_report = false`) nothing is computed, so a
+    # G = 0 run pays nothing and logs nothing.
+    regime_last = nothing
+    regime_reported = false
 
     function solve_flow!(; stokes_scaling::Symbol=:none)
         leaves = Set(sq.leaves)
@@ -1797,6 +1854,22 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             eta_nodes = _nodal_eta(eta_base_probe[], sq)
             band = _advance_maxwell_stress!(txx, tyy, txy, sq, ux, uz, dt,
                                             eta_nodes, pr.shear_modulus)
+            # G255: the Maxwell regime, reported once at the first step that has
+            # a stress update.  The stress update has just built the *material*
+            # nodal viscosity and this step's `dt`, which are exactly the two
+            # inputs of the 2a closure `eta_eff = 1/(1/eta + 1/(G dt))`, so the
+            # measurement is taken on the field the solve saw and at the step it
+            # used.  Diagnostic only: `regime_report = false` skips it and leaves
+            # the run bit-identical.
+            if regime_report
+                regime_last = maxwell_regime(eta_nodes, dt, pr.shear_modulus)
+                if !regime_reported
+                    regime_reported = true
+                    @info _maxwell_regime_message(regime_last, step + 1,
+                                                  t + dt, dt,
+                                                  pr.shear_modulus, false)
+                end
+            end
             # G254: accumulate the validity-band maxima and warn once, at the
             # first step that leaves the band.  `band` is `nothing` only for
             # G <= 0, which the `stress` guard already excludes; the explicit
@@ -2081,6 +2154,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                            txx=txx, tyy=tyy, txy=txy,
                            cooldown=SEMQUAD_AMR_COOLDOWN[],
                            velocity_stale=final_velocity_stale)
+    end
+
+    # G255: report the Maxwell regime once more at the end of the run, with the
+    # last stress step's material field and `dt` (the same measurement the
+    # first-step record made, so a card can be diagnosed from either end of its
+    # log).  Separate from the co-rotation report below: that one is an accuracy
+    # band, this one is what viscosity field the solve actually saw.  A run with
+    # `shear_modulus = 0`, and a `regime_report = false` run, log nothing here.
+    if stress && regime_report && regime_last !== nothing
+        @info _maxwell_regime_message(regime_last, step, t, dt,
+                                      pr.shear_modulus, true)
     end
 
     # G254: report the co-rotation validity band once per run, after every
