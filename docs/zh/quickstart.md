@@ -127,6 +127,8 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=4000 \
 | `CASE_STEPS` | 0（按模式取默认：smoke 10、short 150、spinup 10000、freeze 20000、resume 与 wallrefine 2000） | 步数上限，与绝对步号比较，所以续算时它就是停下的那一步。 |
 | `CASE_LINEAR` | `auto` | 线性求解器。`auto` 在鞍点自由度超过 20 000 时选多重网格，或在自由度超过 2 000 且黏度对比不超过 100 时选多重网格，其余用稀疏直接分解。`direct` 强制走直接路径，也就是逐位可复现的那条，墙钟和内存都约翻倍。`mg` 强制走无矩阵多重网格，且只能串行，因为参数卡没有传 `mg_threads`；只有 `auto` 会用到多线程 V 循环。 |
 
+指南列出了其余的 `CASE_*` 变量以及 `run_semquad_simulation` 的全部关键字；定义 `Ra` 的参考黏度是 `CASE_ETA_REF`（默认 `1.0`），见指南中关于 Rayleigh 数参考黏度的一节。
+
 ## 6. 出问题怎么办
 
 ### 内存不够

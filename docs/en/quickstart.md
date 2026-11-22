@@ -132,7 +132,7 @@ Three things to know:
 | `CASE_STEPS` | 0 (mode default: smoke 10, short 150, spinup 10000, freeze 20000, resume and wallrefine 2000) | Step limit, compared against the absolute step number, so on a resume it is the step to stop at. |
 | `CASE_LINEAR` | `auto` | Linear solver. `auto` picks multigrid at 20 000 saddle degrees of freedom or more, or at 2 000 or more when the viscosity contrast stays at or below 100, and the sparse direct factorization otherwise. `direct` forces the bitwise reproducible path, at roughly twice the wall time and twice the memory. `mg` forces the matrix-free multigrid, serial, because the case passes no `mg_threads`; only `auto` gets the threaded V-cycle. |
 
-The guide lists the other thirteen `CASE_*` variables and every keyword of `run_semquad_simulation`.
+The guide lists the other `CASE_*` variables and every keyword of `run_semquad_simulation`; for the reference viscosity that defines `Ra`, `CASE_ETA_REF` (default `1.0`), see the guide's section on the Rayleigh-number reference viscosity.
 
 ## 6. When something goes wrong
 

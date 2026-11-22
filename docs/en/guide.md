@@ -73,7 +73,7 @@ $$
 | $\mathrm{Ra}$ | Rayleigh number, `1e5` on this case. |
 | $\mathbf f=(0,f\_y)$ | Body force, vertical only. |
 
-`Ra = 1e5` multiplies the thermal buoyancy, with viscosity measured in units of the reference viscosity. The prefactors of section 1.4 put $\eta=1$ at $T=0.5$ , a temperature that sits inside the cold lid, so the convecting interior runs near $T\approx1.3$ where $\eta$ is between $10^{-3}$ and $10^{-2}$ . In internal Rayleigh-number terms that is $10^7$ to $10^8$ , and one overturn takes about $10^{-3}$ in nondimensional time.
+`Ra = 1e5` multiplies the thermal buoyancy, with viscosity measured in units of the reference viscosity `eta_ref` (section 1.9). The prefactors of section 1.4 put $\eta=1$ at $T=0.5$ , a temperature that sits inside the cold lid, so the convecting interior runs near $T\approx1.3$ where $\eta$ is between $10^{-3}$ and $10^{-2}$ . In internal Rayleigh-number terms that is $10^7$ to $10^8$ , and one overturn takes about $10^{-3}$ in nondimensional time.
 
 ### 1.3 Base state, heating and Nusselt numbers
 
@@ -273,7 +273,27 @@ So a viscoelastic card is a *softer, different* problem, and its diagnostics are
 
 **The co-rotation band.** The Jaumann rotation is applied as the linearization $1+\Delta t\,ad\_W$ over the step, not as the exponential. It is valid while $2|W|\min(\Delta t,\tau\_{\mathrm M})$ is small, and `MAXWELL_COROTATION_BOUND` = 0.1 quantifies "small". The driver reports the run maxima of $2|W|\Delta t$ , $2\tau\_{\mathrm M}|W|$ and the per-step rotation once per run, and warns once at the first step outside the band; this report is separate from the regime report above. The run continues: it is an accuracy band, not a stability limit, so reduce `dt` (`dtmax`/`cfl`) to get back inside.
 
+Both reports are switchable: set `regime_report` or `corotation_guard` (both `true` by default) to `false` to silence it for a run whose output must stay quiet; the run is otherwise unchanged.
+
+The stress update uses the step the run actually took, and it is first-order consistent on variable step sequences, so there is no fixed elastic step to set: `dt` keeps following the CFL rule, and no extra option is needed.
+
 **What the stress history is not.** It is a tensor state carried on the mesh, not a free surface and not topography. This code has no moving top boundary: the sticky-air density hook (`rho_multiplier`) lets a low-density top layer flow, but its interface stays where the Eulerian mesh puts it, so no surface relief emerges. A viscoelastic card is not a topographic observable.
+
+### 1.9 The reference viscosity and the Rayleigh number
+
+The nondimensional equations of section 1.2 contain a scaling choice that is easy to miss: `Ra` is defined with one reference viscosity, `eta_ref`,
+
+$$
+\mathrm{Ra} = \frac{\rho g \alpha \Delta T d^3}{\kappa\,\eta_{\mathrm{ref}}},
+$$
+
+and the flow solve uses `eta_law/eta_ref` wherever the material law's viscosity enters, through `eta_multiplier` and the Maxwell effective-viscosity closure of section 1.8. `eta_ref` is `Params.eta_ref`, default `1.0`, in the units the material law returns. The case exposes it as `CASE_ETA_REF`, also default `1.0`; the header prints it and the checkpoint metadata records it.
+
+The convention is only consistent when a rescaled law is paired with the same rescaling of `eta_ref`. Multiplying `comp_Ad` and `comp_As` by `1/c` multiplies every viscosity the law returns by `c`; with `eta_ref = c` the flow is unchanged, because the ratio `eta/eta_ref` is unchanged, while with `eta_ref = 1` the same `Ra` describes a different physical Rayleigh number. The bounds are absolute: `eta_min` and `eta_max` are in the law's units and are applied before the normalization, so a law rescaled by `c` needs its bounds rescaled by `c` as well. The default `1.0` leaves every existing run bit-identical.
+
+When `eta_ref != 1` the driver reports the convention, once at the first flow solve and once at the end of the run. The report gives `Ra`, `eta_ref`, the range and contrast of the normalized field `eta/eta_ref`, `eta_interior` (the arithmetic volume mean of `eta/eta_ref` over the interior band `0.25 <= z <= 0.75`, both wall layers excluded), `Ra_interior = Ra/eta_interior`, and, when the card supplies its scale set, `eta_0` in Pa s. `pic_mode = :newton` and `steady_newton` build viscosity from the raw law, so they refuse `eta_ref != 1` rather than solve a different problem silently.
+
+The production card's default is `eta_ref = 1`, but its material law varies by orders of magnitude across the box, so the interior Rayleigh number is far above the nominal one. The report prints only for `eta_ref != 1`; the convention's numbers at the card's developed state are `eta_interior = 4.280635e-3`, `Ra_interior = 2.336102e7` and `eta_0 = 2.368635e23 Pa s`, the physical viscosity that `Ra` is defined with, which puts the physical interior viscosity at `1.013926e21 Pa s`. At the calibration's hot interior point (`T = 1.75`, `edot_ref`) the same convention gives `Ra = 7.84e7` and a viscosity of `3.02e20 Pa s`. The label `Ra = 1e5` therefore describes the calibration point, not the interior: quote both.
 
 ## 2. The discretization
 
@@ -367,6 +387,16 @@ $$
 
 The left and right walls are insulating and contribute nothing. The top and bottom walls contribute a one-sided normal derivative, and that term is what resolves a thermal boundary layer.
 
+**Choosing the field.** `amr_indicator` selects the field the jump estimator is applied to, and the card sets it with `CASE_INDICATOR`. The default, `:theta`, is the temperature-anomaly field of the display above. `:velocity` applies the same construction to the velocity components, and `:both` adds the two indicators after each is normalized by its own total:
+
+$$
+j_{\mathrm{both}} = j_\theta + \frac{\sum_K j_{\theta,K}}{\sum_K j_{v,K}}\,j_{v,K},
+$$
+
+where $j\_\theta$ and $j\_v$ are the per-leaf indicators of the two fields. Neither field dominates the marking, and at rest, where the velocity vanishes, `:both` reduces exactly to `:theta`.
+
+**The measured comparison.** The measurement is one developed 2-D state at equal cost, 10 000 leaves and 43 steps at the same fixed `dt`, against a 40 000-leaf `:theta` solution. The relative error of `Nu_bot` is 1.10e-4 with `:theta` and 1.01e-5 with `:velocity`; of the volume-mean temperature, 1.75e-4 against 1.15e-4. `:theta` wins on the exact wall-flux residual `resid_A/Nu_top`, about 7e-4 percent against 5e-3 percent. The mechanism is where the leaves go: `:theta` puts 85% of its fine leaves in the wall strips, while `:velocity` puts 3.6% there and refines the interior instead. The choice is therefore observable-dependent, not a ranking. The measurement covers one state, one Rayleigh number, 43 steps (0.2% of the time axis) and 2-D, so keep the default unless you have a reason, and read the comparison as a property of that state rather than a guarantee.
+
 ### 3.2 Marking, coarsening and the leaf cap
 
 Marking is Dörfler's: `refine_frac = 0.2` is the share of the total indicator to resolve, so the cell count follows from the indicator field. The balanced cycle coarsens from below with the relative threshold `coarsen_frac * total` on a complete quartet, pays for refinement by merging the lowest-error eligible quartet, and caps the leaves dropped per cycle at `round(coarsen_frac * n)`. The case uses `coarsen_frac = 0.05`.
@@ -434,10 +464,13 @@ Every knob is a `CASE_*` environment variable read when the script starts. The s
 | `CASE_WALLMIN` | 5 | integer | Minimum level inside the wall strip and on the wall rows. 0 turns the wall rule off. |
 | `CASE_WALLSTRIP` | 0.1 | float in (0, 0.5) | Width of the wall strip, as a fraction of the box height from each wall. |
 | `CASE_SYMMETRY` | `none` | `none`, `x` | x-mirror closure of the AMR passes: `x` refines and merges mirror partners together, for symmetric benchmarks. |
+| `CASE_INDICATOR` | `theta` | `theta`, `velocity`, `both` | Field the AMR jump indicator is applied to, as in section 3.1. |
 | `CASE_LINEAR` | `auto` | `auto`, `direct`, `mg`, `schur_cg`, `lagged` | Linear solver, as in section 4. |
 | `CASE_EV` | 0.11 | float | Entropy-viscosity coefficient. |
 | `CASE_LATENT` | `per_phase` | `per_phase`, `global` | Latent coefficients: one per transition, or the single historical `latent_L = 0.11` for both. Any other value is rejected when `Params` is constructed. |
+| `CASE_COMP_ED`, `CASE_COMP_ES` | 12.0, 17.0 | floats | Activation energies of the composite law's diffusion and dislocation branches, `E_d` and `E_s` (section 1.4). |
 | `CASE_STOKES_SCALING` | `none` | `none`, `equilibrated` | Equilibration of the direct saddle. It engages only on a solve that would otherwise fail, so a healthy solve is unchanged. |
+| `CASE_ETA_REF` | 1.0 | float > 0 | Rayleigh-number reference viscosity in the units the material law returns: `Ra` is defined with it and the flow solve uses `eta/eta_ref`. The header prints it and the checkpoint records it (section 1.9). |
 | `CASE_SHEAR_MODULUS` | empty (off) | float >= 0 | Maxwell viscoelasticity: the nondimensional elastic shear modulus $G$ . Empty or 0 is off and leaves the run bit-identical; a positive value changes the effective viscosity and the physical regime, as section 1.8 describes. |
 | `CASE_EXTDIAG` | 0 | 0, 1 (also `true`, `yes`, `on`) | Append the exact energy-identity residual `resid_A` to `history.csv`. It changes the column count, so it is accepted only in a new output directory. |
 
@@ -472,6 +505,7 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `tmin`, `steady_tol`, `steady_window` | 0, `Inf`, 5 | 0, `Inf`, 5 | Steady-state stop: after `t > tmin`, stop once the relative theta change and the `Nu` change stay below `steady_tol` for `steady_window` steps. |
 | `tavg_start` | `Inf` | `Inf` | Start of the running time average returned as `avg`; `Inf` disables it. |
 | `amr_every` | 0 | 5 | Steps between AMR cycles; 0 freezes the mesh. |
+| `amr_indicator` | `:theta` | `CASE_INDICATOR` | Field of the AMR jump indicator: `:theta`, `:velocity` or `:both` (section 3.1). |
 | `amr_passes` | 1 | 1 | Indicator, refine and transfer passes per cycle. |
 | `refine_frac`, `coarsen_frac` | 0.2, 0.0 | 0.2, `CASE_COARSEN` | Cumulative-error shares of the balanced cycle, marked by Dörfler from above and from below. |
 | `amr_hysteresis`, `amr_coarsen_gate` | 1, true | `CASE_HYST`, `CASE_AMR_GATE == 1` | Hysteresis cooldown and the 2:1 gate. |
@@ -498,6 +532,7 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `stokes_scaling` | `:none` | `CASE_STOKES_SCALING` | `:none` or `:equilibrated`, direct path only. |
 | `corotation_guard` | true | defaults | Report the validity band of the co-rotational term and warn once when the run leaves it; inert and free at `shear_modulus = 0` (section 1.8). |
 | `regime_report` | true | defaults | Report the Maxwell regime once at the first stress step and once at the end of the run; inert and free at `shear_modulus = 0` (section 1.8). |
+| `eta_ref_scale` | `nothing` | the card's `(rho, g, alpha, dT, d, kappa)` scale set | Dimensional scale set for the `eta_ref` report; with it the report also prints `eta_0` in Pa s (section 1.9). |
 | `mass_form` | `:anelastic` | `:boussinesq` | Mass conservation form. |
 | `phases`, `latent_scheme` | `[]`, `:implicit` | two transitions, `:implicit` | Phase transitions and the latent coupling; the two schemes agree when `maxpic = 1`. |
 | `weak_chi0` | 0 | 0 | Initial strain-weakening field; active only when the `Params` weakening parameters are set. |
@@ -523,6 +558,7 @@ The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `s
 | `comp_Vd`, `comp_Vs` | 0, 0 | Activation volumes. |
 | `comp_n`, `comp_Tcut`, `comp_eps_min` | 3, 0 (off), 1e-12 | Stress exponent, temperature floor, strain-rate floor. |
 | `eta_T0`, `eta_min`, `eta_max` | 0.5, 1e-4, 1e4 | Surface offset and viscosity bounds. |
+| `eta_ref` | 1.0 | Rayleigh-number reference viscosity: `Ra` is defined with it and the flow solve uses `eta/eta_ref` (section 1.9). |
 | `bc` | `:free` | Free-slip walls; `:rigid` is no-slip. |
 | `latent_L`, `latent_mode` | 0.11, `:per_phase` | Historical single coefficient, unused here, and the per-transition mode. |
 | `yield_c`, `yield_phi`, `yield_taumax` | `Inf`, 0, `Inf` | Yield surface off. |

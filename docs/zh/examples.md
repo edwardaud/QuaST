@@ -139,6 +139,27 @@ CASE_OUT=out_julia/demo_resume CASE_STEPS=4000 \
 
 两条都从第 2 000 步再走 2 000 步到第 4 000 步，各约 **2.3 h**，本页没有重跑。 `CASE_OUT` 要分开：各自写自己的 `frames/` 与 `history.csv` 。 `CASE_STEPS` 是绝对步号，不大于检查点步号时驱动一步不跑。对冻结后的检查点用 `resume` 会被守卫拒绝，因为该模式传的是 `amr_every = 5` ；这一支要用 `freeze` 接着跑 `frozen.h5` 。
 
+### 打开黏弹性
+
+Maxwell 黏弹性默认关闭；本页任何命令跑的都是纯黏性问题，除非加上参数卡旋钮 `CASE_SHEAR_MODULUS`，也就是无量纲剪切模量 $G$ ，见用户指南 1.8 节。十步冒烟是最快的打开方式：
+
+```bash
+CASE_OUT=out_julia/demo_ve CASE_STEPS=10 CASE_SHEAR_MODULUS=3.55e6 \
+  julia --project=. --threads=8 examples/case_realistic_2d.jl smoke
+```
+
+$G$ 是无量纲的：它以参数卡的参考黏度与时间单位为单位，所以同一个物理剪切模量在 `Ra`、参考黏度或尺度集改变后是不同的数值。这次运行的头部行末尾是 `eta_ref=1 shear_modulus=3.55e+06`； `shear_modulus > 0` 时驱动还会额外打印两次 Maxwell 区域报告，第一次在第一个推进应力的步，第二次在运行结束时。报告经 Julia 的日志器输出，所以这一行很长，并带 `[ Info: ` 前缀；形状是
+
+```text
+[ Info: Maxwell regime (G=3.550000e+06, first stress step, step ..., t=..., dt=...): material eta in [..., ...], contrast ...; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [..., ...], contrast ...; G*dt/eta in [..., ...] -- G*dt caps eta_eff from above, so the contrast the solve sees is ...x smaller (... decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+```
+
+数字随步和 `dt` 变化，行的形状不变；第二次报告把 `first stress step` 换成 `end of run`。要核对的是两个对比度：在演化成熟的生产状态上，实测的 Maxwell 区域为 $G\Delta t = 1.485$ ，材料黏度对比 3.3e6，有效对比约 5e2。
+
+黏弹机制本身很便宜：约占一步的 1%（生产参数卡上 36.2 ms，其中节点上重新采样材料黏度 33.5 ms，应力更新 2.65 ms，弹性载荷 0.08 ms）。检查点因三个应力场增加 `3*8*N` 字节，在生产树上从 1.730 MB 到 2.679 MB，即 1.55 倍；冒烟不写检查点，这项代价要到预积分时才出现。
+
+如果参数卡的材料律被重标度，把 `comp_Ad` 与 `comp_As` 同乘 `1/c`，并在同一条命令里设 `CASE_ETA_REF=c` ：材料律与参考黏度必须一起缩放，否则同一个 `Ra` 描述的是另一个物理 Rayleigh 数。约定见指南中关于 Rayleigh 数参考黏度的一节。
+
 ## 4. 程序化调用
 
 `run_semquad_simulation` 接收一棵树、一张 `Params` 参数卡和一个初始温度异常。把下面这段存成 `build_and_run.jl`，它是完整的，每步打印一行历史。

@@ -40,6 +40,20 @@ Pick `eta_law` on `Params`:
 
 There is no keyword for anything else. `Params.eta_custom` is stored but no solver path reads it, so call `solve_semquad_stokes_var(ss, qt, eta_fun, fx, fz, uDx, uDz; ...)` directly with your law as `eta_fun(x, y)`. Note that `Params` accepts `eta_law=:const` while `run_semquad_simulation` rejects it; use `:expT` with `deta_T=1` for constant viscosity. The 2b law is $\eta = \exp(-9.70406\,T + 4.15888\,(1-y))$ , and the realistic composite card is `make_params()` in `examples/case_realistic_2d.jl`.
 
+## What is `eta_ref` and when should I change it?
+
+`eta_ref` is `Params.eta_ref`, the reference viscosity the Rayleigh number is defined with:
+
+$$
+\mathrm{Ra} = \frac{\rho g \alpha \Delta T d^3}{\kappa\,\eta_{\mathrm{ref}}},
+$$
+
+Its default is `1.0`, in the units the material law returns; the realistic card exposes it as `CASE_ETA_REF`, also default `1.0`. The flow solve uses `eta_law/eta_ref` wherever the law's viscosity enters. Leave it at the default for the realistic card: the calibration defines `Ra = 1e5` with `eta_ref = 1`. Change it when you rescale the law itself: multiplying `comp_Ad` and `comp_As` by `1/c` multiplies every viscosity by `c`, so the same physical problem needs `eta_ref = c`, while with `eta_ref = 1` the nominal `Ra` keeps its value and the physical Rayleigh number moves. Rescale `eta_min` and `eta_max` with the law too, because the bounds are absolute in the law's units. A non-unit value makes the driver report the convention once at the first flow solve and once at the end of the run; `pic_mode = :newton` and `steady_newton` refuse it, because they build viscosity from the raw law.
+
+## Why is the reported `Ra` not the interior Rayleigh number?
+
+`Ra` is normalized by one reference viscosity, `eta_ref`, while the material's actual viscosity varies by orders of magnitude across the box. A run with a non-unit `eta_ref` therefore also reports `eta_interior`, the arithmetic volume mean of `eta/eta_ref` over `0.25 <= z <= 0.75`, and `Ra_interior = Ra/eta_interior`. At the developed production state these are `eta_interior = 4.280635e-3` and `Ra_interior = 2.336102e7`, so the card's nominal `Ra = 1e5` and its interior Rayleigh number are two different numbers; `eta_0 = 2.368635e23 Pa s` puts the physical interior viscosity at `1.013926e21 Pa s`. Quote the nominal value together with `Ra_interior` rather than as the interior Rayleigh number.
+
 ## Does it run in 3-D?
 
 No. The mesh is a two-dimensional quadtree, the elements are two-dimensional GLL tensor elements, and the Stokes solver is built for two velocity components and one pressure. The repository has no 3-D path and no 3-D measurement. Section 8 of the performance volume says "nothing measured" in its 3-D column, and the thresholds do not transfer anyway: a `p = 2` hexahedral leaf has 27 nodes against 9 in two dimensions.
@@ -52,9 +66,17 @@ Run `julia --project=. --threads=8` and leave `linear=:auto` (the default) or `l
 
 Every step solves a variable-viscosity saddle point, while the energy equation is a scalar advection–diffusion system. On the production case at eight threads a warm step takes 2.72 s: 2.21 s (81%) in the Stokes solve, 0.31 s for the energy assembly and solve, 0.14 s for the work integral, and 0.04 s for diagnostics. To cut the Stokes cost, give the multigrid a larger leaf cap, loosen `mg_tol` within the driver's `stokes_tol`, or reduce `max_leaves`. Tightening the energy tolerances will not move the total.
 
+## Why can a viscoelastic run be cheaper than its `shear_modulus = 0` twin?
+
+Because `G` changes the problem rather than adding a cost. The effective viscosity is `eta_eff = 1/(1/eta + 1/(G*dt))`, so every viscosity far above `G*dt` is capped at `G*dt`: at the developed production state (`G*dt = 1.485`) the material contrast `3.3e6` appeared to the flow solve as about `5e2`, which is why a viscoelastic run can cost less than its twin even though the extra machinery costs about 1% of a step. A viscoelastic card is a different problem, so its diagnostics are not its `G = 0` twin's; record the expected effective contrast before interpreting a viscoelastic run.
+
 ## What do I do when the mesh stops refining?
 
 Read `frames/frame_meta.csv`. Compare the `leaves` column against `CASE_MAXLEAVES` (default 10000) and the `nlev` column against `CASE_MAXLEV` (default 7), and you will see which cap you hit. If `leaves` is at its cap, raise `CASE_MAXLEAVES` (about 1.5 GB at 10 000 leaves), or lower `CASE_COARSEN` so the budget exchange frees fewer cells. If `nlev` is at 7, raise `CASE_MAXLEV`; each level halves the leaf size. If neither is at its cap, look at the wall strip set by `CASE_WALLMIN=5` and `CASE_WALLSTRIP=0.1`. A `freeze` run has `amr_every=0` and does not refine by design.
+
+## Which AMR indicator should I use?
+
+`amr_indicator` selects the field the AMR jump indicator is applied to, and the card sets it with `CASE_INDICATOR`: `:theta` (the default), `:velocity`, or `:both`, which adds the two indicators after normalizing each by its own total so neither dominates. On one developed 2-D state at equal cost (10 000 leaves, 43 steps at the same fixed `dt`, against a 40 000-leaf `:theta` solution), `:velocity` gave the smaller `Nu_bot` error (1.01e-5 against 1.10e-4) and the smaller volume-mean temperature error (1.15e-4 against 1.75e-4), while `:theta` gave the smaller exact wall-flux residual (`resid_A/Nu_top`, about 7e-4 percent against 5e-3 percent). `:theta` puts 85% of its fine leaves in the wall strips; `:velocity` puts 3.6% there and refines the interior instead. Which is better therefore depends on the observable, and the measurement covers one state, one Rayleigh number, 43 steps (0.2% of the time axis) and 2-D. Keep the default unless you have a reason, and read the numbers above as a property of that state rather than a ranking.
 
 ## What is `closure` in `history.csv`?
 

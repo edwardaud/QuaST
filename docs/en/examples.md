@@ -139,6 +139,27 @@ CASE_OUT=out_julia/demo_resume CASE_STEPS=4000 \
 
 Both carry the state from step 2 000 to step 4 000, about **2.3 hours** each at the recorded rate; neither was re-run for this page. Give each its own `CASE_OUT` so the `frames/` and `history.csv` do not collide. `CASE_STEPS` is an absolute step number, so a budget at or below the checkpoint step makes the driver run zero steps and write nothing. Asking `resume` to continue a frozen checkpoint fails the configuration guard, because that mode passes `amr_every = 5`; continue that branch with `freeze` on `frozen.h5`.
 
+### Turning on viscoelasticity
+
+Maxwell viscoelasticity is off by default, and any command on this page runs the purely viscous problem unless you add the card knob `CASE_SHEAR_MODULUS`, the nondimensional shear modulus $G$ (guide section 1.8). The ten-step smoke test is the quickest way to see it on:
+
+```bash
+CASE_OUT=out_julia/demo_ve CASE_STEPS=10 CASE_SHEAR_MODULUS=3.55e6 \
+  julia --project=. --threads=8 examples/case_realistic_2d.jl smoke
+```
+
+$G$ is nondimensional: it is scaled by the card's reference viscosity and time unit, so the same physical shear modulus is a different number when `Ra`, the reference viscosity or the scale set changes. The header line of this run ends with `eta_ref=1 shear_modulus=3.55e+06`, and with `shear_modulus > 0` the driver adds two Maxwell regime reports, one at the first stress step and one at the end of the run. The report goes through Julia's logger, so the line is long and carries the `[ Info: ` prefix; its shape is
+
+```text
+[ Info: Maxwell regime (G=3.550000e+06, first stress step, step ..., t=..., dt=...): material eta in [..., ...], contrast ...; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [..., ...], contrast ...; G*dt/eta in [..., ...] -- G*dt caps eta_eff from above, so the contrast the solve sees is ...x smaller (... decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+```
+
+The numbers move with the step and with `dt`; the shape does not, and the second report says `end of run` in place of `first stress step`. The two contrasts are the values to check: at the developed production state the measured Maxwell regime is $G\Delta t = 1.485$, with a material viscosity contrast of 3.3e6 and an effective contrast of about 5e2.
+
+The viscoelastic machinery itself is cheap: about 1% of a step (36.2 ms on the production card, 33.5 ms of it resampling the material viscosity at the nodes, 2.65 ms the stress update and 0.08 ms the elastic load). A checkpoint grows by `3*8*N` bytes for the three stress fields, 1.730 MB to 2.679 MB at the production tree, that is 1.55x; the smoke test writes no checkpoint, so that cost first appears on a spin-up.
+
+If the card's material law is rescaled, multiply both `comp_Ad` and `comp_As` by `1/c` and set `CASE_ETA_REF=c` in the same command: the law and the reference viscosity have to be scaled together, or the same `Ra` describes a different physical Rayleigh number. The guide's section on the Rayleigh-number reference viscosity covers the convention.
+
 ## 4. A programmatic run
 
 `run_semquad_simulation` takes a tree, a `Params` card and an initial temperature anomaly. Save this block as `build_and_run.jl`; it is complete and prints one history row per step.

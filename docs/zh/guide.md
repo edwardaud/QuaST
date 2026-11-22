@@ -71,7 +71,7 @@ $$
 | $\mathrm{Ra}$ | Rayleigh 数。 |
 | $\mathbf f=(0,f\_y)$ | 体力，只有竖直分量。 |
 
-`Ra = 1e5` 乘的是热浮力，黏度以参考黏度为单位。1.4 节的前因子让 $\eta=1$ 对应 $T=0.5$ ，而这一温度落在冷盖内部；对流区在 $T\approx1.3$ 处，黏度只有 $10^{-3}$ 到 $10^{-2}$ ，换算成内部 Rayleigh 数是 $10^7$ 到 $10^8$ 量级。翻一遍的时间尺度 $1/\mathrm{Vrms}$ 约为 $10^{-3}$ 。
+`Ra = 1e5` 乘的是热浮力，黏度以参考黏度 `eta_ref` 为单位（见 1.9 节）。1.4 节的前因子让 $\eta=1$ 对应 $T=0.5$ ，而这一温度落在冷盖内部；对流区在 $T\approx1.3$ 处，黏度只有 $10^{-3}$ 到 $10^{-2}$ ，换算成内部 Rayleigh 数是 $10^7$ 到 $10^8$ 量级。翻一遍的时间尺度 $1/\mathrm{Vrms}$ 约为 $10^{-3}$ 。
 
 ### 1.3 基态、加热与 Nusselt 数
 
@@ -246,7 +246,7 @@ $$
 
 ### 1.8 黏弹性
 
-Maxwell 黏弹性默认关闭。 `Params.shear_modulus` 是无量纲弹性剪切模量 $G$ ，参数卡把它暴露为 `CASE_SHEAR_MODULUS`（不设置或留空表示 0，即关闭）。取正值时它做两件事：携带偏应力历史，并把流场求解实际看到的黏度换成有效黏度
+Maxwell 黏弹性默认关闭。 `Params.shear_modulus` 是无量纲弹性剪切模量 $G$ ，默认值 `0` ；参数卡把它暴露为 `CASE_SHEAR_MODULUS`（不设置或留空同样表示 0，即关闭）。取正值时它做两件事：携带偏应力历史，并把流场求解实际看到的黏度换成有效黏度
 
 $$
 \eta_{\mathrm{eff}} = \frac{1}{1/\eta + 1/(G\,\Delta t)},
@@ -274,7 +274,27 @@ $$
 
 **共转带。** Jaumann 旋转按整步的线性化 $1+\Delta t\,ad\_W$ 施加，而不是指数。它只在 $2|W|\min(\Delta t,\tau\_{\mathrm M})$ 很小时有效， `MAXWELL_COROTATION_BOUND` = 0.1 把「很小」量化。驱动每次运行报告 $2|W|\Delta t$ 、 $2\tau\_{\mathrm M}|W|$ 与逐步旋转的运行最大值，并在第一个越界的步警告一次；这条报告与上面的区域报告相互独立。运行不会中止：这是一个精度带，不是稳定性限制，把 `dt`（`dtmax`/`cfl`）调小即可回到带内。
 
+这两份报告都可以关闭：把 `regime_report` 或 `corotation_guard`（默认都是 `true`）设为 `false`，输出即可保持安静，运行本身不受影响。
+
+应力更新用该步实际走过的 `dt`，并且在变步长序列上具有一阶一致性，因此没有固定弹性步长这个选项： `dt` 照常按 CFL 规则更新，无需额外设置。
+
 **应力历史不是什么。** 它是网格上携带的张量状态，不是自由表面，也不是地形。本代码没有运动的上边界：黏性空气密度钩子（`rho_multiplier`）让低密度顶层能够流动，但其界面停在 Euler 网格给定的位置，因此不会产生地表起伏。黏弹卡不是一个地形观测量。
+
+### 1.9 参考黏度与 Rayleigh 数
+
+1.2 节的无量纲方程里藏着一个容易忽略的标度选择： `Ra` 是相对一个参考黏度 `eta_ref` 定义的，
+
+$$
+\mathrm{Ra} = \frac{\rho g \alpha \Delta T d^3}{\kappa\,\eta_{\mathrm{ref}}},
+$$
+
+流场求解中凡出现材料定律给出的黏度的地方都用 `eta_law/eta_ref` ，包括 `eta_multiplier` 与 1.8 节的 Maxwell 有效黏度闭合。 `eta_ref` 就是 `Params.eta_ref` ，默认值 `1.0` ，单位是材料定律返回值的单位。参数卡通过 `CASE_ETA_REF` 暴露它（默认也是 `1.0`），把它打印在头部，并写入检查点元数据。
+
+只有把被缩放的定律和同样的 `eta_ref` 缩放配对，这个约定才是自洽的。把 `comp_Ad` 与 `comp_As` 同乘 `1/c` ，定律返回的每个黏度都乘 $c$ ；此时取 `eta_ref = c` 流动不变，因为比值 `eta/eta_ref` 没变，而取 `eta_ref = 1` 时同一个 `Ra` 描述的是另一个物理 Rayleigh 数。截断上下限是绝对量： `eta_min` 与 `eta_max` 以定律的单位给出，并且在归一化之前施加，所以定律乘 $c$ 时上下限也要乘 $c$ 。默认值 `1.0` 让所有已有运行逐位不变。
+
+当 `eta_ref != 1` 时，驱动会在第一次流动求解时和运行结束时各报告一次这个约定： `Ra` 、 `eta_ref` 、归一化场 `eta/eta_ref` 的范围与对比度、 `eta_interior` （在 `0.25 <= z <= 0.75` 的内部条带内对 `eta/eta_ref` 取算术体平均，两侧壁层都排除在外）、 `Ra_interior = Ra/eta_interior` ；若参数卡提供了尺度组，还会报告以 Pa s 为单位的 `eta_0` 。 `pic_mode = :newton` 与 `steady_newton` 直接用原始定律构造黏度，因此会拒绝 `eta_ref != 1` ，而不是悄悄求解另一个问题。
+
+生产参数卡的默认值是 `eta_ref = 1` ，但它的材料定律在盒内跨越多个数量级，所以内部 Rayleigh 数远高于名义值。报告只在 `eta_ref != 1` 时打印；用同一套约定算出的该卡成熟状态数值是 `eta_interior = 4.280635e-3` 、 `Ra_interior = 2.336102e7` 和 `eta_0 = 2.368635e23 Pa s` （`Ra` 定义所对应的物理黏度），由此得到物理内部黏度 `1.013926e21 Pa s` 。在标定所用的热内部点（ `T = 1.75` ， `edot_ref` ）上，同一套约定给出 `Ra = 7.84e7` 与 `3.02e20 Pa s` 的黏度。所以 `Ra = 1e5` 这个标签描述的是标定点，而不是内部：引用时要和 `Ra_interior` 一起给出。
 
 ## 2. 数值方法
 
@@ -282,14 +302,25 @@ $$
 
 网格是四叉树。每个叶用 $(\ell,i\_x,i\_y)$ 标记，树始终保持 2:1 平衡，即相邻叶最多相差一级。加密把一个四兄弟拆成四个，粗化把四个合回一个。参数卡把深度限制在 `max_level = 7` ，所以最细的叶高是盒高的 $1/(2\cdot2^{7})=1/256$ ；叶数上限是 `max_leaves = 10000` 。
 
-加密指示子取内部面上的梯度跳变：
+加密指示子默认取温度异常梯度在内部面上的跳变：
 
 $$
-I_K = \frac h2\int_{\partial K}
-[\![\mathbf u\cdot\mathbf n]\!]^2\,\mathrm ds,
+I_K = \frac h2\sum_{F\subset\partial K}\int_F [\![\nabla\theta\cdot\mathbf n]\!]^2\,\mathrm ds,
 $$
 
-顶壁和底壁再额外加一个单侧项。其中 $I\_K$ 是叶 $K$ 的指示子， $h$ 是叶高， $\mathbf u$ 是速度， $\mathbf n$ 是面法向， $[\![\cdot]\!]$ 表示跨面跳变。标记采用 Dörfler 策略：`refine_frac = 0.2` 指需要分辨的指示子总量占比，因此加密多少单元由指示子场自己决定。
+顶壁和底壁再额外加一个单侧项。其中 $I\_K$ 是叶 $K$ 的指示子， $h$ 是叶高， $\theta$ 是温度异常， $\mathbf n$ 是面法向， $[\![\cdot]\!]$ 表示跨面跳变。
+
+加密指示子作用在哪个场，由 `amr_indicator` 选择，参数卡用 `CASE_INDICATOR` 设置。默认的 `:theta` 就是上面这个温度异常场；`:velocity` 把同样的估计分别作用在两个速度分量上再相加；`:both` 把两个指示子各自按自己的总量归一化后相加：
+
+$$
+j_{\mathrm{both}} = j_\theta + \frac{\sum_K j_{\theta,K}}{\sum_K j_{v,K}}\,j_{v,K},
+$$
+
+其中 $j\_\theta$ 与 $j\_v$ 分别是两个场的逐叶指示子。这样两个场都不会主导加密；静止时速度为零，`:both` 精确退化为 `:theta` 。
+
+下面的比较在一个成熟的二维状态上以相同成本测得：10 000 叶、43 步、同样的固定 `dt`，参照解是 40 000 叶的 `:theta` 解。`Nu_bot` 的相对误差，`:theta` 为 1.10e-4，`:velocity` 为 1.01e-5；体积平均温度分别 1.75e-4 与 1.15e-4。精确壁面通量残差 `resid_A/Nu_top` 则是 `:theta` 更小，约 7e-4% 对 5e-3%。机制在于细叶落在哪里：`:theta` 把 85% 的细叶放在壁面条带，`:velocity` 只放 3.6%，转而加密内部。因此选择取决于观测量，而不是给两种指示子排名。这个比较只覆盖一个状态、一个 Rayleigh 数、43 步（时间轴的 0.2%）和二维，所以没有理由时保持默认，并把上面的数字看作该状态的属性，而不是其他流动的保证。
+
+标记采用 Dörfler 策略：`refine_frac = 0.2` 指需要分辨的指示子总量占比，因此加密多少单元由指示子场自己决定。
 
 平衡循环包含以下几部分：
 
@@ -414,10 +445,13 @@ $$
 | `CASE_WALLMIN` | 5 | 整数 | 壁面条带内以及壁面行的最小层级，取 0 关闭壁面规则。 |
 | `CASE_WALLSTRIP` | 0.1 | $(0,0.5)$ 内的浮点 | 壁面条带宽度，从每个壁面向内占盒高的比例。 |
 | `CASE_SYMMETRY` | `none` | `none`、`x` | AMR 各轮的 x 镜像闭合：取 `x` 时镜像伙伴一起加密、一起合并，用于对称基准。 |
+| `CASE_INDICATOR` | `theta` | `theta`、`velocity`、`both` | 加密指示子作用的场，见 2.1 节。 |
 | `CASE_LINEAR` | `auto` | `auto`、`direct`、`mg`、`schur_cg`、`lagged` | 线性求解器，见 2.5 节。 |
 | `CASE_EV` | 0.11 | 浮点 | 熵黏性系数。 |
 | `CASE_LATENT` | `per_phase` | `per_phase`、`global` | 潜热系数：逐个相变计算，或两个相变共用历史值 `latent_L = 0.11` 。传入其他字符串会在构造 `Params` 时被拒绝。 |
+| `CASE_COMP_ED`、`CASE_COMP_ES` | 12.0、17.0 | 浮点 | 复合定律扩散分支与位错分支的活化能 `E_d`、`E_s`（见 1.4 节）。 |
 | `CASE_STOKES_SCALING` | `none` | `none`、`equilibrated` | 直接鞍点的平衡开关，只对本来会失败的求解生效，健康的求解不受影响。 |
+| `CASE_ETA_REF` | 1.0 | 大于 0 的浮点 | 以材料定律单位给出的 Rayleigh 数参考黏度： `Ra` 用它定义，流场求解使用 `eta/eta_ref` 。头部会打印它，检查点也会记录（见 1.9 节）。 |
 | `CASE_SHEAR_MODULUS` | 空（关闭） | 大于等于 0 的浮点 | Maxwell 黏弹性：无量纲弹性剪切模量 $G$ 。留空或取 0 表示关闭，运行结果逐位不变；取正值会改变有效黏度与物理区域，见 1.8 节。 |
 | `CASE_EXTDIAG` | 0 | 0、1 | 把精确能量恒等式残差 `resid_A` 追加到 `history.csv` 。它会改变列数，所以只接受全新的输出目录。 |
 
@@ -470,6 +504,7 @@ $$
 | `dt0`、`dtmax`、`dtmin`、`dt_growth` | 1e-4、`Inf`、1e-14、1.05 | 1e-6、5e-5、1e-9、1.05 | 步长及其上下界。 |
 | `cfl` | 0 | 0.5 | 步长更新所用 CFL 数；取 0 表示把 `dt` 冻结在 `dt0` 。 |
 | `amr_every` | 0 | 5 | 两次 AMR 之间的步数；取 0 冻结网格。 |
+| `amr_indicator` | `:theta` | `CASE_INDICATOR` | 加密指示子作用的场：`:theta`、`:velocity` 或 `:both`（见 2.1 节）。 |
 | `amr_hysteresis`、`amr_coarsen_gate` | 1、true | `CASE_HYST`、`CASE_AMR_GATE == 1` | 平衡循环的迟滞长度与 2:1 校验。 |
 | `refine_frac`、`coarsen_frac` | 0.2、0.0 | 0.2、`CASE_COARSEN` | 平衡循环的误差份额，分别从上方和下方做 Dörfler 标记。 |
 | `max_level`、`max_leaves` | 无上限 | 7、10000 | 深度上限与叶数硬上限。 |
@@ -485,6 +520,7 @@ $$
 | `stokes_scaling` | `:none` | `CASE_STOKES_SCALING` | `:none` 或 `:equilibrated` ，只对直接路径有效。 |
 | `corotation_guard` | true | 默认 | 报告共转项的适用范围，越界时警告一次； `shear_modulus = 0` 时既不采样也不打印（见 1.8 节）。 |
 | `regime_report` | true | 默认 | 在第一个推进应力的步与运行结束时各报告一次 Maxwell 区域； `shear_modulus = 0` 时既不计算也不打印（见 1.8 节）。 |
+| `eta_ref_scale` | `nothing` | 参数卡的 `(rho, g, alpha, dT, d, kappa)` 尺度组 | `eta_ref` 报告所用的尺度组；给出后报告还会打印以 Pa s 为单位的 `eta_0`（见 1.9 节）。 |
 | `mass_form` | `:anelastic` | `:boussinesq` | 质量守恒形式。 |
 | `phases`、`latent_scheme` | `[]`、`:implicit` | 两个相变、`:implicit` | 相变与潜热耦合；`maxpic = 1` 时两种格式结果相同。 |
 | `restart_from` | `""` | 取决于模式 | 从哪个检查点重启。 |

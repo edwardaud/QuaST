@@ -94,20 +94,52 @@ Family **B** is the steady consistent boundary flux (`semquad_nu_cbf`), the resi
 
 Quote **A**. It is the exact derivative of the discrete solution, its wall quadrature is exact, its truncation error is second order and measures $3\times10^{-5}$ to $9\times10^{-5}$ relative at the late states, and it is invariant under wall refinement at a fixed state. B is first order in the wall element, so it serves as a cross-check at fine walls and as the definition of choice when a wall is coarse. Report `Nu_top` and `Nu_bot` together with `h_wall` and `delta_T`, keep at least two wall cells across the layer and preferably four, and refine the wall strip when that fails. Use C for the energy budget, where it closes the discrete identity down to the solver floor.
 
+## Viscoelastic verification
+
+The Maxwell model (guide section 1.8) is verified on its own terms. The benchmarks above were all measured with `shear_modulus = 0`, so they say nothing about the stress history; these are the checks to hold a viscoelastic run to:
+
+| Check | What was compared | Result |
+|---|---|---|
+| AMR transfer | the stress state before and after an AMR cycle | **bit-identical** |
+| 20-step replay | a developed run's stress history, replayed from its own `(dt, u, theta)` | **bit-identical** |
+| Rigid-body rotation | principal-axis error against the analytic objective solution | **1.6e-9 rad** |
+| The same rotation without the co-rotational term | principal-axis error | $\pi/4$ |
+| Pointwise fixed point | how closely the stored stress reproduces the pointwise fixed point | median residual 1.9e-5 on 51.6% of the nodes |
+| Variable-step consistency | uniform, factor-10 alternating and random step sequences | observed order 1.988 to 1.997 |
+
+The stress update takes the actual numerical `dt`, not a fixed elastic step, and the variable-step check is what says so: the observed order is 1.988 to 1.997 on the three sequences; no fixed-elastic-step option exists or is needed. The co-rotational term is the linearized rotation $1+\Delta t\,ad\_W$, valid while $2|\mathbf W|\min(\Delta t,\tau\_{\mathrm M})$ is small; `MAXWELL_COROTATION_BOUND = 0.1` is that band, and the driver reports the run maxima of $2|\mathbf W|\Delta t$, $2\tau\_{\mathrm M}|\mathbf W|$ and the per-step rotation, and warns once at the first step outside it. The rigid-body test is the direct check of the term: with it the principal axis follows the analytic objective solution to 1.6e-9 rad, and without it the same rotation is off by $\pi/4$.
+
+## The reference viscosity
+
+The equations are nondimensionalized with the reference viscosity that appears in the Rayleigh number,
+
+$$
+\mathrm{Ra} = \frac{\rho g \alpha\,\Delta T\,d^3}{\kappa\,\eta_{\mathrm{ref}}},
+$$
+
+where $\eta\_{\mathrm{ref}}$ is `Params.eta_ref` (card knob `CASE_ETA_REF`, default `1.0`) in the units the material law returns. The flow solve uses `eta_law / eta_ref` wherever the law's viscosity enters, and the default leaves every existing run bit-identical.
+
+| Scaling | Change in the flow |
+|---|---|
+| the law and `eta_ref` scaled together | L2-relative 2.6e-15 in the run history, 6.3e-16 in the `theta` field |
+| the law alone | L2-relative 1.37e-1 in the run history, velocity by 9.4, `Vrms` falling by `1/c` |
+
+That is the whole convention. Multiplying `comp_Ad` and `comp_As` by `1/c` multiplies every viscosity the law returns by `c`, so the same physical problem needs `eta_ref = c`; with `eta_ref` left at its default, `Ra` keeps its value while the physical Rayleigh number moves. `eta_min` and `eta_max` are absolute bounds in the law's units, applied before the normalization, so a rescaled law must rescale them too. The card's `Ra = 1e5` describes the calibration point: on the production card the developed state has `eta_interior = 4.280635e-3` and `Ra_interior = 2.336102e7`, and the label should be quoted with `Ra_interior`. `pic_mode = :newton` and `steady_newton` build viscosity from the raw law and refuse `eta_ref != 1`. The guide's section on the Rayleigh-number reference viscosity documents the knob and the report a non-default `eta_ref` prints at the first flow solve and at the end of the run.
+
 ## The automated suite
 
-`test/runtests.jl` includes 156 gate files: analytic identities, constitutive cards, manufactured-solution convergence, the benchmark drivers, the blob regression, checkpoint round trips, the AMR rules, and the solver paths. Run the whole suite with
+`test/runtests.jl` includes the gate files for analytic identities, constitutive cards, manufactured-solution convergence, the benchmark drivers, the blob regression, checkpoint round trips, the AMR rules, and the solver paths. Run the whole suite with
 
 ```bash
-julia --project=. --threads=4 test/runtests.jl
+julia --project=. --threads=8 test/runtests.jl
 ```
 
-It takes about 22 minutes on eight threads. Each gate pins its reference state at a stated relative tolerance; the 2b snapshot gate uses `1e-6` and its symmetry identity `1e-10`, so a change that moves a number surfaces before a benchmark has to be re-run.
+It takes about 25 to 30 minutes on eight threads. Each gate pins its reference state at a stated relative tolerance; the 2b snapshot gate uses `1e-6` and its symmetry identity `1e-10`, so a change that moves a number surfaces before a benchmark has to be re-run.
 
 ## Scope
 
 The validation covers a two-dimensional Cartesian box with free-slip or rigid walls and the Boussinesq mass form used by the benchmark and cross-code runs. It covers the shipped physics where that physics is exercised: composite isostress rheology, phase transitions with per-transition latent heat, internal heating, depth-dependent yielding, and strain weakening. The TALA/ALA reference state has its own self-consistency check.
 
-For studies in this geometry and this physics, the numbers above are the accuracy to expect, and the realistic-case volume records the resolutions and rheologies at which they were measured. Three dimensions, a spherical shell, toroidal motion, plate boundaries, magnetic fields and a free surface lie outside what this code implements, and nothing in the performance record is measured in 3-D. Full elasticity is not a separate rheology either: the one elastic behavior this release carries is the Maxwell viscoelastic model (guide section 1.8), and none of the accuracy numbers above were measured with `shear_modulus > 0`.
+For studies in this geometry and this physics, the numbers above are the accuracy to expect, and the realistic-case volume records the resolutions and rheologies at which they were measured. Three dimensions, a spherical shell, toroidal motion, plate boundaries, magnetic fields and a free surface lie outside what this code implements, and nothing in the performance record is measured in 3-D. Full elasticity is not a separate rheology either: the one elastic behavior this release carries is the Maxwell viscoelastic model (guide section 1.8). The benchmark and cross-code numbers above are measured at the default `eta_ref = 1` and `shear_modulus = 0`; the viscoelastic and reference-viscosity sections above are the checks that cover the other settings.
 
 Before quoting a number in a new regime, run a resolution check on the quantity you intend to quote. Convergence is necessary, and it does not by itself validate an answer.
