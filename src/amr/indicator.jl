@@ -166,26 +166,68 @@ end
 """
     semquad_combined_jump(sq, qt, theta, ux, uz)
 
-The two jump estimators **added as they are**, `jt + jv`, with no rescaling.
+The theta and velocity jump indicators combined so that neither field can
+dominate the other by its raw magnitude.
 
-`theta` alone is blind to a grid-scale velocity error, which is the high-Rayleigh
-number case; the velocity alone vanishes at t = 0, where the flow is at rest, so
-the cycle refines barely at all and the mesh stays coarse.  The plain sum has the
-right limit at both ends: at rest it is exactly the theta indicator, and once the
-flow develops the velocity term contributes wherever the velocity field is rough.
+**Rule.**  Each field is divided by the statistic the Dörfler marking actually
+consumes -- its total mass over the leaves -- and the two dimensionless shapes
+are added:
 
-No normalization is involved.  An earlier version rescaled the velocity part to
-theta's total, which makes a negligible velocity field contribute half of the
-*shape* and reproduces the `:velocity` collapse; the historical
-`coarsen_theta_tol` guard that motivated that rescaling no longer exists in the
-balanced cycle (it was a parameter of the removed classic policy).
+```text
+eta_both = total(jt) * (jt / total(jt) + jv / total(jv))
+         = jt + (total(jt) / total(jv)) * jv
+```
+
+The second form is what the code evaluates.  It is the same ranking as the pure
+`jt/total(jt) + jv/total(jv)` sum because `total(jt) > 0` is a common positive
+factor, which changes no threshold and no selected leaf under the mass-based
+cut (`refine_frac` is a fraction of the total; docs/dev/AMR.md §2.2).  Keeping
+the factor makes the return value literally the theta indicator in the at-rest
+limit instead of a rescaled copy of it.  Either field's absolute units then
+cancel: multiplying `theta` by any positive constant scales the whole
+combination by a positive constant (the cut is invariant), and multiplying the
+velocity by one changes nothing at all because `jv` and `total(jv)` are both
+quadratic in `u`.  That is the operational meaning of "neither dominates".
+
+**Limits, both exact.**
+
+- `total(jv) == 0` (the flow is at rest, or its velocity jump is identically
+  zero): the velocity term carries no information, and the result is exactly
+  `semquad_gradient_jump(sq, qt, theta)`.  This is what lets `:both` run at
+  `t = 0` without collapsing the mesh the way a velocity-only indicator does.
+- `total(jt) == 0` (a uniform `theta`, no temperature jump): there is no theta
+  scale to weight against, so the result is the velocity indicator itself (the
+  marking is scale-invariant, so this is the only informative term).
+
+The historical plain sum `jt + jv` is **not** this: at Ra = 1e8 on the developed
+2.5 x 1 card the velocity total is 3.19e14 against theta's 6.11, so the sum is
+the velocity dictionary to printer precision and `:both` is an alias of
+`:velocity` rather than a second indicator.  G234 pins the normalised rule:
+exact at-rest equality with `:theta`, equal mass from the two fields, invariance
+to rescaling either field, and a selected set that differs from both fields' when
+both have signal.
 """
 function semquad_combined_jump(sq::SemQuad, qt::Quadtree, theta::Vector{Float64},
                                ux::Vector{Float64}, uz::Vector{Float64})
     jt = semquad_gradient_jump(sq, qt, theta)
     jv = semquad_velocity_jump(sq, qt, ux, uz)
+    total_t = 0.0
+    for v in values(jt)
+        total_t += max(v, 0.0)
+    end
+    total_v = 0.0
+    for v in values(jv)
+        total_v += max(v, 0.0)
+    end
+    # At rest the velocity indicator is identically zero: return the theta
+    # dictionary itself (exact equality, no division by zero).
+    total_v > 0.0 || return jt
+    # No temperature signal: the velocity is the only informative field.  The
+    # mass cut is scale-invariant, so returning `jv` changes no selection.
+    total_t > 0.0 || return jv
+    w = total_t / total_v
     for (lf, v) in jv
-        jt[lf] = get(jt, lf, 0.0) + v
+        jt[lf] = get(jt, lf, 0.0) + w * v
     end
     return jt
 end

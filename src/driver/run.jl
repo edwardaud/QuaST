@@ -501,8 +501,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 symmetry::Symbol=:none,
                                 amr_hysteresis::Int=1,
                                 amr_coarsen_gate::Bool=true,
-                                # :theta (default, historical) or :velocity; see
-                                # docs/dev/PHASE1.md 1.1
+                                # :theta (default, historical), :velocity, or
+                                # :both (normalised sum); see docs/dev/PHASE1.md
+                                # 1.1 and src/amr/indicator.jl
                                 amr_indicator::Symbol=:theta,
                                 transfer_mode::Symbol=:nodal,
                                 initial_refine::Int=0,
@@ -1012,11 +1013,22 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         SEMQUAD_AMR_COOLDOWN[] = AmrCooldown()
         for pass in 1:initial_refine
         length(qt.leaves) < max_leaves || break
-        eta = amr_indicator === :velocity ?
-              semquad_velocity_jump(sq, qt, ux, uz) :
-              amr_indicator === :both ?
-              semquad_combined_jump(sq, qt, theta, ux, uz) :
-              semquad_gradient_jump(sq, qt, theta)
+        # At t = 0 the flow is at rest, so the velocity the in-loop pass receives
+        # from the Stokes solve is identically zero.  Pass that zero field
+        # explicitly instead of the undefined `ux`/`uz` the old code read here:
+        # `:velocity` then sees an all-zero indicator and the cycle returns
+        # without refining (there is no velocity error to resolve yet), and
+        # `:both` reduces to `:theta` *exactly* (jt + 0), so its initial mesh is
+        # the theta one.  That reduction is correct behaviour at rest, not a
+        # missing refinement; `run.jl`'s time loop passes the real velocity.
+        if amr_indicator === :theta
+            eta = semquad_gradient_jump(sq, qt, theta)
+        else
+            ux0 = zeros(Float64, sq.N)
+            eta = amr_indicator === :velocity ?
+                  semquad_velocity_jump(sq, qt, ux0, ux0) :
+                  semquad_combined_jump(sq, qt, theta, ux0, ux0)
+        end
         protect = Set{NTuple{3,Int}}()
         for lf in qt.leaves
             if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
@@ -2035,6 +2047,13 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 top_wall_level=top_wall_level, top_wall_frac=top_wall_frac,
                 amr_hysteresis=amr_hysteresis,
                 amr_coarsen_gate=amr_coarsen_gate,
+                # The in-loop indicator runs on the velocity the step just
+                # solved, which is on the current mesh (`sq`).  `:theta`
+                # ignores these; `:velocity`/`:both` need them or
+                # `semquad_amr_passes!` would have to guess (the historical bug
+                # was reading an undefined local and throwing on the first AMR
+                # cycle -- G234 pins a real `amr_every=1` velocity cycle).
+                ux=ux, uz=uz,
                 indicator=amr_indicator)
             sq = ss.su
             # The weakening field lives on the scalar space, so it follows the

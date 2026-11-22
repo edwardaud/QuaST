@@ -69,6 +69,15 @@ stop at the budget, a wall-row-only protect set and an `AmrCooldown` hysteresis.
 It is the only adaptive policy: the `:classic` fraction + hard-budget path was
 removed at `8c622df` (docs/dev/AMR.md).  `refine_wall_to_min!` and the hard leaf
 budget pass below are part of the cycle, not of a policy.
+
+`indicator` selects the field the jump estimator is applied to: `:theta` (the
+default and the production path), `:velocity`, or `:both` (the theta and
+velocity indicators, each divided by its own total, added --
+[`semquad_combined_jump`](@ref)).  The two non-theta modes require the velocity
+that is currently on the mesh: pass it as `ux`/`uz` (scalar node layout, length
+`ss.su.N`).  They are validated only when the selected indicator reads them, so
+existing `:theta` callers are unaffected, and a multi-pass non-theta cycle
+transfers the two components along with `theta` between passes.
 """
 const LAST_AMR_STATS = Ref((refined=0, coarsened=0, merged=0, leaves=0))
 
@@ -89,12 +98,42 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                              amr_cooldown::Union{Nothing,AmrCooldown}=nothing,
                              amr_hysteresis::Int=1,
                              amr_coarsen_gate::Bool=true,
-                             indicator::Symbol=:theta)
+                             indicator::Symbol=:theta,
+                             # Velocity components on the scalar (Q2) node
+                             # layout of `ss`.  Only `:velocity` and `:both`
+                             # read them; `:theta` ignores them, so every
+                             # existing caller keeps its bitwise result.
+                             # They are required (and length-checked) exactly
+                             # when the selected indicator needs them; the old
+                             # code read `ux`/`uz` here without ever receiving
+                             # them, which threw `UndefVarError` on the first
+                             # AMR cycle of every `:velocity`/`:both` run (G234
+                             # now pins that they are passed and used).
+                             ux::Union{Nothing,Vector{Float64}}=nothing,
+                             uz::Union{Nothing,Vector{Float64}}=nothing)
     passes >= 1 || throw(ArgumentError("passes must be >= 1"))
     amr_hysteresis >= 0 ||
         throw(ArgumentError("amr_hysteresis must be >= 0"))
+    indicator in (:theta, :velocity, :both) ||
+        throw(ArgumentError("indicator must be :theta, :velocity or :both"))
     cool = amr_cooldown === nothing ? SEMQUAD_AMR_COOLDOWN[] : amr_cooldown
     sq = ss.su
+    if indicator !== :theta
+        ux === nothing &&
+            throw(ArgumentError("indicator=$(indicator) needs the velocity " *
+                                "x-component: pass ux (and uz) on the scalar " *
+                                "node layout of ss"))
+        uz === nothing &&
+            throw(ArgumentError("indicator=$(indicator) needs the velocity " *
+                                "z-component: pass uz (and ux) on the scalar " *
+                                "node layout of ss"))
+        length(ux) == sq.N ||
+            throw(ArgumentError("ux node field has $(length(ux)) entries, " *
+                                "mesh needs $(sq.N)"))
+        length(uz) == sq.N ||
+            throw(ArgumentError("uz node field has $(length(uz)) entries, " *
+                                "mesh needs $(sq.N)"))
+    end
     nr = 0
     nc = 0
     merged_total = 0
@@ -102,13 +141,14 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         # `indicator` selects what the jump estimator is applied to.  `:theta` is
         # the historical field and the default; `:velocity` sees a grid-scale
         # velocity error that a smooth temperature cannot (PHASE1.md 1.1).
+        # `:both` normalises each field by its own total before adding
+        # (`semquad_combined_jump`), so the velocity's raw 1e13-1e14 scale
+        # advantage at Ra=1e8 cannot turn the sum back into `:velocity`.
         eta = indicator === :velocity ?
               semquad_velocity_jump(sq, qt, ux, uz) :
               indicator === :both ?
               semquad_combined_jump(sq, qt, theta, ux, uz) :
-              indicator === :theta ?
-              semquad_gradient_jump(sq, qt, theta) :
-              throw(ArgumentError("indicator must be :theta, :velocity or :both"))
+              semquad_gradient_jump(sq, qt, theta)
 
         protect = Set{NTuple{3,Int}}()
         # (c') Only the first/last leaf rows are protected: the strip's minimum
@@ -255,6 +295,18 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         theta_prev = transfer_semquad(sq, theta_prev, ss2.su;
                                       mode=transfer_mode, zero_walls=true,
                                       qt_new=qt)
+        if indicator !== :theta
+            # A multi-pass velocity / combined cycle must see the velocity on
+            # the tree the previous pass built.  Both components live on the
+            # scalar node layout, so they follow the same transfer as theta;
+            # `zero_walls=false` because a free-slip wall keeps its tangential
+            # velocity (theta's wall value is the Dirichlet data, the
+            # velocity's is not).
+            ux = transfer_semquad(sq, ux, ss2.su; mode=transfer_mode,
+                                  zero_walls=false, qt_new=qt)
+            uz = transfer_semquad(sq, uz, ss2.su; mode=transfer_mode,
+                                  zero_walls=false, qt_new=qt)
+        end
         ss = ss2
         sq = ss2.su
     end
