@@ -15,62 +15,6 @@
 # Kept in its own file so the legacy time loop can be restored from the
 # release baseline-2026-10-30 tag/archive without touching this code.
 
-# --- optional `:balanced` AMR cooldown state --------------------------------
-# The cooldown is a Dict of leaf keys -> remaining cycles.  It is serialised as
-# an integer matrix with four rows (level, ix, iy, remaining) and one column per
-# key, sorted by key, so the file is deterministic; an empty dict writes no
-# dataset.  The number of AMR cycles the state has been aged through is one
-# integer attribute.  All of this is optional and absent from old checkpoints.
-
-"""Serialise one cooldown dict to a deterministic 4 x n Int64 matrix."""
-function _cooldown_matrix(d::Dict{NTuple{3,Int},Int})
-    ks = sort(collect(d))
-    M = Matrix{Int64}(undef, 4, length(ks))
-    for (j, (k, v)) in enumerate(ks)
-        M[1, j] = k[1]
-        M[2, j] = k[2]
-        M[3, j] = k[3]
-        M[4, j] = v
-    end
-    return M
-end
-
-"""Rebuild one cooldown dict from a 4 x n integer matrix (validated)."""
-function _cooldown_dict(M::AbstractMatrix)
-    size(M, 1) == 4 ||
-        throw(ArgumentError("cooldown matrix must have 4 rows " *
-                            "(level, ix, iy, remaining), got $(size(M, 1))"))
-    d = Dict{NTuple{3,Int},Int}()
-    for j in 1:size(M, 2)
-        l = Int(M[1, j]); ix = Int(M[2, j]); iy = Int(M[3, j])
-        n = Int(M[4, j])
-        (l >= 0 && ix >= 0 && iy >= 0 && n >= 0) ||
-            throw(ArgumentError("cooldown matrix column $j is not a " *
-                                "non-negative leaf/count: ($l, $ix, $iy, $n)"))
-        d[(l, ix, iy)] = n
-    end
-    return d
-end
-
-"""Read the optional cooldown datasets/attribute of an open checkpoint."""
-function _load_cooldown(f::HDF5.File)
-    has_nr = haskey(f, "cooldown_no_refine")
-    has_nc = haskey(f, "cooldown_no_coarsen")
-    has_cyc = haskey(HDF5.attrs(f), "cooldown_cycle")
-    # Old checkpoints have neither a dataset nor the attribute.  A new but
-    # (temporarily) empty cooldown keeps its cycle count in the attribute, so a
-    # file whose dicts are empty still restores the counter.
-    (has_nr || has_nc || has_cyc) || return AmrCooldown()
-    empty_d = Dict{NTuple{3,Int},Int}()
-    nr = has_nr ? _cooldown_dict(read(f["cooldown_no_refine"])) : empty_d
-    nc = has_nc ? _cooldown_dict(read(f["cooldown_no_coarsen"])) :
-                  Dict{NTuple{3,Int},Int}()
-    cyc = has_cyc ? Int(HDF5.attrs(f)["cooldown_cycle"]) : 0
-    cyc >= 0 ||
-        throw(ArgumentError("checkpoint cooldown_cycle=$cyc is negative"))
-    return AmrCooldown(nr, nc, cyc)
-end
-
 """
     save_semquad_state(path, qt, theta, theta_prev, ux, uz, pv; t, dt, dt_prev,
                        step, p, config=Dict(), meta=Dict(), ev=nothing,
@@ -218,74 +162,6 @@ function save_semquad_state(path::AbstractString, qt::Quadtree,
         end
     end
     return path
-end
-
-"""Canonical string form of a run setting, used to compare checkpoints."""
-config_value_string(v::Symbol) = string(v)
-config_value_string(v::Bool) = v ? "true" : "false"
-config_value_string(v::Real) = string(Float64(v))
-config_value_string(v) = string(v)
-
-"""Parse the `key=value` config string stored in a checkpoint."""
-function parse_config_string(s::AbstractString)
-    out = Dict{String,String}()
-    for line in split(s, '\n')
-        isempty(strip(line)) && continue
-        i = findfirst('=', line)
-        i === nothing && continue
-        out[String(line[1:prevind(line, i)])] = String(line[nextind(line, i):end])
-    end
-    return out
-end
-
-"""
-    _checkpoint_leaf_candidates(leaves)
-
-Candidate base-cell counts implied by the leaves that touch the right/top wall.
-A leaf `(l, ix, iy)` on the right wall satisfies `ix + 1 == nx0 * 2^l`, so every
-level whose largest `ix` is a right-wall leaf contributes `(max(ix)+1) / 2^l`.
-Candidates are validated by rebuilding the tree and comparing the leaf set, so
-a level with an interior extreme only produces a harmless candidate.
-"""
-function _checkpoint_leaf_candidates(leaves::Vector{NTuple{3,Int}})
-    maxx = Dict{Int,Int}()
-    maxy = Dict{Int,Int}()
-    for (l, ix, iy) in leaves
-        maxx[l] = max(get(maxx, l, -1), ix)
-        maxy[l] = max(get(maxy, l, -1), iy)
-    end
-    cx = Set{Int}([1])
-    cy = Set{Int}([1])
-    for (l, mx) in maxx
-        q = 1 << l
-        (mx + 1) % q == 0 && push!(cx, (mx + 1) ÷ q)
-    end
-    for (l, my) in maxy
-        q = 1 << l
-        (my + 1) % q == 0 && push!(cy, (my + 1) ÷ q)
-    end
-    return sort(collect(cx)), sort(collect(cy))
-end
-
-"""
-    _rebuild_tree(leaves, maxlev; nx0, ny0, Lx)
-
-Rebuild a tree with the given base cells and return it only when its leaf set is
-exactly `leaves`; otherwise return `nothing`.
-"""
-function _rebuild_tree(leaves::Vector{NTuple{3,Int}}, maxlev::Int;
-                       nx0::Int, ny0::Int, Lx::Float64)
-    qt = Quadtree(maxlev; Lx=Lx, cells_x=nx0, cells_y=ny0)
-    for (l, ix, iy) in leaves
-        node = (0, ix >> l, iy >> l)
-        for lev in 1:l
-            node in qt.leaves && refine!(qt, node)
-            node = (lev, ix >> (l - lev), iy >> (l - lev))
-        end
-    end
-    length(qt.leaves) == length(leaves) || return nothing
-    Set(qt.leaves) == Set(leaves) || return nothing
-    return qt
 end
 
 """
