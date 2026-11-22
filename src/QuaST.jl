@@ -156,6 +156,7 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        weak_zone_factor,
        maxwell_stress_step, maxwell_stress_exact, maxwell_force_stress,
        maxwell_stress_corotate, maxwell_stress_exact_corotational,
+       MAXWELL_COROTATION_BOUND,
        semquad_spin_component,
        semquad_yield_friction, semquad_plastic_strain_rate,
        semquad_plastic_strain_rate_field, semquad_weakening_parts,

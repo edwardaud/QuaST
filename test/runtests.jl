@@ -182,5 +182,6 @@ using QuaST
     include("t_g251_variable_dt.jl")
     include("t_g252_physics_revision.jl")
     include("t_g253_newton_eta_multiplier.jl")
+    include("t_g254_corotation_guard.jl")
 end
 

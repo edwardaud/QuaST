@@ -171,6 +171,16 @@ without a case that needs it would be an unvalidated choice.
 
 `G <= 0` is the disabled convention (`shear_modulus = 0`): the state is left
 untouched and nothing is computed, not even the rotation.
+
+The **return value** is the co-rotation validity bookkeeping (G254): the
+node-wise maxima over the mesh of
+[`maxwell_corotation_band`](@ref)'s three per-step rotations, as
+`(two_w_dt, two_taum_w, resolved_rotation)`.  They are accumulated in the node
+loop that already reads `wxy` and `eta`, so the measurement costs a few flops
+per node and allocates nothing, and it changes no stress component.
+`run_semquad_simulation` accumulates them over the run and reports/warns
+against [`MAXWELL_COROTATION_BOUND`](@ref).  With `G <= 0` the function returns
+`nothing` before sampling anything, so a `shear_modulus = 0` run pays nothing.
 """
 function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
                                   txy::Vector{Float64}, sq::SemQuad,
@@ -187,9 +197,17 @@ function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
     # `G <= 0` is off, not "elastic with zero modulus": the scalar kernel would
     # return its input, but the co-rotational increment is not scaled by G and
     # would still rotate the state.  Keep the disabled path from touching it.
+    # (This is also what makes the co-rotation guard free when G = 0: nothing is
+    # sampled, so nothing beyond the two length checks is paid.)
     G <= 0.0 && return nothing
     eps = semquad_strain_rate_components(sq, ux, uz)
     wxy = semquad_spin_component(sq, ux, uz)
+    # Co-rotation validity band (G254).  Maxima over the domain of the three
+    # per-step rotations; `resolved_rotation = 2|W| min(dt, tau_M)` is the one
+    # compared against the bound (see `MAXWELL_COROTATION_BOUND`).
+    two_w_dt_max = 0.0
+    two_taum_w_max = 0.0
+    resolved_max = 0.0
     @inbounds for g in eachindex(txx)
         # Deviatoric projection (the Maxwell stress has zero trace).  The
         # out-of-plane normal strain is zero in plane strain but contributes its
@@ -206,8 +224,57 @@ function _advance_maxwell_stress!(txx::Vector{Float64}, tyy::Vector{Float64},
         txx[g] = maxwell_stress_step(rxx, eps.exx[g] - tr / 3.0, dt, eta[g], G)
         tyy[g] = maxwell_stress_step(ryy, eps.ezz[g] - tr / 3.0, dt, eta[g], G)
         txy[g] = maxwell_stress_step(rxy, eps.exz[g], dt, eta[g], G)
+        band = maxwell_corotation_band(wxy[g], dt, eta[g] / G)
+        two_w_dt_max = max(two_w_dt_max, band.two_w_dt)
+        two_taum_w_max = max(two_taum_w_max, band.two_taum_w)
+        resolved_max = max(resolved_max, band.resolved_rotation)
     end
-    return nothing
+    return (two_w_dt=two_w_dt_max, two_taum_w=two_taum_w_max,
+            resolved_rotation=resolved_max)
+end
+
+# ---------------------------------------------------------------------------
+# G254 message builders.  Kept as functions so every `@sprintf` format in them
+# is a literal (the macro needs one), and so the gate can pin their wording.
+# They build a `String` only: no state is read or written.
+# ---------------------------------------------------------------------------
+
+function _corotation_band_warning(step::Int, t::Real, two_w_dt::Real,
+                                  two_taum_w::Real, resolved::Real)
+    return string("Maxwell co-rotation validity band exceeded at step ", step,
+                  " (t=", @sprintf("%.6e", t), "): the update applies the ",
+                  "linearised Jaumann rotation 1 + dt*ad_W, valid while the ",
+                  "per-step rotation 2|W|*min(dt, tau_M) is small.  Measured ",
+                  "maxima over the domain on this step: 2|W|dt = ",
+                  @sprintf("%.6e", two_w_dt), ", 2*tau_M*|W| = ",
+                  @sprintf("%.6e", two_taum_w), ", per-step rotation = ",
+                  @sprintf("%.6e", resolved), "; bound = ",
+                  @sprintf("%.3g", MAXWELL_COROTATION_BOUND),
+                  ".  Above the bound the rotation is no longer faithful: the ",
+                  "per-step magnitude error is about (2|W|dt)^2/2 and, for a ",
+                  "step longer than tau_M = eta/G, the update keeps an ",
+                  "old-stress residue of order 2*tau_M*|W|, so the stress ",
+                  "frame (and every diagnostic reading it) drifts by more ",
+                  "than the scheme's stated accuracy allows.  The run ",
+                  "continues -- this is an accuracy band, not a stability ",
+                  "limit -- but treat its stress history as outside the ",
+                  "stated band; reduce dt (dtmax/cfl) to get back inside, or ",
+                  "use the exact exponential of the rotation if this regime ",
+                  "is genuinely needed.")
+end
+
+function _corotation_band_report(steps::Int, two_w_dt::Real,
+                                 two_taum_w::Real, resolved::Real,
+                                 warned::Bool)
+    return string("Maxwell co-rotation validity (G254): over ", steps,
+                  " stress step(s), max 2|W|dt = ",
+                  @sprintf("%.6e", two_w_dt),
+                  ", max 2*tau_M*|W| = ", @sprintf("%.6e", two_taum_w),
+                  ", max per-step rotation 2|W|*min(dt, tau_M) = ",
+                  @sprintf("%.6e", resolved), "; bound = ",
+                  @sprintf("%.3g", MAXWELL_COROTATION_BOUND), " -- ",
+                  warned ? "OUTSIDE the band, see the warning above" :
+                           "inside the band", ".")
 end
 
 """
@@ -350,6 +417,22 @@ transient state and is not a flux error (docs/dev/VALIDATION.md §4).  The extra
 column changes `history.csv`'s layout, so
 `examples/case_realistic_2d.jl` only accepts `CASE_EXTDIAG=1` in a new
 output directory.
+`corotation_guard=true` (the default) checks the **validity band** of the
+linearised co-rotational (Jaumann) term, `1 + dt*ad_W` (G254).  The term is
+valid where `2|W|dt << 1` (elastic regime) and `2*tau_M*|W|` is not large
+(fast-relaxation regime), i.e. where `2|W|*min(dt, tau_M)` is small
+(`MAXWELL_COROTATION_BOUND` = 0.1 quantifies it); outside that band the
+rotation is not faithful even though the scheme remains consistent.  With
+`shear_modulus > 0` the driver reports the run-maximum over the domain of
+`2|W|dt`, of `2*tau_M*|W|` and of the per-step rotation
+`2|W|*min(dt, tau_M)` once per run at `Info` level, and warns once -- at the
+first step that exceeds the bound -- with the measured value, the bound and
+what it means.  The run continues: this is an accuracy band, not a stability
+limit, so refusing would abort a long run for a quantified accuracy loss;
+reduce `dt` (`dtmax`/`cfl`) to get back inside.  The keyword is diagnostic
+only: the maxima are accumulated from values the stress update already samples,
+no arithmetic result depends on them, and a run with the guard off is
+bit-identical (G254).  With `shear_modulus == 0` nothing is sampled or logged.
 Returns a named tuple with the final state and history rows
 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, nleaves]` (plus the opt-in columns
 described above; `history_extra` names them).  `txx`/`tyy`/`txy` are the nodal
@@ -436,6 +519,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 weak_chi0::Float64=0.0,
                                 nu_cbf::Bool=false,
                                 extdiag::Bool=false,
+                                # G254: report the validity band of the
+                                # linearised co-rotational term and warn when
+                                # the run leaves it.  Diagnostic only (no
+                                # arithmetic result depends on it); silently
+                                # does nothing when `shear_modulus = 0`.
+                                corotation_guard::Bool=true,
                                 stokes_tol::Float64=Inf,
                                 cfl_tol::Float64=Inf,
                                 tavg_start::Float64=Inf,
@@ -758,12 +847,26 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             # is what makes the continuation non-silent; G252 pins its text,
             # that the resumed trajectory is bit-identical to the
             # uninterrupted one, and the refusal below.
-            has_stress = restart.txx !== nothing || restart.tyy !== nothing ||
-                         restart.txy !== nothing
-            effect = has_stress ?
+            # "Carries a stress history" would be wrong for a malformed file
+            # that has only one or two of the datasets: that is not a history a
+            # run can continue, it is a partial state the stress init below
+            # refuses (when this run is viscoelastic at all).  Say which case
+            # the file is in, so the warning and the real error agree.  With
+            # `shear_modulus = 0` nothing reads the datasets, so a partial file
+            # is merely ignored -- the wording stays conditional.
+            has_all = restart.txx !== nothing && restart.tyy !== nothing &&
+                      restart.txy !== nothing
+            has_any = restart.txx !== nothing || restart.tyy !== nothing ||
+                      restart.txy !== nothing
+            effect = has_all ?
                 "It carries a Maxwell stress history (txx/tyy/txy) that was " *
                 "advanced by the older update; resuming continues that history " *
                 "under the current update." :
+                has_any ?
+                "It carries only part of a Maxwell stress state (some but not " *
+                "all of txx/tyy/txy), which is a malformed checkpoint rather " *
+                "than a stress history; a viscoelastic restart refuses it " *
+                "instead of resuming an unknown state." :
                 "It carries no Maxwell stress history, so there is no stored " *
                 "stress state for the revision change to affect."
             @warn "checkpoint $(restart_from) predates physics revision " *
@@ -1073,6 +1176,15 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # samples this closure at the nodes after the step has converged.  Only set
     # when `shear_modulus > 0` (the state is `nothing` otherwise).
     eta_base_probe = Ref{Any}(nothing)
+    # Co-rotation validity band (G254): run maxima of the three per-step
+    # rotations `_advance_maxwell_stress!` returns for the steps that advanced
+    # the stress, plus the bookkeeping of the one warning per run.  Pure
+    # reporting state: no numeric result reads it, and with `shear_modulus = 0`
+    # the stress path never runs (`_advance` is not called), so a G = 0 run pays
+    # nothing and logs nothing.
+    corot_band = (two_w_dt=0.0, two_taum_w=0.0, resolved_rotation=0.0)
+    corot_band_steps = 0
+    corot_band_warned = false
 
     function solve_flow!(; stokes_scaling::Symbol=:none)
         leaves = Set(sq.leaves)
@@ -1165,10 +1277,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 1.0 / (1.0 / e + 1.0 / (Gv * dt))
             end
             # 2b step 2: the elastic force term of *this* solve.  The updated
-            # Maxwell stress is `tau^{n+1} = 2 eta_eff eps^{n+1} + a tau^n` with
-            # `a = eta/(eta+G dt)`; the effective-viscosity part is already in the
-            # operator, and `a tau^n` is the explicit load `div(a tau^n)`.  `txx`
-            # still holds `tau^n` here: the advance happens after this step's
+            # Maxwell stress is
+            #
+            #     tau^{n+1} = 2 eta_eff ehat^{n+1} + a R(tau^n),
+            #         R(tau) = tau + dt (W tau - tau W),  a = eta/(eta + G dt),
+            #
+            # with `ehat` the deviatoric strain rate (G249) and `R` the
+            # co-rotational (Jaumann) rotation (G250); the first term is already
+            # in the operator, and the explicit load assembled here is
+            # `a tau^n`, i.e. without the rotation increment -- the deliberate
+            # one-step lag documented on `maxwell_force_stress`.  `txx` still
+            # holds `tau^n` here: the advance happens after this step's
             # momentum, so a same-step update can never feed back (G247 (d)).
             # The material viscosity is sampled from the same closure the stress
             # advance uses at the end of the step (`eta_base_probe[]`).
@@ -1676,8 +1795,28 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # nor the elastic load, so the momentum order is what the coupling needs.
         if stress && eta_base_probe[] !== nothing
             eta_nodes = _nodal_eta(eta_base_probe[], sq)
-            _advance_maxwell_stress!(txx, tyy, txy, sq, ux, uz, dt, eta_nodes,
-                                     pr.shear_modulus)
+            band = _advance_maxwell_stress!(txx, tyy, txy, sq, ux, uz, dt,
+                                            eta_nodes, pr.shear_modulus)
+            # G254: accumulate the validity-band maxima and warn once, at the
+            # first step that leaves the band.  `band` is `nothing` only for
+            # G <= 0, which the `stress` guard already excludes; the explicit
+            # check keeps this a pure diagnostic either way.
+            if corotation_guard && band !== nothing
+                corot_band = (two_w_dt=max(corot_band.two_w_dt, band.two_w_dt),
+                              two_taum_w=max(corot_band.two_taum_w,
+                                             band.two_taum_w),
+                              resolved_rotation=max(corot_band.resolved_rotation,
+                                                    band.resolved_rotation))
+                corot_band_steps += 1
+                if !corot_band_warned &&
+                   band.resolved_rotation > MAXWELL_COROTATION_BOUND
+                    corot_band_warned = true
+                    @warn _corotation_band_warning(step + 1, t + dt,
+                                                   band.two_w_dt,
+                                                   band.two_taum_w,
+                                                   band.resolved_rotation)
+                end
+            end
         end
         # Keep a handle on the second BDF2 level of the step that just finished:
         # `theta_prev` is overwritten below, and the opt-in exact-residual
@@ -1942,6 +2081,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                            txx=txx, tyy=tyy, txy=txy,
                            cooldown=SEMQUAD_AMR_COOLDOWN[],
                            velocity_stale=final_velocity_stale)
+    end
+
+    # G254: report the co-rotation validity band once per run, after every
+    # stress step, so a run that stays inside the band still states its
+    # measured headroom (the warning above is only for leaving it).  A run with
+    # `shear_modulus = 0` never advances the stress, so it logs nothing here.
+    if stress && corotation_guard && corot_band_steps > 0
+        @info _corotation_band_report(corot_band_steps, corot_band.two_w_dt,
+                                      corot_band.two_taum_w,
+                                      corot_band.resolved_rotation,
+                                      corot_band_warned)
     end
 
     avg = avg_n > 0 ? (n=avg_n, t_start=tavg_start,

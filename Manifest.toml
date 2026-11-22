@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "44cd617030a87e6518b7112990576a04b49c863a"
+project_hash = "e5f8f3dd452c7c46caea6562f79091b0dee8d719"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -220,7 +220,7 @@ uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 version = "1.11.0"
 
 [[deps.QuaST]]
-deps = ["HDF5", "LinearAlgebra", "Printf", "Random", "SparseArrays", "Test"]
+deps = ["HDF5", "LinearAlgebra", "Printf", "Random", "SHA", "SparseArrays", "Test"]
 path = "."
 uuid = "4a934f96-4962-41bf-a203-184953d15cc7"
 version = "0.1.0"

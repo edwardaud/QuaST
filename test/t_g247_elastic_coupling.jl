@@ -297,8 +297,9 @@ using Test, QuaST, LinearAlgebra, Printf
         assemble_only=true)
 
     # ---- (d) the equilibrated limit through the driver -------------------
-    # R >> eta: dt = 1000 tau_M-ish.  The stress must reach 2 eta ehat with the
-    # deviatoric strain rate `ehat` (G249), and the flow must reproduce the 2a
+    # R >> eta: dt = 1000 tau_M-ish.  The stress must reach the co-rotational
+    # (Jaumann) steady stress `tau = 2 eta ehat + tau_M (W tau - tau W)` -- not
+    # the spin-free `2 eta ehat` (G250) -- and the flow must reproduce the 2a
     # effective-viscosity solution: both schemes then differ only by the
     # O(tau_M/dt) viscosity shift, and the coupled one is the
     # material-viscosity solution (eta_eff + a eta = eta).

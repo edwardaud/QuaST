@@ -13,7 +13,7 @@
 # guard refuses a file whose stored revision differs, and a file without the key
 # (every checkpoint written before the marker existed) is resumed with a warning
 # that says whether it carries a stress history.  `test/t_g252_physics_revision.jl`
-# pins all three behaviours.
+# pins all three behaviours plus the source hash below.
 #
 # Changelog.  Revisions count the states of the physics, oldest first.  A
 # checkpoint written under a revision below `PHYSICS_REVISION` is not
@@ -53,3 +53,58 @@
 # same commit as any change to the *behaviour* of an existing parameter, and add
 # an entry above dated by that commit.
 const PHYSICS_REVISION = 2
+
+# ---------------------------------------------------------------------------
+# Which sources the revision covers, and the hash that makes it enforceable.
+# ---------------------------------------------------------------------------
+#
+# A commit that changes the Maxwell update does not necessarily remember to bump
+# `PHYSICS_REVISION`; the marker alone is only as good as the human.  Every
+# suite run therefore recomputes a hash of the behaviour-defining sources and
+# fails when one differs from the values recorded below
+# (`test/t_g252_physics_revision.jl`), so a physics change cannot land without
+# the developer making the revision decision explicit.
+#
+# Exactly these sources are covered, and not more:
+#
+# * `src/physics/viscoelastic.jl` -- the whole file.  It exists to hold the
+#   Maxwell update: `maxwell_stress_step` (the relaxation), the co-rotational
+#   kernels, the analytic references and `maxwell_force_stress` (the split the
+#   driver loads).  Every byte of it defines what the stored `txx`/`tyy`/`txy`
+#   mean, so the whole file is behaviour.
+# * `_advance_maxwell_stress!` in `src/driver/run.jl` -- the function alone, not
+#   the file.  It is where the kernels are composed into the per-step update:
+#   the deviatoric projection (`ehat`), the spin sampling, the advance order and
+#   the eta/G Maxwell time.  Both revision-2 changes (958af5e, 8c27a02) edited
+#   this function, so a file list that stopped at `viscoelastic.jl` would not
+#   have caught revision 2 itself.  The rest of `run.jl` is time-loop and
+#   solver plumbing that changes without changing the stored stress; hashing
+#   the whole file would fire on every unrelated driver commit and train people
+#   to refresh the hash without thinking, which defeats the point.
+#
+# Not covered on purpose: `src/physics/revision.jl` (it holds the hashes), the
+# I/O and AMR-transfer code (generic state plumbing, pinned by their own gates),
+# and the accessors `semquad_strain_rate_components`/`semquad_spin_component`
+# (their sign and scaling are pinned against the analytic rigid rotation by
+# G250, which fails loudly on its own if they change).  Adding a file requires
+# editing the expected list in G252 as well, so extending coverage is a
+# deliberate act rather than a one-line change here.
+#
+# The hash is the first 16 hex digits of the SHA-256 of the source bytes with
+# the line endings normalised (every `\r\n` and lone `\r` becomes `\n`, so the
+# checkout's line-ending setting cannot change the result).  For the function
+# region the bytes are the lines from the `function _advance_maxwell_stress!(`
+# line through the matching top-level `end` line, joined with `\n` and
+# terminated by one `\n`; the docstring above the function is not hashed (it
+# documents behaviour, it does not define it).  The gate prints the current
+# values when it fails, so recovery is copy-and-paste.
+#
+# To update: decide, explicitly, whether a stored stress history means something
+# different now.  If it does -- bump `PHYSICS_REVISION`, replace the hash, and
+# add a dated changelog entry for the new revision.  If it does not (a comment,
+# docstring or formatting edit), replace the hash and leave the revision alone.
+# The gate's failure message says the same thing.
+const PHYSICS_SOURCE_HASHES = (
+    "src/physics/viscoelastic.jl" => "faee822c54af970e",
+    "src/driver/run.jl#_advance_maxwell_stress!" => "7a21e3fdc0ebf247",
+)

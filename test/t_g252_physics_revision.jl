@@ -14,6 +14,19 @@
 #
 #   (a) one definition of the constant in the tree, both behaviour-changing
 #       commits in its changelog, and the key stored `run_config` under;
+#   (a2) the *source hash* that makes the revision enforceable: the manifest in
+#       `src/physics/revision.jl` covers exactly the behaviour-defining sources
+#       (the whole of `src/physics/viscoelastic.jl` and the
+#       `_advance_maxwell_stress!` function region of `src/driver/run.jl`), the
+#       recomputed SHA-256 of each matches the recorded short hash, and the
+#       changelog has an entry for every revision up to `PHYSICS_REVISION`.
+#       Non-vacuity: the same check run on a temp copy of the tree reports a
+#       one-line append to `viscoelastic.jl`, does **not** report an append
+#       outside the covered function in `run.jl`, and does report an edit
+#       *inside* it -- which is why that file is covered by function region
+#       rather than whole file -- and its failure message names the file and
+#       says what to do (bump the revision and the hash, add a changelog entry,
+#       or refresh the hash alone if the physics did not change);
 #   (b) a fresh checkpoint carries `physics_revision = PHYSICS_REVISION`, and a
 #       restart within the same revision is bit-identical to the uninterrupted
 #       run (theta/ux/uz/pv/history *and* the Maxwell stress history);
@@ -30,7 +43,7 @@
 #       bit-identical to the uninterrupted one -- for a file that carries a
 #       stress history and for one that does not (G = 0), whose warning says it
 #       is unaffected.
-using Test, QuaST, Logging, Printf
+using Test, QuaST, Logging, Printf, SHA
 
 @testset "G252 physics revision" begin
     # ---- (a) the single source of truth --------------------------------
@@ -56,6 +69,134 @@ using Test, QuaST, Logging, Printf
     # and the driver records it in `run_config` next to the other guard keys
     run_src = read(joinpath(root, "src", "driver", "run.jl"), String)
     @test occursin("run_config[\"physics_revision\"] = PHYSICS_REVISION", run_src)
+
+    # ---- (a2) the source hash makes the revision enforceable ---------------
+    # `PHYSICS_REVISION` only works if the next physics change remembers to bump
+    # it.  `PHYSICS_SOURCE_HASHES` (revision.jl) records a short SHA-256 of the
+    # behaviour-defining sources, and this gate recomputes them on every suite
+    # run: a change to the Maxwell update cannot land without the revision
+    # decision being made visible in revision.jl.
+    #
+    # The hash rule, identical to the one documented in revision.jl: SHA-256 of
+    # the bytes with line endings normalised (`\r\n`, `\r` -> `\n`), truncated to
+    # 16 hex digits; for the function region, the lines from the
+    # `function <name>(` line through the matching top-level `end` line, joined
+    # with `\n` and followed by one `\n`.
+    g252_normalise(p) = replace(read(p, String), "\r\n" => "\n", "\r" => "\n")
+    function g252_function_region(path, marker)
+        lines = split(g252_normalise(path), '\n')
+        i = findfirst(l -> startswith(l, marker), lines)
+        i === nothing && return nothing
+        j = findnext(l -> l == "end", lines, i + 1)
+        j === nothing && return nothing
+        return join(lines[i:j], "\n") * "\n"
+    end
+    g252_short(s) = bytes2hex(sha256(codeunits(s)))[1:16]
+    # `spec` is `path` for a whole file or `path#function_name!` for a region.
+    function g252_source_text(tree, spec)
+        parts = split(spec, '#'; limit=2)
+        path = joinpath(tree, parts[1])
+        isfile(path) || return nothing
+        length(parts) == 1 && return g252_normalise(path)
+        return g252_function_region(path, "function " * parts[2] * "(")
+    end
+    # The manifest is the truth to check against; the expected list is pinned
+    # here so coverage cannot be shortened by deleting an entry from it.
+    const_covered = String[first(h) for h in QuaST.PHYSICS_SOURCE_HASHES]
+    @test const_covered == ["src/physics/viscoelastic.jl",
+                            "src/driver/run.jl#_advance_maxwell_stress!"]
+    @test length(unique(const_covered)) == length(const_covered)
+    @test all(h -> last(h) isa String && occursin(r"^[0-9a-f]{16}$", last(h)),
+              QuaST.PHYSICS_SOURCE_HASHES)
+    function g252_changes(tree)
+        changed = Tuple{String,String,String}[]
+        for (spec, stored) in QuaST.PHYSICS_SOURCE_HASHES
+            txt = g252_source_text(tree, spec)
+            current = txt === nothing ? "<source or function missing>" :
+                      g252_short(txt)
+            current == stored || push!(changed, (spec, stored, current))
+        end
+        return changed
+    end
+    function g252_hash_message(changed)
+        io = IOBuffer()
+        print(io, "the physics revision source hash is stale: a ",
+                  "behaviour-defining source of the Maxwell update changed.\n")
+        for (spec, stored, current) in changed
+            print(io, "  ", spec, "\n      recorded ", stored,
+                      "\n      current  ", current, "\n")
+        end
+        print(io, """
+        Decide whether a stored Maxwell stress history means something different now:
+          * if it does: bump PHYSICS_REVISION in src/physics/revision.jl, replace
+            PHYSICS_SOURCE_HASHES with the current values below, and add a dated
+            changelog entry for the new revision in the same file -- all in one
+            commit;
+          * if it does not (comment/docstring/formatting edit): replace the hash
+            and leave the revision alone.
+        Current values (paste into PHYSICS_SOURCE_HASHES):
+        """)
+        for (spec, _, current) in changed
+            print(io, "    \"", spec, "\" => \"", current, "\",\n")
+        end
+        return String(take!(io))
+    end
+    # the real check: no covered source may differ from its recorded hash
+    changed = g252_changes(root)
+    if !isempty(changed)
+        error(g252_hash_message(changed))
+    end
+    @test isempty(changed)
+    # the changelog carries an entry for the current revision (so bumping the
+    # constant without documenting it fails here)
+    revs = sort([parse(Int, m.captures[1])
+                 for m in eachmatch(r"(?m)^# Revision (\d+)", rev_src)])
+    @test revs == collect(1:Int(PHYSICS_REVISION))
+    log_first = match(Regex("(?m)^# Revision $(Int(PHYSICS_REVISION)) "), rev_src)
+    @test log_first !== nothing
+
+    # non-vacuity: the detector must report a changed covered source and stay
+    # quiet for an identical tree and for a change *outside* the covered region.
+    mktempdir() do tmp
+        mkpath(joinpath(tmp, "src", "physics"))
+        mkpath(joinpath(tmp, "src", "driver"))
+        cp(joinpath(root, "src", "physics", "viscoelastic.jl"),
+           joinpath(tmp, "src", "physics", "viscoelastic.jl"))
+        tmp_run = joinpath(tmp, "src", "driver", "run.jl")
+        cp(joinpath(root, "src", "driver", "run.jl"), tmp_run)
+        # an unchanged copy is not reported (the detector is not always-fail)
+        @test isempty(g252_changes(tmp))
+        # a change outside the covered function region of run.jl is not reported
+        open(tmp_run, "a") do io
+            write(io, "\n# G252 non-vacuity sentinel: unrelated driver edit\n")
+        end
+        @test isempty(g252_changes(tmp))
+        # ... but a change inside it is, and the message names the region
+        run_text = read(tmp_run, String)
+        edited = replace(run_text, "tr / 3.0" => "tr / 2.0"; count=1)
+        @test edited != run_text
+        write(tmp_run, edited)
+        changed2 = g252_changes(tmp)
+        @test length(changed2) == 1
+        @test changed2[1][1] == "src/driver/run.jl#_advance_maxwell_stress!"
+        msg2 = g252_hash_message(changed2)
+        @test occursin("src/driver/run.jl#_advance_maxwell_stress!", msg2)
+        @test occursin("bump PHYSICS_REVISION", msg2)
+        @test occursin("changelog entry", msg2)
+        @test occursin(changed2[1][2], msg2) && occursin(changed2[1][3], msg2)
+        # a comment appended to a covered *file* is reported: the whole of
+        # viscoelastic.jl is behaviour, including its structural text
+        write(tmp_run, run_text)
+        @test isempty(g252_changes(tmp))
+        open(joinpath(tmp, "src", "physics", "viscoelastic.jl"), "a") do io
+            write(io, "\n# G252 non-vacuity sentinel: covered file edit\n")
+        end
+        changed3 = g252_changes(tmp)
+        @test length(changed3) == 1
+        @test changed3[1][1] == "src/physics/viscoelastic.jl"
+        @printf("G252 (a2): covered %d sources, hash check clean; non-vacuity reports %s\n",
+                length(const_covered), changed3[1][1])
+    end
 
     # A tree that is not one leaf (HANDOVER section 8); 16 leaves.
     function g252_tree(nref::Int=2)

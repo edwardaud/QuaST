@@ -34,10 +34,12 @@
 #       callbacks: the composition order is pinned bit for bit);
 #   (d) a checkpoint round trip is bit-exact for the fields and a restart
 #       continues the trajectory bit-identically;
-#   (e) an old-format file without the datasets loads with `nothing`, and a
-#       restart from it follows a bit-identical theta/ux trajectory while the
-#       stress history differs -- the direct evidence that the momentum
-#       equation never sees the stress (no `div(tau)` term in this change);
+#   (e) an old-format file without the datasets loads with `nothing` and the
+#       history restarts from zero.  Before the elastic force term existed this
+#       block also showed a bit-identical theta/ux trajectory, which was the
+#       evidence that the momentum never saw the stress; since that term
+#       (G247) the missing history *does* change the trajectory, so the block
+#       asserts the predicted difference instead;
 #   (f) an AMR cycle in the middle of a run keeps the fields finite, non-trivial
 #       and inside the analytic band |tau| <= 2 eta max|edot|, with the transfer
 #       continuous across the mesh change;

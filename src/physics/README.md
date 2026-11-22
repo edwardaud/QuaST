@@ -19,6 +19,6 @@ those belong here.
 | `phase.jl` | `PhaseTransition`, the phase function and its temperature/depth derivatives. |
 | `phase_buoyancy.jl` | The phase-anomaly buoyancy force on the vertical momentum. |
 | `refstate.jl` | The closed-form/EOS reference state: adiabat, rho, alpha and cp. |
-| `revision.jl` | `PHYSICS_REVISION`: the dated changelog of behaviour changes a checkpoint must not cross. |
+| `revision.jl` | `PHYSICS_REVISION`: the dated changelog of behaviour changes a checkpoint must not cross, plus the hashed list of the behaviour-defining sources that makes forgetting to bump it fail G252. |
 | `tosi_law.jl` | The Tosi et al. (2015) viscoplastic law and its derivatives. |
 | `weakening.jl` | Strain weakening: the advected chi field, its source and its JVP. |

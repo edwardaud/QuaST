@@ -1,10 +1,12 @@
 # Maxwell stress history, step 1: the update kernel.
 #
-# This file holds the physics of the stress update and nothing else.  Wiring the
-# three components into the state vector, the AMR transfer, the checkpoint and the
-# `div(tau)` force term is the next step (docs/dev/PHASE2.md); keeping the kernel
-# separate means it can be gated against the analytic curve before any of that
-# machinery exists, and a failure there cannot be confused with a transport bug.
+# This file holds the physics of the stress update and nothing else.  The state
+# vector, the AMR transfer and the checkpoint live in the driver, and the elastic
+# force term is bridged by `maxwell_force_stress`; keeping the update kernels here
+# means they can be gated against the analytic curve independently of that
+# machinery, so a failure here cannot be confused with a transport or wiring bug.
+# (The composition of the kernels into the per-step update is
+# `_advance_maxwell_stress!` in `src/driver/run.jl`, docs/dev/PHASE2.md 2b.)
 #
 # The update is *objective*: a Maxwell stress that does not rotate with the
 # material is not frame-indifferent, and every mantle-convection run is a
@@ -90,6 +92,80 @@ function maxwell_stress_corotate(txx::Float64, tyy::Float64, txy::Float64,
     return (txx + 2.0 * dt * wxy * txy,
             tyy - 2.0 * dt * wxy * txy,
             txy + dt * wxy * (tyy - txx))
+end
+
+# --- the validity band of the linearised rotation (G254) --------------------
+#
+# `maxwell_stress_corotate` applies the rotation *linearised* over the step,
+# `1 + dt ad_W`, not `exp(dt ad_W)`.  Its error is controlled by one of two
+# dimensionless per-step rotations, depending on which timescale is shorter:
+#
+# * elastic regime, `dt < tau_M`: the step is the limiting time, so the
+#   linearised rotation over-rotates the stress magnitude by
+#   `sqrt(1 + (2 W dt)^2) ~ 1 + 2 (W dt)^2`, i.e. a relative error
+#   `~ (2 W dt)^2 / 2` per step;
+# * fast-relaxation regime, `tau_M < dt`: the old stress has relaxed by
+#   `exp(-dt/tau_M)` before the step ends, so the spin only acts for `tau_M`.
+#   The update instead keeps `~sqrt(1 + (2 W dt)^2)/(1 + dt/tau_M) ~ 2 |W| tau_M`
+#   of the old stress (the exact solution keeps none), i.e. the per-step error
+#   is `O(2 tau_M |W|)` of the steady stress.
+#
+# Both are `2 |W| min(dt, tau_M)`: over one step the update can resolve no finer
+# time than `dt`, and the stress remembers the spin no longer than `tau_M`.  The
+# documented `2 |W| dt << 1` / `2 tau_M |W| << 1` is quantified by the single
+# constant below, which `run_semquad_simulation` reports every run and warns on
+# when exceeded (G254).  It is a *validity/accuracy* bound, not a stability one:
+# beyond it the update is still first order in `dt` and its fixed point is still
+# exact, but the rotation it applies is no longer faithful.
+
+"""
+    MAXWELL_COROTATION_BOUND
+
+The bound on the per-step rotation `2 |W| min(dt, tau_M)` at which the
+linearised co-rotational term `1 + dt ad_W` is considered valid: `0.1`.
+
+Choosing `0.1` makes `<< 1` concrete as one decade below `O(1)`: at the bound a
+step rotates the stress by at most `0.1 rad` (5.7 degrees), and the leading
+linearisation error is at most `0.1^2 / 2 = 0.5%` of the stress magnitude per
+step (elastic regime) or at most `10%` of the steady stress retained spuriously
+(fast-relaxation regime).  It is deliberately conservative rather than tuned to
+keep the gates quiet: most verified cards sit far inside it (the analytic
+rotation gate operates at `W dt = 3.9e-5`), but the stress-state card of G246
+reaches `2|W|dt = 0.103` and G251's forced-varying-step composition card 1.2,
+and the guard reports both in the suite log rather than the bound being moved
+to hide them.  A card at `W dt ~ 1` -- the regime the PHASE2 record warns would
+need the exact exponential -- is reported instead of being silently wrong.
+
+`run_semquad_simulation` compares its run-maximum of
+[`maxwell_corotation_band`](@ref)'s `resolved_rotation` against this value
+(G254).  It reports the maxima once per run and warns once, at the first step
+that exceeds the bound; it does not refuse, because the scheme remains
+consistent outside the band (only the rotation accuracy degrades), so aborting
+a long run would trade a quantified accuracy loss for a lost run.
+"""
+const MAXWELL_COROTATION_BOUND = 0.1
+
+"""
+    maxwell_corotation_band(wxy, dt, tau_M)
+
+The three dimensionless rotations of the linearised co-rotational term at one
+node (`wxy` is the spin `W_xy`, `tau_M = eta/G` the material Maxwell time), as a
+named tuple:
+
+    two_w_dt        = 2 |wxy| dt          explicit rotation over the step
+    two_taum_w      = 2 tau_M |wxy|       rotation over the Maxwell time
+    resolved_rotation = 2 |wxy| min(dt, tau_M)
+
+`resolved_rotation` is the angle the update can actually resolve and is the
+quantity compared against [`MAXWELL_COROTATION_BOUND`](@ref) (see the block
+comment above).  It is `min(two_w_dt, two_taum_w)`; `wxy = 0` gives three zeros.
+"""
+@inline function maxwell_corotation_band(wxy::Float64, dt::Float64,
+                                         tau_M::Float64)
+    two_w_dt = 2.0 * abs(wxy) * dt
+    two_taum_w = 2.0 * tau_M * abs(wxy)
+    return (two_w_dt=two_w_dt, two_taum_w=two_taum_w,
+            resolved_rotation=min(two_w_dt, two_taum_w))
 end
 
 """
@@ -180,21 +256,23 @@ formulation.
 
 One backward-Euler step of the Maxwell update splits the new stress into
 
-    tau^{n+1} = 2 eta_eff eps^{n+1} + a tau^n,      a = eta/(eta + G dt),
+    tau^{n+1} = 2 eta_eff ehat^{n+1} + a tau^n,     a = eta/(eta + G dt),
     eta_eff   = 1/(1/eta + 1/(G dt)),
 
-and the first term is already carried by the Stokes operator through the
-effective viscosity.  The second is an explicit load: momentum gains
-`div(a tau^n)`, whose weak form against the velocity test functions is
-`-int a tau^n : eps(v)`.  This function returns the three nodal components of
-`a tau^n` (`eta` is the *material*, nodal viscosity; `G dt` is the same product
-the 2a closure uses), which is exactly the tensor field the Stokes assembly
-turns into that load.
+where `ehat` is the **deviatoric** strain rate (G249); the load assembled here
+leaves out the co-rotational increment of the old stress, which the paragraph
+further down states and justifies.  The first term is already carried by the
+Stokes operator through the effective viscosity.  The second is an explicit
+load: momentum gains `div(a tau^n)`, whose weak form against the velocity test
+functions is `-int a tau^n : eps(v)`.  This function returns the three nodal
+components of `a tau^n` (`eta` is the *material*, nodal viscosity; `G dt` is
+the same product the 2a closure uses), which is exactly the tensor field the
+Stokes assembly turns into that load.
 
 The two states the scheme needs follow from `a`:
 
-    tau = 0      -> no elastic force,
-    tau = 2 eta eps  ->  eta_eff + a eta = eta,
+    tau = 0          -> no elastic force,
+    tau = 2 eta ehat ->  eta_eff + a eta = eta,
 
 so an equilibrated viscoelastic flow is the purely viscous one (material `eta`),
 not the `eta_eff` one; the two agree as `G dt >> eta` (the coefficient is
