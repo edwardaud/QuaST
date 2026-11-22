@@ -14,6 +14,9 @@ those belong here.
 | `energy.jl` | The BDF2 energy step on the quadtree mesh and its wall-flux condition. |
 | `energy_assembly.jl` | Per-block buffers for the threaded energy assembly. |
 | `eta.jl` | The visco-plastic branch: yield stress, plastic viscosity and the strain-rate field. |
+| `eta_laws.jl` | The `semquad_eta_at` viscosity closures and their analytic derivatives. |
+| `eta_plastic.jl` | The Drucker-Prager branch and the strain-rate helpers it needs. |
+| `eta_weak_zone.jl` | The weak-zone multiplier and its activity predicates. |
 | `latent.jl` | Per-transition latent-heat coefficients and the apparent heat capacity. |
 | `params.jl` | `Params`: the physical/numerical card, base state and viscosity-law selection. |
 | `phase.jl` | `PhaseTransition`, the phase function and its temperature/depth derivatives. |
