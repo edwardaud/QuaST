@@ -79,9 +79,12 @@ using Test, QuaST, Logging, Printf, SHA
     #
     # The hash rule, identical to the one documented in revision.jl: SHA-256 of
     # the bytes with line endings normalised (`\r\n`, `\r` -> `\n`), truncated to
-    # 16 hex digits; for the function region, the lines from the
-    # `function <name>(` line through the matching top-level `end` line, joined
-    # with `\n` and followed by one `\n`.
+    # 16 hex digits.  A spec is either a whole file or `path#function_name!`, the
+    # latter covering the lines from `function <name>(` through its matching
+    # top-level `end`.  Both forms are supported; the shipped manifest hashes
+    # whole files, because each covered file now has exactly one subject (the
+    # Maxwell kernels in `viscoelastic.jl`, the driver-side stress state in
+    # `maxwell_state.jl`).
     g252_normalise(p) = replace(read(p, String), "\r\n" => "\n", "\r" => "\n")
     function g252_function_region(path, marker)
         lines = split(g252_normalise(path), '\n')
@@ -104,7 +107,7 @@ using Test, QuaST, Logging, Printf, SHA
     # here so coverage cannot be shortened by deleting an entry from it.
     const_covered = String[first(h) for h in QuaST.PHYSICS_SOURCE_HASHES]
     @test const_covered == ["src/physics/viscoelastic.jl",
-                            "src/driver/run.jl#_advance_maxwell_stress!"]
+                            "src/driver/maxwell_state.jl"]
     @test length(unique(const_covered)) == length(const_covered)
     @test all(h -> last(h) isa String && occursin(r"^[0-9a-f]{16}$", last(h)),
               QuaST.PHYSICS_SOURCE_HASHES)
@@ -164,29 +167,31 @@ using Test, QuaST, Logging, Printf, SHA
            joinpath(tmp, "src", "physics", "viscoelastic.jl"))
         tmp_run = joinpath(tmp, "src", "driver", "run.jl")
         cp(joinpath(root, "src", "driver", "run.jl"), tmp_run)
+        tmp_state = joinpath(tmp, "src", "driver", "maxwell_state.jl")
+        cp(joinpath(root, "src", "driver", "maxwell_state.jl"), tmp_state)
         # an unchanged copy is not reported (the detector is not always-fail)
         @test isempty(g252_changes(tmp))
-        # a change outside the covered function region of run.jl is not reported
+        # a change to a driver file that is *not* covered is not reported
         open(tmp_run, "a") do io
             write(io, "\n# G252 non-vacuity sentinel: unrelated driver edit\n")
         end
         @test isempty(g252_changes(tmp))
-        # ... but a change inside it is, and the message names the region
-        run_text = read(tmp_run, String)
-        edited = replace(run_text, "tr / 3.0" => "tr / 2.0"; count=1)
-        @test edited != run_text
-        write(tmp_run, edited)
+        # ... but any change to the covered state file is, and is named
+        state_text = read(tmp_state, String)
+        edited = replace(state_text, "tr / 3.0" => "tr / 2.0"; count=1)
+        @test edited != state_text
+        write(tmp_state, edited)
         changed2 = g252_changes(tmp)
         @test length(changed2) == 1
-        @test changed2[1][1] == "src/driver/run.jl#_advance_maxwell_stress!"
+        @test changed2[1][1] == "src/driver/maxwell_state.jl"
         msg2 = g252_hash_message(changed2)
-        @test occursin("src/driver/run.jl#_advance_maxwell_stress!", msg2)
+        @test occursin("src/driver/maxwell_state.jl", msg2)
         @test occursin("bump PHYSICS_REVISION", msg2)
         @test occursin("changelog entry", msg2)
         @test occursin(changed2[1][2], msg2) && occursin(changed2[1][3], msg2)
-        # a comment appended to a covered *file* is reported: the whole of
-        # viscoelastic.jl is behaviour, including its structural text
-        write(tmp_run, run_text)
+        # the whole covered file is behaviour, structural text included: a bare
+        # comment appended to it is reported
+        write(tmp_state, state_text)
         @test isempty(g252_changes(tmp))
         open(joinpath(tmp, "src", "physics", "viscoelastic.jl"), "a") do io
             write(io, "\n# G252 non-vacuity sentinel: covered file edit\n")
