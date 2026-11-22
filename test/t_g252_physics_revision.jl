@@ -16,12 +16,12 @@
 #       commits in its changelog, and the key stored `run_config` under;
 #   (a2) the *source hash* that makes the revision enforceable: the manifest in
 #       `src/physics/revision.jl` covers exactly the behaviour-defining sources
-#       (the whole of `src/physics/viscoelastic.jl` and the
-#       `_advance_maxwell_stress!` function region of `src/driver/run.jl`), the
+#       (`maxwell_kernels.jl`, `maxwell_force.jl`, `maxwell_softening.jl` and
+#       `src/driver/maxwell_state.jl`), the
 #       recomputed SHA-256 of each matches the recorded short hash, and the
 #       changelog has an entry for every revision up to `PHYSICS_REVISION`.
 #       Non-vacuity: the same check run on a temp copy of the tree reports a
-#       one-line append to `viscoelastic.jl`, does **not** report an append
+#       one-line append to a covered file, does **not** report an append
 #       outside the covered function in `run.jl`, and does report an edit
 #       *inside* it -- which is why that file is covered by function region
 #       rather than whole file -- and its failure message names the file and
@@ -82,9 +82,10 @@ using Test, QuaST, Logging, Printf, SHA
     # 16 hex digits.  A spec is either a whole file or `path#function_name!`, the
     # latter covering the lines from `function <name>(` through its matching
     # top-level `end`.  Both forms are supported; the shipped manifest hashes
-    # whole files, because each covered file now has exactly one subject (the
-    # Maxwell kernels in `viscoelastic.jl`, the driver-side stress state in
-    # `maxwell_state.jl`).
+    # whole files, one subject each: the kernels, the force term, the Newton
+    # softening and the driver-side state.  The diagnostics and analytic
+    # references of the subject are deliberately not covered, because they read
+    # the state or define the curves it is checked against.
     g252_normalise(p) = replace(read(p, String), "\r\n" => "\n", "\r" => "\n")
     function g252_function_region(path, marker)
         lines = split(g252_normalise(path), '\n')
@@ -106,7 +107,9 @@ using Test, QuaST, Logging, Printf, SHA
     # The manifest is the truth to check against; the expected list is pinned
     # here so coverage cannot be shortened by deleting an entry from it.
     const_covered = String[first(h) for h in QuaST.PHYSICS_SOURCE_HASHES]
-    @test const_covered == ["src/physics/viscoelastic.jl",
+    @test const_covered == ["src/physics/maxwell_kernels.jl",
+                            "src/physics/maxwell_force.jl",
+                            "src/physics/maxwell_softening.jl",
                             "src/driver/maxwell_state.jl"]
     @test length(unique(const_covered)) == length(const_covered)
     @test all(h -> last(h) isa String && occursin(r"^[0-9a-f]{16}$", last(h)),
@@ -163,8 +166,11 @@ using Test, QuaST, Logging, Printf, SHA
     mktempdir() do tmp
         mkpath(joinpath(tmp, "src", "physics"))
         mkpath(joinpath(tmp, "src", "driver"))
-        cp(joinpath(root, "src", "physics", "viscoelastic.jl"),
-           joinpath(tmp, "src", "physics", "viscoelastic.jl"))
+        for f in ("maxwell_kernels.jl", "maxwell_force.jl",
+                  "maxwell_softening.jl")
+            cp(joinpath(root, "src", "physics", f),
+               joinpath(tmp, "src", "physics", f))
+        end
         tmp_run = joinpath(tmp, "src", "driver", "run.jl")
         cp(joinpath(root, "src", "driver", "run.jl"), tmp_run)
         tmp_state = joinpath(tmp, "src", "driver", "maxwell_state.jl")
@@ -193,12 +199,12 @@ using Test, QuaST, Logging, Printf, SHA
         # comment appended to it is reported
         write(tmp_state, state_text)
         @test isempty(g252_changes(tmp))
-        open(joinpath(tmp, "src", "physics", "viscoelastic.jl"), "a") do io
+        open(joinpath(tmp, "src", "physics", "maxwell_kernels.jl"), "a") do io
             write(io, "\n# G252 non-vacuity sentinel: covered file edit\n")
         end
         changed3 = g252_changes(tmp)
         @test length(changed3) == 1
-        @test changed3[1][1] == "src/physics/viscoelastic.jl"
+        @test changed3[1][1] == "src/physics/maxwell_kernels.jl"
         @printf("G252 (a2): covered %d sources, hash check clean; non-vacuity reports %s\n",
                 length(const_covered), changed3[1][1])
     end

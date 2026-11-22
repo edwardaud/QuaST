@@ -18,6 +18,12 @@ those belong here.
 | `eta_plastic.jl` | The Drucker-Prager branch and the strain-rate helpers it needs. |
 | `eta_weak_zone.jl` | The weak-zone multiplier and its activity predicates. |
 | `latent.jl` | Per-transition latent-heat coefficients and the apparent heat capacity. |
+| `maxwell_band.jl` | The validity band of the linearised co-rotational rotation. |
+| `maxwell_force.jl` | The lagged Maxwell stress as the momentum equation sees it. |
+| `maxwell_kernels.jl` | The Maxwell relaxation kernel and the co-rotational increment. |
+| `maxwell_reference.jl` | The analytic Maxwell solutions the gates converge to. |
+| `maxwell_regime.jl` | The material/effective viscosity regime of a viscoelastic run. |
+| `maxwell_softening.jl` | The effective-viscosity softening for the Newton viscosity factory. |
 | `params.jl` | `Params`: the physical/numerical card, base state and viscosity-law selection. |
 | `phase.jl` | `PhaseTransition`, the phase function and its temperature/depth derivatives. |
 | `phase_buoyancy.jl` | The phase-anomaly buoyancy force on the vertical momentum. |
