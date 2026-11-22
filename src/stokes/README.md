@@ -19,4 +19,6 @@ from `physics/`, and the hierarchy and Krylov machinery are in `mg/`.
 | `selector.jl` | `linear=:auto`: choose direct or MG from saddle size and viscosity contrast. |
 | `solve_const.jl` | Constant-viscosity Stokes solve and point evaluation. |
 | `solve_var.jl` | Variable-viscosity Stokes solve: direct, Schur-CG, MG, lagged and auto. |
+| `solve_var_core.jl` | The core variable-viscosity Stokes solve (every linear path). |
+| `solve_var_fallback.jl` | The `linear = :auto` safety net that redoes an unacceptable MG solve. |
 | `state.jl` | `SemStokes`: Q_p velocity, Q_{p-1} pressure, constraints and residual records. |

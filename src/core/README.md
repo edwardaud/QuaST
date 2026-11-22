@@ -17,5 +17,7 @@ those live in `physics/`, `stokes/` and `amr/`.
 | `parallel.jl` | Threading helpers shared by the leaf-blocked assembly loops. |
 | `poisson.jl` | SIPG/Nitsche Poisson operator: a verification-only assembler and its constrained solve. |
 | `quadtree.jl` | The 2:1-balanced quadtree: refine, coarsen, neighbours, balance and wall grading. |
+| `quadtree_balance.jl` | The x-mirror symmetry and the 2:1 balancing policy. |
+| `quadtree_table.jl` | The flat face table the quadtree queries are answered from. |
 | `semquad.jl` | The continuous Q_p space on the quadtree, its mass matrix and constraints. |
 | `transfer.jl` | Solution transfer between quadtree SEM meshes: nodal restriction and L2 projection. |
