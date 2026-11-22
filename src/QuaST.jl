@@ -109,6 +109,8 @@ include("mg/s1solve.jl")
 include("mg/gmres.jl")
 
 # -- AMR hooks and the driver (the time loop and the steady/Newton paths) ----
+include("amr/wall_refine.jl")
+include("amr/amr_pass.jl")
 include("amr/hooks.jl")
 include("driver/picard.jl")
 include("driver/newton.jl")

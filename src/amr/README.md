@@ -9,6 +9,8 @@ pass and wall refinement that the driver calls. The quadtree itself is in
 
 | File | What it is |
 |---|---|
+| `amr_pass.jl` | One adaptive pass: indicator, marking, coarsening, balance, transfer. |
+| `wall_refine.jl` | Refining the wall strips to a minimum level before a run. |
 | `coarsen_gate.jl` | The 2:1-aware `coarsening_allowed` gate (deal.II port). |
 | `coarsen_plan.jl` | Quartet geometry, the coarsening plan and the live-gated funding merge. |
 | `cooldown.jl` | Hysteresis state of the balanced cycle (`AmrCooldown`). |
