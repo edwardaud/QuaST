@@ -184,5 +184,6 @@ using QuaST
     include("t_g253_newton_eta_multiplier.jl")
     include("t_g254_corotation_guard.jl")
     include("t_g255_regime_report.jl")
+    include("t_g256_physical_contrast.jl")
 end
 

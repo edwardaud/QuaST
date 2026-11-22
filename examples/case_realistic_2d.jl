@@ -72,6 +72,15 @@
 #                                       predates the option and is read as
 #                                       `none`, so switching it on for such a
 #                                       checkpoint is refused.
+#     CASE_COMP_ED / CASE_COMP_ES       the composite law's two activation
+#                                       energies E_d/(R dT), E_s/(R dT).  Unset
+#                                       keeps the card's literals 12.0 / 17.0
+#                                       bit for bit; setting them (together with
+#                                       CASE_COMP_AD / CASE_COMP_AS) runs the
+#                                       mantle-contrast variant that
+#                                       examples/calib_realistic_2d.jl derives
+#                                       from the card's own temperature range.
+#                                       See the comment at `COMP_ED`.
 #     CASE_SHEAR_MODULUS                Maxwell viscoelasticity: the nondimensional
 #                                       shear modulus G.  Unset/empty (the
 #                                       default) or 0 is OFF and leaves every
@@ -107,6 +116,20 @@
 #       (i)  eta(T=0.5, z=0.5, edot_ref) = 1
 #       (ii) eta(T=0.1)/eta(T=0.9) at z=0.5, edot_ref = 1e4
 #   -> comp_Ad = 1.6240183119e5, comp_As = 2.6796419238e-1
+#   The [0.1, 0.9] window is *not* the range the field occupies: the base state
+#   with H = 10 reaches T = max_z Tbar = (H+2)^2/(8H) = 1.8, and a developed
+#   field spans T in [0, 1.647] (docs/dev/PHYSICS.md §2.3).  Calibrated over
+#   that real range the card's realised contrast at the calibration rate is
+#   1.96e6 against the mantle's 1e3-1e5 (docs/dev/HANDOVER.md §10.2 item 2,
+#   docs/dev/PHASE1.md §1.2), so a reader can take the card for a mantle-like
+#   one when it is not.  `calib_realistic_2d.jl` now reports that contrast and
+#   derives a variant that targets it: for the default target 1e4 over
+#   [0, 1.8] it solves comp_Ed = 6.973731528, comp_Es = 9.879452998,
+#   comp_Ad = 1.0658847774e3, comp_As = 2.4961576276e-2; that variant's
+#   realised field contrast is 5.9e4 (in the mantle range).  The defaults stay
+#   the ASPECT-validated card; the variant is run from the environment with
+#   CASE_COMP_ED / CASE_COMP_ES / CASE_COMP_AD / CASE_COMP_AS (the calibration
+#   prints the exact command line).
 # Viscoelasticity  off (shear_modulus = 0): no stress history and no
 #   effective-viscosity change, bit for bit.  `CASE_SHEAR_MODULUS` (a positive
 #   nondimensional G) turns the Maxwell terms on; see the warning at the knob:
@@ -122,7 +145,9 @@
 # Numerics
 #   Ra = 1e5 (CASE_RA overrides), p = 2, max_level = 7 (leaf 1/256),
 #   max_leaves = 10000, dt0/dtmax/dtmin = 1e-6/5e-5/1e-9 (CASE_DT* override),
-#   comp_Ad/comp_As = 1.6240183119e5 / 2.6796419238e-1 (CASE_COMP_* override),
+#   comp_Ad/comp_As = 1.6240183119e5 / 2.6796419238e-1, comp_Ed/comp_Es = 12/17
+#   (CASE_COMP_* override; the *energies* knob runs the calibration's
+#   mantle-contrast variant, see the rheology paragraph above),
 #   eta_min/eta_max = 1e-4 / 1e4 (CASE_ETA_MIN/MAX override),
 #   amr_every = 5, refine_frac = 0.2,
 #   amr_coarsen_gate = true, amr_hysteresis = 1,
@@ -181,8 +206,16 @@ const HHEAT        = 10.0
 # card's own values.
 const COMP_AD      = parse(Float64, get(ENV, "CASE_COMP_AD", "1.6240183119e5"))
 const COMP_AS      = parse(Float64, get(ENV, "CASE_COMP_AS", "2.6796419238e-1"))
-const COMP_ED      = 12.0
-const COMP_ES      = 17.0
+# The activation energies are a physical choice paired with the prefactors: the
+# card's (12, 17) pair is the ASPECT 530/375 kJ/mol one, calibrated over
+# T in [0.1, 0.9].  `CASE_COMP_ED`/`CASE_COMP_ES` run the mantle-contrast
+# variant that `examples/calib_realistic_2d.jl` derives from the card's own
+# temperature range (its output prints the exact command line); unset, the two
+# defaults are the card's literals, bit for bit, so a production run or restart
+# is unaffected.  The energies are part of `run_config` (the checkpoint stores
+# comp_Ed/comp_Es), so a restart cannot switch them silently.
+const COMP_ED      = parse(Float64, get(ENV, "CASE_COMP_ED", "12.0"))
+const COMP_ES      = parse(Float64, get(ENV, "CASE_COMP_ES", "17.0"))
 const COMP_N       = 3.0
 const ETA_T0       = 0.5
 const COMP_EPS_MIN = 1.0e-12
@@ -569,7 +602,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
     @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s shear_modulus=%.3g\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), SHEAR_MODULUS)
-    @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.1f Es=%.1f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
+    @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.6f Es=%.6f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)
     @printf("[case] latent coefficients: 410 %s 660 %s (negative = heats a downwelling)\n",
