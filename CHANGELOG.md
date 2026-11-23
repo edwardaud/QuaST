@@ -6,19 +6,6 @@ public release: earlier development happened in a private repository.
 
 ## [Unreleased]
 
-### Removed
-
-- The classic AMR policy. `amr_policy` (and with it `:classic` and the
-  `:threshold` dispatch), `amr_cycle!` (`src/dgquad.jl`),
-  `amr_cycle_hysteresis!` (`src/amr_advanced.jl`), the DG prototype that shared
-  `dgquad.jl`, and the classic-only keywords `amr_strategy`, `marking`,
-  `refine_thresh`, `coarsen_thresh` and `coarsen_theta_tol` are gone. The
-  balanced policy (`amr_cycle_balanced!`) is the only adaptive policy, and
-  `run_semquad_simulation`'s `initial_refine` now runs it as well, so a run with
-  the old defaults is bit-for-bit unchanged. Checkpoints keep the
-  `amr_policy = "balanced"` config key so files written before the removal still
-  match the restart guard.
-
 ### Added
 
 - `examples/benchmark_cases.jl`: one entry point per published case (Blankenbach 1a, 1b,
@@ -30,9 +17,6 @@ public release: earlier development happened in a private repository.
   benchmark cards use, and `scripts/benchmark_table.jl` turns its logs into table rows.
 - `scripts/check_docs.jl`, run in CI, catches the Markdown constructs that would leave a
   formula rendered literally.
-
-### Added
-
 - `Params.eta_multiplier` scales whatever the viscosity law returned, and
   `weak_zone_factor` builds the factor of a straight weak zone: the cheap
   stand-in for a plate boundary, next to the law rather than instead of it.
@@ -40,18 +24,67 @@ public release: earlier development happened in a private repository.
   `Twall_right` instead of insulating them; `:insulating` stays the default.
 - `Params.H_half_life` decays the radiogenic source as `H 2^(-t/H_half_life)`, the
   form ASPECT's `Radioactive decay` subsection uses. `Inf` keeps the constant rate
-  bit for bit; the Newton and steady paths refuse a finite value because they
-  assemble the source themselves. Gate G231 pins the exact scaling.
+  bit for bit.
+- Maxwell viscoelasticity: `Params.shear_modulus` turns on the deviatoric stress history,
+  the effective-viscosity closure, the lagged elastic force term and the co-rotational
+  update, and the driver reports the viscosity regime it produces. `CASE_SHEAR_MODULUS`
+  exposes it on the realistic card.
+- `Params.eta_ref` and `CASE_ETA_REF`: the viscosity the Rayleigh number is defined with,
+  separate from the viscosity the material law returns. A non-unit value makes the driver
+  report the convention, the interior Rayleigh number and the physical reference viscosity.
+- `amr_indicator` and `CASE_INDICATOR`: the field the AMR jump estimator is applied to can
+  be the temperature (`:theta`, the default), the velocity (`:velocity`), or the two after
+  normalizing each by its own total (`:both`).
+- Per-wall boundary conditions: `Params.wall_bc` and `Params.wall_u` set each of the four
+  walls to free slip, rigid, or a prescribed tangential velocity.
+- `Params.rho_multiplier`, the density hook a low-density sticky-air layer needs.
+- A physics revision marker (`src/physics/revision.jl`): a checkpoint written under a
+  different revision is refused at restart, and a key-less checkpoint is resumed with a
+  warning that names what the revision changed.
+- `corotation_guard` and `regime_report` keywords, plus `MAXWELL_COROTATION_BOUND`, which
+  report how far a run sits from the linearized rotation's validity band and what viscosity
+  contrast the effective closure produces.
 
 ### Changed
 
+- The Maxwell stress update is deviatoric and co-rotational: the strain rate is projected
+  onto its deviatoric part, the old stress is rotated with `dt (W tau - tau W)` before the
+  backward-Euler relaxation, and the two changes together move the stress fixed point from
+  `2 eta ehat` to `2 eta ehat + tau_M (W tau - tau W)`. A `shear_modulus > 0` run started
+  from a checkpoint written before this change is refused by the physics revision guard.
+- The `:both` AMR indicator adds the two fields after normalizing each by its own total;
+  it used to be a plain sum, which the velocity term dominated by orders of magnitude.
 - The user documentation was rewritten in both languages rather than translated, and the
-  internal layer labels were removed from every page, comment and gate header.
+  internal layer labels were removed from every page, comment and gate header. The set is
+  now organized by question, one owner per fact, with the same hierarchy in both languages.
 - The benchmark drivers now start from ASPECT's own initial fields, which are close to the
   steady state, and take `CASE_CFL` from the cards (`5.0` for the Blankenbach cases).
 
+### Removed
+
+- The steady-state Newton solver: `newton.jl`, `dp_steady.jl`, `tosi_steady.jl`,
+  `steady_entry.jl`, the `steady_newton` keyword and the `steady` field of the returned
+  state. The solver time-steps; steady state is reached, and detected, by continuing the
+  transient, which is what ASPECT and CitcomS do as well.
+- The classic AMR policy. `amr_policy` (and with it `:classic` and the
+  `:threshold` dispatch), `amr_cycle!` (`src/dgquad.jl`),
+  `amr_cycle_hysteresis!` (`src/amr_advanced.jl`), the DG prototype that shared
+  `dgquad.jl`, and the classic-only keywords `amr_strategy`, `marking`,
+  `refine_thresh`, `coarsen_thresh` and `coarsen_theta_tol` are gone. The
+  balanced policy (`amr_cycle_balanced!`) is the only adaptive policy, and
+  `run_semquad_simulation`'s `initial_refine` now runs it as well, so a run with
+  the old defaults is bit-for-bit unchanged. Checkpoints keep the
+  `amr_policy = "balanced"` config key so files written before the removal still
+  match the restart guard.
+- Sixteen one-off launcher scripts under `scripts/`, superseded by `run_benchmarks.sh`.
+- Five Blankenbach 2b example variants (`blankenbach_2b{,_time,_stretch,_wall,_cbf_ev}.jl`),
+  superseded by `benchmark_cases.jl`, and `examples/tosi_case5a_cycle.jl`, which the
+  ordinary driver reproduces.
+
 ### Fixed
 
+- The velocity-based AMR indicator threw at its first adaptation cycle (it read a field the
+  pass never received), so every `:velocity` and `:both` run stopped there.
 - The benchmark driver passed a full temperature as the anomaly when a case had no ASCII
   field, which drove the Tosi cases into a violent startup.
 - The benchmark driver's diagnostics used the mesh from before an adaptation pass, so a
@@ -60,13 +93,9 @@ public release: earlier development happened in a private repository.
   "wall-refined" run was a uniform mesh.
 - The limit-cycle analysis called `minmax` with a splatted slice and crashed after a case
   had finished; the trajectory is now written to a CSV as well.
-
-### Removed
-
-- Sixteen one-off launcher scripts under `scripts/`, superseded by `run_benchmarks.sh`.
-- Five Blankenbach 2b example variants (`blankenbach_2b{,_time,_stretch,_wall,_cbf_ev}.jl`),
-  superseded by `benchmark_cases.jl`, and `examples/tosi_case5a_cycle.jl`, which the
-  ordinary driver reproduces.
+- The energy step's entropy viscosity lives in `physics/` with the assembly that uses it,
+  and the driver's per-step diagnostics row, the run configuration and the restart guard
+  each have their own file.
 
 ## [0.1.0] - 2026-11-13
 

@@ -5,132 +5,52 @@
   自适应四叉树网格 · 无矩阵多重网格 Stokes 求解
 </p>
 
-<p align="center">
-  <a href="docs/zh/README.md">文档</a> ·
-  <a href="docs/zh/quickstart.md">快速开始</a> ·
-  <a href="docs/zh/examples.md">算例</a> ·
-  <a href="docs/zh/validation.md">验证</a> ·
-  <a href="README.md">English</a>
-</p>
+<p align="right"><a href="README.md">English</a></p>
 
-<p align="center">
-  <img alt="Julia" src="https://img.shields.io/badge/Julia-1.12-9558B2?logo=julia&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-131%20851%20assertions-brightgreen">
-  <img alt="Docs" src="https://img.shields.io/badge/docs-English%20%7C%20中文-blue">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-</p>
+QuaST 求解二维直角盒子内地幔对流的不可压 Boussinesq 或滞弹性 Stokes 方程与能量方程。速度取 `p` 次 Taylor–Hood 单元，压力取 `p - 1` 次，节点为 Gauss–Legendre–Lobatto 点。网格是保持 2:1 平衡的四叉树，随解自适应；温度用 BDF2 推进。Stokes 鞍点有两条路径：稀疏直接分解，或无矩阵几何多重网格；`linear = :auto` 按鞍点规模与黏度对比选择。物性部分覆盖扩散–位错复合流变、随深度变化的 Drucker–Prager 屈服、应变弱化、带潜热的相变、内部加热，以及 Maxwell 黏弹性。
 
-QuaST 求解不可压 Boussinesq 或滞弹性（anelastic）形式的 Stokes 方程与能量方程。单元是 $Q\_p/Q\_{p-1}$ Taylor–Hood，节点取 Gauss–Legendre–Lobatto 点。网格是保持 2:1 平衡的四叉树，悬挂节点用精确约束消去而非罚函数。时间推进用 BDF2，网格按“误差对固定叶数上限”的策略自适应。线性求解由规模与黏度对比自动选路。
+![同一真实算例分别由 QuaST 与 ASPECT 求解](docs/assets/quast_vs_aspect_realistic.gif)
 
-这是一个只做二维、直角坐标盒子的研究代码：没有球壳，没有板块边界，没有弹性或黏弹性，也没有磁场。
+图：同一个真实算例，上排 QuaST，下排 ASPECT，从同一初值出发。四列依次为温度、相对水平平均的温度异常、对数色标下的黏度，以及按加密层级着色的网格。
 
-## 安装
+## 能做什么，不能做什么
 
-需要 Julia 1.12。
+| 能做 | 不能做 |
+|---|---|
+| 在二维直角盒子内求解；四壁可分别设为自由滑移或无滑移，并可给出给定的壁面速度 | 做三维，或做球壳 |
+| 支持 Boussinesq 与滞弹性两种质量守恒形式，以及 TALA/ALA 参考态 | 模拟环型运动、板块边界、磁场或自由表面 |
+| 四叉树自适应，误差指示量可取温度、速度或两者；网格保持 2:1 平衡，能量步用熵黏性稳定 | 把完全弹性作为独立流变；本版本唯一的弹性行为是 Maxwell 黏弹性 |
+| 携带扩散–位错复合流变、随深度变化的 Drucker–Prager 屈服、应变弱化、带潜热的相变与内部加热 | 移动顶面：Maxwell 应力历史不是自由表面，不产生地形 |
+| 用稀疏直接分解或无矩阵几何多重网格求解鞍点（`linear = :auto` 选择），并从 HDF5 检查点逐位重启 | 使用非结构网格：网格是方形叶子的四叉树 |
+
+## 三条命令跑出第一个结果
 
 ```bash
-git clone git@github.com:edwardaud/QuaST.git
-cd QuaST
+git clone git@github.com:edwardaud/QuaST.git && cd QuaST
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
-```
-
-`instantiate` 需要五到十分钟，占用不到 2 GB 磁盘。
-
-## 第一次运行
-
-真实算例跑十步，含编译约两分钟：
-
-```bash
 CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
-**每次都要设 `CASE_OUT`。** 不设的时候结果会写进 `out_julia/case_realistic`，那里可能存着你在意的运行数据。
+第二条命令在干净的环境里要五到十分钟，占用不到 2 GB 磁盘。第三条跑真实算例的前 10 步，首次约两分钟，几乎全是编译：第 5 步和第 10 步各做一次网格自适应，在 `CASE_OUT` 下写出 `history.csv` 和 `frames/`，不写检查点，结束时打印 `[case] DONE mode=smoke steps=10`。**每次都要设 `CASE_OUT`**：不设时结果写进 `out_julia/case_realistic`，那里可能放着上一次的预积分。命令按 Julia 1.12 核对；`Project.toml` 允许 1.10 及以后。
 
-生产规模的预积分，八线程约两小时：
-
-```bash
-mkdir -p out_julia/run1
-CASE_OUT=out_julia/run1 CASE_STEPS=2000 \
-  julia --project=. --threads=8 examples/case_realistic_2d.jl spinup
-```
-
-进度写进 `run.log`，逐步诊断累积在 `history.csv`，`frames/` 存温度场供出图。
-
-## 功能
-
-| | |
-|---|---|
-| **网格** | 四叉树自适应：平衡加密、2:1 合法性校验、局部再平衡；壁面边界层可强制保持最小层级 |
-| **离散** | 速度取 $Q\_p$ 、压力取 $Q\_{p-1}$ ，GLL 节点，悬挂节点用精确约束消去 |
-| **物理** | 扩散–位错复合流变、随深度变化的 Drucker–Prager 屈服与应变弱化、逐相变潜热、内部加热、Adams–Williamson 与 Murnaghan 两种参考态 |
-| **线性代数** | 稀疏直接与无矩阵多重网格两条 Stokes 路径，由 `linear` 一个开关选择；`:auto` 按鞍点规模与黏度对比自动决定 |
-| **重启** | 逐位可复现：同一检查点配同一套配置重启，轨迹逐位重现 |
+这十步只是冒烟测试，不是结果。一次运行会产出哪些文件、最先要改哪几项设置、出错时怎么处理，见[快速开始](docs/zh/quickstart.md)。
 
 ## 验证
 
-**表 1.** 已发表基准与本求解器的对照。`我们` 一列是每个算例最好的收敛运行；`ASPECT` 一列是同
-一个量在 ASPECT 随基准卡片发布的参考统计中的值（Blankenbach 各例），或 Tosi 等（2015）
-Table 2 中 ASPECT 那一列。最后两列分别是相对发表值与相对 ASPECT 的差。破折号表示该算例没有这个量。
+| 对照 | 结果 | 记录在 |
+|---|---|---|
+| Blankenbach 等（1989）算例 1a，第 5 级加密下的稳态：`Nu` 对发表值 4.884409 | **+0.08%** | [验证](docs/zh/validation.md) |
+| 同一状态由 ASPECT 导入、两程序各自推进：`Nu_bot` 对 ASPECT | **+0.003%** | [验证](docs/zh/validation.md) |
+| 自动化测试套件 | **131 906** 条断言通过、0 条失败，另有 2 条 broken（等待本仓库未附带的检查点） | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
-| 算例 | 量 | 发表值 | ASPECT | 我们 | 相对发表值 | 相对 ASPECT |
-|:-----------------|:-------------|-------------:|-------------:|-------------:|-------------:|-------------:|
-| Blankenbach 1a | `Nu` | 4.884409 | 4.884409 | **4.888163** | +0.08% | +0.08% |
-| | `Vrms` | 42.864947 | 42.864956 | **42.8724** | +0.02% | +0.02% |
-| Blankenbach 1b | `Nu` | 10.534095 | 10.533912 | **10.568610** | +0.33% | +0.33% |
-| | `Vrms` | 193.21454 | 193.22175 | **193.2137** | −0.00% | −0.00% |
-| Blankenbach 1c | `Nu` | 21.972465 | 21.972523 | **22.315960** | +1.56% | +1.56% |
-| | `Vrms` | 833.98977 | 833.99083 | **834.0082** | +0.00% | +0.00% |
-| Blankenbach 2a | `Nu` | 10.066 | 10.065793 | **10.124814** | +0.58% | +0.59% |
-| | `Vrms` | 480.4334 | 480.43579 | **479.695** | −0.15% | −0.15% |
-| Blankenbach 2b | `Nu` | 6.9299 | 6.929727 | **6.992620** | +0.91% | +0.91% |
-| | `Vrms` | 171.755 | 171.75354 | **171.634** | −0.07% | −0.07% |
-| Tosi 1 | `Nu_top` | 3.4298 | 3.4305 | **3.4216** | −0.24% | −0.26% |
-| | `u_rms` | 251.80 | 251.3069 | **249.53** | −0.90% | −0.71% |
-| Tosi 5a | 周期 | 0.0792 | — | **0.0783** | −1.14% | — |
-| | `Nu_top` 最小 | 2.6950 | — | **2.6924** | −0.10% | — |
-| | `Nu_top` 最大 | 7.2792 | — | **7.4889** | +2.88% | — |
-| | 平均 `T` 最小 | 0.6543 | — | **0.6505** | −0.58% | — |
-| | 平均 `T` 最大 | 0.6722 | — | **0.6686** | −0.54% | — |
-| blob，`Ra = 1e8`，第 25 帧 | `Tmax` | — | 1.2531 | **1.2644** | — | +0.90% |
-| 真实算例，导入 ASPECT 状态 | `Nu_top` | — | 5.990543 | **5.990543** | — | +0.000% |
-| | `Nu_bot` | — | −3.075076 | **−3.074986** | — | +0.003% |
-
-最后三行比的是 ASPECT 而不是发表值：blob 是 25 帧的瞬态；真实算例那两行从导入的 ASPECT
-状态出发，差别只能来自离散——底壁一致到 0.003%。每一行背后的条件见[验证页](docs/zh/validation.md)。
-
-![同一个算例分别由 QuaST 与 ASPECT 求解](docs/assets/quast_vs_aspect_realistic.gif)
-
-两排求解同一张 2.5 × 1 卡片：四壁自由滑移，顶壁 $T = 0$ 、底壁 $T = 1$ ， $\mathrm{Ra} = 10^{5}$ ，内部加热 $H = 10$ ；黏度随温度与应力变化，取扩散–位错复合流变（ $n = 3$ ， $E\_d = 12$ ， $E\_s = 17$ ，等应力分配，截断在 $[10^{-4}, 10^{4}]\,\eta\_0$ ），410 km 与 660 km 当量深度各放一个相变。上排是本求解器的矩阵无关多重网格，下排是 ASPECT，同一初值，覆盖 $t\_{nd} = 10^{-6}$ 到 $3.2 \times 10^{-4}$ ，色标全程固定。
-
-四列依次为温度、相对水平平均的温度异常、 $\log\_{10}\eta$ 、按加密层级着色的网格。黏度在这里跨七个量级：羽流通道内 $10^{-3}$ ，冷盖下方截断值 $10^{4}$ 。两排的硬盖、内部与通道都落在同样的深度。我们的通道更窄，9 976 个叶子跟着它走，ASPECT 是 27 460 个均匀单元。每个面板下方印的是该帧的读数。
+Blankenbach 数值背后的收敛过程、Tosi 极限环结果、黏弹性检查、Nusselt 数的两种约定，以及证据的边界，都在验证页。套件用 `julia --project=. test/runtests.jl` 运行。
 
 ## 文档
 
-全部文档都带中英切换，入口在 [docs/](docs/README.md)。
-
-| 文档 | 内容 |
-|---|---|
-| [快速开始](docs/zh/quickstart.md) | 安装、第一次运行、中途停下与续算、新手常踩的坑 |
-| [用户指南](docs/zh/guide.md) | 方程与边界条件、离散与线性求解、全部可调项、输出格式 |
-| [算例](docs/zh/examples.md) | 四个可直接运行的算例，附实测墙钟与供核对的数值 |
-| [验证](docs/zh/validation.md) | 基准收敛结果、ASPECT 对照、Nusselt 数的两种约定 |
-| [常见问题](docs/zh/faq.md) | 改 Rayleigh 数、加相变、换流变、线程、重启、引用 |
-| [代码结构](docs/architecture.md) | 每个文件放在哪里、为什么 |
-| [工程记录](docs/dev/README.md) | 推导、性能史、缺陷账本，供维护者查阅 |
-
-## 测试
-
-```bash
-julia --project=. test/runtests.jl                             # 全量，约 22 分钟
-julia --project=. test/run_gates.jl t_g229_default_balanced.jl # 单个 gate
-```
-
-套件包含 157 个 gate 文件、131 906 条断言，覆盖逐位回归、基准值、不变量与精度类别。CI 按需手动运行。
-
-## 与 ASPECT 对照
-
-`aspect_runs/realistic/` 里放着 `.prm` 输入、把复合流变接入 ASPECT 2.5 的小型 C++ 插件，以及分析脚本。运行它们需要 ASPECT 镜像，镜像不在本仓库内。
+先从[文档索引](docs/README.md)看全部文档与阅读顺序。第一次运行看[快速开始](docs/zh/quickstart.md)；要照抄算例看[算例](docs/zh/examples.md)；要查方法、全部可调项与输出格式看[用户指南](docs/zh/guide.md)。要核对数值看[验证](docs/zh/validation.md)，常改的地方看[常见问题](docs/zh/faq.md)，代码怎么组织看[代码结构](docs/architecture.md)。
 
 ## 许可
 
 MIT，见 [LICENSE](LICENSE)。
+
+**下一步：** 先看[文档索引](docs/README.md)的阅读顺序，再从[快速开始](docs/zh/quickstart.md)运行第一条命令。

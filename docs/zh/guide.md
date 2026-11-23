@@ -2,20 +2,22 @@
 
 # 用户指南：二维地幔对流真实算例
 
-本页讲 `examples/case_realistic_2d.jl` 这个算例：它求解的物理问题、所用的数值方法、每一个可调项、每一个输出文件的格式、重启规则，以及线程和内存表现。文中出现的每个取值，要么是该脚本里的字面量，要么是 `src/driver/run.jl` 中 `run_semquad_simulation` 的默认值。第 7 节说明这些结论的原始记录在哪里。
+本页是参考页：讲 `examples/case_realistic_2d.jl` 求解的物理问题、数值方法、全部可调项、输出文件格式、重启规则，以及线程与内存表现。要按步骤操作，见[快速开始](quickstart.md)；要跑现成的算例，见[算例](examples.md)。
 
-算例本身：2.5 × 1 的不可压流体盒，四壁自由滑移，顶部温度 0、底部温度 1，内部加热 `H = 10`，名义 Rayleigh 数 `Ra = 1e5`，扩散与位错两种蠕变同时生效，含两个相变并带潜热。屈服和应变弱化都关掉了。
+算例本身： $2.5 \times 1$ 的不可压流体盒，四壁自由滑移，顶部温度 0、底部温度 1，内部加热 `H = 10`，名义 Rayleigh 数 `Ra = 1e5`；扩散与位错两种蠕变同时生效，含两个相变并带潜热。屈服和应变弱化都关掉了。本页出现的每个取值，要么是脚本里的字面量，要么是 `src/driver/run.jl` 中 `run_semquad_simulation` 的默认值，要么是仓库内的实测记录。
 
 <details>
 <summary><b>目录</b></summary>
 
 - [1. 物理问题](#1-物理问题)
-- [2. 数值方法](#2-数值方法)
-- [3. 参数参考](#3-参数参考)
-- [4. 输出格式](#4-输出格式)
-- [5. 重启与配置守卫](#5-重启与配置守卫)
-- [6. 线程与内存](#6-线程与内存)
-- [7. 工程记录](#7-工程记录)
+- [2. 离散](#2-离散)
+- [3. 自适应策略](#3-自适应策略)
+- [4. 线性求解器与 `:auto` 规则](#4-线性求解器与-auto-规则)
+- [5. 参数参考](#5-参数参考)
+- [6. 输出格式](#6-输出格式)
+- [7. 重启与配置守卫](#7-重启与配置守卫)
+- [8. 线程与内存](#8-线程与内存)
+- [9. 下一步读什么](#9-下一步读什么)
 
 </details>
 
@@ -35,13 +37,13 @@ $$
 
 其中 $u\_x$ 、 $u\_y$ 是速度的两个分量。温度在顶壁取 $T=0$ 、在底壁取 $T=1$ ，侧壁绝热。
 
-边界条件可以逐壁设置。`bc = :free`（默认）表示四壁自由滑移；`bc = :rigid` 表示四壁无滑移，此时切向分量也被固定，取值来自壁面速度闭合 $u\_{Dx}(x,y)$ 与 $u\_{Dy}(x,y)$ 。`wall_bc` 单独覆盖某一面壁，顺序为 `(xminus, xplus, yminus, yplus)`，取值 `:same`（跟随 `bc`）、`:free` 或 `:rigid`。卡片里对应 `CASE_WALL_BC=rigid,rigid,free,free`。
+边界条件可以逐壁设置。 `bc = :free`（默认）表示四壁自由滑移； `bc = :rigid` 表示四壁无滑移，此时切向分量也被固定，取值来自壁面速度闭合 $u\_{Dx}(x,y)$ 与 $u\_{Dy}(x,y)$ 。 `wall_bc` 单独覆盖某一面壁，顺序为 `(xminus, xplus, yminus, yplus)`，取值 `:same`（跟随 `bc`）、`:free` 或 `:rigid`。参数卡用 `CASE_WALL_BC=rigid,rigid,free,free` 这种四元组形式给出。
 
-壁面速度闭合本身就是位置的函数，而四面壁处在不同的 $y$ （或 $x$ ）上，所以空间变化的壁面速度不需要额外接口：取 $u\_{Dx}=Uy$ 并设 `bc = :rigid`，就是顶盖以 $U$ 拖动、底部静止，解析解 $u=(Uy,0)$ 可复现到 $10^{-10}$ ，由门禁 G238 钉住。单一闭合唯一无法表达的是角点上两壁速度不一致，而那里连续条件本来就不允许不一致。
+壁面速度闭合本身就是位置的函数，而四面壁处在不同的 $y$ （或 $x$ ）上，所以空间变化的壁面速度不需要额外接口：取 $u\_{Dx}=Uy$ 并设 `bc = :rigid`，就是顶盖以 $U$ 拖动、底部静止，解析解 $u=(Uy,0)$ 可复现到 $10^{-10}$ 。单一闭合唯一无法表达的是角点上两壁速度不一致，而那里连续条件本来就不允许不一致。
 
-### 1.2 方程
+### 1.2 控制方程
 
-无量纲 Boussinesq 方程组，动量、连续性、能量：
+无量纲 Boussinesq 方程组，动量、连续性与能量：
 
 $$
 -\nabla\cdot\left(2\eta\,\boldsymbol\varepsilon(\mathbf u)\right) + \nabla p = \mathbf f,
@@ -63,7 +65,7 @@ $$
 | $\mathbf u=(u\_x,u\_y)$ | 速度。 |
 | $p$ | 动压力。 |
 | $\eta$ | 黏度。 |
-| $\boldsymbol\varepsilon(\mathbf u)$ | 应变率张量 $\left(\nabla\mathbf u+\nabla\mathbf u^{\mathsf T}\right)/2$ 。 |
+| $\boldsymbol\varepsilon(\mathbf u)$ | 应变率张量 $(\nabla\mathbf u+\nabla\mathbf u^{\mathsf T})/2$ 。 |
 | $\theta=T-\bar T$ | 温度异常。 |
 | $\bar T(y)$ | 1.3 节的传导基态。 |
 | $\Gamma\_i$ | 第 $i$ 个相变的相分数。 |
@@ -71,9 +73,9 @@ $$
 | $\mathrm{Ra}$ | Rayleigh 数。 |
 | $\mathbf f=(0,f\_y)$ | 体力，只有竖直分量。 |
 
-`Ra = 1e5` 乘的是热浮力，黏度以参考黏度 `eta_ref` 为单位（见 1.9 节）。1.4 节的前因子让 $\eta=1$ 对应 $T=0.5$ ，而这一温度落在冷盖内部；对流区在 $T\approx1.3$ 处，黏度只有 $10^{-3}$ 到 $10^{-2}$ ，换算成内部 Rayleigh 数是 $10^7$ 到 $10^8$ 量级。翻一遍的时间尺度 $1/\mathrm{Vrms}$ 约为 $10^{-3}$ 。
+`Ra = 1e5` 乘的是热浮力，黏度以参考黏度 `eta_ref` 为单位（见 1.9 节）。1.4 节的前因子让 $\eta=1$ 对应 $T=0.5$ ，而这一温度落在冷盖内部；对流区在 $T\approx1.3$ 处，黏度只有 $10^{-3}$ 到 $10^{-2}$ ，换算成内部 Rayleigh 数是 $10^7$ 到 $10^8$ 量级。翻转一次的时间尺度 $1/\mathrm{Vrms}$ 约为 $10^{-3}$ 。
 
-### 1.3 基态、加热与 Nusselt 数
+### 1.3 基态、内部加热与 Nusselt 数
 
 $H$ 是能量方程 $\partial T/\partial t + \mathbf u\cdot\nabla T = \nabla^2 T + H$ 里的体积加热率。参数卡演化的对象是相对传导剖面的温度异常，而那个剖面正好带走这份加热：
 
@@ -99,7 +101,7 @@ $$
 \mathrm{Nu}_{top} - \mathrm{Nu}_{bot} = H;
 $$
 
-实际偏离这个恒等式的量就是 `closure`，含义见 4.2 节。
+实际偏离这个恒等式的量就是 `closure`，含义见 6.2 节。
 
 ### 1.4 流变
 
@@ -219,7 +221,9 @@ $$
 \left|\frac{\partial\Gamma_i}{\partial T}\right| \le \frac{|\mathrm{slope}_i|}{2w_i}=0.64.
 $$
 
-`CASE_LATENT=global` 用来复现 2026-11-08 之前的运行：两个相变共用一个 `latent_L = 0.11`。这个值在 410 处连符号都是错的，所以它只是一个回放开关。
+两个系数绝对值之和为 0.18996，因此表观热容因子不会越出 $[0.88,1.12]$ 。若装配时算出的因子会变成负数，代码直接报错，因为那等于让能量方程在时间上反向推进。
+
+`CASE_LATENT=global` 让两个相变共用一个历史值 `latent_L = 0.11`，只用于回放早期运行。这个值在 410 处连符号都是错的，所以它不是一个可用的物理选项。
 
 ### 1.7 初始条件
 
@@ -227,22 +231,7 @@ $$
 \theta_0(x,y) = 0.05\sin(\pi y)\cos\left(\frac{2\pi x}{L_x}\right) + 0.02\sin(2\pi y)\cos\left(\frac{4\pi x}{L_x}\right),
 $$
 
-其中 $L\_x=2.5$ 是盒宽， $\theta\_0$ 是初始温度异常。它在顶壁和底壁为零，这是温度异常必须满足的条件；分布关于 $x=L\_x/2$ 对称。整个过程没有随机数：参数卡、种子和固定步数决定了每次运行都可重复。
-
-以下开关处于关闭状态：
-
-| 开关 | 取值 | 作用 |
-|---|---|---|
-| `yield_c`、`yield_taumax` | `Inf` | 关闭屈服。 |
-| `yield_phi` | 0 | 关闭摩擦角。 |
-| `weak_eps_ref` | 0 | 关闭应变弱化。 |
-| `rho_heating`、`rho_cp` | `false` | 关闭密度加权加热。 |
-| `side_thermal`、`Twall_left`、`Twall_right` | `:insulating` | 侧壁绝热（法向通量为零）。取 `:fixed` 时两侧壁分别固定为给定物理温度，约定与顶/底壁相同：`Twall - Tbar`。 |
-| `H_half_life` | `Inf` | 放射性生热保持恒定。取有限值时按 `H·2^(-t/H_half_life)` 衰减，时间单位与代码一致；只能用 Picard 时间推进。 |
-| `Di` | 0 | 关闭耗散加热与绝热加热。 |
-| `refstate` | `nothing` | 不使用参考态。 |
-| `deviatoric` | `false` | 不做偏量投影。 |
-| `mass_form` | `:boussinesq` | Boussinesq 质量守恒形式。 |
+其中 $L\_x=2.5$ 是盒宽， $\theta\_0$ 是初始温度异常。它在顶壁和底壁为零，这是温度异常必须满足的条件；分布关于 $x=L\_x/2$ 对称。整个过程没有随机数：初值、参数卡与固定步数决定了每次运行都可重复。
 
 ### 1.8 黏弹性
 
@@ -294,48 +283,17 @@ $$
 
 当 `eta_ref != 1` 时，驱动会在第一次流动求解时和运行结束时各报告一次这个约定： `Ra` 、 `eta_ref` 、归一化场 `eta/eta_ref` 的范围与对比度、 `eta_interior` （在 `0.25 <= z <= 0.75` 的内部条带内对 `eta/eta_ref` 取算术体平均，两侧壁层都排除在外）、 `Ra_interior = Ra/eta_interior` ；若参数卡提供了尺度组，还会报告以 Pa s 为单位的 `eta_0` 。 `pic_mode = :newton` 直接用原始定律构造黏度，因此会拒绝 `eta_ref != 1` ，而不是悄悄求解另一个问题。
 
-生产参数卡的默认值是 `eta_ref = 1` ，但它的材料定律在盒内跨越多个数量级，所以内部 Rayleigh 数远高于名义值。报告只在 `eta_ref != 1` 时打印；用同一套约定算出的该卡成熟状态数值是 `eta_interior = 4.280635e-3` 、 `Ra_interior = 2.336102e7` 和 `eta_0 = 2.368635e23 Pa s` （`Ra` 定义所对应的物理黏度），由此得到物理内部黏度 `1.013926e21 Pa s` 。在标定所用的热内部点（ `T = 1.75` ， `edot_ref` ）上，同一套约定给出 `Ra = 7.84e7` 与 `3.02e20 Pa s` 的黏度。所以 `Ra = 1e5` 这个标签描述的是标定点，而不是内部：引用时要和 `Ra_interior` 一起给出。
+生产参数卡的默认值是 `eta_ref = 1` ，但它的材料定律在盒内跨越多个数量级，所以内部 Rayleigh 数远高于名义值。报告只在 `eta_ref != 1` 时打印；用同一套约定算出的该卡成熟状态数值是 `eta_interior = 4.280635e-3` 、 `Ra_interior = 2.336102e7` 和 `eta_0 = 2.368635e23 Pa s` （ `Ra` 定义所对应的物理黏度），由此得到物理内部黏度 `1.013926e21 Pa s` 。在标定所用的热内部点（ `T = 1.75` ， `edot_ref` ）上，同一套约定给出 `Ra = 7.84e7` 与 `3.02e20 Pa s` 的黏度。所以 `Ra = 1e5` 这个标签描述的是标定点，而不是内部：引用时要和 `Ra_interior` 一起给出。
 
-## 2. 数值方法
+## 2. 离散
 
-### 2.1 网格
+### 2.1 网格与空间
 
-网格是四叉树。每个叶用 $(\ell,i\_x,i\_y)$ 标记，树始终保持 2:1 平衡，即相邻叶最多相差一级。加密把一个四兄弟拆成四个，粗化把四个合回一个。参数卡把深度限制在 `max_level = 7` ，所以最细的叶高是盒高的 $1/(2\cdot2^{7})=1/256$ ；叶数上限是 `max_leaves = 10000` 。
+网格是四叉树。每个叶用 $(\ell,i\_x,i\_y)$ 标记，树始终保持 2:1 平衡，即相邻叶最多相差一级。加密把一个四兄弟拆成四个，粗化把四个合回一个。参数卡把深度限制在 `max_level = 7` ，所以最细的叶高是盒高的 $1/(2\cdot2^{7})=1/256$ 。初始树由 5 × 2 个基础单元各均匀细分三次得到，即均匀的 level 3、共 640 个叶。
 
-加密指示子默认取温度异常梯度在内部面上的跳变：
+采用 Taylor-Hood 单元：速度取 $Q\_p$ ，压力取 $Q\_{p-1}$ ，本卡取 $p=2$ ，即 $Q\_2$ 速度、 $Q\_1$ 压力。节点是参考正方形上的 Gauss-Legendre-Lobatto 点，速度每方向 $p+1$ 个，压力每方向 $p$ 个。单元矩阵用 Gauss-Legendre 求积，每方向取 `p+2` 个点，这正是 `make_fedata` 的默认 `nq = p + 2` ；它把 $Q\_p$ 的质量矩阵与刚度矩阵都精确积分。
 
-$$
-I_K = \frac h2\sum_{F\subset\partial K}\int_F [\![\nabla\theta\cdot\mathbf n]\!]^2\,\mathrm ds,
-$$
-
-顶壁和底壁再额外加一个单侧项。其中 $I\_K$ 是叶 $K$ 的指示子， $h$ 是叶高， $\theta$ 是温度异常， $\mathbf n$ 是面法向， $[\![\cdot]\!]$ 表示跨面跳变。
-
-加密指示子作用在哪个场，由 `amr_indicator` 选择，参数卡用 `CASE_INDICATOR` 设置。默认的 `:theta` 就是上面这个温度异常场；`:velocity` 把同样的估计分别作用在两个速度分量上再相加；`:both` 把两个指示子各自按自己的总量归一化后相加：
-
-$$
-j_{\mathrm{both}} = j_\theta + \frac{\sum_K j_{\theta,K}}{\sum_K j_{v,K}}\,j_{v,K},
-$$
-
-其中 $j\_\theta$ 与 $j\_v$ 分别是两个场的逐叶指示子。这样两个场都不会主导加密；静止时速度为零，`:both` 精确退化为 `:theta` 。
-
-下面的比较在一个成熟的二维状态上以相同成本测得：10 000 叶、43 步、同样的固定 `dt`，参照解是 40 000 叶的 `:theta` 解。`Nu_bot` 的相对误差，`:theta` 为 1.10e-4，`:velocity` 为 1.01e-5；体积平均温度分别 1.75e-4 与 1.15e-4。精确壁面通量残差 `resid_A/Nu_top` 则是 `:theta` 更小，约 7e-4% 对 5e-3%。机制在于细叶落在哪里：`:theta` 把 85% 的细叶放在壁面条带，`:velocity` 只放 3.6%，转而加密内部。因此选择取决于观测量，而不是给两种指示子排名。这个比较只覆盖一个状态、一个 Rayleigh 数、43 步（时间轴的 0.2%）和二维，所以没有理由时保持默认，并把上面的数字看作该状态的属性，而不是其他流动的保证。
-
-标记采用 Dörfler 策略：`refine_frac = 0.2` 指需要分辨的指示子总量占比，因此加密多少单元由指示子场自己决定。
-
-平衡循环包含以下几部分：
-
-| 机制 | 参数 | 作用 |
-|---|---|---|
-| 粗化 | `coarsen_frac * total` | 在完整四兄弟上，把相对阈值以下的部分粗化掉。 |
-| 配额交换 | `max_leaves` | 合并误差最小的合格四兄弟，腾出叶数给要加密的地方。 |
-| 迟滞 | `amr_hysteresis = 1` | 刚合并过的四兄弟不马上再拆开。 |
-| 2:1 校验 | `amr_coarsen_gate = true` | 拒绝会导致一步之后又得撤销的合并。 |
-| 壁面规则 | `wall_strip = 0.1`、`wall_min_level = 5` | 顶底壁条带内以及壁面行至少保持 level 5，之后再执行叶数上限。 |
-| 场传递 | `transfer_mode = :nodal` | 网格变化时用节点插值搬运场变量。 |
-
-### 2.2 空间离散与悬挂节点
-
-采用 Taylor-Hood 单元：速度取 $Q\_p$ ，压力取 $Q\_{p-1}$ ，本卡取 $p=2$ ，即 $Q\_2$ 速度、 $Q\_1$ 压力。节点是参考正方形上的 Gauss-Legendre-Lobatto 点，速度每方向 $p+1$ 个，压力每方向 $p$ 个；单元积分用 $(p,p-1)$ 阶 Gauss-Legendre 求积。
+### 2.2 悬挂节点与约束
 
 粗叶面上存在细节点，即悬挂节点。它的取值由粗面 GLL 插值给出的迹决定，写成稀疏约束矩阵 $C$ ，自由行上是单位阵。系统按
 
@@ -343,17 +301,35 @@ $$
 C^{\mathsf T} A\,C
 $$
 
-组装并求解，其中 $A$ 是未加约束的组装矩阵， $C$ 是约束矩阵， $C^{\mathsf T}$ 是其转置。这样对称性得以保留，对线性约束而言是精确的。边界值走同一个仿射映射，另外固定一个压力自由度，消掉常数零空间。
+组装并求解，其中 $A$ 是未加约束的组装矩阵， $C$ 是约束矩阵， $C\^{\mathsf T}$ 是其转置。这样对称性得以保留，对线性约束而言是精确的。边界值走同一个仿射映射，另外固定一个压力自由度，消掉常数零空间。
 
 ### 2.3 时间积分
 
-流场是准静态的，每步解一次 Stokes。能量方程用 BDF2，第一步退化为后向 Euler，变步长比
+流场是准静态的，每步解一次 Stokes。能量方程用 BDF2，第一步退化为后向 Euler。记变步长比为
 
 $$
-w = \frac{\Delta t}{\Delta t_{\mathrm{prev}}}
+w = \frac{\Delta t}{\Delta t_{\mathrm{prev}}},
 $$
 
-进入 BDF2 系数。 $\Delta t$ 是当前步长， $\Delta t\_{\mathrm{prev}}$ 是上一步步长。参数卡取 `maxpic = 1` ，即黏度滞后一步：一步之内唯一的流动求解使用步初温度，因此该步在黏度耦合上只有一阶精度，但结果完全确定。
+则一步的更新写成
+
+$$
+\frac{a}{\Delta t}\theta^{n+1} + \mathbf u\cdot\nabla\theta^{n+1} - \nabla^2\theta^{n+1}
+= \frac{b}{\Delta t}\theta^{n} - \frac{c}{\Delta t}\theta^{n-1},
+$$
+
+$$
+a = \frac{2w+1}{1+w}, \qquad b = 1+w, \qquad c = \frac{w^2}{1+w}.
+$$
+
+| 符号 | 含义 |
+|---|---|
+| $\theta^n$ | 步初的温度异常。 |
+| $\theta^{n-1}$ | 再往前一步的温度异常。 |
+| $\Delta t$ | 当前步长； $\Delta t\_{\mathrm{prev}}$ 是上一步步长。 |
+| $a, b, c$ | BDF2 的质量系数；第一步取 $a=b=1/\Delta t$ 、 $c=0$ 。 |
+
+参数卡取 `maxpic = 1` ，即黏度滞后一步：一步之内唯一的流动求解使用步初温度，因此该步在黏度耦合上只有一阶精度，但结果完全确定。
 
 步长按
 
@@ -368,7 +344,7 @@ $$
 振荡通过逐单元熵黏性压制，黏性项加到能量算子上，每个叶一个值：
 
 $$
-\nu_e = \frac{c_{ev}\,h_e^2 R}{\mathcal E},
+\nu_e = \frac{c_{ev}\,h_e^2 R}{\sigma},
 \qquad
 \nu_{\max} = c_{\max}\,|\mathbf u|\,h_e,
 \qquad
@@ -378,16 +354,67 @@ $$
 | 符号 | 含义 |
 |---|---|
 | $\nu$ | 该叶实际加入的熵黏性。 |
-| $R$ | 单元内 $\theta$ 方程残差的最大绝对值。 |
+| $R$ | 单元内 $\theta$ 方程残差的最大绝对值（ `ev_alpha = 2` 时再乘以 $\lvert T-\langle T\rangle\rvert$ ）。 |
 | $h\_e=\sqrt2\,h$ | 熵黏性的长度尺度， $h$ 是叶尺寸。 |
-| $\mathcal E$ | 熵残差的全局散布。 |
+| $\sigma$ | 熵残差的全局散布：对网格上的 $(T-\langle T\rangle)^2$ 取 $\max(e\_{\max}-\bar e,\ \bar e-e\_{\min})$ ，其中 $\langle T\rangle=(T\_{\min}+T\_{\max})/2$ 是温度的中点， $\bar e$ 是 $(T-\langle T\rangle)^2$ 的面积平均。 |
 | $\lvert\mathbf u\rvert$ | 单元内最大速度模。 |
 | $c\_{ev}$ | 参数卡的 `ev`，取 0.11。 |
 | $c\_{\max}$ | 参数卡的 `ev_cmax`，取 0.052。 |
 
-参数卡取 `ev_alpha = 2` ，所以用 $h\_e^2$ 形式。壁面行上的黏性为零。每个时间步都重算，并写入检查点，因为没有它就无法重建上一步的能量算子。
+参数卡取 `ev_alpha = 2` ，所以用 $h\_e^2$ 形式。壁面行上的黏性为零。每个时间步都重算；最初两步以及任何变差为零时，代码直接取 $\nu=\nu\_{\max}$ 。熵黏性场写入检查点，因为没有它就无法重建上一步的能量算子。
 
-### 2.5 两条线性求解路径与 `:auto`
+## 3. 自适应策略
+
+### 3.1 指示子
+
+加密指示子默认取温度异常梯度在内部面上的跳变：
+
+$$
+I_K = \frac h2\sum_{F\subset\partial K}\int_F [\![\nabla\theta\cdot\mathbf n]\!]^2\,\mathrm ds,
+$$
+
+左右两侧壁绝热，对指示子没有任何贡献；顶壁和底壁再额外加一个单侧法向导数项，正是这一项让热边界层得到分辨。其中 $I\_K$ 是叶 $K$ 的指示子， $h$ 是叶高， $\theta$ 是温度异常， $\mathbf n$ 是面法向， $[\![\cdot]\!]$ 表示跨面跳变。
+
+加密指示子作用在哪个场，由 `amr_indicator` 选择，参数卡用 `CASE_INDICATOR` 设置。默认的 `:theta` 就是上面这个温度异常场； `:velocity` 把同样的估计分别作用在两个速度分量上再相加； `:both` 把两个指示子各自按自己的总量归一化后相加：
+
+$$
+j_{\mathrm{both}} = j_\theta + \frac{\sum_K j_{\theta,K}}{\sum_K j_{v,K}}\,j_{v,K},
+$$
+
+其中 $j\_\theta$ 与 $j\_v$ 分别是两个场的逐叶指示子。这样两个场都不会主导加密；静止时速度为零， `:both` 精确退化为 `:theta` 。
+
+下面的比较在一个成熟的二维状态上以相同成本测得：10 000 叶、43 步、同样的固定 `dt`，参照解是 40 000 叶的 `:theta` 解。 `Nu_bot` 的相对误差， `:theta` 为 1.10e-4， `:velocity` 为 1.01e-5；体积平均温度分别 1.75e-4 与 1.15e-4。精确壁面通量残差 `resid_A/Nu_top` 则是 `:theta` 更小，约 7e-4% 对 5e-3%。机制在于细叶落在哪里： `:theta` 把 85% 的细叶放在壁面条带， `:velocity` 只放 3.6%，转而加密内部。因此选择取决于观测量，而不是给两种指示子排名。这个比较只覆盖一个状态、一个 Rayleigh 数、43 步（时间轴的 0.2%）和二维，所以没有理由时保持默认，并把上面的数字看作该状态的属性，而不是其他流动的保证。
+
+### 3.2 标记、粗化与叶数上限
+
+标记采用 Dörfler 策略： `refine_frac = 0.2` 指需要分辨的指示子总量占比，因此加密多少单元由指示子场自己决定。
+
+平衡循环包含以下几部分：
+
+| 机制 | 参数 | 作用 |
+|---|---|---|
+| 粗化 | `coarsen_frac * total`、`round(coarsen_frac * n)` | 在完整四兄弟上，把相对阈值以下的部分粗化掉；每个周期丢掉的叶数上限是 `round(coarsen_frac * n)` ，`n` 是周期开始时的叶数。 |
+| 配额交换 | `max_leaves` | 合并误差最小的合格四兄弟，腾出叶数给要加密的地方。 |
+| 2:1 校验 | `amr_coarsen_gate = true` | 拒绝会导致一步之后又得撤销的合并。 |
+| 场传递 | `transfer_mode = :nodal` | 网格变化时用节点插值搬运场变量。 |
+
+叶数上限是 `max_leaves = 10000` 。本卡取 `amr_passes = 1` ，也就是每个 AMR 周期只跑一轮指示子、加密与场传递。
+
+### 3.3 迟滞与壁面规则
+
+平衡循环还有三条固定规则：
+
+| 机制 | 参数 | 作用 |
+|---|---|---|
+| 迟滞 | `amr_hysteresis = 1` | 刚合并过的四兄弟不马上再拆开。 |
+| 死区 | `0.5` | 平衡循环的粗化阈值取 `tau_h = min(tau_c, 0.5 tau_r)` ，这个倍数固定为 0.5。 |
+| 壁面规则 | `wall_strip = 0.1`、`wall_min_level = 5` | 顶底壁条带内以及壁面行至少保持 level 5，之后再执行叶数上限。 |
+
+壁面规则存在的原因：单靠指示子时，顶壁停留在 level 3 或 4，而内部已经到 level 5 或 6；这时逐点 `Nu_top` 与壁面加密后的值相差 1.2%，一致边界通量相差 9.6%。
+
+## 4. 线性求解器与 `:auto` 规则
+
+### 4.1 直接路径
 
 直接路径求解的是消去约束与边界值之后的约化鞍点
 
@@ -402,13 +429,17 @@ $$
 | 块 | 尺寸 | 是什么 |
 |---|---|---|
 | $K\_{\mathrm{red}}$ | 速度为行、速度为列 | 消去约束与边界值后的约化速度矩阵 |
-| $B^{\mathsf T}$ | 速度为行、压力为列 | 梯度 |
+| $B\^{\mathsf T}$ | 速度为行、压力为列 | 梯度 |
 | $B\_s$ | 压力为行、速度为列 | 散度 |
 | $0$ | 压力为行、压力为列 | 零块，鞍点结构就来自它 |
 
-其中 $K\_{\mathrm{red}}$ 是约化速度矩阵， $B$ 是梯度， $B\_s$ 是散度， $p$ 是压力。分解用 UMFPACK，并对真正的约化残差做检查。壁面加密后的自由滑移四叉树会让无平移分解失稳，因此这条路径采用平移阶梯：相对对角平移依次取 $10^{-12}$ 、 $10^{-10}$ 、 $10^{-8}$ ，最后一级对无平移算子做若干步迭代精化。`stokes_scaling = :equilibrated` 会先尝试对称平衡 $S\to DSD$ ，其中 $S$ 是鞍点矩阵、 $D$ 是对角缩放矩阵，作用是把接近零的压力模态抬到舍入误差之上；它只在本来会进入阶梯的那些求解上生效。直接路径是唯一逐位可复现的路径。
+其中 $K\_{\mathrm{red}}$ 是约化速度矩阵， $B$ 是梯度， $B\_s$ 是散度， $p$ 是压力。分解用 UMFPACK，并对真正的约化残差做检查。壁面加密后的自由滑移四叉树会让无平移分解失稳，因此这条路径采用平移阶梯：相对对角平移依次取 $10^{-12}$ 、 $10^{-10}$ 、 $10^{-8}$ ；若没有一级满足接受容差，就以最好的那级为预条件，对无平移算子做若干步 GMRES 迭代精化。另有两级更小的平移 $10^{-14}$ 与 $10^{-13}$ ：当无平移分解已经完全丢掉解时先试这两级，阶梯与精化都失败、该步即将中止前再作为最后手段试一次。 `stokes_scaling = :equilibrated` 会先尝试对称平衡 $S\to DSD$ ，其中 $S$ 是鞍点矩阵、 $D$ 是对角缩放矩阵，作用是把接近零的压力模态抬到舍入误差之上；它只在本来会进入阶梯的那些求解上生效。直接路径是唯一逐位可复现的路径。
+
+### 4.2 多重网格路径
 
 多重网格路径用 flexible GMRES 配块三角预条件：速度块用几何 V 循环，每级至少按 1.5 倍 h 粗化，采用阻尼 Jacobi 光滑，各层算子由叶局部无矩阵 apply 构建；压力 Schur 补用三因子 w-BFBT 近似。FGMRES 每 100 次重启，总上限 500 次，按真正的约化鞍点残差对 `mg_tol` 判断收敛。参数卡传 `mg_tol = 1e-8` ，比它的 `stokes_tol = 1e-3` 低五个数量级；库默认值是 `1e-10` 。
+
+### 4.3 `:auto` 规则
 
 `linear = :auto` 在组装之前根据当前鞍点的两个属性决定路径。鞍点自由度按
 
@@ -426,38 +457,46 @@ $$
 
 黏度对比在固定的 33 × 33 网格上采样，样本取自本次求解实际使用的黏度场。 `:auto` 一旦选中多重网格，还会强制 `mg_operator = :matrixfree` 和 `mg_threads = min(8, Threads.nthreads())` 。如果这次求解没过 `stokes_tol` 或抛出异常，同一次求解会改走直接路径并记入 `LAST_AUTO_FALLBACK` ，运行继续，计数最后打在 `auto_fallbacks` 里。显式指定 `linear = :mg` 没有这层保护，失败就是失败。本卡在 8 188 叶时鞍点为 78 720 个自由度，在 10 000 叶时为 95 308 个，都超过 20 000，所以新运行都会解析到多重网格。
 
-## 3. 参数参考
+## 5. 参数参考
 
-### 3.1 参数卡的环境变量
+### 5.1 参数卡的环境变量
 
-每个可调项都是脚本启动时读取的 `CASE_*` 环境变量，第二列是参数卡给出的默认值。
+下表的可调项通过脚本启动时读取的 `CASE_*` 环境变量设置；第二列是参数卡给出的默认值。
 
 | 变量 | 默认值 | 允许值 | 作用 |
 |---|---|---|---|
 | `CASE_OUT` | `out_julia/case_realistic` | 任意路径 | 输出根目录，运行产生的全部文件都在它下面。 |
 | `CASE_STEPS` | 0 | 整数 | 步数上限，与绝对步号比较。取 0 表示用模式默认值：smoke 10，short 150，spinup 10000，freeze 20000，resume 与 wallrefine 2000。 |
 | `CASE_FRAME` | 0 | 整数 | 帧间隔，单位是步。取 0 表示用参数卡的 5。 |
+| `CASE_LX` | 2.5 | 浮点 | 盒宽。必须保持 `CASE_LX/CASE_CX == 1/CASE_CY`，否则叶就不再是正方形。 |
+| `CASE_CX`、`CASE_CY` | 5、2 | 整数 | x 与 y 方向的基础单元数。 |
 | `CASE_MAXLEV` | 7 | 整数 | 四叉树最大层级，最细叶高为盒高的 $1/(2\cdot2^{\ell})$ 。 |
 | `CASE_MAXLEAVES` | 10000 | 整数 | 叶数硬上限，每个 AMR 周期之后执行。 |
 | `CASE_AMR_GATE` | 1 | 0、1 | 平衡循环中的 2:1 粗化校验，取 0 关闭。 |
-| `CASE_HYST` | 1 | 整数 | 迟滞长度，以 AMR 周期计：既是冷却时长，也是平衡循环死区的倍数。 |
+| `CASE_HYST` | 1 | 整数 | 迟滞冷却，以 AMR 周期计；取 0 关闭。 |
 | `CASE_COARSEN` | 0.05 | 浮点 | 粗化配额：平衡循环的相对阈值与每周期单元数上限。 |
 | `CASE_WALLMIN` | 5 | 整数 | 壁面条带内以及壁面行的最小层级，取 0 关闭壁面规则。 |
 | `CASE_WALLSTRIP` | 0.1 | $(0,0.5)$ 内的浮点 | 壁面条带宽度，从每个壁面向内占盒高的比例。 |
+| `CASE_WALL_BC` | 空（全部 `:same`） | `same`、`free`、`rigid` 的四元组 | 逐壁速度条件，顺序为 `(xminus, xplus, yminus, yplus)`，见 1.1 节。 |
 | `CASE_SYMMETRY` | `none` | `none`、`x` | AMR 各轮的 x 镜像闭合：取 `x` 时镜像伙伴一起加密、一起合并，用于对称基准。 |
-| `CASE_INDICATOR` | `theta` | `theta`、`velocity`、`both` | 加密指示子作用的场，见 2.1 节。 |
-| `CASE_LINEAR` | `auto` | `auto`、`direct`、`mg`、`schur_cg`、`lagged` | 线性求解器，见 2.5 节。 |
+| `CASE_INDICATOR` | `theta` | `theta`、`velocity`、`both` | 加密指示子作用的场，见 3.1 节。 |
+| `CASE_LINEAR` | `auto` | `auto`、`direct`、`mg`、`schur_cg`、`lagged` | 线性求解器，见 4 节。 |
 | `CASE_EV` | 0.11 | 浮点 | 熵黏性系数。 |
 | `CASE_LATENT` | `per_phase` | `per_phase`、`global` | 潜热系数：逐个相变计算，或两个相变共用历史值 `latent_L = 0.11` 。传入其他字符串会在构造 `Params` 时被拒绝。 |
 | `CASE_COMP_ED`、`CASE_COMP_ES` | 12.0、17.0 | 浮点 | 复合定律扩散分支与位错分支的活化能 `E_d`、`E_s`（见 1.4 节）。 |
+| `CASE_COMP_AD`、`CASE_COMP_AS` | 1.6240183119e5、2.6796419238e-1 | 浮点 | 两种机制的前因子，单位是 $1/\eta\_0$ 。在另一个 `Ra` 下运行时按 `Ra / Ra_new` 缩放，以保持有量纲的材料常数不变。 |
+| `CASE_DT0` | 1.0e-6 | 浮点 | 初始步长，第一步会立即切到 CFL 值。 |
+| `CASE_DTMAX`、`CASE_DTMIN` | 5.0e-5、1.0e-9 | 浮点 | 自适应步长的上下界。 |
+| `CASE_RA` | 1.0e5 | 浮点 | 参数卡的 Rayleigh 数。 |
+| `CASE_ETA_MIN`、`CASE_ETA_MAX` | 1.0e-4、1.0e4 | 浮点 | 黏度的绝对上下界，以定律的单位给出，并在 `eta_ref` 归一化之前施加（见 1.9 节）。 |
 | `CASE_STOKES_SCALING` | `none` | `none`、`equilibrated` | 直接鞍点的平衡开关，只对本来会失败的求解生效，健康的求解不受影响。 |
 | `CASE_ETA_REF` | 1.0 | 大于 0 的浮点 | 以材料定律单位给出的 Rayleigh 数参考黏度： `Ra` 用它定义，流场求解使用 `eta/eta_ref` 。头部会打印它，检查点也会记录（见 1.9 节）。 |
 | `CASE_SHEAR_MODULUS` | 空（关闭） | 大于等于 0 的浮点 | Maxwell 黏弹性：无量纲弹性剪切模量 $G$ 。留空或取 0 表示关闭，运行结果逐位不变；取正值会改变有效黏度与物理区域，见 1.8 节。 |
 | `CASE_EXTDIAG` | 0 | 0、1 | 把精确能量恒等式残差 `resid_A` 追加到 `history.csv` 。它会改变列数，所以只接受全新的输出目录。 |
 
-`main()` 在做任何事之前就会拒绝无法识别的 `CASE_AMR_GATE`、`CASE_SYMMETRY` 或 `CASE_STOKES_SCALING` 。下面这些是字面量，不是可调项：
+`main()` 在做任何事之前就会拒绝无法识别的 `CASE_AMR_GATE`、`CASE_SYMMETRY` 或 `CASE_STOKES_SCALING` 。下面这些是参数卡传给驱动的取值：
 
-| 字面量 | 取值 |
+| 取值 | 参数卡里的值 |
 |---|---|
 | `Ra` | `1e5` |
 | `H` | `10` |
@@ -471,14 +510,14 @@ $$
 | `dtmin` | `1e-9` |
 | `cfl` | 0.5 |
 | `dt_growth` | 1.05 |
-| `maxpic` | 1 。 `pic_mode = :newton` 是研究选项：需要 `linear=:direct`，拒绝参考态、可压缩质量形式与 `nu_cbf`，在实测算例上比 Picard + 多重网格更慢。 |
+| `maxpic` | 1。`pic_mode = :newton` 是研究选项：需要 `linear=:direct`，拒绝参考态、可压缩质量形式与 `nu_cbf`，在实测算例上比 Picard + 多重网格更慢。 |
 | `pic_tol` | `1e-6` |
 | `ev_cmax` | 0.052 |
 | `ev_alpha` | 2 |
 | `checkpoint_every` | 200 |
 | 帧网格 | 256 × 256 |
 
-共有七种模式：
+共有七种运行模式：
 
 | 模式 | 作用 |
 |---|---|
@@ -490,9 +529,9 @@ $$
 | `resume <ckpt>` | 带 AMR 续算。 |
 | `symseed <ckpt>` | 换一个 `CASE_SYMMETRY` 后续算。 |
 
-三个种子模式都是复制检查点、只改写下一阶段要变的那条配置字符串，所以重启守卫对其余各项依然照查。
+种子模式只复制检查点并改写下一阶段要变的那条配置字符串，其余各项照旧参与重启守卫的比较，规则见第 7 节。
 
-### 3.2 `run_semquad_simulation` 的关键字
+### 5.2 run_semquad_simulation 的关键字
 
 「默认值」一列是库的默认，「参数卡」一列是 `case_realistic_2d.jl` 传入的值。
 
@@ -504,39 +543,75 @@ $$
 | `dt0`、`dtmax`、`dtmin`、`dt_growth` | 1e-4、`Inf`、1e-14、1.05 | 1e-6、5e-5、1e-9、1.05 | 步长及其上下界。 |
 | `cfl` | 0 | 0.5 | 步长更新所用 CFL 数；取 0 表示把 `dt` 冻结在 `dt0` 。 |
 | `amr_every` | 0 | 5 | 两次 AMR 之间的步数；取 0 冻结网格。 |
-| `amr_indicator` | `:theta` | `CASE_INDICATOR` | 加密指示子作用的场：`:theta`、`:velocity` 或 `:both`（见 2.1 节）。 |
+| `amr_indicator` | `:theta` | `CASE_INDICATOR` | 加密指示子作用的场：`:theta`、`:velocity` 或 `:both`（见 3.1 节）。 |
+| `amr_passes` | 1 | 1 | 每个 AMR 周期里指示子、加密与场传递的轮数。 |
 | `amr_hysteresis`、`amr_coarsen_gate` | 1、true | `CASE_HYST`、`CASE_AMR_GATE == 1` | 平衡循环的迟滞长度与 2:1 校验。 |
 | `refine_frac`、`coarsen_frac` | 0.2、0.0 | 0.2、`CASE_COARSEN` | 平衡循环的误差份额，分别从上方和下方做 Dörfler 标记。 |
 | `max_level`、`max_leaves` | 无上限 | 7、10000 | 深度上限与叶数硬上限。 |
 | `wall_min_level`、`wall_strip` | 0、0.1 | 5、0.1 | 壁面规则，取 0 关闭。 |
 | `symmetry`、`transfer_mode` | `:none`、`:nodal` | `CASE_SYMMETRY`、`:nodal` | 镜像闭合与 AMR 场传递方式。 |
+| `hotspot_weight`、`hotspot_frac`、`hotspot_min_level`、`hotspot_mode`、`hotspot_zmin` | 0、0.5、0、`:theta`、0 | 关闭 | 热点加密规则。 |
+| `top_wall_level`、`top_wall_frac` | 0、0.5 | 关闭 | 顶壁加密规则。 |
+| `zero_side_eta`、`side_strip` | false、0.05 | false、0.05 | 侧墙条带的黏度清零。 |
 | `advection` | `:galerkin` | `:skew` | 能量方程的对流离散形式。 |
 | `ev`、`ev_cmax`、`ev_alpha` | 0、0.052、2 | 0.11、0.052、2 | 熵黏性，见 2.4 节；`ev = 0` 关闭。 |
 | `maxpic`、`pic_tol`、`pic_relax`、`pic_mode` | 1、1e-6、1.0、`:picard` | 相同 | 步内非线性迭代；用 Newton 时要求 `linear=:direct` 。 |
-| `linear` | `:auto` | `CASE_LINEAR` | 线性求解器，见 2.5 节。 |
+| `pic_reject`、`pic_reject_clamp`、`pic_reject_res`、`pic_reject_max` | false、0.25、10、4 | 默认值 | 当贴限比例或残差变大时拒绝一次 Picard 试步，并用减半的松弛重做。 |
+| `pic_adapt`、`pic_relax_min`、`pic_eta_relax`、`pic_u_relax` | false、0.05、1.0、1.0 | 默认值 | Picard 循环的松弛自适应、应变率平均与速度欠松弛。 |
+| `pic_div_window`、`pic_div_factor` | 0、10 | 默认值 | Picard 循环的散度检测器。 |
+| `newton_maxit`、`newton_krylov`、`newton_restart`、`newton_ls`、`newton_geo_safety` | 15、80、30、8、0 | 默认值 | Newton 控制项，`pic_mode = :picard` 时都不起作用。 |
+| `linear` | `:auto` | `CASE_LINEAR` | 线性求解器，见 4 节。 |
 | `stokes_tol` | `Inf` | 1e-3 | 真正残差超过它就中止该步；同时也是 `:auto` 回退和直接路径的接受容差。 |
+| `schur_maxiter`、`schur_precond` | 200、`:mass` | 默认值 | `linear = :schur_cg` 的迭代上限与预条件。 |
 | `mg_tol`、`mg_threads` | 1e-10、1 | 1e-8、1（`auto`：`min(8, nthreads)`） | 多重网格的外层容差与线程数。 |
 | `mg_operator`、`mg_pressure_eta_tol` | `:matrixfree`、1.0 | 相同 | 多重网格的几何形式，以及压力块缓存的重建阈值。 |
+| `mg_vel_solver`、`mg_smoothing`、`mg_omega` | `:vcycle`、`:auto`、`nothing` | 默认值 | 多重网格的速度求解器与 V 循环调度。 |
 | `stokes_scaling` | `:none` | `CASE_STOKES_SCALING` | `:none` 或 `:equilibrated` ，只对直接路径有效。 |
 | `corotation_guard` | true | 默认 | 报告共转项的适用范围，越界时警告一次； `shear_modulus = 0` 时既不采样也不打印（见 1.8 节）。 |
 | `regime_report` | true | 默认 | 在第一个推进应力的步与运行结束时各报告一次 Maxwell 区域； `shear_modulus = 0` 时既不计算也不打印（见 1.8 节）。 |
 | `eta_ref_scale` | `nothing` | 参数卡的 `(rho, g, alpha, dT, d, kappa)` 尺度组 | `eta_ref` 报告所用的尺度组；给出后报告还会打印以 Pa s 为单位的 `eta_0`（见 1.9 节）。 |
 | `mass_form` | `:anelastic` | `:boussinesq` | 质量守恒形式。 |
 | `phases`、`latent_scheme` | `[]`、`:implicit` | 两个相变、`:implicit` | 相变与潜热耦合；`maxpic = 1` 时两种格式结果相同。 |
+| `weak_chi0` | 0 | 0 | 初始应变弱化场；只有参数卡设置了弱化参数时才起作用。 |
+| `nu_cbf` | false | false | 把一致边界通量的 Nusselt 对追加到 history 里（见 6.2 节）。 |
 | `restart_from` | `""` | 取决于模式 | 从哪个检查点重启。 |
 | `checkpoint_path`、`checkpoint_every` | `""`、0 | `$CASE_OUT/spinup.h5`、200 | 检查点的写入位置与间隔。 |
-| `callback`、`verbose`、`profile_steps` | `nothing`、false、false | 帧写入器、true、false | 步钩子、逐步输出、逐步计时。 |
-| `extdiag` | false | `CASE_EXTDIAG` | 增加 `resid_A` 历史列。 |
-| `initial_refine` | 0 | 0 | 第一步之前在初值上做的 AMR 轮数。 |
-| `tavg_start`、`steady_tol`、`cfl_tol` | `Inf` | `Inf` | 时间平均窗口、稳态判据、CFL 中止保护。 |
+| `checkpoint_meta`、`callback`、`verbose`、`profile_steps` | 空、`nothing`、false、false | 参数卡的元数据、帧写入器、true、false | 检查点元数据、步钩子、逐步输出、逐步计时。 |
+| `pic_diag`、`extdiag` | false、false | false、`CASE_EXTDIAG` | 非线性诊断，以及 `resid_A` 历史列。 |
+| `initial_refine`、`theta_ic` | 0、`nothing` | 0、`nothing` | 第一步之前在初值上做的 AMR 轮数；`theta_ic` 在每次加密后的树上重新采样解析初值。 |
+| `tavg_start`、`steady_tol`、`cfl_tol`、`tmin`、`steady_window` | `Inf`、`Inf`、`Inf`、0、5 | `Inf`、`Inf`、`Inf`、0、5 | `tavg_start` 是时间平均窗口； `steady_tol`、`steady_window` 与 `tmin` 是稳态停止判据，在 `t > tmin` 之后，相对温度与相对 `Nu` 的变化在 `steady_window` 步内都低于 `steady_tol` 即停止； `cfl_tol` 是壁面 CFL 中止保护。 |
 
-函数返回 `theta`、`t`、`steps`、`history`、`history_extra`、`qt`、`ss`、`ux`、`uz`、`pv`、`avg`、`steady`、`weak`、`chi`、`chi_prev` 。 `history` 每实际跑一步记一行，列的含义见 4.2 节； `history_extra` 存放固定 18 列之后追加的列。
+函数返回 `theta`、`t`、`steps`、`history`、`history_extra`、`qt`、`ss`、`ux`、`uz`、`pv`、`avg`、`weak`、`chi`、`chi_prev` ，以及 Maxwell 应力历史的 `txx`、`tyy`、`txy`（`shear_modulus = 0` 时为 `nothing`）。 `history` 每实际跑一步记一行，列的含义见 6.2 节； `history_extra` 存放固定 18 列之后追加的列。
 
-## 4. 输出格式
+### 5.3 参数卡
+
+`case_realistic_2d.jl` 里的 `make_params()` 设置下列字段； `Params` 的其余字段保持 `src/physics/params.jl` 中列出的默认值。表中既有显式关闭的开关，也有为交代取值而列出的关键字段；物理背景见 1.1 至 1.9 节。
+
+| 字段 | 取值 | 含义 |
+|---|---|---|
+| `comp_Tcut` | 0（关闭） | 复合定律里绝对温度的下限取 0，即关闭此项。 |
+| `yield_c`、`yield_taumax` | `Inf` | 关闭屈服。 |
+| `yield_phi` | 0 | 关闭摩擦角。 |
+| `yield_c_grad`、`yield_mu_grad` | 0、0 | 关闭屈服面的深度依赖：内聚力与摩擦系数随深度的梯度都取 0。 |
+| `weak_f` | 1 | 残余弱化因子取 1，即不弱化。 |
+| `weak_eps_ref` | 0 | 关闭应变弱化。 |
+| `rho_heating`、`rho_cp` | `false` | 关闭密度加权加热。 |
+| `side_thermal`、`Twall_left`、`Twall_right` | `:insulating` | 侧壁绝热（法向通量为零）。取 `:fixed` 时两侧壁分别固定为给定物理温度，约定与顶/底壁相同：`Twall - Tbar`。 |
+| `Twall_top`、`Twall_bot` | 0、1 | 顶壁与底壁温度；参数卡不显式设置，保持 `Params` 的默认值。 |
+| `H_half_life` | `Inf` | 放射性生热保持恒定。取有限值时按 `H·2^(-t/H_half_life)` 衰减，时间单位与代码一致；只能用 Picard 时间推进。 |
+| `Di` | 0 | 关闭耗散加热与绝热加热。 |
+| `heating_adiabatic`、`heating_dissipation` | `false`、`false` | 绝热加热与耗散加热的开关；`Di = 0` 时两项都不产生源项。 |
+| `refstate` | `nothing` | 不使用参考态。 |
+| `deviatoric` | `false` | 不做偏量投影。 |
+| `mass_form` | `:boussinesq` | Boussinesq 质量守恒形式。 |
+
+`Params` 还会校验黏度定律。 `:composite` 拒绝 Drucker–Prager 屈服面； `:tosi` 自带塑性分支，因此拒绝 `yield_*` ； `:arrhenius` 要求 `eta_T0 > 0` 。
+
+## 6. 输出格式
 
 所有文件都写在 `CASE_OUT` 下。目录由程序创建；只有要用 shell 重定向把日志写进该目录时，才需要它事先存在。
 
-### 4.1 `run.log`
+### 6.1 run.log
 
 这个文件不是程序创建的，而是 stdout 与 stderr 的 shell 重定向。内容包括四行头部、每步一行（`verbose=true` 时）、每 5 步一行 AMR（带加密、粗化、合并计数以及平衡循环的计数器）、每 100 步一行参数卡回调的进度，以及最后两行：
 
@@ -547,7 +622,7 @@ $$
 
 stdout 是块缓冲的，回调每 100 步 flush 一次，因此重定向出来的日志最多滞后 100 步。错误走 stderr，不缓冲。
 
-### 4.2 `history.csv`
+### 6.2 history.csv
 
 在运行返回时一次写出，每实际跑一步一行：
 
@@ -575,17 +650,26 @@ t,dt,Nu_top,Nu_bot,Vrms,meanT,N,leaves,div_max,hmin,umax,cfl,closure,usrms_surf,
 | `balance` | $(\mathrm{Ra}\,W-U)/\max(\lvert\mathrm{Ra}\,W\rvert,\lvert U\rvert)$ ，力学平衡的相对残差。 |
 | `closure_nolatent` | 去掉潜热项后的 `closure` 。本卡有潜热，所以这一列存在；没有相变的运行只写 18 列。 |
 
-设 `CASE_EXTDIAG=1` 会追加一列 `resid_A` ：所引用的逐点 Nusselt 数与格式能量恒等式之间的精确残差，按单位面积计，因此对时间步通量为零，对逐点通量为 $O(h)$ 。
+设 `CASE_EXTDIAG=1` 会追加一列 `resid_A` ：所引用的逐点 Nusselt 数与格式能量恒等式之间的精确残差，按单位面积计，因此对时间步通量为零，对逐点通量为 $O(h)$ 。设 `nu_cbf=true` 会追加一致边界通量的一对 Nusselt 数 `Nu_cbf_top` 与 `Nu_cbf_bot` 。两项可以同时打开；在本卡上把这两项都打开时，追加的列依次是 `closure_nolatent`、`Nu_cbf_top`、`Nu_cbf_bot`、`resid_A` 。
 
-### 4.3 帧文件
+### 6.3 帧文件
 
 每 `CASE_FRAME` 步存一帧，并错开每个 AMR 周期的第一步：AMR 那一轮会把速度清零，如果在 AMR 步上写帧，得到的是零速度和没有意义的 Nusselt 数。最后一帧总会补上。
 
-`frames/frame_NNNNN_T.bin`：完整温度 $T=\bar T+\theta$ ，256 × 256 网格，小端 Float64，512 KB。 $x$ 变化最快，然后 $y$ ；在 numpy 里就是 `T = np.fromfile(path).reshape(256, 256)` ， `T[j, i]` 是 $(x\_i,y\_j)$ 处的值，画图时用 `origin="lower"` 。
+每个帧步写下列文件：
 
-`frames/frame_NNNNN_mesh.csv`：每个叶一行，按叶序排列（先 level，再 `ix`，再 `iy`），列为 `level,x0,y0,h` ，17 位有效数字。 $h$ 是叶高， $x\_0$ 、 $y\_0$ 是左下角坐标。
+| 文件 | 内容 |
+|---|---|
+| `frames/frame_NNNNN_T.bin` | 完整温度 $T=\bar T+\theta$ ，256 × 256 网格，小端 Float64，512 KB。 |
+| `frames/frame_NNNNN_mesh.csv` | 每个叶一行，按叶序排列（先 level，再 `ix`，再 `iy`），列为 `level,x0,y0,h` ，17 位有效数字。 |
+| `frames/frame_NNNNN_eta.bin` | 每个速度节点一个单精度值，为 $\log\_{10}(\eta/\eta\_{\mathrm{ref}})$ ，供渲染器使用。 |
+| `frames/frame_NNNNN_speed.bin` | 每个速度节点一个单精度值，为速度模。 |
+| `frames/frame_NNNNN_nodes.bin` | 每个速度节点两个单精度值，先 $x$ 后 $y$ 。 |
+| `frames/frame_meta.csv` | 追加一行元数据，见下。 |
 
-`frames/frame_meta.csv` 以追加方式打开，每帧一行：
+`T.bin` 的 $x$ 变化最快，然后 $y$ ；在 numpy 里就是 `T = np.fromfile(path).reshape(256, 256)` ， `T[j, i]` 是 $(x\_i,y\_j)$ 处的值，画图时用 `origin="lower"` 。 `mesh.csv` 里的 $h$ 是叶高， $x\_0$ 、 $y\_0$ 是左下角坐标。
+
+`frame_meta.csv` 以追加方式打开，每帧一行：
 
 ```text
 frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,eta_max,eta_clip_frac,wall_s,ng
@@ -593,7 +677,7 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 
 `nlev` 是不同层级的个数，`eta_clip_frac` 是黏度贴住上下限的速度节点比例，`wall_s` 是写帧器构造至今的秒数。
 
-### 4.4 检查点
+### 6.4 检查点
 
 单个 HDF5 文件，每 `checkpoint_every` 步写一次，结束时再写一次，始终写到同一路径（`$CASE_OUT/spinup.h5`、`frozen.h5`、`resume.h5` 等）。它保存把轨迹接下去所需的全部状态：
 
@@ -605,20 +689,15 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 | `pv` | 压力空间上的压力。 |
 | `ev` | 可选，每个叶一个熵黏性值，按 `leaves` 的顺序。 |
 | `weak`、`weak_prev` | 可选，两个层的应变弱化场，本卡没有。 |
+| `txx`、`tyy`、`txy` | 可选，三个 Maxwell 偏应力分量； `shear_modulus = 0` 时不存在（见 1.8 节）。 |
 | `cooldown_no_refine`、`cooldown_no_coarsen` | 可选，平衡循环的迟滞状态，每个叶键一列。 |
 | 属性 | `t`、`dt`、`dt_prev`、`step`、`p`、`maxlevel`、`nx0`、`ny0`、`Lx`、`cooldown_cycle`、`velocity_stale`、自由格式元数据，以及 `config`：影响轨迹的设置，写成按换行分隔的 `key=value` 字符串。 |
 
 `velocity_stale` 标记最后一步是 AMR 步的收尾检查点：里面存的速度只是诊断性重解，重启时会被清零。
 
-## 5. 重启与配置守卫
+## 7. 重启与配置守卫
 
-`restart_from` 会在第一步之前用检查点内容替换网格、`p` 和初始状态；`checkpoint_path` 让续算写到自己的文件。`maxsteps` 与 `tstop` 始终按绝对量解释。守卫把检查点里存的 `config` 与本次调用的设置逐键比较，只要有一项不同就拒绝启动：
-
-```text
-ArgumentError: restart configuration mismatch in /path/resume.h5:
-  symmetry: checkpoint=none, current=x
-  wall_min_level: checkpoint=0.0, current=5.0
-```
+`restart_from` 会在第一步之前用检查点内容替换网格、`p` 和初始状态；`checkpoint_path` 让续算写到自己的文件。`maxsteps` 与 `tstop` 始终按绝对量解释。守卫把检查点里存的 `config` 与本次调用的设置逐键比较，只要有一项不同就拒绝启动，并在错误信息里逐行列出 `键: checkpoint=..., current=...` 。完整报错样例与处理步骤见[快速开始](quickstart.md)的「出问题怎么办」。
 
 参与比较的是会影响轨迹的那些键：
 
@@ -635,20 +714,24 @@ ArgumentError: restart configuration mismatch in /path/resume.h5:
 | 参考态 | 参考态相关设置。 |
 | 缩放 | `stokes_scaling`。 |
 
-比较以检查点里的键为准迭代，所以比检查点更晚出现的键不参与比较。`stokes_scaling` 有明确默认值：缺这个键的文件按 `none` 读取，而给这类轨迹打开该选项会被拒绝。
+`physics_revision` 是物理代码的属性，而不是某个参数的取值：驱动拒绝在另一个 revision 下写出的检查点；没有这个标记的文件会在警告后续算，警告里会说明该文件是否带有 Maxwell 应力历史。
 
-属于状态、不参与配置比较的内容：`p` 与网格从文件恢复，平衡循环的冷却状态也随之恢复。`dt0`、`dt_growth`、`initial_refine`、`linear`、`mg_tol`、`mg_threads` 以及其他求解器设置既不存储也不比较，因此同一条轨迹可以用不同的线性路径或不同的检查点节奏继续。
+比较以检查点里的键为准迭代，所以比检查点更晚出现的键不参与比较。 `stokes_scaling` 有明确默认值：缺这个键的文件按 `none` 读取，而给这类轨迹打开该选项会被拒绝。
+
+属于状态、不参与配置比较的内容：`p` 与网格从文件恢复，平衡循环的冷却状态也随之恢复。 `dt0`、`dt_growth`、`initial_refine`、`linear`、`mg_tol`、`mg_threads` 以及其他求解器设置既不存储也不比较，因此同一条轨迹可以用不同的线性路径或不同的检查点节奏继续。
 
 续算被拒时，把存下的值原样重设一遍，或者改用种子模式。种子模式复制检查点，只改写冲突的那一个字符串：`freeze` 把 `amr_every` 设为 0，`wallrefine` 设置 `wall_min_level` 与 `wall_strip` 并加密壁面，`symseed` 设置 `symmetry` 。源文件始终不被修改。
 
-## 6. 线程与内存
+## 8. 线程与内存
 
 用 `--threads=N` 启动 Julia。本卡唯一用到 Julia 线程池的地方是 `linear = :auto` 选中的无矩阵 V 循环，它被限制在八个线程（`mg_threads = min(8, Threads.nthreads())`），所以开超过八个对 `auto` 路径没有收益。单线程时 `auto` 会警告一次并串行运行。显式指定 `linear = :mg` 时 `mg_threads` 保持为 1，除非调用者自己设置；直接分解在任何情况下都是串行的。
 
+实测线程收益：八线程下，生产规模 Stokes 的热启动求解耗时 1.36 s，直接求解 3.37 s；完整求解相对单线程的加速是 1.30 到 1.42 倍，V 循环是 1.77 到 2.05 倍。需要逐位可复现时固定用 `linear = :direct` 。
+
 生产状态下的实测内存：在 10 000 叶上限下，八线程多重网格路径峰值常驻约 1.3 GB，直接分解约 2.4 GB。两者都是进程峰值，包含 Julia 运行时和已加载的状态。默认运行应预留 2 GB 空闲内存，直接路径预留 3 GB。
 
-磁盘几乎全被帧吃掉：每帧约 0.8 MB（512 KB 的 `T.bin` 加几百 kB 的网格 CSV），所以 20 000 步、间隔 5 的一轮约 3 GB；一个检查点约 2 MB。
+磁盘几乎全被帧吃掉。6.3 节列出每帧写的文件，大小随树变化；一个检查点约 2 MB。
 
-## 7. 工程记录
+## 9. 下一步读什么
 
-默认值背后的测量、开发中发现的缺陷、性能优化过程，以及对基准和 ASPECT 的验证，都保存在工程记录，也就是 `docs/dev/` 目录。
+这些默认值背后的基准记录与已核对的适用范围见[验证](validation.md)；上手之后想改某一处，见[常见问题](faq.md)。可运行的算例与各自应打印的数字见[算例](examples.md)。

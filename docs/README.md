@@ -1,42 +1,39 @@
-<p align="right"><a href="en/README.md">English</a> · <a href="zh/README.md">中文</a></p>
-
 # Documentation
 
-<p align="center">
-  <img alt="Julia" src="https://img.shields.io/badge/Julia-1.12-9558B2?logo=julia&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-131%20851%20assertions-brightgreen">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-green">
-</p>
+This page is the map of the documentation. It lists every document with the question it answers, then gives two reading orders: one for a new user and one for a user who wants to verify a number. The five user pages exist in English in `en/` and in Chinese in `zh/`, and each of them opens with a language switch, so each row of the table below names both versions. The two top-level README files are separate documents, not translations of each other.
 
-The user guides live in `en/` and `zh/`, five pages in each language: install and run, the method and its parameters, the examples, the validation evidence, the FAQ. [architecture.md](architecture.md), beside this page, maps the source tree. The engineering record lives in `dev/`: derivations, measured numbers and the defect ledger, written for maintainers. A user page tells you how to do something; a `dev/` volume tells you why a default has the value it has, and which measurement settled it.
+## Documents
 
-## User guides
-
-| Page | Read it when |
+| Document | The question it answers |
 |---|---|
-| [Quick start](en/quickstart.md) | You have not run the code yet: install, the ten-step smoke test, stopping and resuming, the failures a new user hits |
-| [Guide](en/guide.md) | You need the equations, the method, every knob and keyword, the output formats |
-| [Examples](en/examples.md) | You want a case to copy: four runnable scripts with measured runtimes and numbers to check |
-| [Validation](en/validation.md) | You are about to trust a number: benchmark convergence, the ASPECT comparison, the two Nusselt conventions, the limits |
-| [FAQ](en/faq.md) | Your task is "change X": the Rayleigh number, a phase, the rheology, threads, restarting, citation |
+| [README](../README.md) · [README.zh.md](../README.zh.md) | What is QuaST, what does it not do, and what are the three commands to a first result? |
+| This page | Which documents exist, and in what order should I read them? |
+| [Quick start](en/quickstart.md) · [快速开始](zh/quickstart.md) | How do I install it, run it for the first time, read the files it produces, and recover when something fails? |
+| [Guide](en/guide.md) · [用户指南](zh/guide.md) | What are the equations, the discretization, the adaptive policy and the linear solvers, and what does every parameter, output format and restart rule mean? |
+| [Examples](en/examples.md) · [算例](zh/examples.md) | Which examples ship, what command runs each one, and what numbers should it print? |
+| [Validation](en/validation.md) · [验证](zh/validation.md) | What has been verified, against what, with which measured numbers, and what does the evidence not cover? |
+| [FAQ](en/faq.md) · [常见问题](zh/faq.md) | How do I make a specific change once the quick start is behind me? |
+| [Architecture](architecture.md) | How is the code organized into five layers, and where does one time step go? |
+| [English pages](en/README.md) · [中文页面](zh/README.md) | Which user pages exist in this language, and what is each one for? |
+| Engineering record, `docs/dev/` | Why does a default have the value it has, and which measurement settled it? This is maintainer material and is not tracked by this repository. |
 
-The same five pages exist in `zh/`.
+The repository records — `CHANGELOG.md`, `CONTRIBUTING.md`, and the `README.md` files under `src/`, `test/`, `examples/`, `benchmarks/`, `scripts/` and `aspect_runs/` — are records and reference pages of the repository, not pages of this documentation set.
 
-## The engineering record
+## Reading order
 
-The engineering record is a **local** volume set. It records how each part of the
-code came to be, which defects were found and how, what each measurement cost, and
-where the project stands. It is not part of the published documentation: it lives
-in `docs/dev/` on the development machine and is not tracked by this repository.
+### If you are new
 
-If you are working on the code and have that directory, the volumes are the ones
-the source comments cite by name: `SOLVER.md`, `PHYSICS.md`, `AMR.md`, `MG.md`,
-`VALIDATION.md`, `CASE_REALISTIC.md`, `VIDEOS.md`, `BUG_LEDGER.md`, `HANDOFF.md`,
-`PERFORMANCE.md`, `FILES.md`. Without it, the user guides above stand on their own:
-every number a user needs is in them or in the tests.
+1. [README](../README.md) — what the solver is, what it does not do, and a first result in three commands.
+2. [Quick start](en/quickstart.md) — install, the first run, the files it produces, and what to do when it fails.
+3. [Examples](en/examples.md) — take one case at a time; each page gives the command and a number to check.
+4. [Guide](en/guide.md) — read the sections you need; the parameter reference is a lookup table, not a chapter.
+5. [FAQ](en/faq.md) — when your task is "change X".
 
-## Where to start
+### If you want to verify a number
 
-- Run a case: [Quick start](en/quickstart.md), then [Examples](en/examples.md).
-- Understand the method: [Guide](en/guide.md) sections 1 and 2, then `dev/SOLVER.md` and `dev/PHYSICS.md`.
-- Change the code: [Architecture](architecture.md) for the map, `dev/HANDOFF.md` for the runbook, and `dev/BUG_LEDGER.md` before you start debugging.
+1. [Validation](en/validation.md) — which benchmark, which quantity, which agreement, and how far the evidence reaches.
+2. [Examples](en/examples.md) — rerun the shipped case behind the number you care about; each page names the value to check.
+3. [Architecture](architecture.md) — if you also want to follow the code path that produced it.
+4. The automated suite: `julia --project=. test/runtests.jl`; the recorded full-suite result is in [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+**Next:** [Quick start](en/quickstart.md) is the shortest path from a clone to a running case.
