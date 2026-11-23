@@ -12,8 +12,9 @@
 # the exact diffusion operator that produced theta^(n+1), so the EV values must
 # be recorded rather than recomputed (see `semquad_flux.jl` and G149).
 #
-# Kept in its own file so the legacy time loop can be restored from the
-# release baseline-2026-10-30 tag/archive without touching this code.
+# The file is split by concern -- the state itself here, the cooldown datasets,
+# the configuration codec and the tree rebuild in `checkpoint_*.jl` -- so a
+# change to one of them cannot disturb the others.
 
 """
     save_semquad_state(path, qt, theta, theta_prev, ux, uz, pv; t, dt, dt_prev,
