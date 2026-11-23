@@ -132,6 +132,7 @@ include("driver/eta_ref_report.jl")
 # signatures; the checkpoint functions they call are resolved at run time, like
 # every other driver call, so they can be included just before the entry point.
 include("driver/restart_guard.jl")
+include("driver/diagnostics_row.jl")
 include("driver/run.jl")
 include("driver/mass.jl")
 

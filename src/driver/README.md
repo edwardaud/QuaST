@@ -12,6 +12,7 @@ elsewhere: the driver only composes them.
 
 | File | What it is |
 |---|---|
+| `diagnostics_row.jl` | The per-step diagnostics row of the run history. |
 | `dp_steady.jl` | Steady Newton for the Drucker–Prager rheology, including the pressure derivative. |
 | `eta_ref_report.jl` | The `eta_ref` convention report: normalised field, interior mean, `Ra_interior`, physical units. |
 | `mass.jl` | The TALA/EOS density functions, the compressibility block and the eta-range diagnostic. |
