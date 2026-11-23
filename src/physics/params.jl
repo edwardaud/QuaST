@@ -173,10 +173,25 @@ struct Params
     # so this is the exact `2 eta eps(u).n` tangential traction; the normal
     # component, which carries `-p`, needs the `:open` wall and is stage 3.  A
     # value is only allowed where the tangential component is free, i.e. on a
-    # `:free` wall: on a `:rigid` wall the tangential velocity is Dirichlet and
-    # the load would be silently dropped by the constraint matrix, so it is an
-    # error (docs/dev/BC_DESIGN.md §3.2/§3.6).
+    # `:free` or `:open` wall: on a `:rigid` wall the tangential velocity is
+    # Dirichlet and the load would be silently dropped by the constraint matrix,
+    # so it is an error (docs/dev/BC_DESIGN.md §3.2/§3.6).
     wall_t::NTuple{4,Union{Nothing,Function}}
+    # Per-wall *normal* traction (BC stage 3, G261/G262/G263), same
+    # `(xminus, xplus, yminus, yplus)` order.  `nothing` (the default) is zero
+    # traction; a function `(x,y) -> Float64` prescribes the **normal component of
+    # the total Cauchy traction** -- the global component `t_x` on an x-wall and
+    # `t_z` on a y-wall, in the positive coordinate direction, exactly the
+    # `wall_t`/`wall_un` convention and *not* the scalar `n·(sigma·n)`.  Because
+    # the traction is `t = sigma.n` with the **outward** normal, a pressure `p0`
+    # imposed on an open boundary is `wall_tn = -p0` on the top wall and
+    # `wall_tn = +p0` on the bottom wall.  It carries the pressure
+    # (`t_n = -p + 2 eta eps_nn`), so it is only allowed on an `:open` wall -- the
+    # only wall with a free normal velocity; on a `:free`/`:rigid` wall the
+    # normal component is Dirichlet and the load would be silently dropped.
+    # It is the *dynamic* pressure traction in the solver's nondimensional
+    # pressure unit, not a lithostatic value.
+    wall_tn::NTuple{4,Union{Nothing,Function}}
     rho_heating::Bool     # add -T*H to the energy source (rho=(1-T) heating)
     rho_cp::Bool          # weight M and C by rho=1-T (ASPECT rho*cp LHS)
     tosi::Union{Nothing,TosiLaw}  # :tosi viscoplastic law (absolute units + eta0)
@@ -228,8 +243,12 @@ struct Params
     # Per-wall velocity condition, in the order (xminus, xplus, yminus, yplus).
     # `:same` means "follow `bc`", which is the default and therefore bit-identical
     # to the historical single-`bc` behaviour; `:free`/`:rigid` override one wall.
-    # A mixed tuple is only accepted with `linear=:direct` until the multigrid
-    # constraint operator carries the tuple (docs/dev/PHASE1.md 1.3 step 2).
+    # `:open` (BC stage 3) leaves **both** components free: the natural (traction)
+    # condition applies, optionally with the `wall_t`/`wall_tn` data.  An `:open`
+    # wall has no Dirichlet component, so with any `:open` wall the nodal pressure
+    # pin is invalid and the solver derives a different gauge (no pin); the
+    # well-posedness rules live in the constructor below
+    # (docs/dev/BC_DESIGN.md §3.5, G262).
     wall_bc::NTuple{4,Symbol}
     # Rayleigh-number reference viscosity, in the units the material law
     # returns: `Ra` is defined as rho g alpha dT d^3/(kappa eta_ref) and the flow
@@ -254,10 +273,10 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 wall_un::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 wall_t::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
-                # BC stage 2: a *normal* traction (`sigma.n`'s normal component)
-                # needs a free normal velocity -- the `:open` wall of stage 3 --
-                # and the derived pressure gauge.  The keyword is accepted only
-                # to refuse a request loudly instead of ignoring it.
+                # BC stage 3: the *normal* traction.  It carries `-p`, so it is
+                # only legal on an `:open` wall (free normal velocity) and it
+                # forces the derived pressure gauge (no nodal pin).  `nothing`
+                # everywhere is the historical card bit for bit.
                 wall_tn::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 div_penalty::Real=0.0,
                 eta_custom=nothing, eta_multiplier=nothing,
@@ -308,10 +327,12 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
     length(wall_bc) == 4 ||
         throw(ArgumentError("wall_bc must have four entries (xminus, xplus, " *
                             "yminus, yplus)"))
-    all(w -> w in (:same, :free, :rigid), wall_bc) ||
-        throw(ArgumentError("wall_bc entries must be :same, :free or :rigid"))
+    all(w -> w in (:same, :free, :rigid, :open), wall_bc) ||
+        throw(ArgumentError("wall_bc entries must be :same, :free, :rigid or " *
+                            ":open"))
     # `wall_u` is a *tangential* value, so it exists only on a `:rigid` wall.
-    # On a `:free` wall the tangential component is traction-free (natural) and
+    # On a `:free` wall the tangential component is traction-free (natural), and
+    # on an `:open` wall there is no Dirichlet component at all; in both cases
     # the value would be silently ignored -- the pre-G258 behaviour, corrected
     # here because a silently ignored boundary value is worse than an error.
     # The condition checked is the *resolved* one, so a `:same` entry follows
@@ -322,22 +343,44 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
         if wall_u[i] !== nothing && _resolved_wall(i) !== :rigid
             throw(ArgumentError("wall_u[$i] (wall $(_wall_names[i])) sets a " *
                                 "tangential velocity, but that wall resolves to " *
-                                ":$(_resolved_wall(i)) and a :free wall's " *
-                                "tangential component is traction-free, so the " *
-                                "value would be silently ignored.  Set " *
+                                ":$(_resolved_wall(i)): " *
+                                (_resolved_wall(i) === :open ?
+                                 "an :open wall has no Dirichlet component (the " *
+                                 "natural traction condition applies to both " *
+                                 "components)" :
+                                 "a :free wall's tangential component is " *
+                                 "traction-free") *
+                                ", so the value would be silently ignored.  Set " *
                                 "wall_bc[$i] = :rigid (or `bc = :rigid`) for a " *
                                 "wall whose tangential motion you prescribe, or " *
                                 "drop wall_u[$i]."))
         end
     end
-    # BC stage 2: a tangential *traction* is a data term on the free side, so it
-    # only exists where the tangential velocity is free, i.e. on a `:free` wall
-    # (`:open` is stage 3).  On a `:rigid` wall the tangential component is
-    # Dirichlet, so the assembled load would be dropped by the constraint matrix:
-    # a silent no-op.  The solver repeats this validation for direct library
-    # calls (`_semquad_validate_wall_traction`).
+    # BC stage 1/3: `wall_un` is a *normal velocity* (Dirichlet data), so it only
+    # exists where the normal component is Dirichlet: not on an `:open` wall.
     for i in 1:4
-        if wall_t[i] !== nothing && _resolved_wall(i) !== :free
+        if wall_un[i] !== nothing && _resolved_wall(i) === :open
+            throw(ArgumentError("wall_un[$i] (wall $(_wall_names[i])) sets a " *
+                                "normal *velocity*, but that wall resolves to " *
+                                ":open, which has no Dirichlet component: the " *
+                                "natural traction condition applies and the " *
+                                "normal velocity is an unknown, so the value " *
+                                "would be silently ignored.  Set wall_bc[$i] = " *
+                                ":free (or :rigid) for a wall whose normal " *
+                                "velocity you prescribe, or use wall_tn[$i] for " *
+                                "a normal *traction* on the open wall, or drop " *
+                                "wall_un[$i]."))
+        end
+    end
+    # BC stage 2/3: a tangential *traction* is a data term on the free side, so
+    # it only exists where the tangential velocity is free: a `:free` or an
+    # `:open` wall.  On a `:rigid` wall the tangential component is Dirichlet,
+    # so the assembled load would be dropped by the constraint matrix: a silent
+    # no-op.  The solver repeats this validation for direct library calls
+    # (`_semquad_validate_wall_traction`).
+    for i in 1:4
+        if wall_t[i] !== nothing &&
+           !(_resolved_wall(i) === :free || _resolved_wall(i) === :open)
             throw(ArgumentError("wall_t[$i] (wall $(_wall_names[i])) sets a " *
                                 "tangential *traction*, but that wall resolves " *
                                 "to :$(_resolved_wall(i)), where the tangential " *
@@ -345,22 +388,77 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                                 "be assembled onto a dof with no equation and " *
                                 "silently dropped.  A tangential traction needs a " *
                                 "wall with a free tangential component (a :free " *
-                                "wall); set wall_bc[$i] = :free (or `bc = :free`), " *
-                                "or drop wall_t[$i]."))
+                                "or :open wall); set wall_bc[$i] = :free, or " *
+                                "drop wall_t[$i]."))
         end
     end
-    # The normal component of the total Cauchy traction carries the pressure and
-    # needs a free normal velocity (the `:open` wall) plus the derived pressure
-    # gauge: stage 3.  Refuse rather than ignore.
-    all(t -> t === nothing, wall_tn) ||
-        throw(ArgumentError("wall_tn (a normal traction) is not implemented " *
-                            "yet: the normal component of the Cauchy traction " *
-                            "carries the pressure (-p + 2 eta eps_nn), so " *
-                            "prescribing it needs a free normal velocity (the " *
-                            ":open wall), a derived pressure gauge and a net-flux " *
-                            "skip -- stage 3 of docs/dev/BC_DESIGN.md (§3.5 and " *
-                            "§6).  This stage implements the tangential traction " *
-                            "`wall_t` only."))
+    # BC stage 3: the normal component of the total Cauchy traction carries the
+    # pressure (`t_n = -p + 2 eta eps_nn`), so it needs a free normal velocity --
+    # the `:open` wall -- and with it the derived pressure gauge.  On a `:free`
+    # or `:rigid` wall the normal velocity is Dirichlet and the load would be
+    # dropped by the constraint matrix: refuse instead of ignoring.  The solver
+    # repeats this validation (`_semquad_validate_wall_tnormal`).
+    for i in 1:4
+        if wall_tn[i] !== nothing && _resolved_wall(i) !== :open
+            throw(ArgumentError("wall_tn[$i] (wall $(_wall_names[i])) sets a " *
+                                "*normal traction*, but that wall resolves to " *
+                                ":$(_resolved_wall(i)), whose normal component " *
+                                "is Dirichlet.  The load would be assembled onto " *
+                                "a dof with no equation and silently dropped.  A " *
+                                "normal traction carries the pressure and needs a " *
+                                "wall with a free normal velocity: set " *
+                                "wall_bc[$i] = :open (an :open wall has no " *
+                                "Dirichlet component, so its natural condition " *
+                                "IS the traction level and the pressure gauge " *
+                                "becomes derived, docs/dev/BC_DESIGN.md §3.5), " *
+                                "or drop wall_tn[$i]."))
+        end
+    end
+    # BC stage 3: the well-posedness rules of a configuration with `:open` walls.
+    # (1) all four walls open is the pure traction problem: the velocity is
+    # determined only up to a rigid motion (and the data must satisfy net force
+    # and torque compatibility), which this solver does not gauge -- refuse.
+    # (2) the rigid-mode rank test.  On this axis-aligned box the exact test of
+    # "no rigid mode is admissible" is combinatorial: a rigid translation in x
+    # is blocked iff some x-wall keeps a Dirichlet normal component (then u_x is
+    # fixed along a whole vertical line), likewise for y; the rotation is blocked
+    # by any wall that keeps a Dirichlet normal component (its mode value varies
+    # along that wall).  So the configuration needs at least one non-`:open`
+    # x-wall AND one non-`:open` y-wall.  The solver repeats it on the actual
+    # Dirichlet dof set with a 3x3 Gram matrix of the rigid modes (G262).
+    _nopen = count(==(:open), map(_resolved_wall, 1:4))
+    if _nopen > 0
+        _nopen == 4 &&
+            throw(ArgumentError("all four walls are :open.  That is the pure " *
+                                "traction problem: with the natural condition " *
+                                "sigma.n = 0 on the whole boundary the velocity " *
+                                "is determined only up to a rigid motion (and the " *
+                                "data must satisfy zero net force and torque " *
+                                "compatibility), so the discrete saddle is " *
+                                "singular and the pressure is not fixed by the " *
+                                "boundary.  Leave at least one x-wall " *
+                                "(xminus/xplus) and one y-wall (yminus/yplus) " *
+                                "with a Dirichlet normal component, i.e. " *
+                                "wall_bc = :free or :rigid on those walls."))
+        _xok = any(i -> _resolved_wall(i) !== :open, (1, 2))
+        _yok = any(i -> _resolved_wall(i) !== :open, (3, 4))
+        if !(_xok && _yok)
+            _missing = !_xok ? "x-translation" : "y-translation"
+            _pair = !_xok ? "xminus/xplus" : "yminus/yplus"
+            throw(ArgumentError("the wall configuration leaves the " *
+                                "$_missing unconstrained: both $_pair walls are " *
+                                ":open, so no wall imposes a Dirichlet normal " *
+                                "component in that direction and the velocity " *
+                                "of a solution is determined only up to that " *
+                                "rigid translation (the 3x3 rigid-mode Gram " *
+                                "test of docs/dev/BC_DESIGN.md §3.5 would be " *
+                                "singular).  An :open wall is well posed only " *
+                                "when the normal velocity is Dirichlet on at " *
+                                "least one x-wall and one y-wall: set " *
+                                "wall_bc = :free (or :rigid) on one wall of " *
+                                "that pair."))
+        end
+    end
     eta_soft >= 0 || throw(ArgumentError("eta_soft must be >= 0"))
     div_penalty >= 0 || throw(ArgumentError("div_penalty must be >= 0"))
     if eta_law === :expT
@@ -476,6 +574,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            Float64(shear_modulus), NTuple{4,Union{Nothing,Function}}(wall_u),
            NTuple{4,Union{Nothing,Function}}(wall_un),
            NTuple{4,Union{Nothing,Function}}(wall_t),
+           NTuple{4,Union{Nothing,Function}}(wall_tn),
            rho_heating, rho_cp, tosi, Float64(Di),
            heating_adiabatic, heating_dissipation, refstate, rho_ref_weight,
            compress_p, Float64(compress_gamma),

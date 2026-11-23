@@ -418,6 +418,29 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                             "a run with both would differ from the Picard path " *
                             "with the same card.  Use pic_mode=:picard, or set " *
                             "eta_ref = 1.0."))
+    # BC stage 1/2/3: the per-step Newton solves the Stokes system with `bc`
+    # only (`semquad_step_newton`), so every per-wall field is silently ignored
+    # there.  For `wall_bc` that is a *wrong answer* once an `:open` wall (or a
+    # mixed free/rigid tuple) is requested: the Newton run would solve the closed
+    # single-`bc` problem instead.  Refuse a non-default per-wall configuration
+    # on the Newton path instead of ignoring it (the pre-existing gap recorded in
+    # docs/dev/BC_PROGRESS.md §4.4, closed here because stage 3 makes it
+    # load-bearing).
+    if pic_mode === :newton
+        per_wall = any(w -> w !== :same, pr.wall_bc) ||
+                   any(t -> t !== nothing, pr.wall_u) ||
+                   any(t -> t !== nothing, pr.wall_un) ||
+                   any(t -> t !== nothing, pr.wall_t) ||
+                   any(t -> t !== nothing, pr.wall_tn)
+        per_wall && throw(ArgumentError("pic_mode=:newton ignores the " *
+            "per-wall boundary-condition fields (wall_bc, wall_u, wall_un, " *
+            "wall_t, wall_tn): the per-step Newton solves the Stokes system " *
+            "with `bc` only, so the run would silently use a different " *
+            "boundary configuration than the card states (in particular an " *
+            ":open wall would be closed).  Use pic_mode=:picard for a " *
+            "per-wall configuration, or leave the per-wall fields at their " *
+            "defaults."))
+    end
     latent_scheme in (:implicit, :lagged) ||
         throw(ArgumentError("latent_scheme must be :implicit or :lagged"))
     0.0 <= weak_chi0 <= 1.0 ||
@@ -993,6 +1016,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                                   wall_u=pr.wall_u,
                                                   wall_un=pr.wall_un,
                                                   wall_t=pr.wall_t,
+                                                  wall_tn=pr.wall_tn,
                                                   stokes_scaling=stokes_scaling,
                                                   auto_fallback_tol=stokes_tol,
                                                   stokes_accept_tol=stokes_tol,

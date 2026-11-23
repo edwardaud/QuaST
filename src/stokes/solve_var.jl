@@ -250,18 +250,21 @@ from `uDx` on an x-wall (`x = const`) and from `uDz` on a y-wall
 other closure.  The keywords refine that value per wall, in the order
 `(xminus, xplus, yminus, yplus)`:
 
-* `wall_bc` (`:same`/`:free`/`:rigid`) selects a wall's condition; `:same`
-  follows `bc`.  The normal component is Dirichlet on a `:free` and on a
-  `:rigid` wall, so it is always pinned.
+* `wall_bc` (`:same`/`:free`/`:rigid`/`:open`) selects a wall's condition;
+  `:same` follows `bc`.  The normal component is Dirichlet on a `:free` and on a
+  `:rigid` wall; an `:open` wall (stage 3) has **no** Dirichlet component on
+  either component -- the natural traction condition applies, optionally with
+  the `wall_t`/`wall_tn` data.
 * `wall_u` is the wall's *tangential* velocity, and only exists on a `:rigid`
-  wall; a value on a (resolved) `:free` wall is an `ArgumentError`, because the
-  tangential component there is traction-free and the value would be silently
+  wall; a value on a (resolved) `:free` or `:open` wall is an `ArgumentError`,
+  because the tangential component there is free and the value would be silently
   ignored (the pre-G258 behaviour).
 * `wall_un` is the wall's *normal* velocity: `u_x` on an x-wall and `u_z` on a
   y-wall, in the positive coordinate direction -- the value of the wall's
   normal component, exactly like the legacy closures, **not** the outward flux
   `u·n`.  `nothing` falls back to the global closure for that wall, which
-  keeps the historical path bit-identical (G258).
+  keeps the historical path bit-identical (G258).  A value on an `:open` wall is
+  an `ArgumentError` (there is no Dirichlet component to refine).
 * `wall_t` is the wall's *tangential traction*, added to the Stokes RHS as
   `∫ tbar·v dS` on the **unreduced** load vector (so `Cu'` projects it onto the
   admissible test space; it is never Dirichlet data).  `tbar = σ·n` is the
@@ -271,24 +274,46 @@ other closure.  The keywords refine that value per wall, in the order
   table to get wrong.  On an axis-aligned wall the tangential component is
   pressure-free (`t_x = σ_xy`, `t_z = σ_zy`), so this is the exact
   `2ηε(u)·n` shear traction.  It requires a wall whose tangential component is
-  free (a `:free` wall); on a `:rigid` wall the tangential velocity is
-  Dirichlet, so a traction there would be dropped by the constraints -- a
+  free (a `:free` or `:open` wall); on a `:rigid` wall the tangential velocity
+  is Dirichlet, so a traction there would be dropped by the constraints -- a
   silent no-op, refused with an `ArgumentError` (docs/dev/BC_DESIGN.md §3.2).
   `nothing` is zero traction, so the default path is bit-identical (G259/G260).
-* `wall_tn` is the *normal* traction and is **not implemented in this stage**:
-  it carries the pressure (`-p + 2ηε_nn`), so it needs a free normal velocity
-  (the `:open` wall of stage 3) and the derived pressure gauge.  Any non-empty
-  entry is an `ArgumentError`; the keyword exists only to refuse the request
-  loudly instead of ignoring it.
+* `wall_tn` is the wall's *normal traction* (stage 3), the same data term for
+  the wall's normal component: the global `t_x` on an x-wall and `t_z` on a
+  y-wall, no outward-normal sign table.  It carries the pressure
+  (`t_n = -p + 2ηε_nn`), so it is accepted only on an `:open` wall (free normal
+  velocity) and it is the data that fixes the pressure level: because
+  `tbar = σ·n` uses the **outward** normal, a pressure `p0` on an open boundary
+  is `wall_tn = -p0` on the top wall and `+p0` on the bottom wall.  It is the
+  **dynamic** pressure traction, not a lithostatic value.  `nothing` is zero
+  traction (the natural condition), so the default path is bit-identical
+  (G261/G262/G263).
 
-Because every wall keeps a Dirichlet normal component, the prescribed data must
-satisfy `∫∂Ω u·n dS = 0`.  An unbalanced configuration (e.g. a through-flow
+**Open walls and the pressure gauge.** The nodal pressure pin is exact only
+while the normal velocity is Dirichlet on the whole boundary (the constant
+pressure is then in the null space of the reduced gradient, and the dropped
+continuity row is a linear combination of the others).  With any `:open` wall
+that is no longer true, so the gauge is derived: the solver pins one pressure
+dof **iff no wall is `:open`** and otherwise leaves the pressure unpinned; the
+resolved decision is `LAST_SEMSTOKES_PRESSURE_GAUGE` (`:pin` / `:none`).  The
+open configurations the solver accepts are the well-posed ones: at least one
+x-wall and one y-wall must keep a Dirichlet normal component (otherwise a rigid
+translation is left admissible -- refused), and all four walls `:open` (the pure
+traction problem, which needs a velocity gauge and net force/torque-compatible
+data) is refused.  `linear=:direct` (with its shift ladder), `linear=:mg` and
+`linear=:auto` are verified without the pin; `:schur_cg`/`:lagged` are refused
+with an open wall because those paths assume the closed-boundary gauge.
+
+**Net-flux compatibility.** When no wall is `:open` the prescribed normal data
+must satisfy `∫∂Ω u·n dS = 0`.  An unbalanced configuration (e.g. a through-flow
 prescribed on one x-wall only) raises an `ArgumentError` that reports the
 measured net flux, instead of solving a discrete problem whose continuity
-equations are inconsistent.  A corner dof belongs to two walls and the walls
-are written in the order above, so a later wall owns the corner: in particular,
-a rigid top/bottom wall's tangential value overrides the side walls' normal
-value at its two corners (docs/dev/BC_DESIGN.md §1.4; G258 (d)).
+equations are inconsistent.  With any `:open` wall the free normal velocity
+absorbs the imbalance, so the check is skipped.  A corner dof belongs to two
+walls and the walls are written in the order above, so a later wall owns the
+corner: in particular, a rigid top/bottom wall's tangential value overrides the
+side walls' normal value at its two corners (docs/dev/BC_DESIGN.md §1.4;
+G258 (d)).
 """
 function solve_semquad_stokes_var(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,

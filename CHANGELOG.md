@@ -42,6 +42,17 @@ public release: earlier development happened in a private repository.
   carry a prescribed tangential load (the total Cauchy traction's tangential component,
   assembled as a boundary-face RHS term). `CASE_WALL_UN` and `CASE_WALL_T` expose both on
   the realistic card, and both are recorded by the restart guard.
+- Open walls and normal traction: `wall_bc` accepts `:open` (no Dirichlet component on
+  either component -- the natural traction condition applies) and `Params.wall_tn`
+  prescribes the normal component of the total Cauchy traction on such a wall
+  (`CASE_WALL_TN` on the realistic card, recorded by the restart guard). The normal
+  component carries the pressure, so an open wall fixes the pressure level and the nodal
+  pressure pin becomes **derived**: the solver pins one pressure dof iff no wall is
+  `:open`. Ill-posed open configurations (all four walls open; a rigid translation left
+  admissible because both walls of a pair are open) are refused with an actionable
+  message, the net-flux compatibility check is skipped for open walls, `:schur_cg`/
+  `:lagged` are refused there, and the per-step Newton path refuses per-wall boundary
+  data instead of silently ignoring it.
 - `Params.rho_multiplier`, the density hook a low-density sticky-air layer needs.
 - A physics revision marker (`src/physics/revision.jl`): a checkpoint written under a
   different revision is refused at restart, and a key-less checkpoint is resumed with a

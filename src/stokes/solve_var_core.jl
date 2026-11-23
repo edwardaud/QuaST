@@ -80,6 +80,110 @@ function _semquad_wall_normal_flux(ss::SemStokes,
     return flux, umax
 end
 
+"""
+    _semquad_rigid_mode_gram(ss, fixed) -> Matrix{Float64}
+
+3x3 Gram matrix `G_ij = sum_d m_i(d) m_j(d)` of the three 2-D rigid-body modes
+restricted to the Dirichlet dofs `d in keys(fixed)`:
+
+```text
+ r_1 = (1, 0)          x-translation
+ r_2 = (0, 1)          y-translation
+ r_3 = (-y, x)         rotation about the origin
+```
+
+so an x-component dof at `(x,y)` contributes `(1, 0, -y)` and a z-component dof
+contributes `(0, 1, x)`.  A rigid mode is admissible (it vanishes on all Dirichlet
+dofs, hence is in the range of `C_u`) **iff** its coefficient vector lies in the
+kernel of `G`; the velocity of a solution is therefore unique iff `G` has rank 3.
+`G` is positive semidefinite, so the solver's test is
+`eigmin(G) > 1e-10 * eigmax(G)` (a relative threshold; the rank-deficient cases
+of an axis-aligned box produce an eigenvalue at round-off, the well-posed ones
+one of order the number of Dirichlet dofs).  `fixed` carries the *values* too,
+but the uniqueness question is about the homogeneous linearised problem, so only
+the dof set is used -- the rigid-mode rank test of docs/dev/BC_DESIGN.md §3.5.
+"""
+function _semquad_rigid_mode_gram(ss::SemStokes, fixed::Dict{Int,Float64})
+    su = ss.su
+    nu = su.N
+    G = zeros(Float64, 3, 3)
+    for k in keys(fixed)
+        if k <= nu
+            y = su.coords[k][2]
+            m1 = 1.0; m2 = 0.0; m3 = -y
+        else
+            x = su.coords[k - nu][1]
+            m1 = 0.0; m2 = 1.0; m3 = x
+        end
+        G[1, 1] += m1 * m1; G[1, 2] += m1 * m2; G[1, 3] += m1 * m3
+        G[2, 1] += m2 * m1; G[2, 2] += m2 * m2; G[2, 3] += m2 * m3
+        G[3, 1] += m3 * m1; G[3, 2] += m3 * m2; G[3, 3] += m3 * m3
+    end
+    return G
+end
+
+"""
+    _semquad_check_rigid_modes(ss, fixed, resolved_wall_bc)
+
+Refuse a wall configuration whose Dirichlet dof set leaves a rigid-body mode
+admissible, with an actionable message naming the missing motion.  Called by
+`_solve_semquad_stokes_var_core` exactly when some wall is `:open` (with every
+wall closed the historical normal-Dirichlet data remove all three modes, so the
+default path does not pay for this check or change its answer).
+
+The test is the **numeric rank test** of [`_semquad_rigid_mode_gram`](@ref) on
+the actual `fixed` dict: `eigmin(G) > 1e-10 * eigmax(G)`.  The eigenvector of
+the smallest eigenvalue is the admissible rigid motion and is what the error
+message reports, so the diagnosis cannot drift from the matrix it is based on.
+(The same condition is checked combinatorially and earlier in `Params`, where a
+non-`:open` x-wall blocks the x-translation and a non-`:open` y-wall the
+y-translation, and either blocks the rotation; that cheap layer gives a card
+user the error before any solve is attempted.)
+
+The eigenvalue test is used rather than a Cholesky factorisation because a
+singular `G` may come out with a tiny positive eigenvalue from round-off; the
+relative threshold `1e-10` is far above that round-off and far below the
+well-posed eigenvalues (order the number of Dirichlet dofs, measured for the
+G262 configurations).  The null vector is reported as the admissible rigid motion
+(normalised to its largest coefficient), so the message names the direction even
+if a future mesh rule breaks the simple coverage argument.
+"""
+function _semquad_check_rigid_modes(ss::SemStokes,
+                                    fixed::Dict{Int,Float64},
+                                    resolved_wall_bc)
+    G = _semquad_rigid_mode_gram(ss, fixed)
+    E = eigen(Symmetric(G))
+    lam = E.values
+    lamax = lam[3]
+    (isfinite(lamax) && lamax > 0.0 && lam[1] > 1.0e-10 * lamax) && return nothing
+    # Rank-deficient: the eigenvector of the (near-)zero eigenvalue is the
+    # admissible rigid motion.  Report it honestly instead of guessing from the
+    # wall bookkeeping.
+    v = E.vectors[:, 1]
+    vmax = maximum(abs, v)
+    if vmax > 0.0
+        v ./= vmax
+    else
+        v .= (1.0, 0.0, 0.0)
+    end
+    names = ("x-translation", "y-translation", "rigid rotation")
+    imax = argmax(abs.(v))
+    dominant = names[imax]
+    throw(ArgumentError("the wall configuration leaves a rigid-body mode " *
+        "unconstrained: the 3x3 Gram matrix of the rigid modes " *
+        "(x-translation, y-translation, rotation about the origin) restricted " *
+        "to the Dirichlet dofs is singular (eigenvalues $(lam[1]), $(lam[2]), " *
+        "$(lam[3]); the admissible rigid motion is " *
+        "$(v[1]) * x-translation + $(v[2]) * y-translation + " *
+        "$(v[3]) * rotation, i.e. the $dominant).  The velocity of a solution " *
+        "is determined only up to that motion and the discrete saddle is " *
+        "singular.  An :open wall is well posed only when the normal velocity " *
+        "is Dirichlet on at least one x-wall and one y-wall (a non-:open wall " *
+        "fixes that component along a whole line): set wall_bc = :free (or " *
+        ":rigid) on enough walls to remove the printed motion.  Resolved " *
+        "wall_bc = ($(join(String.(resolved_wall_bc), ","))).  Test: " *
+        "_semquad_rigid_mode_gram, docs/dev/BC_DESIGN.md §3.5, G262."))
+end
 
 function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,
@@ -120,11 +224,18 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   # wall with a free tangential component
                                   # (`:free`; `:open` in stage 3).
                                   wall_t::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
-                                  # BC stage 2 placeholder: the *normal*
-                                  # traction is stage 3 (it needs `:open` walls,
-                                  # a free normal velocity and the derived
-                                  # pressure gauge).  Any non-empty entry is
-                                  # refused by `_semquad_refuse_wall_normal_traction`.
+                                  # BC stage 3: per-wall *normal* traction, same
+                                  # order; `nothing` = zero (the natural
+                                  # condition of an `:open` wall).  The value is
+                                  # the global traction component in the positive
+                                  # coordinate direction (`t_x` on an x-wall,
+                                  # `t_z` on a y-wall), i.e. the **outward**
+                                  # normal is already in `tbar = sigma.n`: a
+                                  # pressure p0 on an open boundary is
+                                  # `-p0` on the top wall and `+p0` on the
+                                  # bottom.  It carries the pressure, so it
+                                  # needs an `:open` wall (free normal velocity)
+                                  # and it forces the derived pressure gauge.
                                   wall_tn::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                                   stokes_accept_tol::Float64=Inf,
                                   stokes_lost_tol::Float64=SEMSTOKES_LOST_TOL,
@@ -165,37 +276,76 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   return_system::Bool=false,
                                   assemble_only::Union{Bool,Symbol}=false)
     bc in (:free, :rigid) || throw(ArgumentError("bc must be :free or :rigid"))
-    all(w -> w in (:same, :free, :rigid), wall_bc) ||
-        throw(ArgumentError("wall_bc entries must be :same, :free or :rigid"))
+    all(w -> w in (:same, :free, :rigid, :open), wall_bc) ||
+        throw(ArgumentError("wall_bc entries must be :same, :free, :rigid or " *
+                            ":open"))
     # Stage 1 validation (G258 (e)): `wall_u` is a *tangential* value and only a
     # `:rigid` wall applies it; on a `:free` wall the tangential component is
-    # traction-free, so the value would be a silent no-op.  `Params` refuses the
-    # same configuration, but a direct library call bypasses it -- hence the
-    # duplicate check here.  `wall_un` needs no such check: the normal component
-    # is Dirichlet on every `:free`/`:rigid` wall.
+    # traction-free and on an `:open` wall there is no Dirichlet component at
+    # all, so the value would be a silent no-op.  `Params` refuses the same
+    # configuration, but a direct library call bypasses it -- hence the
+    # duplicate check here.
+    #
+    # BC stage 3: `wall_un` is a *normal velocity* (Dirichlet data) and does not
+    # exist on an `:open` wall (its normal component is free); `wall_t` needs a
+    # free tangential component (`:free`/`:open`) and `wall_tn` needs the free
+    # normal component of an `:open` wall (see `_semquad_validate_wall_tnormal`).
     #
     # The *resolved* wall tuple (`:same` -> `bc`) is built once and reused by the
-    # fixed-dof loop, the traction validation and the load pass; the resolution
-    # is pure, so every legacy `fixed` dict is unchanged.
+    # fixed-dof loop, the validation, the well-posedness test and the load pass;
+    # the resolution is pure, so every legacy `fixed` dict is unchanged.
     resolved_wall_bc = ntuple(i -> wall_bc[i] === :same ? bc : wall_bc[i], 4)
     for i in 1:4
         wbc = resolved_wall_bc[i]
         wall_u[i] === nothing || wbc === :rigid ||
             throw(ArgumentError("wall_u[$i] sets the tangential velocity of a " *
-                                "wall that resolves to :$wbc; only a :rigid wall " *
-                                "has a Dirichlet tangential component, so the " *
-                                "value would be silently ignored.  Set " *
+                                "wall that resolves to :$wbc; " *
+                                (wbc === :open ?
+                                 "an :open wall has no Dirichlet component (the " *
+                                 "natural traction condition applies to both " *
+                                 "components)" :
+                                 "only a :rigid wall has a Dirichlet " *
+                                 "tangential component") *
+                                ", so the value would be silently ignored.  Set " *
                                 "wall_bc[$i] = :rigid (or `bc = :rigid`), or " *
                                 "drop wall_u[$i]."))
+        wall_un[i] === nothing || wbc !== :open ||
+            throw(ArgumentError("wall_un[$i] sets the normal velocity of a " *
+                                "wall that resolves to :open, which has no " *
+                                "Dirichlet component: its normal velocity is an " *
+                                "unknown and the natural (zero unless wall_tn) " *
+                                "traction applies, so the value would be " *
+                                "silently ignored.  Set wall_bc[$i] = :free (or " *
+                                ":rigid) to prescribe a normal velocity, or use " *
+                                "wall_tn[$i] for a normal traction on the open " *
+                                "wall, or drop wall_un[$i]."))
     end
-    # Stage 2 (G259/G260): `wall_t` is a tangential *traction*, i.e. a data term
-    # on the free side, so its wall's tangential component must be free (`:free`;
-    # stage 3 adds `:open`).  On a `:rigid` wall the tangential component is
-    # Dirichlet and `Cu'` would drop the assembled load: a silent no-op, refused
-    # here and in `Params`.  `wall_tn` (normal traction) is stage 3 and is
-    # refused explicitly rather than ignored.
-    _semquad_refuse_wall_normal_traction(wall_tn)
+    # Stage 2/3: `wall_t` is a tangential *traction*, i.e. a data term on the free
+    # side, so its wall's tangential component must be free (`:free` or `:open`).
+    # On a `:rigid` wall the tangential component is Dirichlet and `Cu'` would
+    # drop the assembled load: a silent no-op, refused here and in `Params`.
+    # `wall_tn` is the *normal* traction and needs the free normal component of
+    # an `:open` wall; both validators are shared with `Params`.
     _semquad_validate_wall_traction(wall_t, resolved_wall_bc)
+    _semquad_validate_wall_tnormal(wall_tn, resolved_wall_bc)
+    # BC stage 3: the well-posedness refusal that needs no mesh -- all four walls
+    # `:open` is the pure traction problem (velocity determined only up to a
+    # rigid motion, pressure not fixed by the boundary, and a net force/torque
+    # compatibility condition the data generally violate).  The *other* refused
+    # configuration (a rigid mode left admissible by an open pair) is diagnosed
+    # after the fixed-dof set is built, where the actual Dirichlet dofs are
+    # known; `_semquad_check_rigid_modes`.
+    all(w -> w === :open, resolved_wall_bc) &&
+        throw(ArgumentError("all four walls are :open.  That is the pure " *
+                            "traction problem: with the natural condition " *
+                            "sigma.n = 0 on the whole boundary the velocity is " *
+                            "determined only up to a rigid motion (and the data " *
+                            "must satisfy zero net force and torque " *
+                            "compatibility), the discrete saddle is singular and " *
+                            "the pressure is not fixed by the boundary.  Leave " *
+                            "at least one x-wall (xminus/xplus) and one y-wall " *
+                            "(yminus/yplus) with a Dirichlet normal component " *
+                            "(wall_bc = :free or :rigid on those walls)."))
     stokes_scaling in SEMSTOKES_SCALINGS ||
         throw(ArgumentError("stokes_scaling must be :none or :equilibrated"))
     (geo_u === nothing) == (geo_coef === nothing) ||
@@ -244,6 +394,24 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     linear in (:direct, :schur_cg, :mg, :lagged, :auto) ||
         throw(ArgumentError("linear must be :direct, :schur_cg, :mg, :lagged " *
                             "or :auto"))
+    # BC stage 3: an `:open` wall removes the nodal pressure pin (the constant
+    # pressure is no longer in the null space of the reduced gradient, so pinning
+    # one dof would replace a continuity equation by `p_a = 0`, i.e. solve a
+    # different problem).  The direct path (with its shift ladder), the
+    # multigrid path and the `:auto` selector are verified without the pin;
+    # `:schur_cg` and `:lagged` carry their own gauge/scaling assumptions and are
+    # refused on an open-wall configuration rather than answered wrongly.
+    if any(w -> w === :open, resolved_wall_bc) &&
+       (linear === :schur_cg || linear === :lagged)
+        throw(ArgumentError("linear=:$linear is not supported with an :open " *
+                            "wall: the derived pressure gauge removes the nodal " *
+                            "pin, so the reduced saddle is a different " *
+                            "(unpinned) problem and the :schur_cg/:lagged paths " *
+                            "assume the closed-boundary gauge.  Use " *
+                            "linear=:direct (with its shift ladder), linear=:mg " *
+                            "or linear=:auto -- all three are verified for open " *
+                            "walls (G263)."))
+    end
     (assemble_only === false || assemble_only === true || assemble_only === :mg) ||
         throw(ArgumentError("assemble_only must be false (solve), true (assemble " *
                             "everything) or :mg (the reduced matrix-free MG " *
@@ -435,17 +603,19 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     IG = asm.IG; JG = asm.JG; VG = asm.VG
     IP = asm.IP; JP = asm.JP; VP = asm.VP
     fv = asm.fv
-    # BC stage 2: prescribed tangential traction.  RHS only: the load is added
+    # BC stage 2/3: prescribed traction (tangential `wall_t` and, on `:open`
+    # walls, normal `wall_tn`).  RHS only: the load is added
     # to the **unreduced** `fv` (never to `fr`, and never to `u0`, which is
     # Dirichlet data) so that `fr = Cu' (fv - K u0 + Bm' p0)` below is the exact
     # virtual work on the admissible test space; `Cu'` redistributes a loaded
     # hanging-master node and drops a loaded Dirichlet dof, which is the
     # weak-form restriction (docs/dev/BC_DESIGN.md §3.2/§3.3).  With every
-    # `wall_t` entry `nothing` this call returns before touching `fv`, which is
-    # what keeps the default path bit-identical (G260).  The pass runs after the
-    # threaded leaf assembly and touches no operator (`K`, `Kred`, `B`, the
-    # matrix-free path and the multigrid hierarchy never see it).
-    _semquad_boundary_traction!(fv, su, bmask, fd, wall_t, resolved_wall_bc)
+    # `wall_t`/`wall_tn` entry `nothing` this call returns before touching `fv`,
+    # which is what keeps the default path bit-identical (G260).  The pass runs
+    # after the threaded leaf assembly and touches no operator (`K`, `Kred`,
+    # `B`, the matrix-free path and the multigrid hierarchy never see it).
+    _semquad_boundary_traction!(fv, su, bmask, fd, wall_t, wall_tn,
+                                resolved_wall_bc)
 
     if mf_path
         K = nothing
@@ -500,6 +670,11 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
             wi = _wall_index(dir)
             bmask[fb + wi] != 0x00 || continue
             wbc = resolved_wall_bc[wi]
+            # BC stage 3: an `:open` wall has **no** Dirichlet component -- both
+            # components are free and the natural traction condition applies,
+            # with `wall_t`/`wall_tn` as data.  It writes nothing, so every
+            # legacy (:free/:rigid) `fixed` dict stays bit-identical.
+            wbc === :open && continue
             rigid_wall = wbc === :rigid
             # per-wall normal value: `wall_un[wi] === nothing` reproduces the
             # historical global closure for that wall bit for bit (G258);
@@ -534,43 +709,60 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
             end
         end
     end
-    # Net-flux compatibility of the prescribed normal data (docs/dev/BC_DESIGN.md
-    # §3.5 eq. 8).  In stage 1 the normal component is Dirichlet on *every* wall,
-    # so the constant pressure is in the null space of the reduced gradient and
-    # the pinned pressure gauge is exact only when the boundary data satisfy
-    # ∫∂Ω u·n dS = 0.  The default card (driver closures `(x,y)->0.0`, every
-    # `wall_un` nothing) integrates to zero exactly, so the `umax == 0` shortcut
-    # keeps the default path free of extra arithmetic.  When `:open` walls land
-    # (design commit 3) this check must skip the walls with a free normal
-    # component, which absorb the imbalance by construction.
-    netflux, wumax = _semquad_wall_normal_flux(ss, fixed, fd, n, nu, bmask)
-    if wumax > 0.0
-        perimeter = 2.0 * (qt.Lx + 1.0)
-        # The relative threshold is the design's `1e-12 * u_scale * perimeter`,
-        # with one necessary correction: an **absolute floor** of `1e-12`
-        # (in the solver's nondimensional velocity unit).  A manufactured-
-        # solution gate (G33/G44/G150/G151/G154) prescribes the exact field as
-        # its Dirichlet data; the *mathematical* net flux of that data is zero,
-        # but its floating-point evaluation at the boundary nodes is not (e.g.
-        # `sin(pi) = 1.2e-16`), so a strictly data-scaled test would reject
-        # legitimate reference gates whose imbalance is a round-off artefact
-        # and physically irrelevant.  The floor only decides cases whose flux
-        # inconsistency is below 1e-12 of a unit velocity -- far below any
-        # accuracy gate in the suite -- and it does not weaken the user-facing
-        # check (a card's wall_un values are O(1..1e3)).
-        tol = 1.0e-12 * max(wumax * perimeter, 1.0)
-        if abs(netflux) > tol
-            throw(ArgumentError("the prescribed normal wall velocities have a " *
-                "net outward boundary flux of $(netflux) (threshold $(tol) = " *
-                "1e-12 * max(umax * perimeter, 1), umax = $(wumax)).  Every wall " *
-                "keeps a Dirichlet normal component, and the discrete continuity " *
-                "equations are consistent only when ∫∂Ω u·n dS = 0.  " *
-                "`wall_un[i]` (and the legacy `uDx`/`uDz` closures) is the wall's " *
-                "normal *component* in the positive coordinate direction, so the " *
-                "outward flux is its face integral with the sign -1 on " *
-                "xminus/yminus and +1 on xplus/yplus; balance the inflow and the " *
-                "outflow (e.g. `wall_un = (U, U, 0, 0)` for a uniform " *
-                "through-flow)."))
+    # BC stage 3: is there an `:open` wall?  It decides two things below: the
+    # pressure gauge (pin only when *no* wall is open) and the well-posedness
+    # test / net-flux skip.
+    any_open = any(w -> w === :open, resolved_wall_bc)
+    if any_open
+        # BC stage 3 well-posedness: with an `:open` wall the Dirichlet set can
+        # shrink enough to leave a rigid-body mode admissible.  `fixed` is final
+        # here, so the numeric 3x3 rigid-mode Gram test runs on exactly the dofs
+        # the solve will impose (docs/dev/BC_DESIGN.md §3.5; the all-`:open`
+        # pure-traction case was refused before the assembly).  With every wall
+        # closed the historical normal Dirichlet data always remove the three
+        # modes, so the default path does not run this check.
+        _semquad_check_rigid_modes(ss, fixed, resolved_wall_bc)
+    else
+        # Net-flux compatibility of the prescribed normal data (docs/dev/
+        # BC_DESIGN.md §3.5 eq. 8).  When the normal component is Dirichlet on
+        # *every* wall (i.e. no wall is `:open`), the constant pressure is in the
+        # null space of the reduced gradient and the pinned pressure gauge is
+        # exact only when the boundary data satisfy ∫∂Ω u·n dS = 0.  The default
+        # card (driver closures `(x,y)->0.0`, every `wall_un` nothing) integrates
+        # to zero exactly, so the `umax == 0` shortcut keeps the default path
+        # free of extra arithmetic.  BC stage 3: with an `:open` wall the free
+        # normal velocity absorbs any imbalance by construction, so the check is
+        # skipped above -- the free normal component is the compatibility.
+        netflux, wumax = _semquad_wall_normal_flux(ss, fixed, fd, n, nu, bmask)
+        if wumax > 0.0
+            perimeter = 2.0 * (qt.Lx + 1.0)
+            # The relative threshold is the design's `1e-12 * u_scale *
+            # perimeter`, with one necessary correction: an **absolute floor** of
+            # `1e-12` (in the solver's nondimensional velocity unit).  A
+            # manufactured-solution gate (G33/G44/G150/G151/G154) prescribes the
+            # exact field as its Dirichlet data; the *mathematical* net flux of
+            # that data is zero, but its floating-point evaluation at the
+            # boundary nodes is not (e.g. `sin(pi) = 1.2e-16`), so a strictly
+            # data-scaled test would reject legitimate reference gates whose
+            # imbalance is a round-off artefact and physically irrelevant.  The
+            # floor only decides cases whose flux inconsistency is below 1e-12
+            # of a unit velocity -- far below any accuracy gate in the suite --
+            # and it does not weaken the user-facing check (a card's wall_un
+            # values are O(1..1e3)).
+            tol = 1.0e-12 * max(wumax * perimeter, 1.0)
+            if abs(netflux) > tol
+                throw(ArgumentError("the prescribed normal wall velocities have a " *
+                    "net outward boundary flux of $(netflux) (threshold $(tol) = " *
+                    "1e-12 * max(umax * perimeter, 1), umax = $(wumax)).  Every wall " *
+                    "keeps a Dirichlet normal component, and the discrete continuity " *
+                    "equations are consistent only when ∫∂Ω u·n dS = 0.  " *
+                    "`wall_un[i]` (and the legacy `uDx`/`uDz` closures) is the wall's " *
+                    "normal *component* in the positive coordinate direction, so the " *
+                    "outward flux is its face integral with the sign -1 on " *
+                    "xminus/yminus and +1 on xplus/yplus; balance the inflow and the " *
+                    "outflow (e.g. `wall_un = (U, U, 0, 0)` for a uniform " *
+                    "through-flow)."))
+            end
         end
     end
     cons_u = semquad_constraints(su, qt)
@@ -581,9 +773,28 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     end
     u0, Cu, _ = _affine_constraint(Nu2, cons2, fixed)
     cons_p = semquad_constraints(sp, qt)
+    # BC stage 3: the pressure gauge is **derived**, not unconditional.  The nodal
+    # pin (one pressure dof fixed to zero, its continuity equation dropped) is
+    # exact only when the constant pressure is in the null space of the reduced
+    # gradient, i.e. when ∫_Ω div v = ∫_∂Ω v·n = 0 for every admissible test
+    # function -- true **iff** the normal velocity is Dirichlet on the whole
+    # boundary.  With any `:open` wall a boundary test function with non-zero
+    # normal trace exists, the constant is NOT in the null space, and pinning one
+    # dof plus dropping its continuity row would solve a different problem
+    # (p_a = 0 in place of one continuity equation).  The rule is therefore
+    # mechanical: pin iff no wall is `:open`; with every wall closed this is
+    # bit-identical to the historical code.  `LAST_SEMSTOKES_PRESSURE_GAUGE`
+    # records the resolved decision (`:pin` / `:none`) for G262, and the returned
+    # `C_p` carries `np - 1` columns when pinned and `np` when not (its column
+    # count is the second, structural observation of the same decision).
     pf = Dict{Int,Float64}()
-    pfree0 = setdiff(1:np, collect(keys(cons_p)))
-    isempty(pfree0) || (pf[first(pfree0)] = 0.0)
+    if any_open
+        LAST_SEMSTOKES_PRESSURE_GAUGE[] = :none
+    else
+        pfree0 = setdiff(1:np, collect(keys(cons_p)))
+        isempty(pfree0) || (pf[first(pfree0)] = 0.0)
+        LAST_SEMSTOKES_PRESSURE_GAUGE[] = :pin
+    end
     p0, Cp, _ = _affine_constraint(np, cons_p, pf)
 
     CpB = Cp' * Bc * Cu

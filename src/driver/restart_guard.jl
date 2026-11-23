@@ -217,10 +217,12 @@ function _run_config(pr::Params;
     # does not invalidate historical files.
     run_config["wall_u"] = _wall_value_marker(pr.wall_u)
     run_config["wall_un"] = _wall_value_marker(pr.wall_un)
-    # BC stage 2: the per-wall tangential *traction* changes the load vector, so
-    # it changes the trajectory exactly like the wall motion.  Same marker (a
-    # closure has no comparable value); stage 3 adds `wall_tn` here.
+    # BC stage 2/3: the per-wall *traction* changes the load vector, so it
+    # changes the trajectory exactly like the wall motion.  Same marker (a
+    # closure has no comparable value): `wall_t` is the tangential and
+    # `wall_tn` the normal component.
     run_config["wall_t"] = _wall_value_marker(pr.wall_t)
+    run_config["wall_tn"] = _wall_value_marker(pr.wall_tn)
     run_config["latent_L"] = pr.latent_L
     run_config["latent_mode"] = pr.latent_mode
     run_config["latent_scheme"] = latent_scheme

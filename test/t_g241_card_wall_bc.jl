@@ -20,9 +20,9 @@ using Test, QuaST
     @test occursin("CASE_WALL_BC", src)
     @test occursin("get(ENV, \"CASE_WALL_BC\", \"\")", src)
 
-    # 2. both validations are present: four entries, and the three allowed values
+    # 2. both validations are present: four entries, and the allowed values
     @test occursin("length(parts) == 4", src)
-    @test occursin("all(w -> w in (:same, :free, :rigid), parts)", src)
+    @test occursin("all(w -> w in (:same, :free, :rigid, :open), parts)", src)
 
     # 3. forwarded into Params, which is where the driver reads it
     @test occursin("wall_bc=WALL_BC", src)
@@ -64,6 +64,21 @@ using Test, QuaST
     @test occursin("join((v === nothing ? \"-\" : string(v) for v in WALL_T_VALUES), \",\")", src)
     @test Params(wall_t=(nothing, nothing, nothing, (x, y) -> 2.0)).wall_t[4](0.0, 0.0) == 2.0
     @test Params().wall_t == (nothing, nothing, nothing, nothing)
+
+    # 8. G261/G262 added the per-wall *normal traction* knob (stage 3): the same
+    #    shape (empty = all `nothing` = the historical card, four finite entries,
+    #    forwarded into `Params`, printed in the header), and `CASE_WALL_BC` now
+    #    accepts `open`.
+    @test occursin("CASE_WALL_TN", src)
+    @test occursin("get(ENV, \"CASE_WALL_TN\", \"\")", src)
+    @test occursin("CASE_WALL_TN entry", src)
+    @test occursin("wall_tn=WALL_TN", src)
+    @test occursin("wall_tn=%s", src)
+    @test occursin("join((v === nothing ? \"-\" : string(v) for v in WALL_TN_VALUES), \",\")", src)
+    @test occursin("same, free, rigid or open", src)
+    @test Params(bc=:free, wall_bc=(:free, :free, :free, :open),
+                 wall_tn=(nothing, nothing, nothing, (x, y) -> 2.0)).wall_tn[4](0.0, 0.0) == 2.0
+    @test Params().wall_tn == (nothing, nothing, nothing, nothing)
     # the card source still parses as Julia (the knob's const block is only
     # executed when the card runs, so a syntax error would otherwise survive)
     @test Meta.parseall(src) isa Expr

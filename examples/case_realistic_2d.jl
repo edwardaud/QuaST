@@ -43,11 +43,15 @@
 #                                       production wall rule; CASE_WALLMIN=0
 #                                       turns it off)
 #     CASE_WALL_BC                      per-wall velocity condition, four
-#                                       `same|free|rigid` entries in the order
-#                                       (xminus, xplus, yminus, yplus); empty
-#                                       means all `same`, i.e. follow `bc`
+#                                       `same|free|rigid|open` entries in the
+#                                       order (xminus, xplus, yminus, yplus);
+#                                       empty means all `same`, i.e. follow `bc`
 #                                       (`:free` on this card), the historical
-#                                       free-slip behaviour
+#                                       free-slip behaviour.  `open` leaves both
+#                                       velocity components free (the natural
+#                                       traction condition applies; optional data
+#                                       in CASE_WALL_T / CASE_WALL_TN) and makes
+#                                       the pressure gauge derived (no nodal pin)
 #     CASE_WALL_UN                      per-wall normal velocity, four comma-
 #                                       separated constant entries like
 #                                       CASE_WALL_BC (an empty entry keeps the
@@ -71,12 +75,24 @@
 #                                       y-wall -- not an outward-normal
 #                                       component); on an axis-aligned wall it
 #                                       is the exact 2*eta*eps(u).n shear.  Only
-#                                       meaningful on a wall that is `:free`
-#                                       (free tangential component); a `:rigid`
-#                                       wall's tangential velocity is Dirichlet
-#                                       and the tuple is refused.  The normal
-#                                       traction needs the `:open` wall of
-#                                       stage 3 and is not on this card (G259)
+#                                       meaningful on a wall that is `:free` or
+#                                       `:open` (free tangential component); a
+#                                       `:rigid` wall's tangential velocity is
+#                                       Dirichlet and the tuple is refused
+#                                       (G259)
+#     CASE_WALL_TN                      per-wall *normal* traction, four comma-
+#                                       separated constant entries like
+#                                       CASE_WALL_UN (an empty entry = zero
+#                                       traction).  The value is the total
+#                                       Cauchy traction's normal component in the
+#                                       positive coordinate direction (t_x on an
+#                                       x-wall, t_z on a y-wall); because the
+#                                       traction uses the OUTWARD normal, a
+#                                       pressure p0 on an open boundary is -p0 on
+#                                       the top wall and +p0 on the bottom.  Only
+#                                       meaningful on an `:open` wall, and it
+#                                       makes the pressure gauge derived
+#                                       (stage 3, G261/G262/G263)
 #     CASE_SYMMETRY                     x-mirror closure of the AMR passes:
 #                                       `none` (default, the production card:
 #                                       the pair-strict mirror rule off, the
@@ -408,8 +424,13 @@ const AMR_HYST     = parse(Int, get(ENV, "CASE_HYST", "1"))
 # :theta (default) or :velocity; see docs/dev/PHASE1.md 1.1
 const AMR_IND      = Symbol(get(ENV, "CASE_INDICATOR", "theta"))
 # Per-wall velocity condition, `(xminus, xplus, yminus, yplus)`.  `CASE_WALL_BC` is
-# a comma-separated list of `same|free|rigid`; `same` follows `CASE_BC` (the card's
-# single `bc`).  Empty means all `:same`, i.e. the historical behaviour.
+# a comma-separated list of `same|free|rigid|open`; `same` follows `CASE_BC` (the
+# card's single `bc`).  Empty means all `:same`, i.e. the historical behaviour.
+# `open` means no Dirichlet component on that wall: the natural traction applies,
+# with the optional `CASE_WALL_T` / `CASE_WALL_TN` data.  Because an open wall
+# removes the pressure pin, the configuration must be well posed: not all four
+# walls open, and at least one x-wall and one y-wall with a Dirichlet normal
+# component (`Params` refuses the rest).
 const WALL_BC     = begin
     raw = strip(get(ENV, "CASE_WALL_BC", ""))
     if isempty(raw)
@@ -419,8 +440,9 @@ const WALL_BC     = begin
         length(parts) == 4 ||
             error("CASE_WALL_BC needs four comma-separated entries " *
                   "(xminus,xplus,yminus,yplus), got \"$raw\"")
-        all(w -> w in (:same, :free, :rigid), parts) ||
-            error("CASE_WALL_BC entries must be same, free or rigid, got \"$raw\"")
+        all(w -> w in (:same, :free, :rigid, :open), parts) ||
+            error("CASE_WALL_BC entries must be same, free, rigid or open, " *
+                  "got \"$raw\"")
         parts
     end
 end
@@ -504,6 +526,48 @@ const WALL_T_VALUES = let
 end
 const WALL_T = ntuple(i -> WALL_T_VALUES[i] === nothing ? nothing :
                            ((x, y) -> WALL_T_VALUES[i]), 4)
+# Per-wall *normal* traction, `(xminus, xplus, yminus, yplus)`, comma-separated
+# like `CASE_WALL_BC`.  Each entry is a constant value of the wall's normal
+# traction wrapped into a `(x, y) -> value` closure, or empty for zero traction
+# (the natural condition of an `:open` wall).  Empty overall = all `nothing`,
+# which is the historical card bit for bit.  The value is the **total** Cauchy
+# traction's normal component as the global component in the positive coordinate
+# direction: `t_x` on an x-wall, `t_z` on a y-wall -- because `t = sigma.n` uses
+# the **outward** normal, a pressure p0 imposed on an open boundary is `-p0` on
+# the top wall and `+p0` on the bottom wall.  On an axis-aligned wall the normal
+# component carries the pressure (`t_n = -p + 2 eta eps_nn`), so this is the data
+# that fixes the pressure level; it needs a wall with a free normal velocity
+# (`:open`) and it switches the pressure gauge to the derived (no-pin) one.  A
+# `wall_tn` entry on a `:free`/`:rigid` wall is refused by `Params` (the normal
+# velocity is Dirichlet there and the load would be silently dropped).  This is
+# the stage-3 knob of the boundary-condition feature
+# (docs/dev/BC_DESIGN.md §3.1/§3.5/§3.6).
+const WALL_TN_VALUES = let
+    raw = strip(get(ENV, "CASE_WALL_TN", ""))
+    if isempty(raw)
+        (nothing, nothing, nothing, nothing)
+    else
+        parts = Tuple(strip(v) for v in split(raw, ','))
+        length(parts) == 4 ||
+            error("CASE_WALL_TN needs four comma-separated entries " *
+                  "(xminus,xplus,yminus,yplus), got \"$raw\"")
+        ntuple(4) do i
+            p = parts[i]
+            if isempty(p)
+                nothing
+            else
+                v = parse(Float64, p)
+                # `parse` accepts NaN/Inf; a traction value must be finite
+                isfinite(v) ||
+                    error("CASE_WALL_TN entry $i must be finite, " *
+                          "got \"$p\"")
+                v
+            end
+        end
+    end
+end
+const WALL_TN = ntuple(i -> WALL_TN_VALUES[i] === nothing ? nothing :
+                            ((x, y) -> WALL_TN_VALUES[i]), 4)
 # x-mirror closure of the AMR passes (`symmetry=:x`).  The default is `none`,
 # the production card (docs/dev/CASE_REALISTIC.md §1.5): `none` switches the
 # pair-strict mirror rule off.  Under `:x` a quartet is merged only together
@@ -626,6 +690,7 @@ function make_params()
                   # 1.0 declares the calibration's convention and is inert
                   eta_ref=ETA_REF,
                   bc=:free, wall_bc=WALL_BC, wall_un=WALL_UN, wall_t=WALL_T,
+                  wall_tn=WALL_TN,
                   latent_L=LATENT_L, latent_mode=LATENT_MODE,
                   # the viscoelastic knob: 0.0 (the empty default) leaves every
                   # viscoelastic term off and the card bit-identical; a positive
@@ -786,7 +851,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     # Only an opt-in run records it, so the checkpoints of the default card stay
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
-    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s eta_ref=%.6g shear_modulus=%.3g wall_un=%s wall_t=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), ETA_REF, SHEAR_MODULUS, join((v === nothing ? "-" : string(v) for v in WALL_UN_VALUES), ","), join((v === nothing ? "-" : string(v) for v in WALL_T_VALUES), ","))
+    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s eta_ref=%.6g shear_modulus=%.3g wall_un=%s wall_t=%s wall_tn=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), ETA_REF, SHEAR_MODULUS, join((v === nothing ? "-" : string(v) for v in WALL_UN_VALUES), ","), join((v === nothing ? "-" : string(v) for v in WALL_T_VALUES), ","), join((v === nothing ? "-" : string(v) for v in WALL_TN_VALUES), ","))
     @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.6f Es=%.6f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)

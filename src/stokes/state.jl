@@ -31,6 +31,13 @@ const LAST_SEMSTOKES_VEL_CG_ITERS = Ref(0)
 # True when the direct path had to retry with the 1e-12 relative diagonal
 # regularization (wall trees with free-slip; see the direct branch below).
 const LAST_SEMSTOKES_REGULARIZED = Ref(false)
+# Pressure gauge of the last variable-viscosity solve: `:pin` when one nodal
+# pressure dof was pinned to zero (exact only while the normal velocity is
+# Dirichlet on the whole boundary, i.e. when **no** wall is `:open`), `:none`
+# when an `:open` wall forced the derived gauge (docs/dev/BC_DESIGN.md §3.5).
+# `nothing` before the first solve.  G262 pins "the pin is on exactly when no
+# wall is open" on this record plus the column count of the returned `C_p`.
+const LAST_SEMSTOKES_PRESSURE_GAUGE = Ref{Any}(nothing)
 
 # --- the direct path's shift ladder (docs/dev/CASE_REALISTIC.md §13) -------------
 #

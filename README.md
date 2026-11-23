@@ -41,7 +41,7 @@ The ten steps are a smoke test, not a result. For the files a run produces, the 
 |---|---|---|
 | Blankenbach et al. (1989) case 1a at refinement level 5, steady state: `Nu` against the published 4.884409 | **+0.08%** | [Validation](docs/en/validation.md) |
 | The same state imported from ASPECT, advanced by both codes: `Nu_bot` against ASPECT | **+0.003%** | [Validation](docs/en/validation.md) |
-| The automated test suite | **132 993** assertions passed, 0 failed, and 2 broken entries that wait for checkpoints the repository does not ship | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| The automated test suite | **133 402** assertions passed, 0 failed, and 2 broken entries that wait for checkpoints the repository does not ship | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 The validation page carries the convergence behind the Blankenbach number, the Tosi limit-cycle results, the viscoelastic checks, the two Nusselt conventions, and the paragraph that says where the evidence stops. The suite runs with `julia --project=. test/runtests.jl`.
 
