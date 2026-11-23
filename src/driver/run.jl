@@ -1546,75 +1546,46 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         # stores a pre-AMR mesh, and a restart from it is not equivalent to the
         # uninterrupted run (which would have refined that step).
         if amr_every > 0 && step % amr_every == 0
-            tp = profile_steps ? time_ns() : 0
-            old_sq = sq
-            ss, theta, theta_prev, nr = semquad_amr_passes!(
-                ss, qt, theta, theta_prev;
-                refine_frac=refine_frac, coarsen_frac=coarsen_frac,
-                passes=amr_passes, max_level=max_level,
-                max_leaves=max_leaves, wall_min_level=wall_min_level,
-                wall_strip=wall_strip, symmetry=symmetry,
-                transfer_mode=transfer_mode,
-                hotspot_weight=hotspot_weight, hotspot_frac=hotspot_frac,
-                hotspot_min_level=hotspot_min_level,
-                hotspot_mode=hotspot_mode, hotspot_zmin=hotspot_zmin, zero_side_eta=zero_side_eta, side_strip=side_strip,
-                top_wall_level=top_wall_level, top_wall_frac=top_wall_frac,
-                amr_hysteresis=amr_hysteresis,
-                amr_coarsen_gate=amr_coarsen_gate,
-                # The in-loop indicator runs on the velocity the step just
-                # solved, which is on the current mesh (`sq`).  `:theta`
-                # ignores these; `:velocity`/`:both` need them or
-                # `semquad_amr_passes!` would have to guess (the historical bug
-                # was reading an undefined local and throwing on the first AMR
-                # cycle -- G234 pins a real `amr_every=1` velocity cycle).
-                ux=ux, uz=uz,
-                indicator=amr_indicator)
-            # The pass wrote `LAST_AMR_STATS` and `LAST_AMR_BALANCED`; snapshot
-            # them before the verbose print below reads them.
-            snapshot!(diag)
-            sq = ss.su
-            # The weakening field lives on the scalar space, so it follows the
-            # same transfer as theta (no wall Dirichlet data: `zero_walls=false`).
-            if weak
-                chi = transfer_semquad(old_sq, chi, sq; mode=transfer_mode,
-                                       zero_walls=false, qt_new=qt)
-                chi_prev = transfer_semquad(old_sq, chi_prev, sq;
-                                            mode=transfer_mode,
-                                            zero_walls=false, qt_new=qt)
-                chi_iter = copy(chi)
-            end
-            # The Maxwell stress history is a set of scalar fields on the same
-            # space, so it follows the same transfer as `chi` (2b step 1).
-            if stress
-                txx = transfer_semquad(old_sq, txx, sq; mode=transfer_mode,
-                                       zero_walls=false, qt_new=qt)
-                tyy = transfer_semquad(old_sq, tyy, sq; mode=transfer_mode,
-                                       zero_walls=false, qt_new=qt)
-                txy = transfer_semquad(old_sq, txy, sq; mode=transfer_mode,
-                                       zero_walls=false, qt_new=qt)
-            end
-            ux = zeros(Float64, sq.N)
-            uz = zeros(Float64, sq.N)
-            pv = zeros(Float64, ss.sp.N)
-            edot_field = nothing      # the mesh changed: the old field is stale
-            ev_field = nothing        # same for the elementwise EV field
-            # old tree hierarchies (`:auto` may resolve to MG on the new tree).
-            # `_semquad_mg_drop_tree_entries!` keeps the per-level cache (G221):
-            # a coarse level whose leaf set did not change survives the cycle.
-            (linear === :mg || linear === :auto) && _semquad_mg_drop_tree_entries!()
-            velocity_stale = true
-            tprof !== nothing && (tprof[5] += (time_ns() - tp) / 1.0e9)
-            verbose && @printf("    AMR: N=%d leaves=%d maxjump=%d refined=%d coarsened=%d merged=%d\n",
-                               sq.N, length(qt.leaves), max_face_level_jump(qt), nr,
-                               diag.amr_stats.coarsened, diag.amr_stats.merged)
-            if verbose
-                # Balanced-cycle diagnostics (docs/dev/AMR.md §4.1/§4):
-                # the recirculation counter and the coarsening-gate ledger.
-                d = diag.amr_balanced
-                @printf("      balanced: gate_refused=%d extended=%d recirc=%d post=%+d tau_h=%.3e eligible=%d\n",
-                        d.gate_refused, d.gate_extended, d.recirc, d.post,
-                        d.tau_h, d.eligible)
-            end
+            amr = _amr_step!(ss, qt, theta, theta_prev; diag=diag, sq=sq,
+                             refine_frac=refine_frac, coarsen_frac=coarsen_frac,
+                             amr_passes=amr_passes, max_level=max_level,
+                             max_leaves=max_leaves,
+                             wall_min_level=wall_min_level,
+                             wall_strip=wall_strip, symmetry=symmetry,
+                             transfer_mode=transfer_mode,
+                             hotspot_weight=hotspot_weight,
+                             hotspot_frac=hotspot_frac,
+                             hotspot_min_level=hotspot_min_level,
+                             hotspot_mode=hotspot_mode,
+                             hotspot_zmin=hotspot_zmin,
+                             zero_side_eta=zero_side_eta,
+                             side_strip=side_strip,
+                             top_wall_level=top_wall_level,
+                             top_wall_frac=top_wall_frac,
+                             amr_hysteresis=amr_hysteresis,
+                             amr_coarsen_gate=amr_coarsen_gate,
+                             amr_indicator=amr_indicator, ux=ux, uz=uz,
+                             chi=chi, chi_prev=chi_prev, chi_iter=chi_iter,
+                             txx=txx, tyy=tyy, txy=txy,
+                             weak=weak, stress=stress, linear=linear,
+                             tprof=tprof, profile_steps=profile_steps,
+                             verbose=verbose)
+            ss = amr.ss
+            theta = amr.theta
+            theta_prev = amr.theta_prev
+            sq = amr.sq
+            chi = amr.chi
+            chi_prev = amr.chi_prev
+            chi_iter = amr.chi_iter
+            txx = amr.txx
+            tyy = amr.tyy
+            txy = amr.txy
+            ux = amr.ux
+            uz = amr.uz
+            pv = amr.pv
+            edot_field = amr.edot_field
+            ev_field = amr.ev_field
+            velocity_stale = amr.velocity_stale
         end
 
         # The step that just finished used `dt`; that is also the BDF2

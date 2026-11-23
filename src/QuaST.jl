@@ -134,6 +134,10 @@ include("driver/diagnostics_row.jl")
 # solver/AMR diagnostic out-parameters.  It names only the value types of the
 # Refs defined in `stokes/` and `amr/` above.
 include("driver/run_diagnostics.jl")
+# Stage 2 of the `RunState` refactor: the AMR block of the time loop as one
+# function.  It calls `semquad_amr_passes!`, `transfer_semquad`, `snapshot!`
+# and the MG tree-cache drop, so it comes after `run_diagnostics.jl`.
+include("driver/amr_step.jl")
 include("driver/run.jl")
 include("driver/mass.jl")
 
