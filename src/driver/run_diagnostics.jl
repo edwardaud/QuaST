@@ -48,8 +48,11 @@ immediately after every `solve_flow!`, after the per-step Newton (the last
 solver-side call before its residual is read) and after every AMR pass; reusing
 a snapshot across one of those calls would log a stale value.
 
-`SEMQUAD_AMR_COOLDOWN` is deliberately not a field: it is driver state, not a
-producer diagnostic, and stage 1 of the refactor leaves it in `amr/cooldown.jl`.
+The AMR hysteresis state (`AmrCooldown`) is deliberately not a field: it is the
+driver's own state, not a producer diagnostic.  It is a local of
+`run_semquad_simulation` (stage 3a of the `RunState` refactor), passed explicitly
+to the AMR calls and returned as `cooldown` in the result, so there is no module
+global left to mirror here.
 """
 mutable struct RunDiagnostics
     residual::Float64                 # LAST_SEMSTOKES_RESIDUAL

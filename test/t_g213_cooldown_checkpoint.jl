@@ -164,7 +164,6 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
         cbA = st -> begin
             if st.step == 11
                 a_cycle[] = (row=cycle_row(LAST_AMR_BALANCED[]),
-                             cycle=SEMQUAD_AMR_COOLDOWN[].cycle,
                              leaves=length(st.qt.leaves), N=st.sq.N)
             end
         end
@@ -199,7 +198,6 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
         cbB2 = st -> begin
             if st.step == 11
                 b_cycle[] = (row=cycle_row(LAST_AMR_BALANCED[]),
-                             cycle=SEMQUAD_AMR_COOLDOWN[].cycle,
                              leaves=length(st.qt.leaves), N=st.sq.N)
             end
         end
@@ -219,12 +217,23 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
         @test Set(b2.qt.leaves) == Set(a.qt.leaves)
         @test b2.history == a.history[11:20]
         # the first AMR cycle after the resume is the uninterrupted one, and the
-        # restored counter aged by exactly one cycle
+        # final hysteresis state is the one the uninterrupted run ended with.
+        # The end-state check is stronger than the old mid-run `cycle` global
+        # observation it replaces: the returned `cooldown` is compared key by key
+        # (both dicts, not just one integer), so every cooling leaf and its
+        # remaining count has to agree.
         @test b_cycle[].row == a_cycle[].row
         @test b_cycle[].leaves == a_cycle[].leaves
         @test b_cycle[].N == a_cycle[].N
-        @test b_cycle[].cycle == 11
-        @test a_cycle[].cycle == 11
+        @test !isempty(a.cooldown.no_refine)
+        @test !isempty(a.cooldown.no_coarsen)
+        @test a.cooldown.cycle == 20
+        @test b2.cooldown.cycle == a.cooldown.cycle
+        @test b2.cooldown.no_refine == a.cooldown.no_refine
+        @test b2.cooldown.no_coarsen == a.cooldown.no_coarsen
+        @printf("  end cooldown: cycle=%d nref=%d ncoa=%d\n",
+                a.cooldown.cycle, length(a.cooldown.no_refine),
+                length(a.cooldown.no_coarsen))
 
         # Sensitivity: the same checkpoint with the cooldown stripped diverges.
         nocool = joinpath(dirname(path), "g213_resume_nocool.h5")

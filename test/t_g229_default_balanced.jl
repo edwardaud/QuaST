@@ -30,11 +30,14 @@ end
                 eta_c=4.1588830833596718565,
                 Twall_top=0.0, Twall_bot=1.0, bc=:free)
 
-    # A gate that pins the default path has to start from the module's defaults:
-    # other gates leave the process-global AMR cooldown advanced, and the driver
-    # reads that global when the caller passes no `amr_cooldown`.
+    # A gate that pins the default path has to start from the module's defaults.
+    # The process-global MG cache outlives a run, so this gate clears it.  The
+    # AMR hysteresis state no longer needs the reset it used to do here: stage 3a
+    # made it a local of `run_semquad_simulation` (returned as `.cooldown`),
+    # created fresh by every call, so a default run can no longer inherit the
+    # cooldown that an earlier gate in the same process advanced.  Determinism is
+    # therefore a property of the driver, not of a test-side global reset.
     function reset_module_state()
-        SEMQUAD_AMR_COOLDOWN[] = AmrCooldown()
         empty!(QuaST.SEMQUAD_MG_CACHE)
         return nothing
     end

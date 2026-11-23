@@ -33,6 +33,15 @@ that is currently on the mesh: pass it as `ux`/`uz` (scalar node layout, length
 `ss.su.N`).  They are validated only when the selected indicator reads them, so
 existing `:theta` callers are unaffected, and a multi-pass non-theta cycle
 transfers the two components along with `theta` between passes.
+
+`amr_cooldown` is the `AmrCooldown` hysteresis state of the balanced cycle: pass
+the same object to every call of a run so the no-refine/no-coarsen cooldowns and
+the cycle counter survive across calls.  A direct caller that omits it gets a
+fresh `AmrCooldown()` for that call only -- there is no shared hysteresis state
+between separate calls without the keyword.  The production driver owns one state
+for the whole run (`run_semquad_simulation` creates it, restores it on a resume,
+returns it as `cooldown` and passes it here) exactly as it does for the
+`initial_refine`/in-loop cycle calls.
 """
 const LAST_AMR_STATS = Ref((refined=0, coarsened=0, merged=0, leaves=0))
 
@@ -71,7 +80,7 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         throw(ArgumentError("amr_hysteresis must be >= 0"))
     indicator in (:theta, :velocity, :both) ||
         throw(ArgumentError("indicator must be :theta, :velocity or :both"))
-    cool = amr_cooldown === nothing ? SEMQUAD_AMR_COOLDOWN[] : amr_cooldown
+    cool = amr_cooldown === nothing ? AmrCooldown() : amr_cooldown
     sq = ss.su
     if indicator !== :theta
         ux === nothing &&

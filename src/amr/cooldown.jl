@@ -1,4 +1,4 @@
-# Hysteresis state of the balanced AMR cycle: `AmrCooldown` and its default.
+# Hysteresis state of the balanced AMR cycle: `AmrCooldown`.
 """
     AmrCooldown()
 
@@ -11,10 +11,12 @@ plus `cycle`, the number of AMR cycles this state has been aged through.
 checkpoint can round-trip, so a restored cooldown can be shown to be the same
 object (the decisions themselves depend only on the dicts).  A key is removed
 when its counter reaches zero or when the leaf stops being a leaf, so the state
-never refers to a stale mesh.  Pass the same object to every cycle of a run
-(`SEMQUAD_AMR_COOLDOWN` is the driver's default); `save_semquad_state` persists
-it as optional HDF5 state (docs/dev/BUG_LEDGER.md §10.5), and a checkpoint
-without it loads an empty cooldown, which is the historical restart behaviour.
+never refers to a stale mesh.  The state is owned by the caller: pass the same
+object to every cycle of a run.  `run_semquad_simulation` creates one for its run,
+returns it in the result (`cooldown`) and writes it through `save_semquad_state`,
+which persists it as optional HDF5 state (docs/dev/BUG_LEDGER.md §10.5); a
+checkpoint without it loads an empty cooldown, which is the historical restart
+behaviour.
 """
 mutable struct AmrCooldown
     no_refine::Dict{NTuple{3,Int},Int}
@@ -53,7 +55,4 @@ function _age_cooldown!(c::AmrCooldown, leaves::Set{NTuple{3,Int}})
     end
     return c
 end
-
-"""Default hysteresis state of the production driver (`run_semquad_simulation`)."""
-const SEMQUAD_AMR_COOLDOWN = Ref(AmrCooldown())
 

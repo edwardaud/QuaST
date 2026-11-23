@@ -195,7 +195,7 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        PHYSICS_REVISION,
        blend_field, semquad_deta_dp, semquad_deta_dp_eps, semquad_deta_chi,
        picard_diverging, picard_adapt_relax, amr_cycle_balanced!, AmrCooldown,
-       SEMQUAD_AMR_COOLDOWN, LAST_AMR_BALANCED, assemble_semquad_velocity_mass,
+       LAST_AMR_BALANCED, assemble_semquad_velocity_mass,
        solve_semquad_poisson, semquad_eval, LAST_SEMSTOKES_RESIDUAL,
        LAST_SEMSTOKES_SCHUR_ITERS, LAST_SEMSTOKES_VEL_CG_ITERS, LAST_SEMSTOKES_REGULARIZED,
        LAST_SEMSTOKES_RESID_SPLIT, LAST_SEMSTOKES_SHIFT, LAST_SEMSTOKES_REFINE_ITERS,

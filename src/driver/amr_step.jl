@@ -38,6 +38,11 @@ returned unchanged when `weak`/`stress` is false; the caller rebinds them
 unconditionally, which is then a no-op.  `tprof[5]` is the `amr` slot of the
 caller's per-step profile, updated over the same region as before the
 extraction.
+
+`amr_cooldown` is the caller-owned `AmrCooldown` hysteresis state of the balanced
+cycle.  It is forwarded to `semquad_amr_passes!`, which ages it in place, so the
+driver must pass the same object to every cycle (and to its `initial_refine`
+cycles); the function itself neither creates nor stores it.
 """
 function _amr_step!(ss::SemStokes, qt::Quadtree, theta::Vector{Float64},
                     theta_prev::Vector{Float64};
@@ -52,6 +57,10 @@ function _amr_step!(ss::SemStokes, qt::Quadtree, theta::Vector{Float64},
                     side_strip::Float64, top_wall_level::Int,
                     top_wall_frac::Float64, amr_hysteresis::Int,
                     amr_coarsen_gate::Bool,
+                    # The caller-owned hysteresis state of the balanced cycle;
+                    # the pass ages it in place, so it must be the same object
+                    # across every AMR call of the run.
+                    amr_cooldown::AmrCooldown,
                     # The in-loop indicator's velocity and selection (see the
                     # comment at the call).
                     ux::Vector{Float64}, uz::Vector{Float64},
@@ -79,6 +88,7 @@ function _amr_step!(ss::SemStokes, qt::Quadtree, theta::Vector{Float64},
         top_wall_level=top_wall_level, top_wall_frac=top_wall_frac,
         amr_hysteresis=amr_hysteresis,
         amr_coarsen_gate=amr_coarsen_gate,
+        amr_cooldown=amr_cooldown,
         # The in-loop indicator runs on the velocity the step just
         # solved, which is on the current mesh (`sq`).  `:theta`
         # ignores these; `:velocity`/`:both` need them or

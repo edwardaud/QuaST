@@ -230,7 +230,11 @@ implied by trace zero, `tau_zz = -(tau_xx + tau_yy)`, rather than stored -- the
 step's stress also drives the momentum through the 2b elastic force term
 `div(a tau^n)` (2b step 2; see `maxwell_force_stress`), so its history feeds the
 velocity trajectory.  With `shear_modulus == 0` no elastic path exists at all and
-the run is bit-identical to the pre-2b one.
+the run is bit-identical to the pre-2b one.  `cooldown` is the run's final
+`AmrCooldown` hysteresis state (the two cooldown dicts and the cycle counter): the
+driver owns it for the whole run, restores it from a checkpoint on a resume and
+writes it back through `save_semquad_state`, so a caller can inspect the state the
+last AMR cycle left without reading a module global.
 """
 function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64};
                                 p::Int=2, tstop::Float64=1.0e-3,
@@ -549,16 +553,23 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         end
     end
     theta = copy(theta0)
+    # Hysteresis state of the balanced AMR cycle.  It is a local of this call,
+    # not a module global: a fresh run starts with an empty cooldown, so it is
+    # deterministic and cannot inherit another run's state in the same process.
+    # It is created here (before `initial_refine`), restored from the checkpoint
+    # further down, passed explicitly to every cycle (the `initial_refine` cycle,
+    # `_amr_step!`) and to both checkpoint writes, and returned in the result as
+    # `cooldown`.
+    cooldown_state = AmrCooldown()
     if restart === nothing
         # `initial_refine` runs the balanced cycle -- the only adaptive policy --
         # on the initial condition, with the indicator and the wall-row protect
         # set the first in-loop pass builds in `semquad_amr_passes!`.  The
-        # cooldown is reset here so a fresh run never inherits the module global
-        # of an earlier run in the same process; the loop below resets it again
-        # for a restart-free start, so the pre-refinement state is not carried
-        # into the time loop (each pass still pays its hysteresis, which is what
-        # an equal in-loop pass sequence would do).
-        SEMQUAD_AMR_COOLDOWN[] = AmrCooldown()
+        # cooldown is the run-local state created above, so a fresh run never
+        # inherits earlier state; the time-loop setup below replaces it with a
+        # fresh state again for a restart-free start, so the pre-refinement state
+        # is not carried into the time loop (each pass still pays its hysteresis,
+        # which is what an equal in-loop pass sequence would do).
         for pass in 1:initial_refine
         length(qt.leaves) < max_leaves || break
         # At t = 0 the flow is at rest, so the velocity the in-loop pass receives
@@ -589,7 +600,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                             symmetry=symmetry, protect=protect,
                             wall_min_level=wall_min_level,
                             wall_strip=wall_strip,
-                            cooldown=SEMQUAD_AMR_COOLDOWN[],
+                            cooldown=cooldown_state,
                             hysteresis_cycles=amr_hysteresis,
                             coarsen_gate=amr_coarsen_gate)
         refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
@@ -672,15 +683,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # the next step.
     ev_field = (restart !== nothing && ev > 0.0) ? restart.ev : nothing
     velocity_stale = true
-    # Hysteresis state of the balanced AMR cycle.  A fresh run starts with an
-    # empty cooldown, so it is deterministic.  A checkpoint carries the cooldown
-    # (`save_semquad_state`'s optional datasets), and it is restored verbatim so
-    # the first AMR cycle after a resume is the one the uninterrupted run would
-    # have executed; an old checkpoint without the data loads an empty cooldown,
-    # which is exactly the historical restart behaviour (docs/dev/BUG_LEDGER.md
-    # §10.5).  The cooldown is state, not configuration: it is not in
-    # `run_config` and the restart guard must not compare it.
-    SEMQUAD_AMR_COOLDOWN[] =
+    # Hysteresis state of the balanced AMR cycle: this is the run's own local
+    # (it replaces the module-global cooldown Ref of the pre-stage-3a driver).  A
+    # fresh run starts with an empty cooldown, so it is deterministic and cannot
+    # inherit another run's state in the same process.  A checkpoint carries the
+    # cooldown (`save_semquad_state`'s optional datasets), and it is restored
+    # verbatim so the first AMR cycle after a resume is the one the uninterrupted
+    # run would have executed; an old checkpoint without the data loads an empty
+    # cooldown, which is exactly the historical restart behaviour
+    # (docs/dev/BUG_LEDGER.md §10.5).  The cooldown is state, not configuration:
+    # it is not in `run_config` and the restart guard must not compare it.
+    cooldown_state =
         (restart !== nothing && restart.cooldown !== nothing) ?
         restart.cooldown : AmrCooldown()
 
@@ -1564,6 +1577,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                              top_wall_frac=top_wall_frac,
                              amr_hysteresis=amr_hysteresis,
                              amr_coarsen_gate=amr_coarsen_gate,
+                             amr_cooldown=cooldown_state,
                              amr_indicator=amr_indicator, ux=ux, uz=uz,
                              chi=chi, chi_prev=chi_prev, chi_iter=chi_iter,
                              txx=txx, tyy=tyy, txy=txy,
@@ -1611,7 +1625,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                config=run_config, meta=checkpoint_meta,
                                ev=ev_field, weak=chi, weak_prev=chi_prev,
                                txx=txx, tyy=tyy, txy=txy,
-                               cooldown=SEMQUAD_AMR_COOLDOWN[])
+                               cooldown=cooldown_state)
         end
 
         # Steady-state detection, same criterion as the uniform driver: the
@@ -1673,7 +1687,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                            config=run_config, meta=checkpoint_meta,
                            ev=ev_field, weak=chi, weak_prev=chi_prev,
                            txx=txx, tyy=tyy, txy=txy,
-                           cooldown=SEMQUAD_AMR_COOLDOWN[],
+                           cooldown=cooldown_state,
                            velocity_stale=final_velocity_stale)
     end
 
@@ -1721,6 +1735,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             # `shear_modulus > 0`.  Advanced once per step and, with
             # `shear_modulus > 0`, the previous step's value drives the next
             # Stokes solve through the elastic force term.
-            txx=txx, tyy=tyy, txy=txy)
+            txx=txx, tyy=tyy, txy=txy,
+            # Final AMR hysteresis state (state, not configuration): the two
+            # cooldown dicts and the cycle counter the driver owned for this run.
+            cooldown=cooldown_state)
 end
 
