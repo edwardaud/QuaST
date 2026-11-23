@@ -15,6 +15,67 @@ _wall_index(dir::Symbol) = dir === :xminus ? 1 :
                            dir === :xplus ? 2 :
                            dir === :yminus ? 3 : 4
 
+"""
+    _semquad_wall_normal_flux(ss, qt, fixed, fd, n, nu) -> (flux, umax)
+
+Net boundary flux `∫∂Ω u·n dS` of the prescribed normal Dirichlet data, in the
+**outward-normal** convention (negative on `xminus`/`yminus`, positive on
+`xplus`/`yplus`), plus the largest prescribed normal value `umax`.
+
+The data are read from the final `fixed` dict and integrated with the same 1-D
+Gauss rule the leaf assembly uses (`fd.gl_w`/`fd.phi_v`, exact for the
+polynomial interpolant of the face data).  A corner node belongs to two walls;
+using the final dict is deliberate, because the wall write order
+`(xminus, xplus, yminus, yplus)` lets a later rigid y-wall's *tangential* value
+overwrite the x-wall's normal one at the corner, and that is the data the solve
+actually imposes (docs/dev/BC_DESIGN.md §1.4).  The pass is serial and runs
+after the fixed-dof loop, so it changes no assembly order.
+"""
+function _semquad_wall_normal_flux(ss::SemStokes, qt::Quadtree,
+                                   fixed::Dict{Int,Float64}, fd::FEData,
+                                   n::Int, nu::Int)
+    su = ss.su
+    flux = 0.0
+    umax = 0.0
+    for lf in su.leaves
+        hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
+        uids = su.elem[lf]
+        for dir in (:xminus, :xplus, :yminus, :yplus)
+            has_no_face_neighbor(qt, lf, dir) || continue
+            if dir === :xminus || dir === :xplus
+                iF = dir === :xminus ? 1 : n
+                sgn = dir === :xplus ? 1.0 : -1.0
+                for j in 1:n
+                    umax = max(umax, abs(get(fixed, uids[(j - 1) * n + iF], 0.0)))
+                end
+                for q in 1:fd.nq
+                    val = 0.0
+                    for j in 1:n
+                        val += get(fixed, uids[(j - 1) * n + iF], 0.0) *
+                               fd.phi_v[j, q]
+                    end
+                    flux += sgn * (0.5 * hy * fd.gl_w[q]) * val
+                end
+            else
+                jF = dir === :yminus ? 1 : n
+                sgn = dir === :yplus ? 1.0 : -1.0
+                for i in 1:n
+                    umax = max(umax, abs(get(fixed, nu + uids[(jF - 1) * n + i], 0.0)))
+                end
+                for q in 1:fd.nq
+                    val = 0.0
+                    for i in 1:n
+                        val += get(fixed, nu + uids[(jF - 1) * n + i], 0.0) *
+                               fd.phi_v[i, q]
+                    end
+                    flux += sgn * (0.5 * hx * fd.gl_w[q]) * val
+                end
+            end
+        end
+    end
+    return flux, umax
+end
+
 
 function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,
@@ -44,6 +105,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   bc::Symbol=:rigid, linear::Symbol=:direct,
                                   wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                                   wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
+                                  wall_un::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                                   stokes_accept_tol::Float64=Inf,
                                   stokes_lost_tol::Float64=SEMSTOKES_LOST_TOL,
                                   stokes_scaling::Symbol=:none,
@@ -83,6 +145,24 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   return_system::Bool=false,
                                   assemble_only::Union{Bool,Symbol}=false)
     bc in (:free, :rigid) || throw(ArgumentError("bc must be :free or :rigid"))
+    all(w -> w in (:same, :free, :rigid), wall_bc) ||
+        throw(ArgumentError("wall_bc entries must be :same, :free or :rigid"))
+    # Stage 1 validation (G258 (e)): `wall_u` is a *tangential* value and only a
+    # `:rigid` wall applies it; on a `:free` wall the tangential component is
+    # traction-free, so the value would be a silent no-op.  `Params` refuses the
+    # same configuration, but a direct library call bypasses it -- hence the
+    # duplicate check here.  `wall_un` needs no such check: the normal component
+    # is Dirichlet on every `:free`/`:rigid` wall.
+    for i in 1:4
+        wbc = wall_bc[i] === :same ? bc : wall_bc[i]
+        wall_u[i] === nothing || wbc === :rigid ||
+            throw(ArgumentError("wall_u[$i] sets the tangential velocity of a " *
+                                "wall that resolves to :$wbc; only a :rigid wall " *
+                                "has a Dirichlet tangential component, so the " *
+                                "value would be silently ignored.  Set " *
+                                "wall_bc[$i] = :rigid (or `bc = :rigid`), or " *
+                                "drop wall_u[$i]."))
+    end
     stokes_scaling in SEMSTOKES_SCALINGS ||
         throw(ArgumentError("stokes_scaling must be :none or :equilibrated"))
     (geo_u === nothing) == (geo_coef === nothing) ||
@@ -365,16 +445,25 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
             has_no_face_neighbor(qt, lf, dir) || continue
             # per-wall condition: :same follows the global c; this is what
             # keeps the historical single-c runs bit-identical
-            wbc = (wall_bc[_wall_index(dir)] === :same ? bc : wall_bc[_wall_index(dir)])
+            wi = _wall_index(dir)
+            wbc = (wall_bc[wi] === :same ? bc : wall_bc[wi])
             rigid_wall = wbc === :rigid
+            # per-wall normal value: `wall_un[wi] === nothing` reproduces the
+            # historical global closure for that wall bit for bit (G258);
+            # `wall_un[wi]` is the normal *component* in the positive
+            # coordinate direction, exactly like `uDx`/`uDz`, not the outward
+            # flux.  The write order (x walls, then y walls, normal before
+            # tangential) is unchanged, so every corner overwrite of the legacy
+            # paths is preserved (docs/dev/BC_DESIGN.md §1.4/§3.4).
+            un = wall_un[wi]
             if dir === :xminus || dir === :xplus
                 iF = dir === :xminus ? 1 : n
                 xf = dir === :xplus ? x0 + hx : x0
                 for j in 1:n
                     yv = y0 + 0.5 * (su.xi[j] + 1.0) * hy
                     g = uids[(j - 1) * n + iF]
-                    fixed[g] = uDx(xf, yv)
-                    tang = wall_u[_wall_index(dir)]
+                    fixed[g] = un === nothing ? uDx(xf, yv) : un(xf, yv)
+                    tang = wall_u[wi]
                     rigid_wall && (fixed[nu + g] =
                                    tang === nothing ? uDz(xf, yv) : tang(xf, yv))
                 end
@@ -384,12 +473,51 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                 for i in 1:n
                     xv = x0 + 0.5 * (su.xi[i] + 1.0) * hx
                     g = uids[(jF - 1) * n + i]
-                    fixed[nu + g] = uDz(xv, yf)
-                    tang = wall_u[_wall_index(dir)]
+                    fixed[nu + g] = un === nothing ? uDz(xv, yf) : un(xv, yf)
+                    tang = wall_u[wi]
                     rigid_wall && (fixed[g] =
                                    tang === nothing ? uDx(xv, yf) : tang(xv, yf))
                 end
             end
+        end
+    end
+    # Net-flux compatibility of the prescribed normal data (docs/dev/BC_DESIGN.md
+    # §3.5 eq. 8).  In stage 1 the normal component is Dirichlet on *every* wall,
+    # so the constant pressure is in the null space of the reduced gradient and
+    # the pinned pressure gauge is exact only when the boundary data satisfy
+    # ∫∂Ω u·n dS = 0.  The default card (driver closures `(x,y)->0.0`, every
+    # `wall_un` nothing) integrates to zero exactly, so the `umax == 0` shortcut
+    # keeps the default path free of extra arithmetic.  When `:open` walls land
+    # (design commit 3) this check must skip the walls with a free normal
+    # component, which absorb the imbalance by construction.
+    netflux, wumax = _semquad_wall_normal_flux(ss, qt, fixed, fd, n, nu)
+    if wumax > 0.0
+        perimeter = 2.0 * (qt.Lx + 1.0)
+        # The relative threshold is the design's `1e-12 * u_scale * perimeter`,
+        # with one necessary correction: an **absolute floor** of `1e-12`
+        # (in the solver's nondimensional velocity unit).  A manufactured-
+        # solution gate (G33/G44/G150/G151/G154) prescribes the exact field as
+        # its Dirichlet data; the *mathematical* net flux of that data is zero,
+        # but its floating-point evaluation at the boundary nodes is not (e.g.
+        # `sin(pi) = 1.2e-16`), so a strictly data-scaled test would reject
+        # legitimate reference gates whose imbalance is a round-off artefact
+        # and physically irrelevant.  The floor only decides cases whose flux
+        # inconsistency is below 1e-12 of a unit velocity -- far below any
+        # accuracy gate in the suite -- and it does not weaken the user-facing
+        # check (a card's wall_un values are O(1..1e3)).
+        tol = 1.0e-12 * max(wumax * perimeter, 1.0)
+        if abs(netflux) > tol
+            throw(ArgumentError("the prescribed normal wall velocities have a " *
+                "net outward boundary flux of $(netflux) (threshold $(tol) = " *
+                "1e-12 * max(umax * perimeter, 1), umax = $(wumax)).  Every wall " *
+                "keeps a Dirichlet normal component, and the discrete continuity " *
+                "equations are consistent only when ∫∂Ω u·n dS = 0.  " *
+                "`wall_un[i]` (and the legacy `uDx`/`uDz` closures) is the wall's " *
+                "normal *component* in the positive coordinate direction, so the " *
+                "outward flux is its face integral with the sign -1 on " *
+                "xminus/yminus and +1 on xplus/yplus; balance the inflow and the " *
+                "outflow (e.g. `wall_un = (U, U, 0, 0)` for a uniform " *
+                "through-flow)."))
         end
     end
     cons_u = semquad_constraints(su, qt)

@@ -1,5 +1,8 @@
 # G241: the card still reads, validates and forwards CASE_WALL_BC.
 #
+# (G258 added the sibling `CASE_WALL_UN` knob; its wiring block is at the end
+# and is asserted the same way.)
+#
 # G228's convention: the card is an example script, so the gate asserts on its
 # source rather than spawning a julia process.  The behavioural side of the knob was
 # validated by hand at three settings (unset, a mixed tuple, a bad value); what this
@@ -35,4 +38,21 @@ using Test, QuaST
     @test Params(wall_bc=(:rigid, :free, :free, :rigid)).wall_bc ==
           (:rigid, :free, :free, :rigid)
     @test_throws ArgumentError Params(wall_bc=(:free, :free, :free, :nope))
+
+    # 6. G258 added the per-wall *normal* velocity knob the same way: read from
+    #    the environment with an empty (= all `nothing`) default, four
+    #    comma-separated entries, forwarded into `Params`, and printed.
+    @test occursin("CASE_WALL_UN", src)
+    @test occursin("get(ENV, \"CASE_WALL_UN\", \"\")", src)
+    @test occursin("isempty(raw)", src)
+    @test occursin("length(parts) == 4", src)
+    @test occursin("CASE_WALL_UN entry", src)
+    @test occursin("must be finite", src)
+    @test occursin("wall_un=WALL_UN", src)
+    @test occursin("wall_un=%s", src)
+    @test Params(wall_un=(nothing, nothing, nothing, (x, y) -> 2.0)).wall_un[4](0.0, 0.0) == 2.0
+    @test Params().wall_un == (nothing, nothing, nothing, nothing)
+    # the card source still parses as Julia (the knob's const block is only
+    # executed when the card runs, so a syntax error would otherwise survive)
+    @test Meta.parseall(src) isa Expr
 end

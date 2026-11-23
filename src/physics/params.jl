@@ -150,6 +150,16 @@ struct Params
     # makes a lid-driven cavity expressible: the top wall's tangential value no
     # longer forces the x-walls' normal velocity (docs/dev/PHASE2.md 2a cross-check).
     wall_u::NTuple{4,Union{Nothing,Function}}
+    # Per-wall *normal* velocity, in the same `(xminus, xplus, yminus, yplus)`
+    # order.  `nothing` (the default) keeps the global `uDx`/`uDz` closure for
+    # that wall, which is the historical behaviour and bit-identical; a function
+    # `(x,y) -> Float64` prescribes the wall's normal *component* instead: `u_x`
+    # on an x-wall and `u_z` on a y-wall, in the positive coordinate direction,
+    # exactly the convention of the legacy closures (it is **not** the outward
+    # flux `u·n`).  The normal component is Dirichlet on every `:free` and
+    # `:rigid` wall either way; `wall_un` only refines its value, per wall
+    # (docs/dev/BC_DESIGN.md §3.4/§3.6, G258).
+    wall_un::NTuple{4,Union{Nothing,Function}}
     rho_heating::Bool     # add -T*H to the energy source (rho=(1-T) heating)
     rho_cp::Bool          # weight M and C by rho=1-T (ASPECT rho*cp LHS)
     tosi::Union{Nothing,TosiLaw}  # :tosi viscoplastic law (absolute units + eta0)
@@ -225,6 +235,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                 shear_modulus::Real=0.0,
                 wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
+                wall_un::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 div_penalty::Real=0.0,
                 eta_custom=nothing, eta_multiplier=nothing,
                 rho_multiplier=nothing,
@@ -276,6 +287,26 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                             "yminus, yplus)"))
     all(w -> w in (:same, :free, :rigid), wall_bc) ||
         throw(ArgumentError("wall_bc entries must be :same, :free or :rigid"))
+    # `wall_u` is a *tangential* value, so it exists only on a `:rigid` wall.
+    # On a `:free` wall the tangential component is traction-free (natural) and
+    # the value would be silently ignored -- the pre-G258 behaviour, corrected
+    # here because a silently ignored boundary value is worse than an error.
+    # The condition checked is the *resolved* one, so a `:same` entry follows
+    # `bc`; the solver repeats the check for direct library calls (G258 (e)).
+    _resolved_wall(i) = wall_bc[i] === :same ? bc : wall_bc[i]
+    _wall_names = ("xminus", "xplus", "yminus", "yplus")
+    for i in 1:4
+        if wall_u[i] !== nothing && _resolved_wall(i) !== :rigid
+            throw(ArgumentError("wall_u[$i] (wall $(_wall_names[i])) sets a " *
+                                "tangential velocity, but that wall resolves to " *
+                                ":$(_resolved_wall(i)) and a :free wall's " *
+                                "tangential component is traction-free, so the " *
+                                "value would be silently ignored.  Set " *
+                                "wall_bc[$i] = :rigid (or `bc = :rigid`) for a " *
+                                "wall whose tangential motion you prescribe, or " *
+                                "drop wall_u[$i]."))
+        end
+    end
     eta_soft >= 0 || throw(ArgumentError("eta_soft must be >= 0"))
     div_penalty >= 0 || throw(ArgumentError("div_penalty must be >= 0"))
     if eta_law === :expT
@@ -389,6 +420,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            Float64(eta_soft), Float64(div_penalty), eta_custom, eta_multiplier,
            rho_multiplier,
            Float64(shear_modulus), NTuple{4,Union{Nothing,Function}}(wall_u),
+           NTuple{4,Union{Nothing,Function}}(wall_un),
            rho_heating, rho_cp, tosi, Float64(Di),
            heating_adiabatic, heating_dissipation, refstate, rho_ref_weight,
            compress_p, Float64(compress_gamma),

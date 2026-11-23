@@ -242,6 +242,35 @@ net, not the expected path.
   `K`; an `assemble_only=:mg` call does not move it.  The mode requires
   `linear=:mg, mg_operator=:matrixfree` and is bitwise for every object it
   returns (docs/dev/MG.md, G220).
+
+**Boundary-condition keywords.** The two positional closures `uDx`/`uDz` are
+the historical global Dirichlet data: every wall's *normal* component is taken
+from `uDx` on an x-wall (`x = const`) and from `uDz` on a y-wall
+(`y = const`), and a `:rigid` wall takes its *tangential* component from the
+other closure.  The keywords refine that value per wall, in the order
+`(xminus, xplus, yminus, yplus)`:
+
+* `wall_bc` (`:same`/`:free`/`:rigid`) selects a wall's condition; `:same`
+  follows `bc`.  The normal component is Dirichlet on a `:free` and on a
+  `:rigid` wall, so it is always pinned.
+* `wall_u` is the wall's *tangential* velocity, and only exists on a `:rigid`
+  wall; a value on a (resolved) `:free` wall is an `ArgumentError`, because the
+  tangential component there is traction-free and the value would be silently
+  ignored (the pre-G258 behaviour).
+* `wall_un` is the wall's *normal* velocity: `u_x` on an x-wall and `u_z` on a
+  y-wall, in the positive coordinate direction -- the value of the wall's
+  normal component, exactly like the legacy closures, **not** the outward flux
+  `u·n`.  `nothing` falls back to the global closure for that wall, which
+  keeps the historical path bit-identical (G258).
+
+Because every wall keeps a Dirichlet normal component, the prescribed data must
+satisfy `∫∂Ω u·n dS = 0`.  An unbalanced configuration (e.g. a through-flow
+prescribed on one x-wall only) raises an `ArgumentError` that reports the
+measured net flux, instead of solving a discrete problem whose continuity
+equations are inconsistent.  A corner dof belongs to two walls and the walls
+are written in the order above, so a later wall owns the corner: in particular,
+a rigid top/bottom wall's tangential value overrides the side walls' normal
+value at its two corners (docs/dev/BC_DESIGN.md §1.4; G258 (d)).
 """
 function solve_semquad_stokes_var(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,

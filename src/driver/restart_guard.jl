@@ -10,6 +10,20 @@
 # of the entry point's body, which now only calls them.
 
 """
+    _wall_value_marker(t)
+
+Stable comparable marker for one per-wall tuple of function-or-`nothing`
+entries (`wall_u`, `wall_un`): one `"none"`/`"custom"` token per wall,
+comma-joined in the `(xminus, xplus, yminus, yplus)` order.  A function has no
+canonical value to compare, so -- exactly like `eta_multiplier` and
+`rho_multiplier` -- the guard records only *whether* a custom value is present,
+not which one: a restart that swaps one function for another is not detectable,
+and the docs state that limit.
+"""
+_wall_value_marker(t::NTuple{4,Union{Nothing,Function}}) =
+    join((e === nothing ? "none" : "custom" for e in t), ",")
+
+"""
     _run_config(pr; settings...)
 
 Build the `run_config` dictionary of one run: the canonical value of every
@@ -194,6 +208,15 @@ function _run_config(pr::Params;
     # default 1.0, which is the historical behaviour; a new checkpoint records it.
     run_config["eta_ref"] = pr.eta_ref
     run_config["wall_bc"] = join(string.(pr.wall_bc), ",")
+    # The wall *motion* is part of the trajectory.  `wall_u` was a pre-existing
+    # gap here (only `wall_bc` was recorded; BC_DESIGN.md §3.6 item 4) and
+    # `wall_un` is new with G258.  Both are per-wall tuples of functions, which
+    # cannot be serialised or compared, so each gets the
+    # `eta_multiplier`/`rho_multiplier` marker: `none`/`custom` per wall.  The
+    # guard tolerates keys an older checkpoint does not carry, so adding these
+    # does not invalidate historical files.
+    run_config["wall_u"] = _wall_value_marker(pr.wall_u)
+    run_config["wall_un"] = _wall_value_marker(pr.wall_un)
     run_config["latent_L"] = pr.latent_L
     run_config["latent_mode"] = pr.latent_mode
     run_config["latent_scheme"] = latent_scheme

@@ -131,9 +131,12 @@ end
     @test occursin("isfinite(G) && G >= 0.0", src)
     # forwarded into Params, which is where the driver reads it
     @test occursin("shear_modulus=SHEAR_MODULUS", src)
-    # printed in the header line, with its argument
+    # printed in the header line, with its argument (G258 appended the per-wall
+    # `wall_un=%s` argument after it, so the printf argument list no longer ends
+    # with `, SHEAR_MODULUS)`)
     @test occursin("shear_modulus=%.3g", src)
-    @test occursin(", SHEAR_MODULUS)", src)
+    @test occursin(", SHEAR_MODULUS,", src)
+    @test occursin("wall_un=%s", src)
     # the warning comment near the knob points at the regime change, with the
     # measured numbers of docs/dev/PHASE2.md and the report it points at
     @test occursin("WARNING", src)

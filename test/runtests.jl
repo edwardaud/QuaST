@@ -179,5 +179,6 @@ using QuaST
     include("t_g255_regime_report.jl")
     include("t_g256_physical_contrast.jl")
     include("t_g257_eta_ref.jl")
+    include("t_g258_per_wall_normal_velocity.jl")
 end
 

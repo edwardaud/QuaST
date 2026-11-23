@@ -82,8 +82,11 @@ using SparseArrays
     @test prdef.Di == 0.0 && prdef.latent_L == 0.0 && prdef.weak_f == 1.0
     @test prdef.wall_bc == (:same, :same, :same, :same)   # last struct field
     mfun = (x, y) -> 0.5 + 0.5 * x
+    # `bc=:rigid` because `wall_u` sets a *tangential* value and since G258 a
+    # value on a resolved `:free` wall is an error instead of a silent no-op
+    # (the yplus value below is the field this check is about).
     prm = Params(; eta_multiplier=(x, y) -> 2.0, rho_multiplier=mfun,
-                 shear_modulus=3.0,
+                 shear_modulus=3.0, bc=:rigid,
                  wall_u=(nothing, nothing, nothing, (x, y) -> 1.0),
                  rho_heating=true, rho_cp=true, Di=2.0, latent_L=0.1,
                  weak_f=0.3, weak_mode=:linear)
