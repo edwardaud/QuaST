@@ -92,23 +92,36 @@ end
     @test nita < 200
 
     # --- the guard's cost: one division + one comparison per cycle ----------
-    # A 200 us loop is dominated by scheduling noise, so both arms are warmed up
-    # and timed over enough repetitions that the guard's share is measurable
-    # rather than lost in a single run.  The 1.5x bound then says "the guard does
-    # not double the cost", which is the property worth pinning.
+    # The loop is microseconds long, so a single pair of @elapsed windows measures
+    # scheduling noise as much as the guard: run under a loaded suite, one arm can
+    # land in a busy window and the other in a quiet one, and the ratio then reflects
+    # the load schedule rather than the guard.  Both arms are therefore warmed up and
+    # then timed in *interleaved* rounds, and the comparison uses each arm's minimum
+    # (the standard noise-free timing estimator: the minimum is the run least
+    # disturbed by the scheduler).  The 1.5x bound still says "the guard does not
+    # double the cost", which is the property worth pinning.
     local tg, to
     for _ in 1:5
         QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200, restart=20,
                               stagnation=1.2)
         QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200, restart=20)
     end
-    tg = @elapsed for _ in 1:200
-        QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200,
+    rounds = 7
+    reps = 50
+    tg_all = Vector{Float64}(undef, rounds)
+    to_all = Vector{Float64}(undef, rounds)
+    for r in 1:rounds
+        tg_all[r] = @elapsed for _ in 1:reps
+            QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200,
                                   restart=20, stagnation=1.2)
-    end
-    to = @elapsed for _ in 1:200
-        QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200,
+        end
+        to_all[r] = @elapsed for _ in 1:reps
+            QuaST.gmres_restarted(applyH, bh; tol=1.0e-12, maxit=200,
                                   restart=20)
+        end
     end
+    tg = minimum(tg_all)
+    to = minimum(to_all)
+    @info "G203 guard cost" tg to ratio = tg / to
     @test tg < 1.5 * to
 end
