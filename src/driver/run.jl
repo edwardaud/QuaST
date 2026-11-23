@@ -1130,6 +1130,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # loop but read by the step diagnostics afterwards (a `while` body is its
     # own scope in Julia); only the opt-in `extdiag` diagnostic reads it.
     lat_theta_used = nothing
+    # The driver-owned snapshot of the solver/AMR out-parameter diagnostics
+    # (`run_diagnostics.jl`).  Every read of those diagnostics below goes
+    # through `diag`, and it is re-taken immediately after each producer call --
+    # never carried across one, because the producers overwrite the module Refs
+    # in place.
+    diag = RunDiagnostics()
 
     while step < maxsteps && t < tstop
         tp_step = profile_steps ? time_ns() : 0
@@ -1171,33 +1177,36 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             end
             pic_diag && (_SEMQUAD_ETA_CLAMP[] = 0; _SEMQUAD_ETA_CALLS[] = 0)
             solve_flow!(stokes_scaling=stokes_scaling)
+            # The solve wrote the `LAST_SEMSTOKES_*` out-parameters; snapshot
+            # them before the outcome block below reads them.
+            snapshot!(diag)
             if tprof !== nothing
                 tprof[1] += stokes_ns[] / 1.0e9
                 tprof[2] += work_ns[] / 1.0e9
             end
-            if isfinite(stokes_tol) && LAST_SEMSTOKES_RESIDUAL[] > stokes_tol
+            if isfinite(stokes_tol) && diag.residual > stokes_tol
                 # The direct path has already escalated its shift ladder and
                 # refined (src/stokes/, docs/dev/CASE_REALISTIC.md
                 # §13); this error is the last resort, so report the numbers that
                 # identify the state.  Written to *stderr*, the same unbuffered
                 # stream as the error, so it is adjacent to it in a redirected
                 # log (the stdout step records are block-buffered, §11.1).
-                sp = LAST_SEMSTOKES_RESID_SPLIT[]
+                sp = diag.resid_split
                 er = eta_probe[] === nothing ? nothing :
                      semquad_eta_range(sq, eta_probe[], pr)
                 @printf(stderr,
                         "[case] STOKES-FAIL step=%d res=%.6e (vel=%.3e div=%.3e) stokes_tol=%.1e shift=%.0e refine=%d leaves=%d N=%d saddle=%d eta=[%.3e,%.3e] eta_clip=%.3f%%\n",
-                        step, LAST_SEMSTOKES_RESIDUAL[], sp.vel, sp.div,
-                        stokes_tol, LAST_SEMSTOKES_SHIFT[],
-                        LAST_SEMSTOKES_REFINE_ITERS[], length(qt.leaves), sq.N,
+                        step, diag.residual, sp.vel, sp.div,
+                        stokes_tol, diag.shift,
+                        diag.refine_iters, length(qt.leaves), sq.N,
                         2 * sq.N + ss.sp.N,
                         er === nothing ? NaN : er.min,
                         er === nothing ? NaN : er.max,
                         er === nothing ? NaN : 100.0 * er.nclip / er.n)
-                lad = LAST_SEMSTOKES_LADDER[]
+                lad = diag.ladder
                 if lad !== nothing
                     @printf(stderr, "[case] STOKES-FAIL ladder: %s\n",
-                            join([r[1] === :refine ? @sprintf("refine:%d:%.3e", LAST_SEMSTOKES_REFINE_ITERS[], r[2]) :
+                            join([r[1] === :refine ? @sprintf("refine:%d:%.3e", diag.refine_iters, r[2]) :
                                    r[1] === :equilibrated ? @sprintf("equil:%.3e", r[2]) :
                                    @sprintf("%.0e:%.3e", r[1], r[2]) for r in lad], " "))
                 end
@@ -1209,19 +1218,19 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 # `:auto` when the selector made the choice.
                 fix = linear === :auto ?
                       "the solve auto-selected " *
-                      "$(LAST_SEMSTOKES_AUTO_CHOICE[].choice); pass " *
+                      "$(diag.auto_choice.choice); pass " *
                       "linear=:direct explicitly to force the direct shift ladder" :
                       linear === :mg ?
                       "raise mg_tol/mg_maxit or pass linear=:direct explicitly" :
                       "increase schur_maxiter or use linear=:direct"
-                error("Stokes residual $(LAST_SEMSTOKES_RESIDUAL[]) exceeds " *
+                error("Stokes residual $(diag.residual) exceeds " *
                       "stokes_tol=$stokes_tol at step $step; $fix (the direct " *
                       "shift ladder and its refinement already ran, " *
                       "docs/dev/CASE_REALISTIC.md §13)")
             end
             verbose && linear === :schur_cg &&
                 @printf("    Stokes res=%.2e nit=%d\n",
-                        LAST_SEMSTOKES_RESIDUAL[], LAST_SEMSTOKES_SCHUR_ITERS[])
+                        diag.residual, diag.schur_iters)
             if it == 1 && cfl > 0.0
                 # Update dt on the mesh and velocity of the current step.  This
                 # must happen here (not after the AMR block): the AMR block
@@ -1286,6 +1295,13 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                           chi=chi_iter, chi_n=chi,
                                           chi_nm1=chi_prev,
                                           verbose=verbose)
+                # The per-step Newton is the last solver-side call before the
+                # residual below is read; snapshot after it, so that read cannot
+                # depend on what the Newton did to the module Refs.  (Its own
+                # Stokes calls are `assemble_only=true` today and write no
+                # per-solve record, so this is normally the value `solve_flow!`
+                # left.)
+                snapshot!(diag)
                 newton_iters = nrs.iters
                 newton_res = nrs.res
                 if nrs.converged
@@ -1299,7 +1315,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                     step_clamp = pic_diag && _SEMQUAD_ETA_CALLS[] > 0 ?
                                  _SEMQUAD_ETA_CLAMP[] / _SEMQUAD_ETA_CALLS[] :
                                  NaN
-                    step_res = LAST_SEMSTOKES_RESIDUAL[]
+                    step_res = diag.residual
                     newton_done = true
                     break
                 end
@@ -1366,7 +1382,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             # started from (the eta field is the one `solve_flow!` assembled).
             step_clamp = pic_diag && _SEMQUAD_ETA_CALLS[] > 0 ?
                          _SEMQUAD_ETA_CLAMP[] / _SEMQUAD_ETA_CALLS[] : NaN
-            step_res = LAST_SEMSTOKES_RESIDUAL[]
+            step_res = diag.residual
             if pic_div_window > 0 &&
                picard_diverging(pic_changes; window=pic_div_window,
                                 factor=pic_div_factor)
@@ -1503,14 +1519,14 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         end
 
         tp = profile_steps ? time_ns() : 0
-        diag = _step_diagnostics(sq, qt, pr, theta, theta_prev, theta_nm1_used,
-                                 ux, uz, dt, dt_prev, step, t, ev_field, phases,
-                                 advection, eta_for_energy, W_last, U_last,
-                                 bal_last; extdiag=extdiag, nu_cbf=nu_cbf,
-                                 lat_theta_used=lat_theta_used)
-        row = diag.row
-        Nut = diag.Nut; Nub = diag.Nub; Vr = diag.Vr
-        Ta = diag.Ta; closure = diag.closure
+        stepdiag = _step_diagnostics(sq, qt, pr, theta, theta_prev, theta_nm1_used,
+                                     ux, uz, dt, dt_prev, step, t, ev_field, phases,
+                                     advection, eta_for_energy, W_last, U_last,
+                                     bal_last; extdiag=extdiag, nu_cbf=nu_cbf,
+                                     lat_theta_used=lat_theta_used)
+        row = stepdiag.row
+        Nut = stepdiag.Nut; Nub = stepdiag.Nub; Vr = stepdiag.Vr
+        Ta = stepdiag.Ta; closure = stepdiag.closure
         push!(hist, row)
         tprof !== nothing && (tprof[4] += (time_ns() - tp) / 1.0e9)
         verbose && @printf("  step %4d t=%.3e dt=%.2e Nu=%.5f/%.5f Vrms=%.4e N=%d leaves=%d closure=%.3e\n",
@@ -1553,6 +1569,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 # cycle -- G234 pins a real `amr_every=1` velocity cycle).
                 ux=ux, uz=uz,
                 indicator=amr_indicator)
+            # The pass wrote `LAST_AMR_STATS` and `LAST_AMR_BALANCED`; snapshot
+            # them before the verbose print below reads them.
+            snapshot!(diag)
             sq = ss.su
             # The weakening field lives on the scalar space, so it follows the
             # same transfer as theta (no wall Dirichlet data: `zero_walls=false`).
@@ -1587,11 +1606,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             tprof !== nothing && (tprof[5] += (time_ns() - tp) / 1.0e9)
             verbose && @printf("    AMR: N=%d leaves=%d maxjump=%d refined=%d coarsened=%d merged=%d\n",
                                sq.N, length(qt.leaves), max_face_level_jump(qt), nr,
-                               LAST_AMR_STATS[].coarsened, LAST_AMR_STATS[].merged)
+                               diag.amr_stats.coarsened, diag.amr_stats.merged)
             if verbose
                 # Balanced-cycle diagnostics (docs/dev/AMR.md §4.1/§4):
                 # the recirculation counter and the coarsening-gate ledger.
-                d = LAST_AMR_BALANCED[]
+                d = diag.amr_balanced
                 @printf("      balanced: gate_refused=%d extended=%d recirc=%d post=%+d tau_h=%.3e eligible=%d\n",
                         d.gate_refused, d.gate_extended, d.recirc, d.post,
                         d.tau_h, d.eligible)
@@ -1659,6 +1678,10 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     final_velocity_stale = velocity_stale
     if velocity_stale && step > 0
         solve_flow!(stokes_scaling=stokes_scaling)
+        # Keep the invariant that every `solve_flow!` is followed by a fresh
+        # snapshot even though this stage's driver reads no diagnostic after
+        # this solve (the `RunState` follow-up will).
+        snapshot!(diag)
     end
 
     # G257: the eta_ref convention, once more at the end of the run, on the

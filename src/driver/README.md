@@ -23,4 +23,5 @@ only composes them.
 | `strain_rate.jl` | The nodal strain-rate and spin fields of the SEM velocity. |
 | `restart_guard.jl` | The `run_config` builder and the restart guard of `run_semquad_simulation`. |
 | `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. |
+| `run_diagnostics.jl` | The driver-owned snapshot of the solver and AMR diagnostic out-parameters. |
 | `step_newton.jl` | Globalization of the per-time-step nonlinear solve. |

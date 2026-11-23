@@ -130,6 +130,10 @@ include("driver/eta_ref_report.jl")
 # every other driver call, so they can be included just before the entry point.
 include("driver/restart_guard.jl")
 include("driver/diagnostics_row.jl")
+# Stage 1 of the `RunState` refactor: the driver-owned snapshot of the
+# solver/AMR diagnostic out-parameters.  It names only the value types of the
+# Refs defined in `stokes/` and `amr/` above.
+include("driver/run_diagnostics.jl")
 include("driver/run.jl")
 include("driver/mass.jl")
 
