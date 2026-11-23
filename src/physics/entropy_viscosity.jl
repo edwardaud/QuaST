@@ -178,11 +178,11 @@ end
     semquad_ev_field(sq, qt, pr, theta, ux, uz; dt, ev, ev_cmax, ev_alpha, ev_timestep)
 
 Elementwise entropy-viscosity field (one value per leaf, in `sq.leaves` order)
-exactly as `semquad_steady_parts` computes it: `theta_prev = theta` and
+exactly as the steady operator of the energy step computes it: `theta_prev = theta` and
 `dt_ratio = 0`, i.e. the steady form of the residual.  Exposed so the Newton
 JVP can differentiate the field (the EV tangent, `ev_tangent=true`).
 
-`semquad_steady_parts` fills the same values through
+the energy step fills the same values through
 `assemble_semquad_energy(...; ev_out=...)`; this routine is the standalone
 version used for finite differences.
 """

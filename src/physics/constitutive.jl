@@ -77,7 +77,7 @@ end
     deta_dT_at(T, z, pr)
 
 Derivative `d eta / d T` of the temperature-dependent viscosity laws, used by
-the analytic tangent-linear Newton map (`semquad_newton.jl`).  The hard/smooth
+the analytic tangent-linear Newton map (`driver/step_newton.jl`).  The hard/smooth
 viscosity bounds are not differentiated: at a bound the derivative is returned
 as zero, which is the correct one-sided value for a hard clamp (and a deliberate
 approximation for the smooth floor).  `:tosi` is rejected because its viscosity

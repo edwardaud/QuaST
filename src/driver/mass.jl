@@ -29,7 +29,7 @@ perturbation whose evaluator is `th_at(x, y)`, with the density hook
 `(x, y) -> Ra * theta(x, y)` and never evaluates a multiplier, so every path
 that used it is bit-identical to the pre-hook code.  A uniform multiplier `c`
 therefore gives exactly the same load as `Ra -> Ra*c`, which is the identity the
-gate asserts.  This is the *Boussinesq* form used by the steady/Newton paths,
+gate asserts.  This is the *Boussinesq* form used by the transient driver,
 which carry no reference state (`Ra * theta`; see `run.jl` for the TALA/ALA
 `rho(y) alpha(y) theta` form).
 """

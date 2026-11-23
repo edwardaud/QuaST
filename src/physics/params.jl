@@ -74,7 +74,7 @@ field range, the interior Rayleigh number, and -- when the card supplies its
 scale set -- the physical reference viscosity in Pa s) once at the first flow
 solve and once at the end of the run, whenever `eta_ref != 1`.  The default
 1.0 logs nothing.  The normalisation belongs to the Picard time-stepping path
-only: `pic_mode = :newton` and `steady_newton` build their viscosity from the
+only: `pic_mode = :newton` builds its viscosity from the
 raw law and therefore **refuse** `eta_ref != 1` rather than solve a different
 problem silently.
 """

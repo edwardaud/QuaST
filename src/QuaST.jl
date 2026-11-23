@@ -112,18 +112,15 @@ include("mg/saddle.jl")
 include("mg/s1solve.jl")
 include("mg/gmres.jl")
 
-# -- AMR hooks and the driver (the time loop and the steady/Newton paths) ----
+# -- AMR hooks and the driver (the time loop and the per-step Newton path) ---
 include("amr/wall_refine.jl")
 include("amr/amr_pass.jl")
 include("amr/hooks.jl")
 include("driver/strain_rate.jl")
 include("driver/picard_control.jl")
 include("driver/picard.jl")
-include("driver/newton.jl")
+include("driver/newton_tangent.jl")
 include("driver/step_newton.jl")
-include("driver/tosi_steady.jl")
-include("driver/dp_steady.jl")
-include("driver/steady_entry.jl")
 include("driver/maxwell_state.jl")
 include("driver/maxwell_reports.jl")
 include("driver/eta_ref_report.jl")
@@ -175,12 +172,8 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        semquad_base_T, semquad_base_laplacian, SemRefProfile, semquad_rho, semquad_alpha,
        semquad_cp, semquad_drho_dz, mass_drho_fun, theta_buoyancy_load,
        buoyancy_mass_matrix, semquad_cbf_theta_flux, semquad_nu_cbf,
-       semquad_phase_buoyancy, semquad_newton_steady, semquad_steady_step,
-       semquad_steady_jv, semquad_steady_parts, semquad_ev_field, semquad_tosi_newton,
-       semquad_tosi_inner, semquad_step_newton, semquad_tosi_steady_step,
-       semquad_tosi_steady_jv, semquad_dp_inner, semquad_dp_steady_step,
-       semquad_dp_steady_jv, semquad_dp_stokes_newton, semquad_dp_newton,
-       semquad_dp_deta_T, semquad_steady_newton, yield_active, semquad_yield_stress,
+       semquad_phase_buoyancy, semquad_ev_field, semquad_step_newton,
+       semquad_dp_deta_T, yield_active, semquad_yield_stress,
        semquad_strain_rate_at, weak_active, semquad_weak_factor, semquad_yield_cohesion,
        weak_zone_factor,
        maxwell_stress_step, maxwell_stress_exact, maxwell_force_stress,

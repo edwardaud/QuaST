@@ -49,9 +49,8 @@
 #       is the printed precision), including `eta_0` in Pa s from the card's
 #       scale set, and the stated interior-band definition (the middle half of
 #       the layer).  `eta_ref = 1` emits no report at all;
-#   (e) the paths that do not apply the normalisation refuse the combination
-#       instead of silently solving a different problem: `pic_mode = :newton` and
-#       the `steady_newton` hand-off.
+#   (e) the path that does not apply the normalisation refuses the combination
+#       instead of silently solving a different problem: `pic_mode = :newton`.
 #
 # The helper functions and constants are at file scope (not inside the testset):
 # G255 documents why a closure inside a `@testset` is the wrong shape for
@@ -420,16 +419,8 @@ const G257_REF_UZ = [0.0, 0.0, 0.0, 9.499488123024632, 5.299472576614657, -2.099
     @test err isa ArgumentError
     @test occursin("eta_ref", err.msg)
     @test occursin("newton", lowercase(err.msg))
-    err2 = try
-        run_semquad_simulation(qt, pr_n, th0; p=2, maxsteps=1,
-                               linear=:direct, steady_newton=:auto)
-        nothing
-    catch e
-        e
-    end
-    @test err2 isa ArgumentError
-    @test occursin("eta_ref", err2.msg)
-    @test occursin("steady_newton", err2.msg)
+    # The steady-state hand-off was removed with the steady solver; the Newton
+    # per-step path is the only remaining one that bypasses the normalisation.
     # a malformed scale set is rejected before any work
     @test_throws ArgumentError run_semquad_simulation(qt, pr_n, th0; maxsteps=1,
         linear=:direct,

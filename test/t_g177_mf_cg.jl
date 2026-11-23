@@ -189,22 +189,4 @@ end
     @info "G177 wall tree" leaves = length(qtw.leaves) outer = itw inner_cg = cgw true_res =
         resw du = norm(uwM - uwD) / norm(uwD)
 
-    # ---- the Newton MG saddle exposes mg_operator too --------------------
-    pr = Params(Ra=1.0e4, H=0.0, eta_law=:expTz, eta_b=log(10.0),
-                eta_c=log(2.0), Twall_top=0.0, Twall_bot=1.0, bc=:free)
-    qtn = _g177_uniform(3)
-    ssn = make_semstokes(qtn, 2)
-    th = [0.05 * sin(pi * x / qtn.Lx) * sin(pi * y) for (x, y) in ssn.su.coords]
-    for (i, (x, y)) in enumerate(ssn.su.coords)
-        (y <= 1.0e-14 || y >= 1.0 - 1.0e-14) && (th[i] = 0.0)
-    end
-    step_d = semquad_steady_step(make_semquad(qtn, 2), qtn, ssn, pr, th;
-                                 linear=:direct)
-    step_m = semquad_steady_step(make_semquad(qtn, 2), qtn, ssn, pr, th;
-                                 linear=:mg)
-    # The Newton JVP is solved to 1e-8, so the MG saddle and the direct one
-    # agree to that level, not to round-off.
-    @test norm(step_m.u - step_d.u) / norm(step_d.u) < 1.0e-6
-    @test norm(step_m.theta - step_d.theta) / norm(step_d.theta) < 1.0e-6
-    @info "G177 newton saddle" du = norm(step_m.u - step_d.u) / norm(step_d.u)
 end

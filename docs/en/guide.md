@@ -291,7 +291,7 @@ and the flow solve uses `eta_law/eta_ref` wherever the material law's viscosity 
 
 The convention is only consistent when a rescaled law is paired with the same rescaling of `eta_ref`. Multiplying `comp_Ad` and `comp_As` by `1/c` multiplies every viscosity the law returns by `c`; with `eta_ref = c` the flow is unchanged, because the ratio `eta/eta_ref` is unchanged, while with `eta_ref = 1` the same `Ra` describes a different physical Rayleigh number. The bounds are absolute: `eta_min` and `eta_max` are in the law's units and are applied before the normalization, so a law rescaled by `c` needs its bounds rescaled by `c` as well. The default `1.0` leaves every existing run bit-identical.
 
-When `eta_ref != 1` the driver reports the convention, once at the first flow solve and once at the end of the run. The report gives `Ra`, `eta_ref`, the range and contrast of the normalized field `eta/eta_ref`, `eta_interior` (the arithmetic volume mean of `eta/eta_ref` over the interior band `0.25 <= z <= 0.75`, both wall layers excluded), `Ra_interior = Ra/eta_interior`, and, when the card supplies its scale set, `eta_0` in Pa s. `pic_mode = :newton` and `steady_newton` build viscosity from the raw law, so they refuse `eta_ref != 1` rather than solve a different problem silently.
+When `eta_ref != 1` the driver reports the convention, once at the first flow solve and once at the end of the run. The report gives `Ra`, `eta_ref`, the range and contrast of the normalized field `eta/eta_ref`, `eta_interior` (the arithmetic volume mean of `eta/eta_ref` over the interior band `0.25 <= z <= 0.75`, both wall layers excluded), `Ra_interior = Ra/eta_interior`, and, when the card supplies its scale set, `eta_0` in Pa s. `pic_mode = :newton` builds its viscosity from the raw law, so it refuses `eta_ref != 1` rather than solve a different problem silently.
 
 The production card's default is `eta_ref = 1`, but its material law varies by orders of magnitude across the box, so the interior Rayleigh number is far above the nominal one. The report prints only for `eta_ref != 1`; the convention's numbers at the card's developed state are `eta_interior = 4.280635e-3`, `Ra_interior = 2.336102e7` and `eta_0 = 2.368635e23 Pa s`, the physical viscosity that `Ra` is defined with, which puts the physical interior viscosity at `1.013926e21 Pa s`. At the calibration's hot interior point (`T = 1.75`, `edot_ref`) the same convention gives `Ra = 7.84e7` and a viscosity of `3.02e20 Pa s`. The label `Ra = 1e5` therefore describes the calibration point, not the interior: quote both.
 
@@ -541,9 +541,8 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `checkpoint_path`, `checkpoint_every` | `""`, 0 | mode dependent (`spinup.h5`, `short.h5`, `frozen.h5`, `resume.h5`), 200 | Where and how often to checkpoint. |
 | `checkpoint_meta`, `callback`, `verbose`, `profile_steps` | empty, `nothing`, false, false | case metadata, frame writer, true, false | Checkpoint metadata, step hook, per-step lines, per-step timing. |
 | `pic_diag`, `extdiag` | false, false | false, `CASE_EXTDIAG` | Nonlinear diagnostics, and the `resid_A` history column. |
-| `steady_newton` | `:none` | `:none` | Optional steady Newton solve on the final state; `:auto`, `:map`, `:tosi` or `:dp`. |
 
-The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `ss`, `ux`, `uz`, `pv`, `avg`, `steady`, `weak`, `chi` and `chi_prev`. `history` holds one row per step actually run, with the columns of section 6.2, and `history_extra` names the columns appended after the fixed 18.
+The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `ss`, `ux`, `uz`, `pv`, `avg`, `weak`, `chi` and `chi_prev`. `history` holds one row per step actually run, with the columns of section 6.2, and `history_extra` names the columns appended after the fixed 18.
 
 ### 5.3 The `Params` card
 

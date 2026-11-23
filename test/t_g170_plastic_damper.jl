@@ -63,34 +63,11 @@ using Test, QuaST, LinearAlgebra, Printf
         @test abs(semquad_deta_dp(T, y, e, p, prd) - fd_p) <=
               1.0e-5 * max(abs(fd_p), 1.0e-12)
     end
+    # The former section (c) drove the DP Stokes Newton from a cold start to
+    # show the damper is what makes that solver converge.  The Newton was
+    # removed with the steady-state solver, so the convergence claim has no
+    # subject; the derivative checks above are the physics it depended on.
     # the damper gives the yielded branch a T dependence of its own
     @test semquad_dp_deta_T(0.4, 0.3, 50.0, 3.0, pr0) == 0.0
     @test semquad_dp_deta_T(0.4, 0.3, 50.0, 3.0, prd) != 0.0
-    # ---- (c) cold start of the DP Stokes Newton ----
-    qt = Quadtree(2; cells_x=3, cells_y=3)
-    for _ in 1:2, lf in collect(qt.leaves)
-        refine!(qt, lf)
-    end
-    balance!(qt)
-    ss = make_semstokes(qt, 2)
-    sq = ss.su
-    th = [0.1 * cospi(x) * sinpi(y) for (x, y) in sq.coords]
-    for (i, (x, y)) in enumerate(sq.coords)
-        (y <= 1.0e-12 || y >= 1.0 - 1.0e-12) && (th[i] = 0.0)
-    end
-    s0 = semquad_dp_stokes_newton(sq, qt, ss, pr0, th; tol=1.0e-8, maxit=12)
-    sd = semquad_dp_stokes_newton(sq, qt, ss, prd, th; tol=1.0e-8, maxit=12)
-    v0 = semquad_vrms(sq, qt, s0.u[1:sq.N], s0.u[(sq.N + 1):(2sq.N)])
-    vd = semquad_vrms(sq, qt, sd.u[1:sq.N], sd.u[(sq.N + 1):(2sq.N)])
-    @printf("G170: cold start no damper: conv=%s it=%d resid=%.1e Vrms=%.1e\n",
-            s0.converged, s0.iters, s0.resid, v0)
-    @printf("G170: cold start damper:    conv=%s it=%d resid=%.1e Vrms=%.1e\n",
-            sd.converged, sd.iters, sd.resid, vd)
-    @test sd.converged
-    @test sd.iters <= 10
-    @test sd.resid < 1.0e-8
-    @test 10.0 < vd < 1.0e4
-    # without the damper the same cold start does not reach the tolerance
-    @test !s0.converged
-    @test s0.resid > 1.0e-3
 end

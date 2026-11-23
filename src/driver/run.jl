@@ -216,7 +216,7 @@ defined with -- and the physical interior viscosity.  The report is diagnostic
 only (it measures the closure the solve used; no arithmetic result depends on
 it), and with `eta_ref = 1.0` it logs nothing, so the historical runs stay
 bit-identical.  The normalisation is applied by the Picard time-stepping path
-only: `pic_mode = :newton` and `steady_newton` build their viscosity from the raw
+
 law and refuse `eta_ref != 1` instead of solving a different problem silently.
 Returns a named tuple with the final state and history rows
 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, nleaves]` (plus the opt-in columns
@@ -334,7 +334,6 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 checkpoint_path::String="",
                                 checkpoint_every::Int=0,
                                 checkpoint_meta::AbstractDict=Dict{String,Any}(),
-                                steady_newton::Symbol=:none,
                                 verbose::Bool=false)
     pr.eta_law in (:expT, :expTz, :arrhenius, :tosi, :composite) ||
         throw(ArgumentError("run_semquad_simulation requires eta_law=:expT, " *
@@ -399,8 +398,6 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # zone, or any other multiplicative modification of the law).  A run that asks
     # for both would therefore solve a *different* viscosity than the Picard path
     # with the same card -- a wrong answer with no error.  Refuse instead.  The
-    # steady-state Newton entry points have the same gap; they are not reachable
-    # from here and are out of scope.
     (pic_mode !== :newton || pr.eta_multiplier === nothing) ||
         throw(ArgumentError("pic_mode=:newton does not apply Params.eta_multiplier " *
                             "(the per-step Newton builds its viscosity from the raw " *
@@ -417,15 +414,6 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                             "a run with both would differ from the Picard path " *
                             "with the same card.  Use pic_mode=:picard, or set " *
                             "eta_ref = 1.0."))
-    # The steady-state hand-off at the end of the run has the same gap: the
-    # steady Newton entry points do not apply `Params.eta_ref` (that path is out
-    # of scope and untouched).  Refuse instead of solving a different problem.
-    (steady_newton === :none || pr.eta_ref == 1.0) ||
-        throw(ArgumentError("steady_newton=$(steady_newton) does not apply " *
-                            "Params.eta_ref: the steady-state entry points build " *
-                            "their viscosity from the raw law.  Set eta_ref = " *
-                            "1.0, or run the time-stepping path without the " *
-                            "steady hand-off."))
     latent_scheme in (:implicit, :lagged) ||
         throw(ArgumentError("latent_scheme must be :implicit or :lagged"))
     0.0 <= weak_chi0 <= 1.0 ||
@@ -1127,8 +1115,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # Fresh `:auto` bookkeeping for this run.  `LAST_SEMSTOKES_AUTO_CHOICE` is a
     # process-global Ref, and a run that performs no Stokes solve (maxsteps=0)
     # would otherwise leave a *previous* run's `:mg` decision visible to the
-    # `steady_newton` hand-off below and to the caller's logging.  `:none` means
-    # "no auto solve happened in this run", which the steady entry maps to
+    # caller's logging.  `:none` means
+    # "no auto solve happened in this run", which the caller maps to
     # `:direct`; the first real solve overwrites it with its own decision.
     linear === :auto &&
         (LAST_SEMSTOKES_AUTO_CHOICE[] = _SEMSTOKES_AUTO_CHOICE_NONE)
@@ -1724,27 +1712,6 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                        Nu_bot_std=sqrt(max(avg_sub2 / avg_n - (avg_sub / avg_n)^2, 0.0)),
                        Vrms_std=sqrt(max(avg_sv2 / avg_n - (avg_sv / avg_n)^2, 0.0)),
                        meanT_std=sqrt(max(avg_st2 / avg_n - (avg_st / avg_n)^2, 0.0))) : nothing
-    # Optional steady Newton on the final state.  `run_semquad_simulation`
-    # always time-steps; `steady_newton=:auto|:map|:tosi|:dp` additionally calls
-    # `semquad_steady_newton` on the returned state (the DP/Tosi variants need a
-    # developed theta, which the time loop provides).  The default `:none`
-    # leaves the historical behaviour bit-identical.
-    steady = nothing
-    if steady_newton !== :none
-        # Steady Newton's inner solvers accept `:direct`/`:mg` only; an
-        # `:auto` driver (the default since 2026-11-13) hands them the path its
-        # last Stokes solve resolved to.  The record is reset at run start, so
-        # `:none` here means no solve ran in this run and `:direct` is the
-        # fallback that keeps the historical behaviour.
-        steady_linear = linear
-        if steady_linear === :auto
-            c = LAST_SEMSTOKES_AUTO_CHOICE[].choice
-            steady_linear = c === :mg ? :mg : :direct
-        end
-        steady = semquad_steady_newton(ss.su, qt, ss, pr, theta;
-                                       kind=steady_newton, dt=dt,
-                                       advection=advection, linear=steady_linear)
-    end
     # Names of the columns that were appended after the 18 base ones, in row
     # order, so a writer can emit a header without duplicating the conditions
     # (examples/case_realistic_2d.jl).  The default run has none.
@@ -1754,7 +1721,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     extdiag && push!(hist_extra, "resid_A")
     return (theta=theta, t=t, steps=step, history=hist, history_extra=hist_extra,
             qt=qt, ss=ss,
-            ux=ux, uz=uz, pv=pv, avg=avg, steady=steady,
+            ux=ux, uz=uz, pv=pv, avg=avg,
             weak=weak, chi=chi, chi_prev=chi_prev,
             # Maxwell stress history (2b): `nothing` unless
             # `shear_modulus > 0`.  Advanced once per step and, with
