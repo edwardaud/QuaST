@@ -62,22 +62,6 @@ function _mirror_container(qt::Quadtree, lf::NTuple{3,Int})
     return node
 end
 
-"""The 2:1 test for one leaf (a face neighbor two levels finer).  Reads the flat
-table; the historical scan is the fallback for a key that is not a leaf."""
-function _needs_refine_21(qt::Quadtree, leaf::NTuple{3,Int})
-    id = _table_leaf_id!(qt, leaf)
-    if id == Int32(0)
-        for dir in FACE_DIRS
-            for nb in _neighbors_scan(qt, leaf, dir)
-                nb[1] >= leaf[1] + 2 && return true
-            end
-        end
-        return false
-    end
-    tab = _table_ready!(qt, id)
-    return _leaf21(tab, id)
-end
-
 """
     _mirror_protect(qt, protect)
 
