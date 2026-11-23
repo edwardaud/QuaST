@@ -58,8 +58,8 @@ include("amr/leaf_ops.jl")
 include("amr/indicator.jl")
 # A diagnostic product (the entropy-viscosity field), but the energy assembly
 # annotates its `evg` argument with `SEMEVGlobals`, so it must come first.
-include("diagnostics/entropy_viscosity.jl")
 include("physics/latent.jl")
+include("physics/entropy_viscosity.jl")
 include("physics/energy_assembly.jl")
 include("physics/energy.jl")
 include("physics/eta_weak_zone.jl")

@@ -13,6 +13,7 @@ those belong here.
 | `constitutive.jl` | Viscosity bounds and the `:expT`, `:expTz`, `:arrhenius` and `:composite` laws. |
 | `energy.jl` | The BDF2 energy step on the quadtree mesh and its wall-flux condition. |
 | `energy_assembly.jl` | Per-block buffers for the threaded energy assembly. |
+| `entropy_viscosity.jl` | Entropy viscosity on the quadtree (ASPECT port), including the recorded field. |
 | `eta.jl` | The visco-plastic branch: yield stress, plastic viscosity and the strain-rate field. |
 | `eta_laws.jl` | The `semquad_eta_at` viscosity closures and their analytic derivatives. |
 | `eta_plastic.jl` | The Drucker-Prager branch and the strain-rate helpers it needs. |

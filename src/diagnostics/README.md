@@ -8,6 +8,5 @@ uses on the adaptive mesh. They read a solved state; none of them changes it.
 
 | File | What it is |
 |---|---|
-| `entropy_viscosity.jl` | Entropy viscosity on the quadtree (ASPECT port), including the recorded field. |
 | `flux.jl` | Consistent boundary flux for the temperature equation and `semquad_nu_cbf`. |
 | `global.jl` | Wall Nusselt, Vrms, mean T and the energy Nusselt number. |
