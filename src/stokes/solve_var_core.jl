@@ -16,7 +16,7 @@ _wall_index(dir::Symbol) = dir === :xminus ? 1 :
                            dir === :yminus ? 3 : 4
 
 """
-    _semquad_wall_normal_flux(ss, qt, fixed, fd, n, nu) -> (flux, umax)
+    _semquad_wall_normal_flux(ss, fixed, fd, n, nu, bmask) -> (flux, umax)
 
 Net boundary flux `∫∂Ω u·n dS` of the prescribed normal Dirichlet data, in the
 **outward-normal** convention (negative on `xminus`/`yminus`, positive on
@@ -29,19 +29,23 @@ using the final dict is deliberate, because the wall write order
 `(xminus, xplus, yminus, yplus)` lets a later rigid y-wall's *tangential* value
 overwrite the x-wall's normal one at the corner, and that is the data the solve
 actually imposes (docs/dev/BC_DESIGN.md §1.4).  The pass is serial and runs
-after the fixed-dof loop, so it changes no assembly order.
+after the fixed-dof loop, so it changes no assembly order; `bmask` is the
+precomputed serial boundary mask (`_semquad_boundary_face_mask`), so this pass
+never queries the quadtree neighbour table either.
 """
-function _semquad_wall_normal_flux(ss::SemStokes, qt::Quadtree,
+function _semquad_wall_normal_flux(ss::SemStokes,
                                    fixed::Dict{Int,Float64}, fd::FEData,
-                                   n::Int, nu::Int)
+                                   n::Int, nu::Int, bmask::Vector{UInt8})
     su = ss.su
     flux = 0.0
     umax = 0.0
-    for lf in su.leaves
+    for it in eachindex(su.leaves)
+        lf = su.leaves[it]
         hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
         uids = su.elem[lf]
+        b = 4 * (it - 1)
         for dir in (:xminus, :xplus, :yminus, :yplus)
-            has_no_face_neighbor(qt, lf, dir) || continue
+            bmask[b + _wall_index(dir)] != 0x00 || continue
             if dir === :xminus || dir === :xplus
                 iF = dir === :xminus ? 1 : n
                 sgn = dir === :xplus ? 1.0 : -1.0
@@ -106,6 +110,22 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same),
                                   wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                                   wall_un::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
+                                  # BC stage 2: per-wall tangential *traction*,
+                                  # in the same `(xminus, xplus, yminus, yplus)`
+                                  # order; `nothing` = zero (no load).  The
+                                  # value is the global traction component in
+                                  # the positive coordinate direction (`t_z` on
+                                  # an x-wall, `t_x` on a y-wall) and it is a
+                                  # data term on the free side, so it needs a
+                                  # wall with a free tangential component
+                                  # (`:free`; `:open` in stage 3).
+                                  wall_t::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
+                                  # BC stage 2 placeholder: the *normal*
+                                  # traction is stage 3 (it needs `:open` walls,
+                                  # a free normal velocity and the derived
+                                  # pressure gauge).  Any non-empty entry is
+                                  # refused by `_semquad_refuse_wall_normal_traction`.
+                                  wall_tn::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                                   stokes_accept_tol::Float64=Inf,
                                   stokes_lost_tol::Float64=SEMSTOKES_LOST_TOL,
                                   stokes_scaling::Symbol=:none,
@@ -153,8 +173,13 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # same configuration, but a direct library call bypasses it -- hence the
     # duplicate check here.  `wall_un` needs no such check: the normal component
     # is Dirichlet on every `:free`/`:rigid` wall.
+    #
+    # The *resolved* wall tuple (`:same` -> `bc`) is built once and reused by the
+    # fixed-dof loop, the traction validation and the load pass; the resolution
+    # is pure, so every legacy `fixed` dict is unchanged.
+    resolved_wall_bc = ntuple(i -> wall_bc[i] === :same ? bc : wall_bc[i], 4)
     for i in 1:4
-        wbc = wall_bc[i] === :same ? bc : wall_bc[i]
+        wbc = resolved_wall_bc[i]
         wall_u[i] === nothing || wbc === :rigid ||
             throw(ArgumentError("wall_u[$i] sets the tangential velocity of a " *
                                 "wall that resolves to :$wbc; only a :rigid wall " *
@@ -163,6 +188,14 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                 "wall_bc[$i] = :rigid (or `bc = :rigid`), or " *
                                 "drop wall_u[$i]."))
     end
+    # Stage 2 (G259/G260): `wall_t` is a tangential *traction*, i.e. a data term
+    # on the free side, so its wall's tangential component must be free (`:free`;
+    # stage 3 adds `:open`).  On a `:rigid` wall the tangential component is
+    # Dirichlet and `Cu'` would drop the assembled load: a silent no-op, refused
+    # here and in `Params`.  `wall_tn` (normal traction) is stage 3 and is
+    # refused explicitly rather than ignored.
+    _semquad_refuse_wall_normal_traction(wall_tn)
+    _semquad_validate_wall_traction(wall_t, resolved_wall_bc)
     stokes_scaling in SEMSTOKES_SCALINGS ||
         throw(ArgumentError("stokes_scaling must be :none or :equilibrated"))
     (geo_u === nothing) == (geo_coef === nothing) ||
@@ -373,6 +406,13 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
               (assemble_only === false || kfree) &&
               !return_system && geo_u === nothing && dp_u === nothing
     pleaves = Set(sp.leaves)
+    # BC stage 2: the domain-boundary flag of every leaf face, precomputed
+    # **serially** (the quadtree neighbour table is not thread-safe and must not
+    # be queried from the threaded leaf assembly).  The fixed-dof loop, the
+    # net-flux check and the traction load pass all read this mask instead of
+    # asking `has_no_face_neighbor`, which is exactly the same per-face boolean
+    # they asked for before, so no quantity changes (G259/G260).
+    bmask = _semquad_boundary_face_mask(qt, su)
     # Deviatoric stress 2 eta (eps - (1/3) div(u) I): the volumetric part of
     # 2 eta eps:eps(v) loses 2/3 eta div(u) div(v).  ASPECT's ALA always uses
     # this form (manual eq. 20); without it a compressible (div u = Di u_z)
@@ -395,6 +435,17 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     IG = asm.IG; JG = asm.JG; VG = asm.VG
     IP = asm.IP; JP = asm.JP; VP = asm.VP
     fv = asm.fv
+    # BC stage 2: prescribed tangential traction.  RHS only: the load is added
+    # to the **unreduced** `fv` (never to `fr`, and never to `u0`, which is
+    # Dirichlet data) so that `fr = Cu' (fv - K u0 + Bm' p0)` below is the exact
+    # virtual work on the admissible test space; `Cu'` redistributes a loaded
+    # hanging-master node and drops a loaded Dirichlet dof, which is the
+    # weak-form restriction (docs/dev/BC_DESIGN.md §3.2/§3.3).  With every
+    # `wall_t` entry `nothing` this call returns before touching `fv`, which is
+    # what keeps the default path bit-identical (G260).  The pass runs after the
+    # threaded leaf assembly and touches no operator (`K`, `Kred`, `B`, the
+    # matrix-free path and the multigrid hierarchy never see it).
+    _semquad_boundary_traction!(fv, su, bmask, fd, wall_t, resolved_wall_bc)
 
     if mf_path
         K = nothing
@@ -437,16 +488,18 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
 
     # affine Dirichlet data on the domain boundary
     fixed = Dict{Int,Float64}()
-    for lf in su.leaves
+    for it in eachindex(su.leaves)
+        lf = su.leaves[it]
         hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
         x0 = lf[2] * hx; y0 = lf[3] * hy
         uids = su.elem[lf]
+        fb = 4 * (it - 1)
         for dir in (:xminus, :xplus, :yminus, :yplus)
-            has_no_face_neighbor(qt, lf, dir) || continue
-            # per-wall condition: :same follows the global c; this is what
-            # keeps the historical single-c runs bit-identical
+            # per-wall condition: :same follows the global bc; this is what
+            # keeps the historical single-bc runs bit-identical
             wi = _wall_index(dir)
-            wbc = (wall_bc[wi] === :same ? bc : wall_bc[wi])
+            bmask[fb + wi] != 0x00 || continue
+            wbc = resolved_wall_bc[wi]
             rigid_wall = wbc === :rigid
             # per-wall normal value: `wall_un[wi] === nothing` reproduces the
             # historical global closure for that wall bit for bit (G258);
@@ -490,7 +543,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # keeps the default path free of extra arithmetic.  When `:open` walls land
     # (design commit 3) this check must skip the walls with a free normal
     # component, which absorb the imbalance by construction.
-    netflux, wumax = _semquad_wall_normal_flux(ss, qt, fixed, fd, n, nu)
+    netflux, wumax = _semquad_wall_normal_flux(ss, fixed, fd, n, nu, bmask)
     if wumax > 0.0
         perimeter = 2.0 * (qt.Lx + 1.0)
         # The relative threshold is the design's `1e-12 * u_scale * perimeter`,

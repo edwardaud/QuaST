@@ -160,6 +160,23 @@ struct Params
     # `:rigid` wall either way; `wall_un` only refines its value, per wall
     # (docs/dev/BC_DESIGN.md §3.4/§3.6, G258).
     wall_un::NTuple{4,Union{Nothing,Function}}
+    # Per-wall *tangential* traction (BC stage 2, G259/G260), same
+    # `(xminus, xplus, yminus, yplus)` order.  `nothing` (the default) is zero
+    # traction, so no boundary load is assembled and the default card is
+    # bit-identical; a function `(x,y) -> Float64` prescribes the **total**
+    # Cauchy traction's tangential component, as the global component in the
+    # positive coordinate direction (`t_z` on an x-wall, `t_x` on a y-wall),
+    # exactly the convention of `wall_u`/`wall_un` and *not* a wall-local
+    # (outward) component.  Integration by parts puts `t = sigma.n` on the
+    # right-hand side with a plus sign, and on an axis-aligned wall the
+    # tangential component is pressure-free (`t_x = sigma_xy`, `t_z = sigma_zy`),
+    # so this is the exact `2 eta eps(u).n` tangential traction; the normal
+    # component, which carries `-p`, needs the `:open` wall and is stage 3.  A
+    # value is only allowed where the tangential component is free, i.e. on a
+    # `:free` wall: on a `:rigid` wall the tangential velocity is Dirichlet and
+    # the load would be silently dropped by the constraint matrix, so it is an
+    # error (docs/dev/BC_DESIGN.md §3.2/§3.6).
+    wall_t::NTuple{4,Union{Nothing,Function}}
     rho_heating::Bool     # add -T*H to the energy source (rho=(1-T) heating)
     rho_cp::Bool          # weight M and C by rho=1-T (ASPECT rho*cp LHS)
     tosi::Union{Nothing,TosiLaw}  # :tosi viscoplastic law (absolute units + eta0)
@@ -236,6 +253,12 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                 shear_modulus::Real=0.0,
                 wall_u::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 wall_un::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
+                wall_t::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
+                # BC stage 2: a *normal* traction (`sigma.n`'s normal component)
+                # needs a free normal velocity -- the `:open` wall of stage 3 --
+                # and the derived pressure gauge.  The keyword is accepted only
+                # to refuse a request loudly instead of ignoring it.
+                wall_tn::NTuple{4,Union{Nothing,Function}}=(nothing, nothing, nothing, nothing),
                 div_penalty::Real=0.0,
                 eta_custom=nothing, eta_multiplier=nothing,
                 rho_multiplier=nothing,
@@ -307,6 +330,37 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                                 "drop wall_u[$i]."))
         end
     end
+    # BC stage 2: a tangential *traction* is a data term on the free side, so it
+    # only exists where the tangential velocity is free, i.e. on a `:free` wall
+    # (`:open` is stage 3).  On a `:rigid` wall the tangential component is
+    # Dirichlet, so the assembled load would be dropped by the constraint matrix:
+    # a silent no-op.  The solver repeats this validation for direct library
+    # calls (`_semquad_validate_wall_traction`).
+    for i in 1:4
+        if wall_t[i] !== nothing && _resolved_wall(i) !== :free
+            throw(ArgumentError("wall_t[$i] (wall $(_wall_names[i])) sets a " *
+                                "tangential *traction*, but that wall resolves " *
+                                "to :$(_resolved_wall(i)), where the tangential " *
+                                "component is Dirichlet.  The boundary load would " *
+                                "be assembled onto a dof with no equation and " *
+                                "silently dropped.  A tangential traction needs a " *
+                                "wall with a free tangential component (a :free " *
+                                "wall); set wall_bc[$i] = :free (or `bc = :free`), " *
+                                "or drop wall_t[$i]."))
+        end
+    end
+    # The normal component of the total Cauchy traction carries the pressure and
+    # needs a free normal velocity (the `:open` wall) plus the derived pressure
+    # gauge: stage 3.  Refuse rather than ignore.
+    all(t -> t === nothing, wall_tn) ||
+        throw(ArgumentError("wall_tn (a normal traction) is not implemented " *
+                            "yet: the normal component of the Cauchy traction " *
+                            "carries the pressure (-p + 2 eta eps_nn), so " *
+                            "prescribing it needs a free normal velocity (the " *
+                            ":open wall), a derived pressure gauge and a net-flux " *
+                            "skip -- stage 3 of docs/dev/BC_DESIGN.md (§3.5 and " *
+                            "§6).  This stage implements the tangential traction " *
+                            "`wall_t` only."))
     eta_soft >= 0 || throw(ArgumentError("eta_soft must be >= 0"))
     div_penalty >= 0 || throw(ArgumentError("div_penalty must be >= 0"))
     if eta_law === :expT
@@ -421,6 +475,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
            rho_multiplier,
            Float64(shear_modulus), NTuple{4,Union{Nothing,Function}}(wall_u),
            NTuple{4,Union{Nothing,Function}}(wall_un),
+           NTuple{4,Union{Nothing,Function}}(wall_t),
            rho_heating, rho_cp, tosi, Float64(Di),
            heating_adiabatic, heating_dissipation, refstate, rho_ref_weight,
            compress_p, Float64(compress_gamma),

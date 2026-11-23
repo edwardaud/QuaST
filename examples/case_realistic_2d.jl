@@ -60,6 +60,23 @@
 #                                       x-walls being 1 high and the y-walls Lx
 #                                       wide) or the solver refuses the tuple
 #                                       (G258)
+#     CASE_WALL_T                       per-wall tangential traction, four
+#                                       comma-separated constant entries like
+#                                       CASE_WALL_UN (an empty entry = zero
+#                                       traction on that wall); empty overall =
+#                                       the historical card.  The value is the
+#                                       *total* Cauchy traction's tangential
+#                                       component in the positive coordinate
+#                                       direction (t_z on an x-wall, t_x on a
+#                                       y-wall -- not an outward-normal
+#                                       component); on an axis-aligned wall it
+#                                       is the exact 2*eta*eps(u).n shear.  Only
+#                                       meaningful on a wall that is `:free`
+#                                       (free tangential component); a `:rigid`
+#                                       wall's tangential velocity is Dirichlet
+#                                       and the tuple is refused.  The normal
+#                                       traction needs the `:open` wall of
+#                                       stage 3 and is not on this card (G259)
 #     CASE_SYMMETRY                     x-mirror closure of the AMR passes:
 #                                       `none` (default, the production card:
 #                                       the pair-strict mirror rule off, the
@@ -445,6 +462,48 @@ const WALL_UN_VALUES = let
 end
 const WALL_UN = ntuple(i -> WALL_UN_VALUES[i] === nothing ? nothing :
                             ((x, y) -> WALL_UN_VALUES[i]), 4)
+# Per-wall *tangential* traction, `(xminus, xplus, yminus, yplus)`, comma-
+# separated like `CASE_WALL_BC`.  Each entry is a constant value of the wall's
+# tangential traction wrapped into a `(x, y) -> value` closure, or empty for zero
+# traction (the historical do-nothing condition, `sigma.n = 0` on that
+# component).  Empty overall = all `nothing`, which is the historical card bit
+# for bit.  The value is the **total** Cauchy traction's tangential component,
+# as the global component in the positive coordinate direction: `t_z` on an
+# x-wall, `t_x` on a y-wall.  On an axis-aligned wall the tangential component is
+# pressure-free (`t_x = sigma_xy`, `t_z = sigma_zy`), so this is the exact
+# `2 eta eps(u).n` shear traction (a stress boundary condition); the normal
+# component, which carries `-p`, needs the `:open` wall of stage 3 and is not on
+# this card.  A traction entry is only meaningful on a wall that resolves to
+# `:free` (the tangential component is free there); on a `:rigid` wall the
+# tangential velocity is Dirichlet and `Params` refuses the tuple (the load
+# would be silently dropped).  This is the stage-2 knob of the boundary-
+# condition feature (docs/dev/BC_DESIGN.md §3.1/§3.6).
+const WALL_T_VALUES = let
+    raw = strip(get(ENV, "CASE_WALL_T", ""))
+    if isempty(raw)
+        (nothing, nothing, nothing, nothing)
+    else
+        parts = Tuple(strip(v) for v in split(raw, ','))
+        length(parts) == 4 ||
+            error("CASE_WALL_T needs four comma-separated entries " *
+                  "(xminus,xplus,yminus,yplus), got \"$raw\"")
+        ntuple(4) do i
+            p = parts[i]
+            if isempty(p)
+                nothing
+            else
+                v = parse(Float64, p)
+                # `parse` accepts NaN/Inf; a traction value must be finite
+                isfinite(v) ||
+                    error("CASE_WALL_T entry $i must be finite, " *
+                          "got \"$p\"")
+                v
+            end
+        end
+    end
+end
+const WALL_T = ntuple(i -> WALL_T_VALUES[i] === nothing ? nothing :
+                           ((x, y) -> WALL_T_VALUES[i]), 4)
 # x-mirror closure of the AMR passes (`symmetry=:x`).  The default is `none`,
 # the production card (docs/dev/CASE_REALISTIC.md §1.5): `none` switches the
 # pair-strict mirror rule off.  Under `:x` a quartet is merged only together
@@ -566,7 +625,7 @@ function make_params()
                   # the Rayleigh-number reference viscosity (CASE_ETA_REF):
                   # 1.0 declares the calibration's convention and is inert
                   eta_ref=ETA_REF,
-                  bc=:free, wall_bc=WALL_BC, wall_un=WALL_UN,
+                  bc=:free, wall_bc=WALL_BC, wall_un=WALL_UN, wall_t=WALL_T,
                   latent_L=LATENT_L, latent_mode=LATENT_MODE,
                   # the viscoelastic knob: 0.0 (the empty default) leaves every
                   # viscoelastic term off and the card bit-identical; a positive
@@ -727,7 +786,7 @@ function run_case(mode::String; restart_from::String="", amr_every::Int=AMR_EVER
     # Only an opt-in run records it, so the checkpoints of the default card stay
     # byte-identical (the key is diagnostic, not part of the restart guard).
     EXTDIAG && (meta["extdiag"] = true)
-    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s eta_ref=%.6g shear_modulus=%.3g wall_un=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), ETA_REF, SHEAR_MODULUS, join((v === nothing ? "-" : string(v) for v in WALL_UN_VALUES), ","))
+    @printf("[case] mode=%s Ra=%.1e H=%.1f p=%d max_level=%d max_leaves=%d amr_every=%d steps=%d coarsen=%.4g linear=%s stokes_tol=%.1e mg_tol=%.1e wall_min=%d wall_strip=%.4g ev=%.3g hyst=%d symmetry=%s gate=%d stokes_scaling=%s indicator=%s wall_bc=%s eta_ref=%.6g shear_modulus=%.3g wall_un=%s wall_t=%s\n", mode, RA, HHEAT, PORD, MAXLEV, MAXLEAVES, amr_every, maxsteps, COARSEN_FRAC, LIN_SOLVE, STOKES_TOL, MG_TOL, WALL_MIN, WALL_STRIP, EV_COEF, AMR_HYST, SYMMETRY, AMR_GATE, STOKES_SCALING, AMR_IND, join(string.(WALL_BC), ","), ETA_REF, SHEAR_MODULUS, join((v === nothing ? "-" : string(v) for v in WALL_UN_VALUES), ","), join((v === nothing ? "-" : string(v) for v in WALL_T_VALUES), ","))
     @printf("[case] comp_Ad=%.10e comp_As=%.10e Ed=%.6f Es=%.6f n=%.1f T0=%.2f eta in [%.0e,%.0e]\n", COMP_AD, COMP_AS, COMP_ED, COMP_ES, COMP_N, ETA_T0, ETA_MIN, ETA_MAX)
     @printf("[case] phases: z0=0.87 w=%.3f slope=%+.3f B=%.4f | z0=0.78 w=%.3f slope=%+.3f B=%.4f | latent_L=%.3f latent_mode=%s\n", WIDTH_PT, SLOPE410, B410,
             WIDTH_PT, SLOPE660, B660, LATENT_L, LATENT_MODE)

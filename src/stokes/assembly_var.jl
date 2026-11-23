@@ -455,3 +455,244 @@ function _semquad_assemble_blocks(nt::Int, cfg::SemQuadAsmCfg,
             IG=IG, JG=JG, VG=VG, IP=IP, JP=JP, VP=VP, fv=fv)
 end
 
+# ---------------------------------------------------------------------------
+# Boundary-condition feature, stage 2: the prescribed **tangential traction**
+# as a boundary-face load (G259/G260).
+#
+# The Stokes assembly had no boundary-face integral at all: the natural
+# (do-nothing) condition of the weak form is `sigma.n = 0`, so every
+# unconstrained boundary component was silently traction-free
+# (docs/dev/BC_DESIGN.md §1.1).  Integration by parts of `-div sigma = f` with
+# `sigma = -p I + 2 eta eps(u)` gives
+#
+#     int 2 eta eps(u):eps(v) - int p div v = int f.v + int_{dOmega} (sigma.n).v dS,
+#
+# and the code solves exactly the first two terms (`K u - B'p = fv`).  A
+# prescribed traction is therefore an **RHS** term with a **plus** sign,
+#
+#     fv_i += int_{Gamma_t} tbar . phi_i dS,     tbar = prescribed sigma.n,
+#
+# where `n` is the outward normal and `phi_i` the global velocity basis
+# function.  The load is added to the *unreduced* `fv` (this file has no access
+# to the constraints) and the solve forms `fr = Cu' (fv - K u0 + Bm' p0)`; the
+# constraint matrix is then the exact virtual-work projection onto the
+# admissible test space (a hanging master receives its share, a Dirichlet dof
+# has no row and receives nothing -- see `_semquad_validate_wall_traction`).
+#
+# Stage 2 adds only the **tangential** component, and only where the wall's
+# tangential component is already free (`:free` walls; the `:open` wall of
+# stage 3 will be the second such condition).  On an axis-aligned wall the
+# tangential component of the total Cauchy traction is pressure-free
+# (`t_x = sigma_xy` on a y-wall, `t_z = sigma_zy` on an x-wall), so this load is
+# the exact `2 eta eps(u).n` tangential traction even though the prescribed
+# value is the *total* traction (the normal component, which carries `-p`, is
+# stage 3; it needs a free normal component and a derived pressure gauge,
+# docs/dev/BC_DESIGN.md §3.5 and §6).
+#
+# The data convention is the **global component in the positive coordinate
+# direction**, the same one the legacy Dirichlet closures use: `wall_t` is the
+# global `t_z` on an x-wall and `t_x` on a y-wall.  The map to the
+# `(t_x, t_z)` pair is therefore a pure swap with **no outward-normal sign
+# table** (§3.2 eq. 7): the physical normal sign is already contained in
+# `tbar = sigma.n`, and a user-facing sign table would duplicate it and be the
+# easiest thing in the feature to get wrong.
+#
+# The integral needs no new quadrature data: `fd` already holds the 1-D GLL
+# velocity basis at `nq = p+2` Gauss points (`fd.phi_v`) and the Gauss rule
+# (`fd.gl_x`, `fd.gl_w`), and the physical face Jacobian of a leaf face is
+# `h/2`.  The weight per point is `(h/2)*gl_w[q]`; the integrand is a
+# polynomial of degree `deg(tbar) + p`, so polynomial data up to the velocity
+# degree is integrated exactly (the exactness of §3.2), which is what makes the
+# G259 Couette gate exact to solver round-off.
+# ---------------------------------------------------------------------------
+
+"""
+    _semquad_boundary_face_mask(qt, su) -> Vector{UInt8}
+
+Serially precomputed domain-boundary flag for every leaf face: entry
+`4*(it-1) + _wall_index(dir)` is `0x01` when the face of `su.leaves[it]` in
+direction `dir` has no neighbour, `0x00` otherwise.
+
+The mask exists because the quadtree neighbour table is **not thread-safe**
+(its lazy construction writes the table): the leaf assembly must not query
+`has_no_face_neighbor`/`neighbors` from `Threads.@threads`
+(docs/dev/BC_DESIGN.md §3.3 item 1).  It is built once, serially, before the
+threaded leaf assembly and reused by the fixed-dof loop, the net-flux check and
+`_semquad_boundary_traction!`, so those passes never touch the table.  The
+per-face booleans are exactly what those passes asked the table for before the
+mask existed, so the change is a no-op for every quantity.
+"""
+function _semquad_boundary_face_mask(qt::Quadtree, su::SemQuad)
+    leaves = su.leaves
+    bmask = Vector{UInt8}(undef, 4 * length(leaves))
+    @inbounds for it in eachindex(leaves)
+        lf = leaves[it]
+        b = 4 * (it - 1)
+        bmask[b + 1] = has_no_face_neighbor(qt, lf, :xminus) ? 0x01 : 0x00
+        bmask[b + 2] = has_no_face_neighbor(qt, lf, :xplus) ? 0x01 : 0x00
+        bmask[b + 3] = has_no_face_neighbor(qt, lf, :yminus) ? 0x01 : 0x00
+        bmask[b + 4] = has_no_face_neighbor(qt, lf, :yplus) ? 0x01 : 0x00
+    end
+    return bmask
+end
+
+"""
+    _semquad_has_wall_t(wall_t) -> Bool
+
+`true` when at least one wall carries a tangential-traction closure.  When all
+four entries are `nothing` the load pass is skipped before it touches `fv`, so
+the default path is bit-identical (G260).
+"""
+_semquad_has_wall_t(wall_t) = any(t -> t !== nothing, wall_t)
+
+"""
+    _semquad_validate_wall_traction(wall_t, resolved_wall_bc) -> Bool
+
+Validate the per-wall tangential-traction data against the *resolved* wall
+conditions (the four-tuple already has `:same` replaced by `bc`) and return
+[`_semquad_has_wall_t`](@ref).
+
+`wall_t` is a data term on the **free side**, so it only exists where the
+tangential component is free: in this stage that is exactly a `:free` wall
+(stage 3 adds `:open`).  A tangential traction on a `:rigid` wall targets a
+Dirichlet component; the load would be assembled into `fv` but `Cu'` would drop
+it, i.e. it would be a silent no-op.  The design rejects that combination
+rather than letting a user believe a load was applied (docs/dev/BC_DESIGN.md
+§3.2/§3.6), and the same validation runs in `Params` and in
+`_solve_semquad_stokes_var_core` so a direct library call cannot bypass it.
+Note that this is a *wall-level* rule: a face-integrated load also distributes
+to the face's corner nodes, whose dof may be owned by an adjacent wall.  That
+part is not an error -- the test function associated with a Dirichlet dof is
+not in the admissible space, so `Cu'` dropping its contribution is exactly the
+weak-form restriction (every tangential-traction configuration on a closed box
+has such corners, and the exact Couette data agree there; G259).
+"""
+function _semquad_validate_wall_traction(wall_t, resolved_wall_bc)
+    names = (:xminus, :xplus, :yminus, :yplus)
+    for i in 1:4
+        wall_t[i] === nothing && continue
+        resolved_wall_bc[i] === :free || throw(ArgumentError(
+            "wall_t[$i] (wall $(names[i])) is a tangential *traction*, but " *
+            "that wall resolves to :$(resolved_wall_bc[i]), whose tangential " *
+            "component is Dirichlet.  The boundary load would be assembled " *
+            "onto a dof with no equation and silently dropped, so the request " *
+            "is refused instead of being a no-op.  A tangential traction needs " *
+            "a wall with a free tangential component (wall_bc[$i] = :free, or " *
+            "`bc = :free`); set that, or drop wall_t[$i]."))
+    end
+    return _semquad_has_wall_t(wall_t)
+end
+
+"""
+    _semquad_refuse_wall_normal_traction(wall_tn)
+
+Refuse a *normal*-traction request.  The normal component of the total Cauchy
+traction `tbar = sigma.n` carries the pressure (`t_n = -p + 2 eta eps_nn`), so
+prescribing it needs a **free normal velocity** -- the `:open` wall of stage 3
+-- and with it the derived pressure gauge and the net-flux skip
+(docs/dev/BC_DESIGN.md §3.5, §6 commit 3).  This stage has neither: every wall
+keeps a Dirichlet normal component, so a normal-traction keyword is accepted by
+the API only in order to fail loudly instead of being ignored.
+"""
+function _semquad_refuse_wall_normal_traction(wall_tn)
+    all(t -> t === nothing, wall_tn) && return nothing
+    throw(ArgumentError("wall_tn (a normal traction) is not implemented yet: " *
+        "the normal component of the Cauchy traction carries the pressure " *
+        "(-p + 2 eta eps_nn), so prescribing it needs a free normal velocity " *
+        "(the :open wall), a derived pressure gauge and a net-flux skip -- " *
+        "stage 3 of docs/dev/BC_DESIGN.md (§3.5 and §6).  This stage implements " *
+        "the tangential traction `wall_t` only; use wall_t, or leave wall_tn " *
+        "empty."))
+end
+
+"""
+    _semquad_boundary_traction!(fv, su, bmask, fd, wall_t, resolved_wall_bc)
+
+Add the prescribed tangential-traction load `int tbar.phi_i dS` to the
+**unreduced** velocity load vector `fv` (length `2N`), in place.
+
+For every leaf face flagged by `bmask` and every Gauss point of the face:
+
+* y-faces (`yminus`/`yplus`, physical face length `hx`): `wall_t` is the
+  global `t_x`, so the load goes to the `u_x` rows `g` of the face nodes;
+* x-faces (`xminus`/`xplus`, physical face length `hy`): `wall_t` is the
+  global `t_z`, so the load goes to the `u_z` rows `nu + g`.
+
+with weight `(h/2) * fd.gl_w[q] * fd.phi_v[k,q]` and **no** outward-normal
+sign.  The pass is serial and iterates the leaves and the four directions in a
+fixed order, so the result is deterministic and does not depend on the leaf
+assembly's thread count.  It is a bitwise no-op when every `wall_t` entry is
+`nothing`; a `wall_t = 0` closure adds `+-0.0`, which leaves `fv` bitwise
+unchanged as well (G260).
+"""
+function _semquad_boundary_traction!(fv::Vector{Float64}, su::SemQuad,
+                                     bmask::Vector{UInt8}, fd::FEData,
+                                     wall_t::NTuple{4,Union{Nothing,Function}},
+                                     resolved_wall_bc)
+    _semquad_validate_wall_traction(wall_t, resolved_wall_bc) || return fv
+    n = su.p + 1
+    nu = su.N
+    gl_x = fd.gl_x
+    gl_w = fd.gl_w
+    phi = fd.phi_v
+    nq = fd.nq
+    leaves = su.leaves
+    @inbounds for it in eachindex(leaves)
+        b = 4 * (it - 1)
+        bxm = bmask[b + 1] != 0x00
+        bxp = bmask[b + 2] != 0x00
+        bym = bmask[b + 3] != 0x00
+        byp = bmask[b + 4] != 0x00
+        (bxm | bxp | bym | byp) || continue
+        lf = leaves[it]
+        hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
+        x0 = lf[2] * hx; y0 = lf[3] * hy
+        uids = su.elem[lf]
+        # x-walls: free tangential direction is z -> loads the u_z rows.
+        if bxm && wall_t[1] !== nothing
+            t_τ = wall_t[1]
+            for q in 1:nq
+                yq = y0 + 0.5 * (gl_x[q] + 1.0) * hy
+                wt = 0.5 * hy * gl_w[q] * t_τ(x0, yq)
+                for j in 1:n
+                    fv[nu + uids[(j - 1) * n + 1]] += wt * phi[j, q]
+                end
+            end
+        end
+        if bxp && wall_t[2] !== nothing
+            t_τ = wall_t[2]
+            xf = x0 + hx
+            for q in 1:nq
+                yq = y0 + 0.5 * (gl_x[q] + 1.0) * hy
+                wt = 0.5 * hy * gl_w[q] * t_τ(xf, yq)
+                for j in 1:n
+                    fv[nu + uids[(j - 1) * n + n]] += wt * phi[j, q]
+                end
+            end
+        end
+        # y-walls: free tangential direction is x -> loads the u_x rows.
+        if bym && wall_t[3] !== nothing
+            t_τ = wall_t[3]
+            for q in 1:nq
+                xq = x0 + 0.5 * (gl_x[q] + 1.0) * hx
+                wt = 0.5 * hx * gl_w[q] * t_τ(xq, y0)
+                for i in 1:n
+                    fv[uids[i]] += wt * phi[i, q]
+                end
+            end
+        end
+        if byp && wall_t[4] !== nothing
+            t_τ = wall_t[4]
+            yf = y0 + hy
+            for q in 1:nq
+                xq = x0 + 0.5 * (gl_x[q] + 1.0) * hx
+                wt = 0.5 * hx * gl_w[q] * t_τ(xq, yf)
+                for i in 1:n
+                    fv[uids[(n - 1) * n + i]] += wt * phi[i, q]
+                end
+            end
+        end
+    end
+    return fv
+end
+

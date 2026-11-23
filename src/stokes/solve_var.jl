@@ -262,6 +262,24 @@ other closure.  The keywords refine that value per wall, in the order
   normal component, exactly like the legacy closures, **not** the outward flux
   `u·n`.  `nothing` falls back to the global closure for that wall, which
   keeps the historical path bit-identical (G258).
+* `wall_t` is the wall's *tangential traction*, added to the Stokes RHS as
+  `∫ tbar·v dS` on the **unreduced** load vector (so `Cu'` projects it onto the
+  admissible test space; it is never Dirichlet data).  `tbar = σ·n` is the
+  **total** Cauchy traction and the value is its global component in the
+  positive coordinate direction -- `t_x` on a y-wall and `t_z` on an x-wall,
+  the same convention as `wall_u`/`wall_un`, so there is no outward-normal sign
+  table to get wrong.  On an axis-aligned wall the tangential component is
+  pressure-free (`t_x = σ_xy`, `t_z = σ_zy`), so this is the exact
+  `2ηε(u)·n` shear traction.  It requires a wall whose tangential component is
+  free (a `:free` wall); on a `:rigid` wall the tangential velocity is
+  Dirichlet, so a traction there would be dropped by the constraints -- a
+  silent no-op, refused with an `ArgumentError` (docs/dev/BC_DESIGN.md §3.2).
+  `nothing` is zero traction, so the default path is bit-identical (G259/G260).
+* `wall_tn` is the *normal* traction and is **not implemented in this stage**:
+  it carries the pressure (`-p + 2ηε_nn`), so it needs a free normal velocity
+  (the `:open` wall of stage 3) and the derived pressure gauge.  Any non-empty
+  entry is an `ArgumentError`; the keyword exists only to refuse the request
+  loudly instead of ignoring it.
 
 Because every wall keeps a Dirichlet normal component, the prescribed data must
 satisfy `∫∂Ω u·n dS = 0`.  An unbalanced configuration (e.g. a through-flow

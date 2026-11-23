@@ -37,6 +37,11 @@ public release: earlier development happened in a private repository.
   normalizing each by its own total (`:both`).
 - Per-wall boundary conditions: `Params.wall_bc` and `Params.wall_u` set each of the four
   walls to free slip, rigid, or a prescribed tangential velocity.
+- Per-wall normal velocity (`Params.wall_un`) and tangential traction (`Params.wall_t`):
+  the normal component can be prescribed independently on each wall, and a `:free` wall can
+  carry a prescribed tangential load (the total Cauchy traction's tangential component,
+  assembled as a boundary-face RHS term). `CASE_WALL_UN` and `CASE_WALL_T` expose both on
+  the realistic card, and both are recorded by the restart guard.
 - `Params.rho_multiplier`, the density hook a low-density sticky-air layer needs.
 - A physics revision marker (`src/physics/revision.jl`): a checkpoint written under a
   different revision is refused at restart, and a key-less checkpoint is resumed with a

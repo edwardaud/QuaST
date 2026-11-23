@@ -180,5 +180,7 @@ using QuaST
     include("t_g256_physical_contrast.jl")
     include("t_g257_eta_ref.jl")
     include("t_g258_per_wall_normal_velocity.jl")
+    include("t_g259_traction_couette.jl")
+    include("t_g260_traction_paths.jl")
 end
 

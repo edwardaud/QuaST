@@ -43,6 +43,8 @@ $$
 
 法向分量由 `Params.wall_un` 逐壁设置（求解函数对应的关键字也是 `wall_un`），顺序同样是 `(xminus, xplus, yminus, yplus)`。表项 `(x,y) -> value` 表示该壁法向速度取沿正坐标方向的分量值：竖直壁上就是 $u\_x$ ，水平壁上就是 $u\_y$ ，与被替换的全局闭合约定相同，而不是外法向通量 $u\cdot n$ ； `nothing`（默认）表示沿用历史闭合，驱动把它设为零，所以默认参数卡逐位不变。由于四面壁的法向分量始终是 Dirichlet 条件，给定的数据必须满足零净通量 $\int\_{\partial\Omega}u\cdot n\,\mathrm dS=0$ ；不平衡的取值（例如只在某个竖直壁上给入流）会被拒绝并报告实测通量，而不是去解一个连续性方程不相容的离散问题。用 `wall_un` 给侧壁法向、用 `wall_u` 给顶盖切向的同一 Couette 解可精确到 $2\times10^{-14}$ （见 5.3 节，G258）。 `wall_u` 是切向速度，只在 `:rigid` 壁上有意义； `:free` 壁的切向分量为自由（零切向牵引），此时给值曾被静默忽略，现在直接报错。角点上的分量归属由上述写入顺序决定：后写的壁拥有该自由度，所以刚性顶壁或底壁的切向值会覆盖侧壁在其两个角点上的法向值。
 
+切向*牵引*由 `Params.wall_t` 逐壁设置（求解函数对应的关键字也是 `wall_t`），顺序同样是 `(xminus, xplus, yminus, yplus)`。表项 `(x,y) -> value` 表示该壁切向的**总 Cauchy 牵引** $t=\sigma\cdot n$ ，它作为边界载荷进入弱形式：对动量方程分部积分后 $\int\_\Gamma t\cdot v\,\mathrm dS$ 以正号落在右端，代码把它加到未约化的载荷向量上，再由约束矩阵投影到容许检验空间 —— 它是自由侧的数据，不是 Dirichlet 值。取值是**沿正坐标方向的全局分量**：水平壁上为 $t\_x$ ，竖直壁上为 $t\_z$ ，与上面的 `wall_un` 约定相同，而不是外法向分量。在轴对齐壁上切向牵引不含压力（ $t\_x=\sigma\_{xy}$ 、 $t\_z=\sigma\_{zy}$ ），所以它就是精确的 $2\eta\,\varepsilon(u)\cdot n$ 剪切牵引。由于它只在切向自由的壁上才有意义， `wall_t` 只接受 `:free` 壁；在 `:rigid` 壁上切向速度是 Dirichlet 条件，载荷会被约束静默丢弃，因此直接报错。**法向**牵引是另一种条件：它携带压力，需要 `:open` 壁的自由法向速度与随之确定的压力基准，目前尚未实现， `wall_tn` 请求会被拒绝。 `nothing` 表示零牵引，所以默认参数卡不变；顶壁给定常值牵引的 Couette 解 $u=(t\_0y/\eta,0)$ 、 $p=0$ 可精确到 $10^{-10}$ （G259）。
+
 ### 1.2 控制方程
 
 无量纲 Boussinesq 方程组，动量、连续性与能量：
@@ -481,6 +483,7 @@ $$
 | `CASE_WALLSTRIP` | 0.1 | $(0,0.5)$ 内的浮点 | 壁面条带宽度，从每个壁面向内占盒高的比例。 |
 | `CASE_WALL_BC` | 空（全部 `:same`） | `same`、`free`、`rigid` 的四元组 | 逐壁速度条件，顺序为 `(xminus, xplus, yminus, yplus)`，见 1.1 节。 |
 | `CASE_WALL_UN` | 空（全部 `nothing`） | 四元组，每项为空或一个浮点数 | 逐壁法向速度，顺序为 `(xminus, xplus, yminus, yplus)`；每项是该壁沿正坐标方向的法向分量，留空表示沿用历史的零值，四个值必须满足零净外通量（见 1.1 节）。 |
+| `CASE_WALL_T` | 空（全部 `nothing`） | 四元组，每项为空或一个浮点数 | 逐壁切向牵引，顺序为 `(xminus, xplus, yminus, yplus)`；每项是总 Cauchy 牵引的切向全局分量（水平壁上为 `t_x`，竖直壁上为 `t_z`），留空表示零牵引，且只能给在解析为 `:free` 的壁上（见 1.1 节）。 |
 | `CASE_SYMMETRY` | `none` | `none`、`x` | AMR 各轮的 x 镜像闭合：取 `x` 时镜像伙伴一起加密、一起合并，用于对称基准。 |
 | `CASE_INDICATOR` | `theta` | `theta`、`velocity`、`both` | 加密指示子作用的场，见 3.1 节。 |
 | `CASE_LINEAR` | `auto` | `auto`、`direct`、`mg`、`schur_cg`、`lagged` | 线性求解器，见 4 节。 |
@@ -497,7 +500,7 @@ $$
 | `CASE_SHEAR_MODULUS` | 空（关闭） | 大于等于 0 的浮点 | Maxwell 黏弹性：无量纲弹性剪切模量 $G$ 。留空或取 0 表示关闭，运行结果逐位不变；取正值会改变有效黏度与物理区域，见 1.8 节。 |
 | `CASE_EXTDIAG` | 0 | 0、1 | 把精确能量恒等式残差 `resid_A` 追加到 `history.csv` 。它会改变列数，所以只接受全新的输出目录。 |
 
-`main()` 在做任何事之前就会拒绝无法识别的 `CASE_AMR_GATE`、`CASE_SYMMETRY` 或 `CASE_STOKES_SCALING` ，并校验 `CASE_WALL_BC` 与 `CASE_WALL_UN` 各自的四元组。下面这些是参数卡传给驱动的取值：
+`main()` 在做任何事之前就会拒绝无法识别的 `CASE_AMR_GATE`、`CASE_SYMMETRY` 或 `CASE_STOKES_SCALING` ，并校验 `CASE_WALL_BC`、`CASE_WALL_UN` 与 `CASE_WALL_T` 各自的四元组。下面这些是参数卡传给驱动的取值：
 
 | 取值 | 参数卡里的值 |
 |---|---|
@@ -607,7 +610,7 @@ $$
 | `refstate` | `nothing` | 不使用参考态。 |
 | `deviatoric` | `false` | 不做偏量投影。 |
 | `mass_form` | `:boussinesq` | Boussinesq 质量守恒形式。 |
-| `bc`、`wall_bc`、`wall_un` | `:free`、来自 `CASE_WALL_BC`、来自 `CASE_WALL_UN` | 四壁自由滑移；`:rigid` 是无滑移，`wall_bc` 逐壁覆盖（见 1.1 节）。`wall_un` 逐壁细化法向 Dirichlet 值，空项保持历史零值，且四个值必须零净通量。 |
+| `bc`、`wall_bc`、`wall_un`、`wall_t` | `:free`、来自 `CASE_WALL_BC`、来自 `CASE_WALL_UN`、来自 `CASE_WALL_T` | 四壁自由滑移；`:rigid` 是无滑移，`wall_bc` 逐壁覆盖（见 1.1 节）。`wall_un` 逐壁细化法向 Dirichlet 值，空项保持历史零值，且四个值必须零净通量。`wall_t` 逐壁加切向牵引作为边界载荷；空项为零牵引，且只接受 `:free` 壁（见 1.1 节）。 |
 
 `Params` 还会校验黏度定律。 `:composite` 拒绝 Drucker–Prager 屈服面； `:tosi` 自带塑性分支，因此拒绝 `yield_*` ； `:arrhenius` 要求 `eta_T0 > 0` 。
 
@@ -708,7 +711,7 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 | 类别 | 键 |
 |---|---|
 | AMR | 节奏、各轮设置、份额、叶数上限、层级上限、壁面规则、热点与顶壁规则、对称、传递模式、迟滞与校验。 |
-| 壁面运动 | `wall_bc`；`wall_u` 与 `wall_un` 按每面壁记成 `none`/`custom` 标记：函数没有可比较的取值，若“是否有自定义值”不变而函数本身被替换，守卫无法检出，应从头重算。 |
+| 壁面运动 | `wall_bc`；`wall_u`、`wall_un` 与 `wall_t` 按每面壁记成 `none`/`custom` 标记：函数没有可比较的取值，若“是否有自定义值”不变而函数本身被替换，守卫无法检出，应从头重算。 |
 | 离散 | 对流形式、熵黏性系数。 |
 | 非线性与时间步 | `maxpic`、`pic_tol`、`pic_relax`、`pic_mode`、`pic_reject`、`cfl`、`dtmax`、`dtmin`。 |
 | 质量与投影 | `mass_form`、`deviatoric`。 |

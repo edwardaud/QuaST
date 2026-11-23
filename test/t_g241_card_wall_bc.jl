@@ -52,6 +52,18 @@ using Test, QuaST
     @test occursin("wall_un=%s", src)
     @test Params(wall_un=(nothing, nothing, nothing, (x, y) -> 2.0)).wall_un[4](0.0, 0.0) == 2.0
     @test Params().wall_un == (nothing, nothing, nothing, nothing)
+
+    # 7. G259 added the per-wall *tangential traction* knob with the same shape
+    #    (empty = all `nothing` = the historical card, four finite entries,
+    #    forwarded into `Params`, printed in the header).
+    @test occursin("CASE_WALL_T", src)
+    @test occursin("get(ENV, \"CASE_WALL_T\", \"\")", src)
+    @test occursin("CASE_WALL_T entry", src)
+    @test occursin("wall_t=WALL_T", src)
+    @test occursin("wall_t=%s", src)
+    @test occursin("join((v === nothing ? \"-\" : string(v) for v in WALL_T_VALUES), \",\")", src)
+    @test Params(wall_t=(nothing, nothing, nothing, (x, y) -> 2.0)).wall_t[4](0.0, 0.0) == 2.0
+    @test Params().wall_t == (nothing, nothing, nothing, nothing)
     # the card source still parses as Julia (the knob's const block is only
     # executed when the card runs, so a syntax error would otherwise survive)
     @test Meta.parseall(src) isa Expr

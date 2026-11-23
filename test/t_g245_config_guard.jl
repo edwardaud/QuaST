@@ -36,6 +36,9 @@ using Test, QuaST
     # ------------------------------------------------------------------
     @test occursin("run_config[\"wall_u\"] = _wall_value_marker(pr.wall_u)", src)
     @test occursin("run_config[\"wall_un\"] = _wall_value_marker(pr.wall_un)", src)
+    # BC stage 2: the per-wall tangential traction changes the load vector and
+    # therefore the trajectory, so it is recorded with the same marker.
+    @test occursin("run_config[\"wall_t\"] = _wall_value_marker(pr.wall_t)", src)
     mk(t) = QuaST._wall_value_marker(t)
     @test mk((nothing, nothing, nothing, nothing)) == "none,none,none,none"
     @test mk((nothing, nothing, nothing, (x, y) -> 1.0)) == "none,none,none,custom"
