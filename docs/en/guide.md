@@ -518,7 +518,7 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `zero_side_eta`, `side_strip` | false, 0.05 | false, 0.05 | Side-strip viscosity zeroing. |
 | `advection` | `:galerkin` | `:skew` | Advection form of the energy equation. |
 | `ev`, `ev_cmax`, `ev_alpha` | 0, 0.052, 2 | 0.11, 0.052, 2 | Entropy viscosity, as in section 2.4; `ev = 0` switches it off. |
-| `maxpic`, `pic_tol`, `pic_relax`, `pic_mode` | 1, 1e-6, 1.0, `:picard` | same | Nonlinear iteration inside a step; Newton requires `linear=:direct`. |
+| `maxpic`, `pic_tol`, `pic_relax`, `pic_mode` | 1, 1e-6, 1.0, `:picard` | same | Nonlinear iteration inside a step. `pic_mode = :newton` is a research option: it requires `linear=:direct`, refuses the reference state, the compressible mass form and `nu_cbf`, and is slower than Picard with multigrid on the measured cases. |
 | `pic_reject`, `pic_reject_clamp`, `pic_reject_res`, `pic_reject_max` | false, 0.25, 10, 4 | defaults | Reject a Picard trial when the clamp fraction or the residual grows, and redo it with a halved relaxation. |
 | `pic_adapt`, `pic_relax_min`, `pic_eta_relax`, `pic_u_relax` | false, 0.05, 1.0, 1.0 | defaults | Relaxation adaptation, strain-rate averaging and velocity under-relaxation of the Picard loop. |
 | `pic_div_window`, `pic_div_factor` | 0, 10 | defaults | Divergence detector of the Picard loop. |

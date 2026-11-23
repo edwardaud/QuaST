@@ -471,7 +471,7 @@ $$
 | `dtmin` | `1e-9` |
 | `cfl` | 0.5 |
 | `dt_growth` | 1.05 |
-| `maxpic` | 1 |
+| `maxpic` | 1 。 `pic_mode = :newton` 是研究选项：需要 `linear=:direct`，拒绝参考态、可压缩质量形式与 `nu_cbf`，在实测算例上比 Picard + 多重网格更慢。 |
 | `pic_tol` | `1e-6` |
 | `ev_cmax` | 0.052 |
 | `ev_alpha` | 2 |

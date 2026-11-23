@@ -29,6 +29,17 @@
 # with the time-step energy operator and with the strain-rate tangent Kgeo that
 # a temperature-only law does not need.  The globalization is a backtracking
 # line search on the block-scaled residual that halves on every increase, and a
+# Status: research option, not the production path.  The production configuration
+# is Picard with a matrix-free multigrid Stokes solve (`pic_mode = :picard`,
+# `linear = :auto`), and no shipped card sets `pic_mode = :newton`.  A Newton
+# iteration assembles a Jacobian and factorises its saddle directly, so the driver
+# refuses `linear = :mg` and also refuses a reference state (TALA/ALA), the
+# compressible momentum term and `nu_cbf` -- the analytic Jacobian does not
+# linearise them.  Measured: 18 Picard against 7 Newton iterations over three
+# steps at Ra = 1e6, but 1.87x slower per iteration at 64 leaves and up to 12x at
+# L5, because each iteration pays a direct factorisation instead of a multigrid
+# cycle (docs/dev/SOLVER.md sections 3.2 and 4.6).  A failed Newton falls back to
+# Picard and `pic_diag` records it.
 # Picard fallback is taken by the *driver* when this function reports failure.
 #
 # The strain-rate dependence is supplied by the caller through `make_eta`, so

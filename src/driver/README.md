@@ -1,14 +1,14 @@
 # Driver
 
-The time loop and the nonlinear solvers that advance one step or seek a steady
-state. `run.jl` is `run_semquad_simulation`, the production entry point;
-`maxwell_state.jl`, `maxwell_reports.jl` and `eta_ref_report.jl` hold the
-viscoelastic driver state and the two viscosity diagnostics it reports;
-`picard.jl` holds the lagging, averaging and relaxation helpers; `newton.jl`,
-`tosi_steady.jl`, `dp_steady.jl` and `step_newton.jl` implement the analytic
-tangent maps for eta(T), the Tosi law and Drucker–Prager, steady and per-step;
-`steady_entry.jl` dispatches between them. Physics and linear algebra are
-elsewhere: the driver only composes them.
+The time loop and the nonlinear solvers that advance one step. `run.jl` is
+`run_semquad_simulation`, the production entry point; `maxwell_state.jl`,
+`maxwell_reports.jl` and `eta_ref_report.jl` hold the viscoelastic driver state
+and the two viscosity diagnostics it reports; `picard.jl` holds the lagging,
+averaging and relaxation helpers; `step_newton.jl` and `newton_tangent.jl`
+implement the optional per-step Newton (a research path: it needs
+`linear = :direct` and is slower than the production Picard + multigrid; see the
+header of `step_newton.jl`). Physics and linear algebra are elsewhere: the driver
+only composes them.
 
 | File | What it is |
 |---|---|
