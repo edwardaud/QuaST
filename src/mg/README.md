@@ -19,3 +19,8 @@ factorisation of the fine saddle.
 | `s1solve.jl` | The inner `chol(S1)` solves of the w-BFBT pressure block. |
 | `saddle.jl` | CG on the velocity block and flexible outer GMRES on the reduced saddle. |
 | `vcycle.jl` | The threaded element-wise V-cycle helpers, bitwise in the thread count. |
+
+The V-cycle needs the operator's per-level kernels, and the operator's apply
+needs the V-cycle as its preconditioner: the two directories are mutually
+recursive by design.  `src/stokes/README.md` states the rule that keeps the
+recursion from spreading.

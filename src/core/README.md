@@ -21,3 +21,10 @@ those live in `physics/`, `stokes/` and `amr/`.
 | `quadtree_table.jl` | The flat face table the quadtree queries are answered from. |
 | `semquad.jl` | The continuous Q_p space on the quadtree, its mass matrix and constraints. |
 | `transfer.jl` | Solution transfer between quadtree SEM meshes: nodal restriction and L2 projection. |
+
+`quadtree.jl`, `quadtree_table.jl` and `quadtree_balance.jl` are three views of
+one object: the refinement primitives maintain the flat face table, the table
+build asks the balancer whether a leaf set is legal, and the balancer splits
+leaves.  The call graph between the three is therefore cyclic *by construction*;
+they are split for readability, and a change to any of them is a change to the
+tree itself.

@@ -18,3 +18,9 @@ pass and wall refinement that the driver calls. The quadtree itself is in
 | `hooks.jl` | The AMR pass (`semquad_amr_passes!`) and wall refinement that the driver calls. |
 | `indicator.jl` | The gradient-jump error indicator of the continuous SEM field. |
 | `leaf_ops.jl` | Leaf refine/coarsen primitives, wall refinement and the hard leaf budget. |
+
+`coarsen_gate.jl` and `coarsen_plan.jl` are two halves of one policy and call
+each other: the plan asks the gate whether a pair may merge, and the gate reads
+the plan's ledger to decide.  They are separate files because the gate is the
+part that can be switched off from the card (`amr_coarsen_gate`), not because
+they are independent.
