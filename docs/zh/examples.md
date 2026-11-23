@@ -2,19 +2,20 @@
 
 # 算例
 
-四个可以直接跑的例子。每个都给出命令、物理设置、八线程实测墙钟，以及一个用来核对的数。命令都在仓库根目录执行，第一条只需跑一次：
+五个可以直接跑的例子。每个都给出命令、物理设置、八线程实测墙钟，以及一个用来核对的数。命令都在仓库根目录执行，第一条只需跑一次：
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-下面的时间都是八线程墙钟，不是 CPU 时间。直接求解器在进程内是串行的，所以直接路径用不上另外七个线程。各数的验证依据与适用范围见[验证](validation.md)。
+下面的时间都是八线程墙钟，不是 CPU 时间。直接求解器在进程内是串行的，所以直接路径用不上另外七个线程。全新的 Julia 进程里第一次 `run_semquad_simulation` 主要花在编译驱动上（约 70 s，是整个仓库共同的首次开销）；仿真本身都很短。各数的验证依据与适用范围见[验证](validation.md)。
 
 | 算例 | 命令 | 八线程墙钟 | 核对点 |
 |---|---|---|---|
 | Blankenbach 2b（稳态） | `benchmark_cases.jl 2b 3 0.2` | 约 45 分钟 | `Nu_top = Nu_bot` |
 | blob | `run_blob_kelly_1024.jl` | 141 s | `Tmax25` 与两个摘要 |
 | 真实算例 smoke | `case_realistic_2d.jl smoke` | 首次约 2 分钟 | `Nu_top = 5.999881` |
+| 区域通道 | `channel_flow_2d.jl` | 首次约 70 s，仿真不到 1 s | 剖面误差低于 `1e-10` |
 | 程序化运行 | `build_and_run.jl` | 首次约 84 s | `Nu_top = Nu_bot = 1.000783` |
 
 ## Blankenbach 2b
@@ -140,6 +141,32 @@ CASE_OUT=out_julia/demo_resume CASE_STEPS=4000 \
 ```
 
 两条都从第 2 000 步再走 2 000 步到第 4 000 步，各约 **2.3 h**，本页没有重跑。 `CASE_OUT` 要分开：各自写自己的 `frames/` 与 `history.csv` 。对冻结后的检查点用 `resume` 会被守卫拒绝，因为该模式传的是 `amr_every = 5` ；这一支要用 `freeze` 接着跑 `frozen.h5` 。重启规则与绝对步号的含义见[用户指南](guide.md)第 5 节和[快速开始](quickstart.md)的「停下与续算」。
+
+## 区域通道
+
+`examples/channel_flow_2d.jl` 是边界条件功能的组合演示：平面通道的上游壁给定入流法向速度，下游壁是带精确总牵引的 `:open` 壁，上下壁无滑移。参数卡就是普通的 `Params`，通过 `run_semquad_simulation` 跑一步：
+
+```bash
+julia --project=. --threads=8 examples/channel_flow_2d.jl
+```
+
+通道是 2 × 1，常黏度，由压力梯度 `dp/dx = -G` 驱动， `G = 2` （驱动里的体力是浮力，没有水平分量）。开出的出流给定动压力 `p_out = 2` ，精确解是平面 Poiseuille：
+
+$$
+u_x = \frac{G\,y\,(H-y)}{2\eta},
+\qquad
+p = p_{\text{out}} + G\,(L-x),
+$$
+
+因此参数卡里是 `wall_un = y(1-y)` 、 `wall_t = 1 - 2y` （剪切牵引 `eta du/dy`）与 `wall_tn = -2` （沿外法向的出流动压力）。组合配方见用户指南 1.10 节。运行末尾输出
+
+```text
+[channel] steps=1 leaves=128 err_u=1.832e-14 err_uz=3.289e-14 err_p=4.567e-13 max|u|=0.250000
+```
+
+`err_u` 是最大剖面误差除以中心速度 `G H^2/(8 eta) = 0.25` ， `err_uz` 用同一尺度， `err_p` 是绝对误差。Q2 速度与 Q1 压力精确包含这个解，所以这几个 `1e-14` 是线性求解的误差而不是离散误差。驱动编译好之后，运行本身只要 0.04 s；全新进程约 70 s 花在首次编译上，`julia -O0 --project=. examples/channel_flow_2d.jl` 把启动时间压到约 55 s，在这个精度下答案不变。
+
+通道的门禁 G264 还会跑同一个解在常数体力驱动下的形式（此时 `p` 为常数、 `wall_tn = -p0`），以及自由滑移出流变体（ `wall_t = nothing` ）：后者是另一个有界的流动，因为精确的 Poiseuille 出流本身带有非零剪切，自由滑移解与 Poiseuille 的差恰好是被扣掉那份牵引的响应（这里为中心速度的 18%）。门禁在进程内直接调用本脚本，所以这一页不是只写在文档里的。
 
 ## 程序化调用
 

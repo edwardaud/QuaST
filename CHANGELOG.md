@@ -53,6 +53,11 @@ public release: earlier development happened in a private repository.
   message, the net-flux compatibility check is skipped for open walls, `:schur_cg`/
   `:lagged` are refused there, and the per-step Newton path refuses per-wall boundary
   data instead of silently ignoring it.
+- `examples/channel_flow_2d.jl` and guide section 1.10: the regional-channel
+  recipe, as a runnable card combining a prescribed normal-velocity inflow, no-slip
+  channel walls and an `:open` outflow carrying the exact traction, checked against
+  plane Poiseuille. Gate G264 also runs the body-force-driven channel and the
+  free-slip outflow variant.
 - `Params.rho_multiplier`, the density hook a low-density sticky-air layer needs.
 - A physics revision marker (`src/physics/revision.jl`): a checkpoint written under a
   different revision is refused at restart, and a key-less checkpoint is resumed with a

@@ -41,7 +41,7 @@ CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 |---|---|---|
 | Blankenbach 等（1989）算例 1a，第 5 级加密下的稳态：`Nu` 对发表值 4.884409 | **+0.08%** | [验证](docs/zh/validation.md) |
 | 同一状态由 ASPECT 导入、两程序各自推进：`Nu_bot` 对 ASPECT | **+0.003%** | [验证](docs/zh/validation.md) |
-| 自动化测试套件 | **133 402** 条断言通过、0 条失败，另有 2 条 broken（等待本仓库未附带的检查点） | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| 自动化测试套件 | **133 600** 条断言通过、0 条失败，另有 2 条 broken（等待本仓库未附带的检查点） | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 Blankenbach 数值背后的收敛过程、Tosi 极限环结果、黏弹性检查、Nusselt 数的两种约定，以及证据的边界，都在验证页。套件用 `julia --project=. test/runtests.jl` 运行。
 

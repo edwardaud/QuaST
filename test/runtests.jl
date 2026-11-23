@@ -185,5 +185,6 @@ using QuaST
     include("t_g261_normal_traction.jl")
     include("t_g262_open_wall_wellposed.jl")
     include("t_g263_open_validation.jl")
+    include("t_g264_channel_flow.jl")
 end
 

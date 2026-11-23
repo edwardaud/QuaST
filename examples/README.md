@@ -10,6 +10,7 @@ Run output is written under `out_julia/`, which git ignores.
 | Script | What it does |
 |---|---|
 | `case_realistic_2d.jl` | The production case: 2.5 x 1 box, composite rheology, two phase transitions with latent heat, adaptive mesh. Modes `smoke`, `short`, `spinup`, `resume`, `freeze`, `wallrefine`, `symseed`. |
+| `channel_flow_2d.jl` | The regional channel demonstration: a prescribed normal-velocity inflow, no-slip channel walls and an `:open` outflow carrying the exact traction, compared against plane Poiseuille. |
 | `benchmark_cases.jl` | Every published benchmark in one entry point: Blankenbach 1a, 1b, 1c, 2a, 2b and Tosi cases 1 and 5a, each at a chosen level. |
 | `run_blob_kelly_1024.jl` | The 25-frame `Ra = 1e8` blob baseline, with per-frame SHA-256 rows. |
 | `calib_realistic_2d.jl` | Derivation of the composite rheology prefactors that `case_realistic_2d.jl` carries as literals. |

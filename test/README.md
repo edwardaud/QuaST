@@ -2,8 +2,8 @@
 
 One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
-test script that starts with `using`; most wrap one `@testset`. The 182 files
-hold the suite's 133 404 assertions (133 402 passed, 2 broken) quoted in the
+test script that starts with `using`; most wrap one `@testset`. The 183 files
+hold the suite's 133 602 assertions (133 600 passed, 2 broken) quoted in the
 top-level README, and
 `docs/dev/FILES.md` lists their one-line headers, so they are not repeated here.
 

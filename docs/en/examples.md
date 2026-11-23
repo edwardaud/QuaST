@@ -2,19 +2,20 @@
 
 # Examples
 
-Four runs you can start immediately. Each comes with its command, the physics it computes, the measured runtime on eight threads, and a number to check against. Run everything from the repository root. The first command is needed once:
+Five runs you can start immediately. Each comes with its command, the physics it computes, the measured runtime on eight threads, and a number to check against. Run everything from the repository root. The first command is needed once:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-The timings are wall clock on eight Julia threads, not CPU time. The direct solver is serial inside the process, so a run on that path leaves seven threads idle.
+The timings are wall clock on eight Julia threads, not CPU time. The direct solver is serial inside the process, so a run on that path leaves seven threads idle. A first run in a fresh Julia process is dominated by compiling the driver (about 70 s, the repository-wide cost of the first `run_semquad_simulation` call); the simulations themselves are short.
 
 | Example | Command | Wall clock, eight threads | What to check |
 |---|---|---|---|
 | Blankenbach 2b, steady | `benchmark_cases.jl 2b 3 0.2` | about 45 minutes | `Nu_top = Nu_bot` |
 | Blob | `run_blob_kelly_1024.jl` | about two minutes | `Tmax25` and the two digests |
 | Realistic case, smoke | `case_realistic_2d.jl smoke` | about two minutes the first time | `Nu_top = 5.999881` |
+| Regional channel | `channel_flow_2d.jl` | about 70 s the first time, under a second of simulation | profile error below `1e-10` |
 | Programmatic run | `build_and_run.jl` | about 84 s the first time | `Nu_top = Nu_bot = 1.000783` |
 
 ## Blankenbach 2b
@@ -140,6 +141,32 @@ CASE_OUT=out_julia/demo_resume CASE_STEPS=4000 \
 Both carry the state from step 2 000 to step 4 000. Give each its own `CASE_OUT`: they write
 their own `frames/` and `history.csv`. `CASE_STEPS` is an absolute step number, so a budget
 at or below the checkpoint step runs nothing.
+
+## A regional channel
+
+`examples/channel_flow_2d.jl` is the combined boundary-condition demonstration: a plane channel whose upstream wall prescribes the normal velocity of the inflow, whose downstream wall is `:open` with the exact total traction, and whose top and bottom are no-slip. The card is a plain `Params`, run through `run_semquad_simulation` for one step:
+
+```bash
+julia --project=. --threads=8 examples/channel_flow_2d.jl
+```
+
+The channel is 2 x 1, the viscosity is constant, and the flow is driven by a pressure gradient `dp/dx = -G` with `G = 2`; the driver has no horizontal body force. With the open outflow held at dynamic pressure `p_out = 2`, the exact solution is plane Poiseuille,
+
+$$
+u_x = \frac{G\,y\,(H-y)}{2\eta},
+\qquad
+p = p_{\text{out}} + G\,(L-x),
+$$
+
+so the card carries `wall_un = y(1-y)`, `wall_t = 1 - 2y` (the shear traction `eta du/dy`) and `wall_tn = -2` (the outflow dynamic pressure with the outward normal). Guide section 1.10 is the recipe. The run ends with
+
+```text
+[channel] steps=1 leaves=128 err_u=1.832e-14 err_uz=3.289e-14 err_p=4.567e-13 max|u|=0.250000
+```
+
+`err_u` is the maximum profile error divided by the centreline velocity `G H^2/(8 eta) = 0.25`, and `err_uz` uses the same scale; `err_p` is absolute. Q2 velocity and Q1 pressure contain this solution exactly, so the few `1e-14` are the linear solve, not the discretization. The run itself is 0.04 s once the driver is compiled; a fresh process spends about 70 s on that first-call compilation, and `julia -O0 --project=. examples/channel_flow_2d.jl` cuts the start-up to about 55 s without changing the answer at this accuracy.
+
+The channel's gate, G264, also runs the same solution driven by a constant body force (`p` then constant, with `wall_tn = -p0`), and the free-slip outflow variant (`wall_t = nothing`): that variant is a different, bounded flow, because the exact Poiseuille outflow carries a non-zero shear, so the free-slip solution differs from Poiseuille by exactly the response to the withheld traction (18% of the centreline velocity here). The gate exercises this script in-process; the section is not documentation-only.
 
 ## A programmatic run
 

@@ -49,7 +49,7 @@ The normal *traction* is set per wall by `Params.wall_tn` (the solve takes it as
 - **The pressure gauge is derived.** The nodal pressure pin is exact only while the normal velocity is Dirichlet on the whole boundary (then the constant pressure is in the null space of the reduced gradient, and the dropped continuity equation is a linear combination of the others). With an `:open` wall the solver therefore pins one pressure dof **iff no wall is `:open`**; a pinned open configuration would replace a continuity equation by $p\_a=0$ -- a different problem. The resolved decision is reported as `LAST_SEMSTOKES_PRESSURE_GAUGE` (`:pin`/`:none`).
 - **The open configurations must be well posed.** Every `:open` wall must leave at least one x-wall and one y-wall with a Dirichlet normal component; otherwise a rigid translation (or, with all four walls open, the whole rigid motion) is left admissible and the discrete saddle is singular. All four walls `:open` is the pure traction problem -- it needs a velocity gauge and net force/torque-compatible data -- and is refused, as is any configuration whose 3x3 rigid-mode Gram matrix over the Dirichlet dofs is singular (the message names the admissible motion). `linear=:direct` (with its shift ladder), `linear=:mg` and `linear=:auto` are supported without the pin; `:schur_cg`/`:lagged` assume the closed-boundary gauge and are refused on an open configuration.
 
-The gate numbers for the open-wall surface: a rigid box with the top `:open` and `wall_tn = T` gives $u=0$, $p=-T$ (the outward-normal sign), while the same $T$ on the **bottom** wall gives $p=+T$; the body-force hydrostatic solution with an open top and zero normal traction is $u=0$, $p=1-y$ -- all exact to $10^{-10}$ (G261). A traction-free open lid gives $u=p=0$ with the unpinned saddle and the hydrostatic free-slip/open configuration gives $p=1-y$ (G262). The legacy closed-wall paths are bit-identical to the stage-2 tree and the three linear paths agree on an open case (G263).
+The gate numbers for the open-wall surface: a rigid box with the top `:open` and `wall_tn = T` gives $u=0$, $p=-T$ (the outward-normal sign), while the same $T$ on the **bottom** wall gives $p=+T$; the body-force hydrostatic solution with an open top and zero normal traction is $u=0$, $p=1-y$ -- all exact to $10^{-10}$ (G261). A traction-free open lid gives $u=p=0$ with the unpinned saddle and the hydrostatic free-slip/open configuration gives $p=1-y$ (G262). The legacy closed-wall paths are bit-identical to the stage-2 tree and the three linear paths agree on an open case (G263). Section 1.10 combines the knobs of this section into a regional inflow/outflow channel.
 
 ### 1.2 The equations
 
@@ -304,6 +304,45 @@ The convention is consistent only when a rescaled law is paired with the same re
 When `eta_ref != 1` the driver reports the convention, once at the first flow solve and once at the end of the run. The report gives `Ra`, `eta_ref`, the range and contrast of the normalized field `eta/eta_ref`, `eta_interior` (the arithmetic volume mean of `eta/eta_ref` over the interior band `0.25 <= z <= 0.75`, both wall layers excluded), `Ra_interior = Ra/eta_interior`, and, when the card supplies its scale set, `eta_0` in Pa s. `pic_mode = :newton` builds its viscosity from the raw law, so it refuses `eta_ref != 1` rather than solve a different problem silently.
 
 The production card's default is `eta_ref = 1`, but its material law varies by orders of magnitude across the box, so the interior Rayleigh number is far above the nominal one. The report prints only for `eta_ref != 1`; the convention's numbers at the card's developed state are `eta_interior = 4.280635e-3`, `Ra_interior = 2.336102e7` and `eta_0 = 2.368635e23 Pa s`, the physical viscosity that `Ra` is defined with, which puts the physical interior viscosity at `1.013926e21 Pa s`. At the calibration's hot interior point (`T = 1.75`, `edot_ref`) the same convention gives `Ra = 7.84e7` and a viscosity of `3.02e20 Pa s`. The label `Ra = 1e5` therefore describes the calibration point, not the interior: quote both.
+
+### 1.10 A regional channel model
+
+The per-wall knobs of section 1.1 compose into a regional model: fluid enters through one wall, crosses the domain and leaves through an open wall, while the other walls are no slip or free slip. The shipped demonstration is `examples/channel_flow_2d.jl`, a plane channel whose exact solution is plane Poiseuille; this subsection is the recipe, and the semantics of each knob stay in section 1.1.
+
+The channel card has this shape, in the wall order `(xminus, xplus, yminus, yplus)`:
+
+| wall | `wall_bc` | data |
+|---|---|---|
+| upstream x-wall | `:rigid` | `wall_un` = the normal velocity $u\_x(y)$ of the inflow profile; `wall_u` = the tangential velocity (zero for a normal inflow) |
+| downstream x-wall | `:open` | `wall_tn` = $-p\_{\mathrm{out}}$ (the dynamic pressure of the outflow) and `wall_t = \eta\,\mathrm du\_x/\mathrm dy` (the shear traction) |
+| top and bottom | `:rigid` or `:free` | nothing, or `wall_un` = 0 for a free-slip wall |
+
+The inflow wall must be `:rigid`: a `:free` wall has zero tangential traction and cannot support the shear $\eta\,\mathrm du\_x/\mathrm dy$ that a shear-carrying profile has at its entrance. Prescribing the same normal velocity on a `:free` wall gives a genuinely different flow, measured at 5.6% of the centreline velocity on the plane channel; the design's channel therefore always uses `:rigid` on the inflow, with `wall_u` carrying any tangential part. The velocity of a flow entering through a normal-velocity boundary is prescribed completely by `wall_un` and `wall_u`, and the interior sees it as the same Dirichlet data whichever of the two mechanisms writes the value (gate G264 compares the new `wall_un` route against the legacy `uDx` closure and finds the solutions bit-identical).
+
+Three compatibility conditions make the combination well posed:
+
+- **Mass.** Continuity fixes the flux. The integral of the inflow data is the flux the outflow must carry, and the discrete continuity equations enforce the balance. The net-flux guard of section 1.1 cannot double as the check here: with an open wall an inlet whose integral does not match is not an error, its imbalance simply moves the outflow velocity. The open wall's free normal velocity is what absorbs it, and that is exactly the regional model's outflow.
+- **Pressure level.** The open wall removes the nodal pressure pin (section 1.1), so the pressure is not fixed by a pin but by the normal traction data: `wall_tn` **is** the dynamic pressure of the outflow, $p\_{\mathrm{out}}$, with the sign of the outward normal. It is a dynamic pressure, not a lithostatic one: the solver's `p` excludes the base state and the buoyancy subtracts it analytically, so a user who passes a hydrostatic value imposes that whole column as a traction.
+- **Well-posedness.** At least one x-wall and one y-wall keep a Dirichlet normal component, as section 1.1 requires; the channel satisfies this with the rigid inflow, the two channel walls and the open outflow.
+
+The exact solution of the channel with height $H$, length $L$, pressure gradient $G$ and constant viscosity $\eta$ is plane Poiseuille:
+
+$$
+u_x=\frac{G\,y\,(H-y)}{2\eta},\qquad u_y=0,\qquad p=p\_{\mathrm{out}}+G\,(L-x),
+$$
+
+so the total traction on the outflow, whose outward normal is $+e\_x$, is
+
+$$
+\sigma\cdot n=\left(-p,\ \eta\frac{\mathrm du\_x}{\mathrm dy}\right)
+=\left(-p\_{\mathrm{out}},\ G\left(\frac H2-y\right)\right).
+$$
+
+That is `wall_tn = -p_out` and `wall_t = G(H/2 - y)`; the tangential part is eta-independent at constant eta. The same profile is also the exact solution for a constant body force $f\_x=G$ with no pressure gradient, in which case the pressure is constant, $p=p\_0$, and the outflow normal traction is $-p\_0$. Both driving modes are gates (G264 (a) and (b)); the script uses the pressure-driven one because the driver's body force is the buoyancy and has no horizontal component.
+
+$Q\_2$ velocity and $Q\_1$ pressure contain this solution exactly, and the face quadrature of the traction is exact for its polynomial data, so a channel run measures the linear solve, not the discretisation: the demonstration on a 128-leaf tree reports a profile error of $2\times10^{-14}$ of the centreline velocity and the same pressure field to $5\times10^{-13}$. The three mechanisms are needed together: without the inflow normal velocity nothing drives the region, without the tangential traction the outflow is a different (free-slip) flow, and without `:open`/`wall_tn` the outflow is not at a prescribed pressure.
+
+If the outflow tangential traction is omitted (`wall_t = nothing`), the open wall is a free-slip outlet. The Poiseuille profile is then **not** the solution, because its outflow shear $G(H/2-y)$ violates the zero-tangential-traction condition; the free-slip solution keeps the same inflow data and mass flux, and differs from Poiseuille by exactly the response to the withheld shear traction. That difference is bounded and localised: on the plane channel it is 18% of the centreline velocity, and its strain energy is 2.4% of the derived scale $L\,\lVert\eta u'\rVert^2/(2\eta^2)$. G264 (d) checks the exact linearity in the withheld-traction scale and the response identities, and the script's page in [examples](examples.md) lists the run.
 
 ## 2. The discretization
 
