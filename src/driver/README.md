@@ -21,6 +21,7 @@ elsewhere: the driver only composes them.
 | `picard.jl` | Lagged viscosity, strain-rate averaging and adaptive Picard relaxation. |
 | `picard_control.jl` | The field blend, the divergence test and the adaptive relaxation. |
 | `strain_rate.jl` | The nodal strain-rate and spin fields of the SEM velocity. |
+| `restart_guard.jl` | The `run_config` builder and the restart guard of `run_semquad_simulation`. |
 | `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. |
 | `steady_entry.jl` | Uniform steady-state entry point dispatching the three Newton paths. |
 | `step_newton.jl` | Globalization of the per-time-step nonlinear solve. |

@@ -193,10 +193,10 @@ const G257_REF_UZ = [0.0, 0.0, 0.0, 9.499488123024632, 5.299472576614657, -2.099
     @test_throws ArgumentError Params(eta_ref=-1.0)
     @test_throws ArgumentError Params(eta_ref=NaN)
     @test_throws ArgumentError Params(eta_ref=Inf)
-    run_src = read(normpath(joinpath(@__DIR__, "..", "src", "driver",
-                                     "run.jl")), String)
+    guard_src = read(normpath(joinpath(@__DIR__, "..", "src", "driver",
+                                       "restart_guard.jl")), String)
     # a restart cannot switch eta_ref silently (old checkpoints skip the key)
-    @test occursin("run_config[\"eta_ref\"] = pr.eta_ref", run_src)
+    @test occursin("run_config[\"eta_ref\"] = pr.eta_ref", guard_src)
 
     # ================================================================ (b) ===
     # The default is bit-identical: the complete state of the pinned scenario.

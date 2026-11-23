@@ -127,6 +127,11 @@ include("driver/steady_entry.jl")
 include("driver/maxwell_state.jl")
 include("driver/maxwell_reports.jl")
 include("driver/eta_ref_report.jl")
+# `run_semquad_simulation`'s run-config builder and restart guard name only
+# types defined above (`Quadtree`, `Params`, `PhaseTransition`) in their
+# signatures; the checkpoint functions they call are resolved at run time, like
+# every other driver call, so they can be included just before the entry point.
+include("driver/restart_guard.jl")
 include("driver/run.jl")
 include("driver/mass.jl")
 

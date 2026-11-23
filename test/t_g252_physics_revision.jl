@@ -67,8 +67,8 @@ using Test, QuaST, Logging, Printf, SHA
     @test length(defs) == 1
     @test defs[1] == joinpath("src", "physics", "revision.jl")
     # and the driver records it in `run_config` next to the other guard keys
-    run_src = read(joinpath(root, "src", "driver", "run.jl"), String)
-    @test occursin("run_config[\"physics_revision\"] = PHYSICS_REVISION", run_src)
+    guard_src = read(joinpath(root, "src", "driver", "restart_guard.jl"), String)
+    @test occursin("run_config[\"physics_revision\"] = PHYSICS_REVISION", guard_src)
 
     # ---- (a2) the source hash makes the revision enforceable ---------------
     # `PHYSICS_REVISION` only works if the next physics change remembers to bump

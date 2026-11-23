@@ -12,7 +12,7 @@
 using Test, QuaST
 
 @testset "G245 run_config records the new physics" begin
-    src = read(normpath(joinpath(@__DIR__, "..", "src", "driver", "run.jl")), String)
+    src = read(normpath(joinpath(@__DIR__, "..", "src", "driver", "restart_guard.jl")), String)
 
     @test occursin("run_config[\"shear_modulus\"] = pr.shear_modulus", src)
     @test occursin("run_config[\"wall_bc\"] = join(string.(pr.wall_bc), \",\")", src)
