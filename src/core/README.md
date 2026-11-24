@@ -14,7 +14,7 @@ those live in `physics/`, `stokes/` and `amr/`.
 | `constraints.jl` | Hanging-node constraints: a fine face node is the coarse face's GLL interpolation (historical box body plus a logical mapped method). |
 | `eval.jl` | Point evaluation of a quadtree SEM field: leaf search, the logical-point evaluation and gradient primitives the mapped transfer/indicator use, and a reusable Lagrange workspace. |
 | `fe.jl` | Reference-element data: GLL nodes for the basis, Gauss–Legendre points for quadrature. |
-| `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), point map and inverse, Jacobian/metric and face normals, the map-curvature second derivatives, logical boundary registry, height/depth/gravity, physical measures and normal leaf size, checkpoint identity. |
+| `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), `PolarAnnulus` (stage 0.5a, the 2-D polar annulus), point map and inverse, Jacobian/metric and face normals, the map-curvature second derivatives, logical boundary registry, height/depth/gravity, physical measures and normal leaf size, checkpoint identity. |
 | `gll.jl` | GLL nodes and weights, the barycentric Lagrange basis, Gauss–Legendre quadrature. |
 | `parallel.jl` | Threading helpers shared by the leaf-blocked assembly loops. |
 | `poisson.jl` | SIPG/Nitsche Poisson operator: a verification-only assembler and its constrained solve. |
@@ -37,6 +37,29 @@ bitwise identical, `docs/dev/GEOM_DESIGN.md` §4), the two validation geometries
 exercise the general mapped path, and the logical topology helpers
 (`global_logical`, `leaf_ref`, `locate_leaf_logical`, `face_pairs_logical`) keep
 node identity and face pairing independent of the metric.
+
+`PolarAnnulus` (stage 0.5a, `docs/dev/GEOM_DESIGN.md` §6) is the first
+production-shaped curved geometry: one section at the end of the file defines
+the map `r = R0 + (R1-R0)*S`, `phi = Phi*T`, its analytic inverse, the leaf
+Jacobian `det J = Phi*r*(R1-R0)/(4*nx*ny)` and the map Hessian, the radial
+height/gravity (`h = r - R0`, `grad h = e_r`, `lap h = 1/r`, `g = -e_r`), the
+circle/seam boundary registry (`:inner`/`:outer` as `:wall`, the seam sides as
+`:seam_lo`/`:seam_hi`; a periodic seam is refused because the topology does not
+exist yet) and `nu_wall_sides = (:xminus, :xplus)`.  It consumes the generic
+mapped leaf/face/metric/measure/cache bodies unchanged -- that is the stage-0
+layer's acceptance test -- and G273 pins the map, Jacobian, inverse,
+second-derivative surface, normals and the plane-annulus measures against
+closed forms.  The radial physics wiring is stage 0.5b.  One layer-level
+consequence of adding the fourth concrete subtype is recorded in the section
+itself: `SemQuad.geom` is a non-parametric `AbstractGeometry` field, so the
+geometry API's abstract-typed call sites now see four candidate methods; the
+default inference budget (`max_methods = 3`) returns `Any` for them, which
+boxed the cut-5 cache key (+128 B per warm matrix-free apply, G271) and widened
+`@inferred` box diagnostics (G188).  `geometry.jl` raises the budget to 4 for
+the 14 one-method-per-subtype API functions with
+`Base.Experimental.@max_methods` declarations (a compiler budget, no body or
+value change), restoring the three-subtype inference exactly; a fifth geometry
+must raise them to 5 and re-check G188/G271.
 
 The **map curvature** (`element_hessian`, `map_curvature`, `lap_phi`, cut 3) is
 the second-derivative surface the energy path needs: the physical Laplacian of a
