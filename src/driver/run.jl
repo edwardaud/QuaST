@@ -500,16 +500,22 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     yielding = yield_active(pr)
     weak = weak_active(pr)
     stress = pr.shear_modulus > 0.0
-    # Stage 0 cut 4: a mapped geometry now runs the fixed-mesh direct time loop.
+    # Stage 0 cut 5: a mapped geometry now runs the fixed-mesh direct **and**
+    # multigrid time loop.
     #
-    # Cut 2 routed the assembled Stokes operator, cut 3 the energy assembly and
-    # this cut every per-step diagnostic through the geometry, so the mapped
-    # energy/Stokes step and its history row are correct.  What remains box-only
-    # is, and is refused here with the cut that owns it:
+    # Cut 2 routed the assembled Stokes operator, cut 3 the energy assembly, cut
+    # 4 every per-step diagnostic and cut 5 the matrix-free operator and the MG
+    # hierarchy through the geometry, so the mapped solver has its full linear
+    # path set: `linear=:direct` (bitwise path of the box), `linear=:mg` (sparse
+    # and matrix-free operators) and `linear=:auto` (which resolves to one of
+    # them from the mapped eta contrast).  `:schur_cg`/`:lagged` still carry box
+    # reference-matrix/gauge assumptions and are refused by `solve_var_core.jl`
+    # with an actionable message; the driver pre-checks them here so a mapped
+    # card fails before the setup work.
+    #
+    # What remains box-only is owned by later cuts and is refused here:
     #   * the adaptive machinery -- transfer, indicator, AMR cycles, wall strips
     #     and the `:x` symmetry mirror (`cut 6`; a mapped tree is fixed);
-    #   * the matrix-free/MG solver (`cut 5`; `solve_var_core.jl` already
-    #     refuses anything but `linear=:direct` on a mapped space);
     #   * the strain-rate reconstructions of `driver/strain_rate.jl` (`cut 6`),
     #     which every strain-rate-dependent viscosity law, the yielding branch,
     #     the weakening field and the Maxwell stress advance use;
@@ -524,6 +530,14 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # box-body path on a mapped mesh.
     if !(geom isa CartesianBox)
         gname = geometry_name(geom)
+        (linear === :direct || linear === :mg || linear === :auto) ||
+            throw(ArgumentError("a mapped geometry ($gname) supports " *
+                                "linear=:direct, :mg and :auto in stage 0 " *
+                                "cut 5 (got linear=:$linear): :schur_cg and " *
+                                ":lagged keep the box reference-matrix / " *
+                                "stale-LU gauge assumptions and are box-only.  " *
+                                "Pass linear=:direct, linear=:mg or " *
+                                "linear=:auto."))
         initial_refine == 0 ||
             throw(ArgumentError("a mapped geometry ($gname) does not support " *
                                 "initial_refine > 0 in stage 0 cut 4: the " *

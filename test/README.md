@@ -2,13 +2,14 @@
 
 One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
-test script that starts with `using`; most wrap one `@testset`. The 189 files
-hold the suite's 134 716 assertions (134 714 passed, 2 broken, 0 failed) — the
-count of the stage-0 cut-4 tree, recorded with its evidence in
+test script that starts with `using`; most wrap one `@testset`. The 190 files
+hold the suite's 134 852 assertions (134 850 passed, 2 broken, 0 failed) — the
+count of the stage-0 cut-5 tree, recorded with its evidence in
 `docs/dev/GEOM_PROGRESS.md`. (Cut 1 recorded 134 086 / 134 084 / 0 / 2 on 185
 files; cut 2 adds G267 and G268; cut 3 adds G269, +151 assertions; cut 4 adds
-G270, +302 assertions.) The top-level README still quotes the pre-cut-1 total
-(133 716); the top-level markdown was outside the cut write scopes.
+G270, +302 assertions; cut 5 adds G271, +136 assertions.) The top-level README
+still quotes the pre-cut-1 total (133 716); the top-level markdown was outside
+the cut write scopes.
 
 G266 is the geometry/mapping-layer gate of stage 0 cut 1: it rebuilds the box
 coordinates, node ids, leaf/face metrics, nodal transfer, AMR indicator and the
@@ -54,7 +55,21 @@ with the measured 1.5e-14); a wrong mapped normal and a wrong face Jacobian are
 caught with measured 22.2 % / 25.0 % relative failures; and the mapped driver
 runs end to end on `AffineBox`/`CurvedBox` (heating off/on, latent, CBF and
 exact-residual columns) with the mass-flux identities and the time-step CBF
-energy-budget identity (ID1) closing at ≤6.6e-14. G265 is the gate of
+energy-budget identity (ID1) closing at ≤6.6e-14. G271 is the cut-5 mapped
+multigrid/matrix-free gate: the mapped sparse `K` equals the mapped
+matrix-free apply to ≤3.5e-16 (round-off), mapped `linear=:mg` equals mapped
+`linear=:direct` to ≤1.3e-9 on a uniform and a hanging tree (both at their own
+true reduced residuals), two geometries on one tree give two operators, cache
+entries, hierarchies and `_saddle_key`s with a **zero-allocation** warm mapped
+apply while the *pre-cut* key is shown (reconstructed in the gate) to collide and
+the collision's failure is measured (the box operator on the mapped system is
+solved silently to round-off at 14 % wrong velocity; a box hierarchy is a 4.1×
+worse preconditioner), the coarse levels are the box hierarchy's logical
+coarsenings with mapped coarse operators and bitwise-equal prolongation, the
+threaded mapped V-cycle is bitwise the serial one, and the mapped driver runs
+`:direct`/`:mg`/`:auto` (auto resolves to `:mg` above the selector crossover)
+with `:schur_cg`/`:lagged` still refused with their box-assumption message.
+G265 is the gate of
 `examples/subduction_2d.jl` (the
 regional subduction-style case). It pins only the checks the design classifies
 as exact identities or as the mass-flux conservation identity, with their

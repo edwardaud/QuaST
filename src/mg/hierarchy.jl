@@ -71,6 +71,7 @@ struct SemQuadMGGeom
     ny0::Int
     bc::Symbol
     deviatoric::Bool
+    geom::AbstractGeometry                      # the geometry every level lives on
     qts::Vector{Quadtree}                       # coarsest first, fine last
     sss::Vector{SemStokes}
     Cus::Vector{SparseMatrixCSC{Float64,Int}}   # full -> free per level
@@ -117,7 +118,7 @@ struct SemQuadMG
     LF::Vector{Any}
     UF::Vector{Any}
     operator::Symbol
-    mfops::Vector{Any}
+    mfops::Vector{AnySemQuadKOp}
     mfetas::Vector{SemQuadEtaLane}
     mfwork::Vector{Any}
     sc::Vector{Vector{Float64}}
@@ -366,8 +367,26 @@ space to the fine one.  Every fine GLL node lies in exactly one coarse leaf
 (the coarse tree is a coarsening of the fine one), so evaluating the coarse
 tensor-product basis there is exact.  Both velocity components share the same
 scalar matrix.
+
+Cut 5 dispatches on the geometry: the box body is the historical expression
+(physical fine coordinates, physical→reference inversion of the coarse leaf,
+bitwise unchanged); a mapped geometry uses **logical** coordinates
+(GEOM_DESIGN §2.1 rule 4 / §6.5): the fine node's global logical position comes
+from `global_logical` (leaf index + GLL index, never a physical position), the
+coarse leaf is located by the O(maxlevel) logical descent, and the coarse
+reference abscissa from `leaf_ref`.  The weights are therefore the same 1-D GLL
+interpolation weights on every geometry — the map is a global diffeomorphism, so
+the coarse/fine logical nesting is unchanged — which is what keeps the coarse
+spaces nested and the V-cycle correct on a curved mesh.
 """
 function _mg_prolongation_full(fine::SemQuad, coarse::SemQuad, p::Int)
+    return fine.geom isa CartesianBox ?
+           _mg_prolongation_full_box(fine, coarse, p) :
+           _mg_prolongation_full_mapped(fine.geom, fine, coarse, p)
+end
+
+# Historical box body, verbatim.
+function _mg_prolongation_full_box(fine::SemQuad, coarse::SemQuad, p::Int)
     n = p + 1
     rule = gll_rule(p)
     leaves_c = Set(coarse.leaves)
@@ -393,6 +412,50 @@ function _mg_prolongation_full(fine::SemQuad, coarse::SemQuad, p::Int)
             c = cids[(j - 1) * n + i]
             push!(I, g); push!(J, c); push!(V, w)
             push!(I, Nf + g); push!(J, Nc + c); push!(V, w)
+        end
+    end
+    return sparse(I, J, V, 2 * Nf, 2 * Nc)
+end
+
+# Mapped body: logical positions only (no physical coordinate is read, so a
+# curved face is located by construction, GEOM_DESIGN §6.5).  A node shared by
+# several fine leaves must contribute its row **once**: the box body iterates the
+# global node list, so it has no duplicates; this body iterates leaf-local nodes,
+# so it masks already-emitted rows (a duplicate row is summed by `sparse`, which
+# would multiply the interpolation weight of every shared node — the first
+# implementation did exactly that and the V-cycle diverged, G271 (d)).
+function _mg_prolongation_full_mapped(g::AbstractGeometry, fine::SemQuad,
+                                      coarse::SemQuad, p::Int)
+    n = p + 1
+    rule = gll_rule(p)
+    leaves_c = Set(coarse.leaves)
+    Nf = fine.N
+    Nc = coarse.N
+    I = Int[]; J = Int[]; V = Float64[]
+    sizehint!(I, 4 * Nf * n * n)
+    sizehint!(J, 4 * Nf * n * n)
+    sizehint!(V, 4 * Nf * n * n)
+    seen = falses(Nf)
+    for it in eachindex(fine.leaves)
+        lf = fine.leaves[it]
+        uids = fine.elem[lf]
+        for j in 1:n, i in 1:n
+            gid = uids[(j - 1) * n + i]
+            seen[gid] && continue
+            seen[gid] = true
+            S, T = global_logical(fine, lf, rule.nodes[i], rule.nodes[j])
+            lc = locate_leaf_logical(coarse, S, T, leaves_c)
+            xi, eta = leaf_ref(coarse, lc, S, T)
+            Lx, _ = lagrange_eval(rule, xi)
+            Ly, _ = lagrange_eval(rule, eta)
+            cids = coarse.elem[lc]
+            for jj in 1:n, ii in 1:n
+                w = Lx[ii] * Ly[jj]
+                w == 0.0 && continue
+                c = cids[(jj - 1) * n + ii]
+                push!(I, gid); push!(J, c); push!(V, w)
+                push!(I, Nf + gid); push!(J, Nc + c); push!(V, w)
+            end
         end
     end
     return sparse(I, J, V, 2 * Nf, 2 * Nc)

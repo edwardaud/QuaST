@@ -167,13 +167,13 @@ instead of forking per call (S6).
         mul!(y, mg.A[lev], x)
     elseif mg.threads > 1 && mg.geo.nfs[lev] > SEMQUAD_MG_SERIAL_DOFS[]
         if region === nothing
-            _semquad_apply_Kred_threaded!(y, mg.mfops[lev]::SemQuadKOp,
+            _semquad_apply_Kred_threaded!(y, mg.mfops[lev]::AnySemQuadKOp,
                                           mg.geo.Cus[lev],
                                           mg.mfetas[lev]::SemQuadEtaLane, x,
                                           mg.mfwork[lev]::SemQuadKWork,
                                           mg.par[lev]::SemQuadKPar)
         else
-            _semquad_apply_Kred_region!(y, mg.mfops[lev]::SemQuadKOp,
+            _semquad_apply_Kred_region!(y, mg.mfops[lev]::AnySemQuadKOp,
                                         mg.geo.Cus[lev],
                                         mg.geo.Cuts[lev],
                                         mg.mfetas[lev]::SemQuadEtaLane, x,
@@ -181,7 +181,7 @@ instead of forking per call (S6).
                                         mg.par[lev]::SemQuadKPar, region)
         end
     else
-        _semquad_apply_Kred!(y, mg.mfops[lev]::SemQuadKOp, mg.geo.Cus[lev],
+        _semquad_apply_Kred!(y, mg.mfops[lev]::AnySemQuadKOp, mg.geo.Cus[lev],
                              mg.mfetas[lev]::SemQuadEtaLane, x,
                              mg.mfwork[lev]::SemQuadKWork)
     end

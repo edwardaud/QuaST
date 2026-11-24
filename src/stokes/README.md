@@ -60,9 +60,47 @@ the project's bitwise rule:
   traction and mapping independence) and G268 (the mapped kernel fed the box
   map reproduces the box operator);
 * the mapped assembly is reachable only through `make_semstokes(qt, p;
-  geom=…)`; in cut 2 a mapped solve accepts `linear=:direct` only, and the
-  driver still refuses mapped cards until the energy assembly/diagnostics cuts
-  land.
+  geom=…)`; cut 2 accepted `linear=:direct` only, and the driver refused mapped
+  cards until the energy assembly/diagnostics cuts landed.
+
+Stage 0 cut 5 (`docs/dev/GEOM_PROGRESS.md`) routes the **matrix-free** operator
+and the multigrid layer through the geometry.  The rule is the same two-body
+rule, with the historical matrix-free kernel kept as a separate family:
+
+* `kop.jl` defines `AbstractSemQuadKOp` with two concrete operators:
+  `SemQuadKOp` (the historical box operator: seven per-leaf scalars, today's
+  kernels) and `SemQuadKOpMapped` (the mapped operator: the cached
+  `det J`/`J^{-T}`/quadrature-point arrays of `core/geometry.jl`).  The box
+  operator's construction and arithmetic are unchanged; its cache key
+  (`SEMQUAD_KOP_CACHE`) gains the geometry stamp, so two geometries on one tree
+  can never share an operator (`_semquad_kop_key` exposes the key for G271);
+* `apply.jl` adds the mapped kernel bodies (`_semquad_kn_mapped!` and the
+  leaf-blocked `_semquad_kn_blk_mapped!`/`..._store!` twins, used by the
+  threaded/region V-cycle), which do the same four tensor-product contractions
+  on the raw reference derivatives, mix them through `J^{-T}` at every
+  quadrature point (the design's four weighted reference-space pieces,
+  `GEOM_DESIGN` §2.6) and then run the box kernel's four accumulations.  The
+  gather/scatter, the eta sampling/lane table, the threaded block partition and
+  the scatter order are shared, so the mapped threaded V-cycle is bitwise the
+  serial one (G271 (e));
+* `diag.jl` adds the mapped element diagonal and element stiffness the MG
+  hierarchy needs (`_semquad_diag_full!`, `_semquad_leaf_stiffness!`), so the
+  Jacobi diagonal is the exact mapped `diag(Cu' K Cu)` and the coarsest dense
+  operator is materialised from the mapped apply;
+* the mapped scratch (three extra weighted-gradient planes in `SemQuadKWork`/
+  `SemQuadKScratch`) is allocated **only** when the operator is mapped
+  (`SemQuadKWork(op)` checks the operator type), so a box hierarchy build/apply
+  allocates exactly the pre-cut-5 scratch.
+
+A mapped space now supports `linear=:direct`, `:mg` (sparse and matrix-free
+operators) and `:auto` (the selector's eta-contrast sampler covers the mapped
+domain); `:schur_cg` and `:lagged` stay box-only (reference-matrix / stale-LU
+gauge assumptions) and are refused with an actionable message.  G271 is the
+mapped operator/hierarchy gate: mapped sparse `K` vs the mapped matrix-free
+apply (≤1e-12), mapped `:mg` vs mapped `:direct` (≤1e-6), two geometries on one
+tree giving two operators/caches/hierarchies and a zero-allocation warm apply,
+the geometry-forgotten-key collision and its measured silent failure, the
+logical coarse levels, and the driver's mapped linear paths.
 
 ## Diagnostics are published through module state
 

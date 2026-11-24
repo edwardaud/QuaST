@@ -43,6 +43,53 @@ function _semquad_diag_full!(d::Vector{Float64}, op::SemQuadKOp,
 end
 
 """
+    _semquad_diag_full!(d, op::SemQuadKOpMapped, etav)
+
+Cut-5 mapped counterpart of the unconstrained matrix-free Jacobi diagonal.  The
+element diagonal is the same `dloc_x[k] = sum_q W (a2 gx_k^2 + gz_k^2)` /
+`dloc_z[k] = sum_q W (a2 gz_k^2 + gx_k^2)` with `W = detJ*gl_w*gl_w*eta` and the
+physical basis gradient from the cached `J^{-T}` chain rule; the scatter-add and
+its order are the box body's.  Used by the mapped MG hierarchy (G271 (e)); it
+must equal `diag` of the mapped sparse `K` to round-off.
+"""
+function _semquad_diag_full!(d::Vector{Float64}, op::SemQuadKOpMapped,
+                             etav::AbstractVector{Float64})
+    n = op.n; nq = op.nq; N = op.N
+    phi = op.phi; dphi = op.dphi; gl_w = op.gl_w; ids = op.ids
+    detJ = op.detJ
+    j11v = op.j11; j12v = op.j12; j21v = op.j21; j22v = op.j22
+    a2 = op.deviatoric ? 4.0 / 3.0 : 2.0
+    dlocx = zeros(Float64, n * n)
+    dlocz = zeros(Float64, n * n)
+    fill!(d, 0.0)
+    nq2 = nq * nq
+    @inbounds for li in 1:op.nleaf
+        fill!(dlocx, 0.0); fill!(dlocz, 0.0)
+        k = (li - 1) * nq2
+        for qy in 1:nq, qx in 1:nq
+            k += 1
+            cw = detJ[k] * gl_w[qx] * gl_w[qy] * etav[k]
+            j11 = j11v[k]; j12 = j12v[k]; j21 = j21v[k]; j22 = j22v[k]
+            for j in 1:n, i in 1:n
+                dxi = dphi[i, qx] * phi[j, qy]
+                deta = phi[i, qx] * dphi[j, qy]
+                gx = dxi * j11 + deta * j12
+                gz = dxi * j21 + deta * j22
+                idx = (j - 1) * n + i
+                dlocx[idx] += cw * (a2 * gx * gx + gz * gz)
+                dlocz[idx] += cw * (a2 * gz * gz + gx * gx)
+            end
+        end
+        for idx in 1:(n * n)
+            g = ids[idx, li]
+            d[g] += dlocx[idx]
+            d[N + g] += dlocz[idx]
+        end
+    end
+    return d
+end
+
+"""
     _semquad_diag_reduced(op, Cu, etav; mode::Symbol=:constrained)
 
 Jacobi diagonal of the matrix-free *reduced* level operator `Cu' * K * Cu`.
@@ -66,7 +113,7 @@ can cancel to <= 0, and the positivity clip below then makes that row a `1e12`
 amplifier in the damped-Jacobi smoother (measured: one V-cycle maps
 `||b|| = 1e3` to `||z|| = 1.6e170` on the production tree).
 """
-function _semquad_diag_reduced(op::SemQuadKOp,
+function _semquad_diag_reduced(op::AbstractSemQuadKOp,
                                Cu::SparseMatrixCSC{Float64,Int},
                                etav::AbstractVector{Float64};
                                mode::Symbol=:constrained)
@@ -112,7 +159,7 @@ Historical (defective on hanging rows) `Cu' * diag(K)` diagonal of the reduced
 matrix-free operator.  Kept only as the `mode=:lumped` A/B reference of
 `_semquad_diag_reduced`.
 """
-function _semquad_diag_reduced_lumped(op::SemQuadKOp,
+function _semquad_diag_reduced_lumped(op::AbstractSemQuadKOp,
                                       Cu::SparseMatrixCSC{Float64,Int},
                                       etav::AbstractVector{Float64})
     dfull = zeros(Float64, 2 * op.N)
@@ -175,6 +222,67 @@ function _semquad_leaf_stiffness!(Kloc::Matrix{Float64}, op::SemQuadKOp,
 end
 
 """
+    _semquad_leaf_stiffness!(Kloc, op::SemQuadKOpMapped, etav, li, gx, gz)
+
+Cut-5 mapped counterpart of the `2n^2 x 2n^2` element stiffness: the same
+accumulation tree as the box body with `w = detJ*gl_w*gl_w` and the physical
+gradients from the cached `J^{-T}` chain rule.  Consumed by the exact reduced
+diagonal and by the dense coarsest operator of a mapped matrix-free hierarchy;
+G271 (e) pins it against the mapped sparse `K`.
+"""
+function _semquad_leaf_stiffness!(Kloc::Matrix{Float64},
+                                  op::SemQuadKOpMapped,
+                                  etav::AbstractVector{Float64}, li::Int,
+                                  gx::Vector{Float64}, gz::Vector{Float64})
+    n = op.n; nq = op.nq; nv = n * n
+    phi = op.phi; dphi = op.dphi; gl_w = op.gl_w
+    detJ = op.detJ
+    j11v = op.j11; j12v = op.j12; j21v = op.j21; j22v = op.j22
+    a2 = op.deviatoric ? 4.0 / 3.0 : 2.0
+    fill!(Kloc, 0.0)
+    k = (li - 1) * nq * nq
+    @inbounds for qy in 1:nq, qx in 1:nq
+        k += 1
+        w = detJ[k] * gl_w[qx] * gl_w[qy]
+        etaq = etav[k]
+        j11 = j11v[k]; j12 = j12v[k]; j21 = j21v[k]; j22 = j22v[k]
+        for j in 1:n, i in 1:n
+            kk = (j - 1) * n + i
+            dxi = dphi[i, qx] * phi[j, qy]
+            deta = phi[i, qx] * dphi[j, qy]
+            gx[kk] = dxi * j11 + deta * j12
+            gz[kk] = dxi * j21 + deta * j22
+        end
+        if op.deviatoric
+            for l in 1:nv
+                xl = gx[l]; zl = gz[l]
+                @simd for kk in 1:nv
+                    Kloc[kk, l] += etaq * (a2 * gx[kk] * xl + gz[kk] * zl) * w
+                    Kloc[kk, nv + l] += etaq * (gz[kk] * xl -
+                                                (2.0 / 3.0) * gx[kk] * zl) * w
+                    Kloc[nv + kk, l] += etaq * (gx[kk] * zl -
+                                                (2.0 / 3.0) * gz[kk] * xl) * w
+                    Kloc[nv + kk, nv + l] += etaq * (a2 * gz[kk] * zl +
+                                                     gx[kk] * xl) * w
+                end
+            end
+        else
+            for l in 1:nv
+                xl = gx[l]; zl = gz[l]
+                @simd for kk in 1:nv
+                    Kloc[kk, l] += etaq * (a2 * gx[kk] * xl + gz[kk] * zl) * w
+                    Kloc[kk, nv + l] += etaq * (gz[kk] * xl) * w
+                    Kloc[nv + kk, l] += etaq * (gx[kk] * zl) * w
+                    Kloc[nv + kk, nv + l] += etaq * (a2 * gz[kk] * zl +
+                                                     gx[kk] * xl) * w
+                end
+            end
+        end
+    end
+    return Kloc
+end
+
+"""
     _semquad_diag_reduced_constrained(op, Cu, etav)
 
 Exact `diag(Cu' K Cu)` of the matrix-free reduced velocity operator; see
@@ -182,7 +290,7 @@ Exact `diag(Cu' K Cu)` of the matrix-free reduced velocity operator; see
 `transpose(Cu)` (column `g` = the constraint row of full dof `g`), so no
 `K`-matrix and no `Cu' K Cu` product is ever formed.
 """
-function _semquad_diag_reduced_constrained(op::SemQuadKOp,
+function _semquad_diag_reduced_constrained(op::AbstractSemQuadKOp,
                                            Cu::SparseMatrixCSC{Float64,Int},
                                            etav::AbstractVector{Float64})
     n = op.n; nq = op.nq; N = op.N
@@ -253,7 +361,7 @@ operator to the unit vectors.  Used by the fully matrix-free hierarchy (MF-3)
 in place of the sparse `A[1]`: the coarsest tree has only the base leaves, so
 `nf` is `O(100)` and this costs less than one fine-level V-cycle.
 """
-function _semquad_dense_operator!(A::Matrix{Float64}, op::SemQuadKOp,
+function _semquad_dense_operator!(A::Matrix{Float64}, op::AbstractSemQuadKOp,
                                   Cu::SparseMatrixCSC{Float64,Int},
                                   etav::AbstractVector{Float64},
                                   work::SemQuadKWork)

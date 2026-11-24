@@ -500,6 +500,14 @@ end
     return BoxLeafMetric(x0, y0, hx, hy, 2.0 / hx, 2.0 / hy, 0.25 * hx * hy)
 end
 
+# The quadrature-rule form of the box metric is the historical seven scalars
+# (the 3-arg method), **not** a mapped metric built from the box map: the cold
+# measure helpers (e.g. `leaf_measure`) can be called on a box geometry and must
+# keep the box's historical values.  No production box kernel reaches this
+# (the box bodies use the 3-arg form directly).
+@inline leaf_metric(g::CartesianBox, lay, lf::NTuple{3,Int}, ::FEData) =
+    leaf_metric(g, lay, lf)
+
 """
     MappedLeafMetric
 
@@ -523,12 +531,28 @@ end
 """
     leaf_metric(g, lay, lf, fd) -> MappedLeafMetric
 
-Build the mapped leaf metric of a non-box geometry at the `fd.nq x fd.nq`
-quadrature points (the map, Jacobian and inverse are evaluated once per point;
-the kernels only index the arrays).  The box path deliberately does not use
-this: its methods are the seven `BoxLeafMetric` scalars.
+The mapped leaf metric of a non-box geometry at the `fd.nq x fd.nq` quadrature
+points (the map, Jacobian and inverse are evaluated once per point; the kernels
+only index the arrays).  The box path deliberately does not use this: its
+methods are the seven `BoxLeafMetric` scalars.
+
+Cut 5: the metric is **cached** per `(geometry, leaf-set, layout, p, nq)` (see
+[`_geom_cache`](@ref) and the cache section below), so a warm mapped assembly
+only reads precomputed arrays; the body below is the raw builder that fills a
+cache entry.
 """
-function leaf_metric(g::AbstractGeometry, lay, lf::NTuple{3,Int}, fd::FEData)
+@inline function leaf_metric(g::AbstractGeometry, lay, lf::NTuple{3,Int},
+                             fd::FEData)
+    t = _geom_cache(g, lay, fd)
+    lm = t.lm
+    lm === nothing && (lm = _ensure_leaf_metrics!(t))
+    return (lm::Vector{MappedLeafMetric})[t.index[lf]]
+end
+
+# Raw builder of one mapped leaf metric; only the cache fill calls it, so a
+# mapped assembly does not rebuild it per call (GEOM_DESIGN §2.5).
+function _build_mapped_leaf_metric(g::AbstractGeometry, lay,
+                                   lf::NTuple{3,Int}, fd::FEData)
     nq = fd.nq
     n2 = nq * nq
     xq = Vector{Float64}(undef, n2)
@@ -785,7 +809,20 @@ with `tr(M H_p) = M11 Hp11 + 2 M12 Hp12 + M22 Hp22`.
     return BoxMapCurvature(ihe2, 0.0, ihe2, 0.0, 0.0)
 end
 
+# Cut 5: cached exactly like the leaf metric (same key, lazy per-entry table),
+# because the mapped energy/EV path asks for one curvature per leaf per call.
 function map_curvature(g::AbstractGeometry, lay, lf::NTuple{3,Int}, fd::FEData)
+    t = _geom_cache(g, lay, fd)
+    if t.mc === nothing
+        _ensure_map_curvatures!(t)
+    end
+    mc = t.mc::Vector{MappedMapCurvature}
+    return mc[t.index[lf]]
+end
+
+# Raw builder of one mapped map-curvature record.
+function _build_mapped_map_curvature(g::AbstractGeometry, lay,
+                                     lf::NTuple{3,Int}, fd::FEData)
     nq = fd.nq
     n2 = nq * nq
     m11 = Vector{Float64}(undef, n2)
@@ -923,9 +960,28 @@ core of [`face_metric(g, lay, lf, side, fd)`](@ref), which feeds the Gauss
 quadrature points of `fd`; the diagnostics call it with the **GLL nodes**
 (`sq.xi`) because the box wall bodies integrate with the GLL rule (E8), and a
 mapped wall integral must use the same rule to be comparable.
+
+Cut 5: cached per `(geometry, leaf-set, layout, p, side, face-parameter rule)`,
+the same cache entry as the leaf metric (the face table is a lazy slot, so a
+face-metric rule that no volume kernel uses, like the GLL nodes, does not build
+a volume table).
 """
 function _mapped_face_metric(g::AbstractGeometry, lay, lf::NTuple{3,Int},
                              side::Symbol, qs::Vector{Float64})
+    t = _geom_cache_nq(g, lay, length(qs))
+    slot = get(t.fm, (side, length(qs)), nothing)
+    if slot === nothing || slot[1] != qs
+        _ensure_face_metrics!(t, side, qs)
+        slot = t.fm[(side, length(qs))]
+    end
+    fms = slot[2]
+    return fms[t.index[lf]]
+end
+
+# Raw builder of one mapped face metric at the arbitrary face parameters `qs`.
+function _build_mapped_face_metric(g::AbstractGeometry, lay,
+                                   lf::NTuple{3,Int}, side::Symbol,
+                                   qs::Vector{Float64})
     nq = length(qs)
     xq = Vector{Float64}(undef, nq)
     yq = Vector{Float64}(undef, nq)
@@ -1017,6 +1073,271 @@ end
 @inline function face_point(g::AbstractGeometry, lay, lf::NTuple{3,Int},
                             side::Symbol, fd::FEData, q::Int)
     return face_point(face_metric(g, lay, lf, side, fd), q)
+end
+
+# ---------------------------------------------------------------------------
+# 6b. The metric / curvature / face cache (stage 0 cut 5, GEOM_DESIGN §2.5)
+# ---------------------------------------------------------------------------
+#
+# The mapped path evaluates the map and the Jacobian at every leaf/quadrature
+# point.  Doing that inside every assembly, energy step, diagnostic and matrix-
+# free apply is what made every mapped call allocate a fresh `MappedLeafMetric`
+# per leaf (measured +1.9 MB per assembly at 1024 leaves, cut-2/cut-3 records).
+# This section caches those tables so a **warm** mapped assembly or apply only
+# reads precomputed arrays and allocates nothing of its own.
+#
+# The key is exactly the design's `(geometry identity, tree identity/hash, p,
+# nq)`:
+#
+#   * `geometry_stamp(g)` — a 64-bit deterministic stamp of the canonical
+#     identity (`geometry_identity` hashed through the raw Float64 bits of every
+#     shape parameter plus a type tag).  An equal geometry gives an equal stamp;
+#     a changed parameter gives a different stamp, so a box and an annulus can
+#     never share an entry (the collision class GEOM_DESIGN §8 risk 5 warns
+#     about);
+#   * `_leafset_hash(leaves)` — the order-independent splitmix64 leaf-set
+#     fingerprint the MG caches already use (the same function, one definition);
+#   * `nleaf`, `nx0`, `ny0`, `Lx` — the layout, because the leaf hash alone does
+#     not say how a `(level, ix, iy)` maps to a logical position;
+#   * `p`, `nq` — the polynomial degree and the quadrature-rule size.  `p` is
+#     redundant for the *leaf metric* itself (only `nq` enters the rule) but it
+#     is in the key as the design specifies and it keeps the entries of two
+#     spaces that share a rule size separate rather than aliased.
+#
+# **Invalidation rule.**  An entry is a pure function of its key and is never
+# invalidated: a geometry change, a leaf-set change, a layout change or a
+# different rule is a *new key*, so a stale hit is impossible.  There is no
+# manual invalidation on the production path (an AMR cycle changes the tree and
+# therefore the key).  The only supported clearing operation is
+# [`empty_semquad_geometry_cache!`](@ref), for memory management in long
+# processes and for gates that want a cold build; the caches grow with the
+# number of distinct (geometry, tree) pairs a process sees, which is bounded by
+# the tree trajectory.  A future time-dependent (ALE) map must add its state
+# version to the stamp — that is the only way an entry could go stale.
+#
+# The three tables are lazy slots on one entry, so a caller pays only for what
+# it uses (a face-only wall loop does not build a volume table, and the entropy
+# viscosity's curvature does not build face tables).
+#
+# The box path never touches any of this: it has its own seven-scalar
+# `BoxLeafMetric` methods, which stay the historical expressions.
+#
+# `SemQuad` is included after this file, so the degree is read generically from
+# the layout object (`SemQuad.p`/`Quadtree` has none) at a cache *miss* only.
+
+"""
+    geometry_stamp(g::AbstractGeometry) -> UInt64
+
+Deterministic 64-bit stamp of the geometry's canonical identity: a type tag and
+the raw bit pattern of every shape parameter.  Equal geometries (same kind, same
+`Float64` parameters) give equal stamps; any changed parameter changes the
+stamp.  This is the geometry identity every cut-5 cache key carries (the metric
+cache, `SEMQUAD_KOP_CACHE`, `SEMQUAD_MG_CACHE`, `SemQuadMGLevelKey` and
+`_saddle_key`).  It is a hash, not the identity string, because it must not
+allocate on a cache lookup; a 64-bit collision is the same accepted risk as
+every other Julia hash key in this code base.
+"""
+function geometry_stamp(g::CartesianBox)
+    return hash((UInt8(1), reinterpret(UInt64, g.Lx)))
+end
+function geometry_stamp(g::AffineBox)
+    A = g.A
+    return hash((UInt8(2), reinterpret(UInt64, A[1]), reinterpret(UInt64, A[2]),
+                 reinterpret(UInt64, A[3]), reinterpret(UInt64, A[4]),
+                 reinterpret(UInt64, g.b[1]), reinterpret(UInt64, g.b[2]),
+                 reinterpret(UInt64, g.Lx)))
+end
+function geometry_stamp(g::CurvedBox)
+    return hash((UInt8(3), reinterpret(UInt64, g.a),
+                 reinterpret(UInt64, g.Lx)))
+end
+
+"""
+    _leafset_hash(leaves) -> UInt64
+
+Deterministic 64-bit fingerprint of a leaf set: the XOR of a splitmix64 mix of
+every `(level, ix, iy)` triple.  XOR is order independent, so this is the hash of
+the *sorted* leaf set without sorting it; equal leaf sets always give equal
+values inside one process.  One definition, shared by the geometry cache and the
+MG caches (`_semquad_mg_leaf_hash` forwards here).
+"""
+function _leafset_hash(leaves)::UInt64
+    h = UInt64(0)
+    @inbounds for lf in leaves
+        z = (UInt64(lf[1]) << 42) ⊻ (UInt64(lf[2]) << 21) ⊻ UInt64(lf[3])
+        z += 0x9e3779b97f4a7c15
+        z = (z ⊻ (z >> 30)) * 0xbf58476d1ce4e5b9
+        z = (z ⊻ (z >> 27)) * 0x94d049bb133111eb
+        h ⊻= (z ⊻ (z >> 31))
+    end
+    return h
+end
+
+"""
+    GeometryCacheKey
+
+Key of one geometry-cache entry: the design's `(geometry identity, tree
+identity/hash, p, nq)` plus the layout dimensions.  All fields are bits values,
+so a `Dict` lookup does not allocate.
+"""
+struct GeometryCacheKey
+    geom::UInt64
+    tree::UInt64
+    nleaf::Int
+    nx0::Int
+    ny0::Int
+    Lx::Float64
+    p::Int
+    nq::Int
+end
+
+Base.:(==)(a::GeometryCacheKey, b::GeometryCacheKey) =
+    a.geom == b.geom && a.tree == b.tree && a.nleaf == b.nleaf &&
+    a.nx0 == b.nx0 && a.ny0 == b.ny0 && a.Lx == b.Lx && a.p == b.p &&
+    a.nq == b.nq
+Base.hash(k::GeometryCacheKey, h::UInt) =
+    hash(k.nq, hash(k.p, hash(k.tree, hash(k.geom, hash(k.Lx, hash(k.nleaf,
+         hash(k.ny0, hash(k.nx0, h))))))))
+
+"""
+    GeometryCacheEntry
+
+One cache entry: the canonical leaf order and the lazy tables.  `leaves` is the
+**sorted** leaf list (the order `make_semquad` and `semquad_kop` use), `index`
+maps a leaf key to its ordinal in that order, and `lm`/`mc`/`fm` are the lazy
+per-leaf metric / map-curvature / face tables.  `lay` is kept for the fast path
+(a same-object hit skips the key computation) and is not part of the identity.
+"""
+mutable struct GeometryCacheEntry
+    key::GeometryCacheKey
+    geom::AbstractGeometry
+    lay::Any
+    leaves::Vector{NTuple{3,Int}}
+    index::Dict{NTuple{3,Int},Int}
+    nq::Int
+    lm::Union{Nothing,Vector{MappedLeafMetric}}
+    mc::Union{Nothing,Vector{MappedMapCurvature}}
+    fm::Dict{Tuple{Symbol,Int},Any}   # (side, face-parameter count) => (qs, table)
+end
+
+"""
+    SEMQUAD_GEOM_CACHE
+
+The metric / curvature / face cache (`Dict{GeometryCacheKey,GeometryCacheEntry}`,
+see the section header for the key and the invalidation rule).
+`SEMQUAD_GEOM_CACHE_LAST` is the one-entry fast path consumed by the hot
+per-leaf accessors; it is a pure memo, never a second source of truth.
+"""
+const SEMQUAD_GEOM_CACHE = Dict{GeometryCacheKey,GeometryCacheEntry}()
+const SEMQUAD_GEOM_CACHE_LAST = Ref{Any}(nothing)
+
+"""
+    empty_semquad_geometry_cache!()
+
+Forget every cached metric/curvature/face table.  This is a memory-management
+and gate-support hook only: the caches are keyed by the full geometry+tree
+identity, so correctness never depends on calling it (invalidation rule in the
+section header).  It returns the number of entries dropped.
+"""
+function empty_semquad_geometry_cache!()
+    n = length(SEMQUAD_GEOM_CACHE)
+    empty!(SEMQUAD_GEOM_CACHE)
+    SEMQUAD_GEOM_CACHE_LAST[] = nothing
+    return n
+end
+
+"""
+    semquad_geometry_cache_stats()
+
+Diagnostics for the gates/docs: the number of live entries, how many of them have
+the leaf-metric / curvature / face tables built, and the total cached leaf
+records.  Read-only; never allocates on the production path.
+"""
+function semquad_geometry_cache_stats()
+    n = length(SEMQUAD_GEOM_CACHE)
+    nlm = 0; nmc = 0; nfm = 0; nleaf = 0
+    for (_, e) in SEMQUAD_GEOM_CACHE
+        e.lm === nothing || (nlm += 1)
+        e.mc === nothing || (nmc += 1)
+        nfm += length(e.fm)
+        nleaf += length(e.leaves)
+    end
+    return (entries=n, metric_tables=nlm, curvature_tables=nmc,
+            face_tables=nfm, leaves=nleaf)
+end
+
+# Degree of the space the layout belongs to: a `SemQuad` has `p`, a bare
+# `Quadtree` layout does not (only its `Lx`/base cells are used).  Cold path
+# only (cache miss), so the `hasproperty` query never touches a hot loop.
+@inline _layout_p(lay) = hasproperty(lay, :p) ? lay.p : 0
+
+@inline function _geom_cache(g::AbstractGeometry, lay, fd::FEData)
+    return _geom_cache_nq(g, lay, fd.nq)
+end
+
+@inline function _geom_cache_nq(g::AbstractGeometry, lay, nq::Int)
+    t = SEMQUAD_GEOM_CACHE_LAST[]
+    if t isa GeometryCacheEntry && t.geom === g && t.lay === lay && t.nq == nq
+        return t::GeometryCacheEntry
+    end
+    return _geom_cache_slow(g, lay, nq)
+end
+
+function _geom_cache_slow(g::AbstractGeometry, lay, nq::Int)
+    key = GeometryCacheKey(geometry_stamp(g), _leafset_hash(lay.leaves),
+                           length(lay.leaves), lay.nx0, lay.ny0,
+                           Float64(lay.Lx), _layout_p(lay), nq)
+    t = get(SEMQUAD_GEOM_CACHE, key, nothing)
+    if t === nothing
+        leaves = sort(collect(lay.leaves))
+        index = Dict{NTuple{3,Int},Int}()
+        sizehint!(index, length(leaves))
+        @inbounds for (li, lf) in enumerate(leaves)
+            index[lf] = li
+        end
+        t = GeometryCacheEntry(key, g, lay, leaves, index, nq, nothing,
+                               nothing, Dict{Tuple{Symbol,Int},Any}())
+        SEMQUAD_GEOM_CACHE[key] = t
+    end
+    SEMQUAD_GEOM_CACHE_LAST[] = t
+    return t::GeometryCacheEntry
+end
+
+# A rule of `nq` points; the metric build only reads `nq` and `gl_x` (the same
+# Gauss-Legendre nodes every `make_fedata` builds for that `nq`).
+_geom_rule(nq::Int) = make_fedata(2, 2; nq=nq)
+
+function _ensure_leaf_metrics!(t::GeometryCacheEntry)
+    t.lm === nothing || return t.lm
+    fd = _geom_rule(t.nq)
+    lm = Vector{MappedLeafMetric}(undef, length(t.leaves))
+    @inbounds for li in eachindex(t.leaves)
+        lm[li] = _build_mapped_leaf_metric(t.geom, t.lay, t.leaves[li], fd)
+    end
+    t.lm = lm
+    return lm
+end
+
+function _ensure_map_curvatures!(t::GeometryCacheEntry)
+    t.mc === nothing || return t.mc
+    fd = _geom_rule(t.nq)
+    mc = Vector{MappedMapCurvature}(undef, length(t.leaves))
+    @inbounds for li in eachindex(t.leaves)
+        mc[li] = _build_mapped_map_curvature(t.geom, t.lay, t.leaves[li], fd)
+    end
+    t.mc = mc
+    return mc
+end
+
+function _ensure_face_metrics!(t::GeometryCacheEntry, side::Symbol,
+                               qs::Vector{Float64})
+    key = (side, length(qs))
+    fms = Vector{MappedFaceMetric}(undef, length(t.leaves))
+    @inbounds for li in eachindex(t.leaves)
+        fms[li] = _build_mapped_face_metric(t.geom, t.lay, t.leaves[li], side, qs)
+    end
+    t.fm[key] = (copy(qs), fms)
+    return fms
 end
 
 # ---------------------------------------------------------------------------

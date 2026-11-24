@@ -12,8 +12,13 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
         throw(ArgumentError("MG coarse_direct_max must be >= 0"))
     geom_assembly in (:minimal, :full) ||
         throw(ArgumentError("MG geom_assembly must be :minimal or :full"))
+    # Cut 5: the geometry identity enters the hierarchy cache key.  A box and a
+    # mapped geometry on the same tree must never share a hierarchy: the levels
+    # store geometry-carrying spaces and their operators are built from the
+    # mapped assembly (GEOM_DESIGN §2.5, risk 5).
+    gstamp = geometry_stamp(ss.su.geom)
     key = (p, qt.nx0, qt.ny0, qt.Lx, bc, deviatoric, wall_bc,
-           length(qt.leaves), hash(qt.leaves),
+           length(qt.leaves), hash(qt.leaves), gstamp,
            coarsen_layers, coarsen_factor, coarse_direct_max, geom_assembly)
     if haskey(SEMQUAD_MG_CACHE, key)
         cached = SEMQUAD_MG_CACHE[key]::SemQuadMGGeom
@@ -45,7 +50,7 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
         lv = nothing
         if cacheable && reuse
             lkey = SemQuadMGLevelKey(idx, nleaf, stamps[idx], p, q.nx0, q.ny0,
-                                     q.Lx, bc, deviatoric, wall_bc)
+                                     q.Lx, bc, deviatoric, wall_bc, gstamp)
             got = get(SEMQUAD_MG_CACHE, lkey, nothing)
             if got isa SemQuadMGLevel
                 lv = got
@@ -75,7 +80,7 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
                 push!(stats.last_rebuilt, idx)
                 reuse && _semquad_mg_level_cache_put!(
                     SemQuadMGLevelKey(idx, nleaf, stamps[idx], p, q.nx0, q.ny0,
-                                      q.Lx, bc, deviatoric, wall_bc), lv)
+                                      q.Lx, bc, deviatoric, wall_bc, gstamp), lv)
             end
         end
         levels[idx] = lv
@@ -130,7 +135,8 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
     nfs = Int[levels[k].nf for k in kept]
     free_rows = Vector{Int}[levels[k].free_rows for k in kept]
     geo = SemQuadMGGeom(p, L, qt.Lx, qt.nx0, qt.ny0, bc, deviatoric,
-                        qts, sss, Cus, Cuts, Ps, nfs, free_rows, coarse_direct)
+                        ss.su.geom, qts, sss, Cus, Cuts, Ps, nfs, free_rows,
+                        coarse_direct)
     SEMQUAD_MG_CACHE[key] = geo
     return geo
 end
@@ -238,7 +244,7 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                          mg_diag::Symbol=:constrained,
                          fine_Cu::Union{Nothing,SparseMatrixCSC{Float64,Int}}=nothing,
                          geom_assembly::Symbol=:minimal,
-                         fine_mfop::Union{Nothing,SemQuadKOp}=nothing,
+                         fine_mfop::Union{Nothing,AnySemQuadKOp}=nothing,
                          fine_mfeta::Union{Nothing,AbstractVector{Float64}}=nothing,
                          wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same))
     smoother in (:jacobi, :sgs) ||
@@ -278,7 +284,7 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                                fine_Cu=fine_Cu, fine_ss=ss,
                                geom_assembly=geom_assembly)
     L = geo.L
-    mfops = Any[]
+    mfops = AnySemQuadKOp[]
     mfetas = SemQuadEtaLane[]
     mfwork = Any[]
     A = Vector{SparseMatrixCSC{Float64,Int}}()
@@ -325,10 +331,10 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                 push!(mfetas, semquad_eta_lanes(opk,
                                                 semquad_eta_field(opk, eta_fun)))
             end
-            push!(mfwork, SemQuadKWork(opk.n, opk.nq, 2 * opk.N))
+            push!(mfwork, SemQuadKWork(opk))
         end
         for k in 1:(L + 1)
-            push!(D, _semquad_diag_reduced(mfops[k]::SemQuadKOp, geo.Cus[k],
+            push!(D, _semquad_diag_reduced(mfops[k]::AnySemQuadKOp, geo.Cus[k],
                                            mfetas[k]::SemQuadEtaLane;
                                            mode=mg_diag))
         end
@@ -349,7 +355,7 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
         else
             n1 = geo.nfs[1]
             A1 = Matrix{Float64}(undef, n1, n1)
-            _semquad_dense_operator!(A1, mfops[1]::SemQuadKOp, geo.Cus[1],
+            _semquad_dense_operator!(A1, mfops[1]::AnySemQuadKOp, geo.Cus[1],
                                      mfetas[1]::SemQuadEtaLane,
                                      mfwork[1]::SemQuadKWork)
             cA = cholesky(Symmetric(A1); check=false)
@@ -423,7 +429,7 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
     par = Any[]
     Pts = Any[]
     if nt > 1 && operator === :matrixfree
-        par = Any[SemQuadKPar(mfops[k]::SemQuadKOp, nt) for k in 1:(L + 1)]
+        par = Any[SemQuadKPar(mfops[k]::AnySemQuadKOp, nt) for k in 1:(L + 1)]
         # Transposed transfer operators: the prolongation is a row gather over
         # `P'`'s CSC (`_semquad_mg_prolong!`), which is bitwise the `mul!`
         # scatter but parallelisable over rows.

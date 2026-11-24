@@ -185,7 +185,7 @@ end
 
 const SEMQUAD_MG_CHUNKS_PER_THREAD = 4
 
-function SemQuadKPar(op::SemQuadKOp, nt::Int)
+function SemQuadKPar(op::AbstractSemQuadKOp, nt::Int)
     nl = op.nleaf
     nt = clamp(nt, 1, max(nl, 1))
     BLK = SEMQUAD_KBLK
@@ -203,18 +203,31 @@ function SemQuadKPar(op::SemQuadKOp, nt::Int)
         cut = min(cld((c * nl) ÷ nchunks, BLK) * BLK, nl)
         bounds[c + 1] = cut + 1
     end
-    scr = [SemQuadKScratch(op.n, op.nq) for _ in 1:nt]
+    scr = [SemQuadKScratch(op.n, op.nq;
+                           mapped = op isa SemQuadKOpMapped) for _ in 1:nt]
     return SemQuadKPar(nt, nchunks, bounds, scr, zeros(op.n * op.n, nl),
                        zeros(op.n * op.n, nl))
 end
 
 # `Val(n)` dispatch of the element-buffer kernel (same list as the serial path).
-function _semquad_kn_blk_store_any!(op::SemQuadKOp,
+# Two concrete kernel families: the historical box body and the cut-5 mapped
+# body; both write the same element-vector buffers in the same leaf order.
+function _semquad_kn_blk_store_any!(op::AbstractSemQuadKOp,
                                     etav::AbstractVector{Float64},
                                     v::AbstractVector{Float64},
                                     scr::SemQuadKScratch, lo::Int, hi::Int,
                                     elx::Matrix{Float64}, elz::Matrix{Float64})
     n = op.n
+    if op isa SemQuadKOpMapped
+        n == 2 && return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(2))
+        n == 3 && return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(3))
+        n == 4 && return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(4))
+        n == 5 && return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(5))
+        n == 6 && return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(6))
+        n == 7 && return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(7))
+        n == 8 && return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(8))
+        return _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, Val(n))
+    end
     n == 2 && return _semquad_kn_blk_store!(op, etav, v, scr, lo, hi, elx, elz, Val(2))
     n == 3 && return _semquad_kn_blk_store!(op, etav, v, scr, lo, hi, elx, elz, Val(3))
     n == 4 && return _semquad_kn_blk_store!(op, etav, v, scr, lo, hi, elx, elz, Val(4))
@@ -232,7 +245,7 @@ Serial scatter-add of the element vectors of the leaves `lo:hi` into the node
 vector: `out[ids[idx, li]] += elx[idx, li]` in increasing `li`, then increasing
 `idx`.  This is the exact accumulation order of the serial kernel.
 """
-function _semquad_scatter_elts!(out::Vector{Float64}, op::SemQuadKOp,
+function _semquad_scatter_elts!(out::Vector{Float64}, op::AbstractSemQuadKOp,
                                 par::SemQuadKPar, lo::Int=1, hi::Int=op.nleaf)
     n2 = op.n * op.n
     N_ = op.N
@@ -255,7 +268,7 @@ end
 contiguous leaf blocks (dynamic scheduling) and the scatter-add done serially in
 leaf order.  Bitwise identical to `_semquad_apply_K_raw!`; see `SemQuadKPar`.
 """
-function _semquad_apply_K_raw_threaded!(out::Vector{Float64}, op::SemQuadKOp,
+function _semquad_apply_K_raw_threaded!(out::Vector{Float64}, op::AbstractSemQuadKOp,
                                         etav::AbstractVector{Float64},
                                         v::AbstractVector{Float64},
                                         par::SemQuadKPar)
@@ -290,7 +303,7 @@ function _semquad_apply_K_raw_threaded!(out::Vector{Float64}, op::SemQuadKOp,
 end
 
 """Leaf chunk `c` of the threaded apply with the worker's own scratch."""
-@inline function _semquad_apply_leaf_chunk!(op::SemQuadKOp,
+@inline function _semquad_apply_leaf_chunk!(op::AbstractSemQuadKOp,
                                             etav::AbstractVector{Float64},
                                             v::AbstractVector{Float64},
                                             scr::SemQuadKScratch,
@@ -310,7 +323,7 @@ on the calling task; only the leaf compute becomes a phase.  Same chunks, same
 kernel, same scatter order as the per-call form, so the result is bitwise equal
 (G223); only the task creation moves out of the per-op path.
 """
-function _semquad_apply_K_raw_region!(out::Vector{Float64}, op::SemQuadKOp,
+function _semquad_apply_K_raw_region!(out::Vector{Float64}, op::AbstractSemQuadKOp,
                                       etav::AbstractVector{Float64},
                                       v::AbstractVector{Float64},
                                       par::SemQuadKPar,
@@ -432,7 +445,7 @@ the `mul!` arithmetic, so the result is bitwise both the serial and the
 serial-`Cu`/threaded-leaf form (G224).  `SEMQUAD_MG_REGION_CU[] = false` calls
 `mul!` on the calling task for the A/B (docs/dev/MG.md).
 """
-function _semquad_apply_Kred_region!(out::Vector{Float64}, op::SemQuadKOp,
+function _semquad_apply_Kred_region!(out::Vector{Float64}, op::AbstractSemQuadKOp,
                                      Cu::SparseMatrixCSC{Float64,Int},
                                      Cut::SparseMatrixCSC{Float64,Int},
                                      etav::AbstractVector{Float64},
@@ -462,7 +475,7 @@ analogue of `_semquad_apply_Kred!`).  The two sparse `Cu` products stay serial
 deterministic); only the leaf-local part is threaded, and it is bitwise
 identical to the serial one.
 """
-function _semquad_apply_Kred_threaded!(out::Vector{Float64}, op::SemQuadKOp,
+function _semquad_apply_Kred_threaded!(out::Vector{Float64}, op::AbstractSemQuadKOp,
                                        Cu::SparseMatrixCSC{Float64,Int},
                                        etav::AbstractVector{Float64},
                                        v::AbstractVector{Float64},
@@ -579,6 +592,125 @@ function _semquad_kn!(out::Vector{Float64}, op::SemQuadKOp,
 end
 
 """
+    _semquad_kn_mapped!(out, op, etav, v, work, ::Val{N})
+
+Scalar matrix-free velocity stiffness for the **mapped** operator (cut 5).  The
+correctness twin of the blocked mapped kernel
+[`_semquad_kn_blk_mapped!`](@ref): it does the four reference-derivative
+contractions, the per-quadrature-point chain rule with the cached `J^{-T}`, the
+design's four weighted reference-space pieces and the four accumulations, leaf by
+leaf.  The box operator is never dispatched here (GEOM_DESIGN §4.3 F5).
+"""
+function _semquad_kn_mapped!(out::Vector{Float64}, op::SemQuadKOpMapped,
+                             etav::AbstractVector{Float64},
+                             v::AbstractVector{Float64}, work::SemQuadKWork,
+                             ::Val{N}) where {N}
+    nq = N + 1
+    N_ = op.N
+    nq2 = nq * nq
+    phi = op.phi; dphi = op.dphi; phiT = op.phiT; dphiT = op.dphiT
+    gl_w = op.gl_w
+    ids = op.ids
+    a2 = op.deviatoric ? 4.0 / 3.0 : 2.0
+    c2 = op.deviatoric ? 2.0 / 3.0 : 0.0
+    xv = work.xv; zv = work.zv
+    uxi_x = work.uxx; ueta_x = work.uxy
+    uxi_z = work.uzx; ueta_z = work.uzy
+    t1 = work.t1
+    Fx1 = work.F
+    Fx2 = work.F2::Matrix{Float64}
+    Fz1 = work.F3::Matrix{Float64}
+    Fz2 = work.F4::Matrix{Float64}
+    ox = work.ox; oz = work.oz
+    detJ = op.detJ
+    j11v = op.j11; j12v = op.j12; j21v = op.j21; j22v = op.j22
+    fill!(out, 0.0)
+    @inbounds for li in 1:op.nleaf
+        for j in 1:N, i in 1:N
+            g = ids[(j - 1) * N + i, li]
+            xv[i, j] = v[g]
+            zv[i, j] = v[N_ + g]
+        end
+        _semquad_contract!(uxi_x, xv, dphi, phi, 1.0, 1.0, t1, Val(N))
+        _semquad_contract!(ueta_x, xv, phi, dphi, 1.0, 1.0, t1, Val(N))
+        _semquad_contract!(uxi_z, zv, dphi, phi, 1.0, 1.0, t1, Val(N))
+        _semquad_contract!(ueta_z, zv, phi, dphi, 1.0, 1.0, t1, Val(N))
+        k0 = (li - 1) * nq2
+        k = k0
+        for qy in 1:nq, qx in 1:nq
+            k += 1
+            W = detJ[k] * gl_w[qx] * gl_w[qy] * etav[k]
+            j11 = j11v[k]; j12 = j12v[k]
+            j21 = j21v[k]; j22 = j22v[k]
+            ax = uxi_x[qx, qy]; bx = ueta_x[qx, qy]
+            az = uxi_z[qx, qy]; bz = ueta_z[qx, qy]
+            uxx = j11 * ax + j12 * bx
+            uxy = j21 * ax + j22 * bx
+            uzx = j11 * az + j12 * bz
+            uzy = j21 * az + j22 * bz
+            A = W * (a2 * uxx - c2 * uzy)
+            Bq = W * (uxy + uzx)
+            Az = W * (a2 * uzy - c2 * uxx)
+            Fx1[qx, qy] = A * j11 + Bq * j21
+            Fx2[qx, qy] = A * j12 + Bq * j22
+            Fz1[qx, qy] = Bq * j11 + Az * j21
+            Fz2[qx, qy] = Bq * j12 + Az * j22
+        end
+        fill!(ox, 0.0); fill!(oz, 0.0)
+        _semquad_accum!(ox, dphi, Fx1, phiT, t1, Val(N))
+        _semquad_accum!(ox, phi, Fx2, dphiT, t1, Val(N))
+        _semquad_accum!(oz, dphi, Fz1, phiT, t1, Val(N))
+        _semquad_accum!(oz, phi, Fz2, dphiT, t1, Val(N))
+        for j in 1:N, i in 1:N
+            g = ids[(j - 1) * N + i, li]
+            out[g] += ox[i, j]
+            out[N_ + g] += oz[i, j]
+        end
+    end
+    return out
+end
+
+"""
+    _semquad_apply_K_raw!(out, op::SemQuadKOpMapped, etav, v, work)
+
+Mapped counterpart of the raw apply: `out = K * v` with the cut-5 mapped kernel
+family.  The blocked variant is the default (`blk > 0`), exactly as on the box.
+"""
+function _semquad_apply_K_raw!(out::Vector{Float64}, op::SemQuadKOpMapped,
+                              etav::AbstractVector{Float64},
+                              v::AbstractVector{Float64}, work::SemQuadKWork;
+                              blk::Int=op.blk)
+    nb = (blk > 0 && op.nleaf >= 2) ? blk : 0
+    n = op.n
+    nb > 0 && return _semquad_apply_K_blk_mapped!(out, op, etav, v, work, nb)
+    n == 2 && return _semquad_kn_mapped!(out, op, etav, v, work, Val(2))
+    n == 3 && return _semquad_kn_mapped!(out, op, etav, v, work, Val(3))
+    n == 4 && return _semquad_kn_mapped!(out, op, etav, v, work, Val(4))
+    n == 5 && return _semquad_kn_mapped!(out, op, etav, v, work, Val(5))
+    n == 6 && return _semquad_kn_mapped!(out, op, etav, v, work, Val(6))
+    n == 7 && return _semquad_kn_mapped!(out, op, etav, v, work, Val(7))
+    n == 8 && return _semquad_kn_mapped!(out, op, etav, v, work, Val(8))
+    return _semquad_kn_mapped!(out, op, etav, v, work, Val(n))
+end
+
+# `Val(n)` dispatch of the serial blocked mapped kernel.
+function _semquad_apply_K_blk_mapped!(out::Vector{Float64},
+                                     op::SemQuadKOpMapped,
+                                     etav::AbstractVector{Float64},
+                                     v::AbstractVector{Float64},
+                                     work::SemQuadKWork, nb::Int)
+    n = op.n
+    n == 2 && return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(2))
+    n == 3 && return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(3))
+    n == 4 && return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(4))
+    n == 5 && return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(5))
+    n == 6 && return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(6))
+    n == 7 && return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(7))
+    n == 8 && return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(8))
+    return _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, Val(n))
+end
+
+"""
     semquad_apply_K!(out, ss, qt, eta, v; deviatoric=false, work=nothing)
 
 Matrix-free `out .= K(eta) * v` for the **unconstrained** quadtree velocity
@@ -602,7 +734,7 @@ function semquad_apply_K!(out::AbstractVector{Float64}, ss::SemStokes,
         "v has $(length(v)) entries, expected 2*N = $(2 * op.N)"))
     length(out) == 2 * op.N || throw(ArgumentError(
         "out has $(length(out)) entries, expected 2*N = $(2 * op.N)"))
-    w = work === nothing ? SemQuadKWork(op.n, op.nq, 2 * op.N) : work
+    w = work === nothing ? SemQuadKWork(op) : work
     etav = _semquad_resolve_eta(op, eta)
     return _semquad_apply_K_raw!(out, op, etav, v, w)
 end
@@ -623,7 +755,7 @@ function semquad_apply_Kred!(out::AbstractVector{Float64}, ss::SemStokes,
                              deviatoric::Bool=false, work=nothing)
     op = semquad_kop(ss, qt; deviatoric=deviatoric)
     N2 = 2 * op.N
-    w = work === nothing ? SemQuadKWork(op.n, op.nq, N2) : work
+    w = work === nothing ? SemQuadKWork(op) : work
     nf = size(Cu, 2)
     length(v) == nf || throw(ArgumentError(
         "v has $(length(v)) entries, expected $(nf) free dofs"))
@@ -639,7 +771,7 @@ end
 Allocation-free core of `semquad_apply_Kred!`, taking the resolved operator and
 viscosity field.  This is what the matrix-free multigrid levels call.
 """
-function _semquad_apply_Kred!(out::Vector{Float64}, op::SemQuadKOp,
+function _semquad_apply_Kred!(out::Vector{Float64}, op::AbstractSemQuadKOp,
                               Cu::SparseMatrixCSC{Float64,Int},
                               etav::AbstractVector{Float64},
                               v::AbstractVector{Float64}, work::SemQuadKWork)

@@ -631,9 +631,18 @@ function _semquad_assemble_blocks(g::AbstractGeometry, nt::Int,
     npq = (sp.p + 1)^2
     Nu2 = 2 * su.N
     has_K = !cfg.mf_path
-    metrics = Vector{MappedLeafMetric}(undef, nleaf)
-    @inbounds for it in 1:nleaf
-        metrics[it] = leaf_metric(g, su, su.leaves[it], fd)
+    # Cut 5: the cached metric table is already in the space's canonical sorted
+    # leaf order, so the assembly reads it directly instead of building one
+    # `MappedLeafMetric` per leaf per call (cut 2/cut 3 allocated +1.9 MB per
+    # assembly at 1024 leaves).  The fallback keeps a non-canonical leaf order
+    # correct.
+    table = _geom_cache(g, su, fd)
+    lmvec = table.lm
+    lmvec === nothing && (lmvec = _ensure_leaf_metrics!(table))
+    metrics = if table.leaves == su.leaves
+        lmvec::Vector{MappedLeafMetric}
+    else
+        MappedLeafMetric[lmvec[table.index[lf]] for lf in su.leaves]
     end
     if nt <= 1
         buf = _semquad_asm_buf(nleaf, nv, npq, Nu2; has_K=has_K,

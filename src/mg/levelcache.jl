@@ -40,7 +40,8 @@
 const SEMQUAD_MG_LEVEL_CACHE = Ref(true)
 
 """
-    SemQuadMGLevelKey(idx, nleaf, stamp, p, nx0, ny0, Lx, bc, deviatoric)
+    SemQuadMGLevelKey(idx, nleaf, stamp, p, nx0, ny0, Lx, bc, deviatoric, wall_bc,
+                      geom)
 
 Cache key of one coarse MG level: the level index (coarse first) plus the
 fingerprint of the level's **own** leaf set (`_semquad_mg_leaf_hash`) and the
@@ -48,6 +49,12 @@ settings that change the level objects for the same leaf set.  Two levels with
 the same leaves and the same settings always get the same key, and the key does
 not depend on anything sampled at build time (eta) -- see the block comment
 above.
+
+Cut 5 adds the geometry stamp: the level stores `SemStokes` spaces that carry
+the geometry, and the mapped assembly of a level is a function of it, so a box
+and an annulus with the same coarse leaf set must never share a cached level
+(GEOM_DESIGN §2.5).  The stamp is `geometry_stamp(g)`, the same identity every
+cut-5 cache key uses.
 """
 struct SemQuadMGLevelKey
     idx::Int
@@ -60,19 +67,22 @@ struct SemQuadMGLevelKey
     bc::Symbol
     deviatoric::Bool
     wall_bc::NTuple{4,Symbol}
+    geom::UInt64
 end
 
 Base.:(==)(a::SemQuadMGLevelKey, b::SemQuadMGLevelKey) =
     a.idx == b.idx && a.nleaf == b.nleaf && a.stamp == b.stamp &&
     a.p == b.p && a.nx0 == b.nx0 && a.ny0 == b.ny0 && a.Lx == b.Lx &&
-    a.bc === b.bc && a.deviatoric == b.deviatoric && a.wall_bc == b.wall_bc
+    a.bc === b.bc && a.deviatoric == b.deviatoric && a.wall_bc == b.wall_bc &&
+    a.geom == b.geom
 Base.hash(k::SemQuadMGLevelKey, h::UInt) =
-    hash(k.stamp, hash(k.idx, hash(k.nleaf, hash(k.p, hash(k.bc,
-              hash(k.wall_bc, hash(k.Lx, h)))))))
+    hash(k.geom, hash(k.stamp, hash(k.idx, hash(k.nleaf, hash(k.p, hash(k.bc,
+              hash(k.wall_bc, hash(k.Lx, h))))))))
 
 function Base.show(io::IO, k::SemQuadMGLevelKey)
     print(io, "SemQuadMGLevelKey(level=", k.idx, ", leaves=", k.nleaf,
-          ", stamp=", string(k.stamp; base=16), ")")
+          ", stamp=", string(k.stamp; base=16),
+          ", geom=", string(k.geom; base=16), ")")
 end
 
 """
@@ -140,18 +150,12 @@ mix of every `(level, ix, iy)` triple.  XOR is order independent, so this is the
 hash of the *sorted* leaf set without sorting it, it never depends on Julia's
 `hash` seed or on `objectid`, and equal leaf sets always give equal values --
 inside one process and across processes (G221 (a)).  The leaf count is carried
-separately in the cache key.
+separately in the cache key.  Cut 5: the function is `_leafset_hash` in the
+geometry layer now (one definition, shared with the metric cache); this name is
+kept because the MG cache keys and G221 use it.
 """
 function _semquad_mg_leaf_hash(leaves)::UInt64
-    h = UInt64(0)
-    @inbounds for lf in leaves
-        z = (UInt64(lf[1]) << 42) ⊻ (UInt64(lf[2]) << 21) ⊻ UInt64(lf[3])
-        z += 0x9e3779b97f4a7c15
-        z = (z ⊻ (z >> 30)) * 0xbf58476d1ce4e5b9
-        z = (z ⊻ (z >> 27)) * 0x94d049bb133111eb
-        h ⊻= (z ⊻ (z >> 31))
-    end
-    return h
+    return _leafset_hash(leaves)
 end
 
 """Number of per-level entries currently held by `SEMQUAD_MG_CACHE`."""

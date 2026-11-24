@@ -65,3 +65,28 @@ The wall-integrating diagnostics use the mapped face metric at the **GLL** nodes
 wall rule (E8), so the box-map cross-check in G270 is a round-off comparison.
 The measures are cold code: they are never called inside an operator kernel.
 
+The **metric / curvature / face cache** (cut 5, `GEOM_DESIGN` §2.5) makes the
+warm mapped path allocation-free: `leaf_metric`, `map_curvature` and
+`_mapped_face_metric` read per-leaf tables cached in `SEMQUAD_GEOM_CACHE`,
+keyed exactly by `(geometry_stamp(g), _leafset_hash(leaves), nleaf, nx0, ny0,
+Lx, p, nq)` (`GeometryCacheKey`).  `geometry_stamp` is the 64-bit deterministic
+stamp of `geometry_identity`'s parameter set (raw `Float64` bits + type tag), so
+a box and a mapped geometry on the same tree can never share an entry; the entry
+is a pure function of its key (never invalidated: a new geometry/tree/degree/
+rule is a new key; `empty_semquad_geometry_cache!()` is for memory management and
+gates only).  The three tables are lazy slots on one entry: the volume metric,
+the map curvature and the per-side face metric are built only when a kernel asks
+for them, so a face-only wall loop builds no volume table.  The box path never
+touches the cache (its methods are the historical seven-scalar expressions and
+the 4-argument `leaf_metric` on a `CartesianBox` returns the 3-argument box
+metric).  `semquad_geometry_cache_stats()` reports the live entries.
+
+The **logical face-pair list** is cached the same way
+(`LOGICAL_FACE_PAIR_CACHE`, keyed by leaf-set fingerprint + layout in
+`quadtree.jl`): it is topology and must not see the geometry (`GEOM_DESIGN`
+§2.1 rule 4), so its key carries no geometry stamp and a geometry change never
+invalidates it.  Before cut 5 every mapped `semquad_constraints` rebuilt the
+list (~1.5 MB per call at 1024 leaves, cut-2 record); the mapped constraints and
+assemblies now reuse it, with the same read-only contract as the box
+`face_pairs` cache.
+

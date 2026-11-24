@@ -130,6 +130,13 @@ grid resolution is reported in docs/dev/SOLVER.md §20.
 """
 function semquad_eta_contrast(su::SemQuad, eta_fun::Function;
                               npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
+    return semquad_eta_contrast(su.geom, su, eta_fun; npoints=npoints)
+end
+
+# Historical box body, verbatim: the sample points are the Cartesian grid
+# `[0,Lx] x [0,1]`, which on the box is the physical domain.
+function semquad_eta_contrast(::CartesianBox, su::SemQuad, eta_fun::Function;
+                              npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
     n = max(1, npoints)
     Lx = su.Lx
     lo = Inf; hi = 0.0
@@ -137,6 +144,28 @@ function semquad_eta_contrast(su::SemQuad, eta_fun::Function;
         e = eta_fun(Lx * (i / n), j / n)
         e > 0.0 || throw(ArgumentError("eta_fun returned $e <= 0 at " *
                                        "($(Lx * i / n), $(j / n))"))
+        lo = min(lo, e); hi = max(hi, e)
+    end
+    return hi / lo
+end
+
+# Cut 5 mapped body: the same fixed `(npoints+1)^2` grid, but in **logical**
+# coordinates mapped through the geometry — the sample must cover the physical
+# domain the solve actually uses, so a mapped run's `:auto` contrast is measured
+# on the mapped eta field (GEOM_DESIGN §3 cut 5, `stokes/selector.jl` row: the
+# contrast sampler grid samples the physical domain through the map).  The box
+# sampler above is untouched and bitwise unchanged.
+function semquad_eta_contrast(g::AbstractGeometry, su::SemQuad,
+                              eta_fun::Function;
+                              npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
+    n = max(1, npoints)
+    Lx = su.Lx
+    lo = Inf; hi = 0.0
+    @inbounds for j in 0:n, i in 0:n
+        x, y = logical_map(g, Lx * (i / n), j / n)
+        e = eta_fun(x, y)
+        e > 0.0 || throw(ArgumentError("eta_fun returned $e <= 0 at " *
+                                       "($x, $y)"))
         lo = min(lo, e); hi = max(hi, e)
     end
     return hi / lo
@@ -435,8 +464,19 @@ Diagonal of the velocity mass matrix `int w(x,y) u_i u_j` on the velocity space
 `su`, computed leaf by leaf and scatter-added (`d` has length `su.N`).  The
 assembled matrix has `(p+1)^4` entries per quadrature point; the diagonal has
 `(p+1)^2`, so this is ~25x cheaper at p=4 and needs no sparse matrix at all.
+
+Dispatches on the geometry (cut 5): the box body is the historical expression;
+the mapped body takes the measure and the point from the cached leaf metric so
+the BFBT lumped diagonal is correct on a mapped geometry (the mapped BFBT
+pressure preconditioner of `linear=:mg`).
 """
 function _semquad_mass_diag!(d::Vector{Float64}, su::SemQuad, w::Function)
+    return _semquad_mass_diag!(d, su.geom, su, w)
+end
+
+# Historical box body, verbatim.
+function _semquad_mass_diag!(d::Vector{Float64}, ::CartesianBox, su::SemQuad,
+                             w::Function)
     p = su.p
     n = p + 1
     # `assemble_semquad_pressure_mass(su)` builds `make_fedata(2, su.p)` and uses
@@ -456,6 +496,34 @@ function _semquad_mass_diag!(d::Vector{Float64}, su::SemQuad, w::Function)
             wq = 0.25 * hx * hy * fd.gl_w[qx] * fd.gl_w[qy] *
                  w(x0 + 0.5 * (fd.gl_x[qx] + 1.0) * hx,
                    y0 + 0.5 * (fd.gl_x[qy] + 1.0) * hy)
+            for j in 1:n, i in 1:n
+                ph = fd.phi_p[i, qx] * fd.phi_p[j, qy]
+                dloc[(j - 1) * n + i] += wq * ph * ph
+            end
+        end
+        for idx in 1:(n * n)
+            d[uids[idx]] += dloc[idx]
+        end
+    end
+    return d
+end
+
+# Mapped body: the cached leaf metric supplies `detJ*gl_w*gl_w` and the mapped
+# quadrature point; the basis and the scatter order are the box body's.
+function _semquad_mass_diag!(d::Vector{Float64}, g::AbstractGeometry,
+                             su::SemQuad, w::Function)
+    p = su.p
+    n = p + 1
+    fd = make_fedata(2, p)
+    dloc = zeros(Float64, n * n)
+    fill!(d, 0.0)
+    @inbounds for lf in su.leaves
+        lm = leaf_metric(g, su, lf, fd)
+        uids = su.elem[lf]
+        fill!(dloc, 0.0)
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            x, y = quad_point(lm, su, lf, fd, qx, qy)
+            wq = quad_measure(lm, fd, qx, qy) * w(x, y)
             for j in 1:n, i in 1:n
                 ph = fd.phi_p[i, qx] * fd.phi_p[j, qy]
                 dloc[(j - 1) * n + i] += wq * ph * ph

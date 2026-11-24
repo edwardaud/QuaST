@@ -502,6 +502,12 @@ ones.  The two agree on a square-leaf single-root unit box; a mapped geometry
 passes the physical face point/measure to its kernels instead of using these
 (the annulus stage).  The current consumers (indicator, constraints, assembly)
 read only `leafL`, `leafR` and `dir`, so no caller depends on the units.
+
+Cut 5 caches the list per `(leaf-set fingerprint, layout)` in
+[`LOGICAL_FACE_PAIR_CACHE`](@ref); the mapped constraints and every mapped
+assembly reuse it, so the warm mapped path does not rebuild it (the cut-2 record
+measured that rebuild at ~1.5 MB per call at 1024 leaves).  The key carries no
+geometry because the list is topology, not metric.
 """
 @inline function _flip_dir(dir::Symbol)
     dir === :xplus && return :xminus
@@ -510,7 +516,39 @@ read only `leafL`, `leafR` and `dir`, so no caller depends on the units.
     return :yplus
 end
 
+"""
+    LOGICAL_FACE_PAIR_CACHE
+
+Per-tree cache of [`face_pairs_logical`](@ref) (cut 5): the logical pair list is
+a pure function of the leaf set and the base cells — it must not see the geometry
+(GEOM_DESIGN §2.1 rule 4) — so it is keyed by the leaf-set fingerprint and the
+layout, and a geometry change never invalidates it (there is nothing geometric
+to invalidate).  This is the "logical face-pair connection" the cut-2 record
+assigned to cut 5: before it every mapped `semquad_constraints` rebuilt the list
+(~1.5 MB at 1024 leaves), every mapped assembly call.  Same read-only contract as
+the box `face_pairs` cache: callers must not mutate the returned vector.
+
+Invalidation rule: a new key is a new leaf set/layout; entries are never mutated;
+`empty!(LOGICAL_FACE_PAIR_CACHE)` is the only clearing operation.
+"""
+const LOGICAL_FACE_PAIR_CACHE = Dict{Any,Vector{FacePair}}()
+
+"""Cache key of one logical face-pair list: leaf set + layout (topology only)."""
+function _logical_face_pair_key(qt::Quadtree)
+    return (_leafset_hash(qt.leaves), length(qt.leaves), qt.nx0, qt.ny0,
+            qt.Lx)
+end
+
 function face_pairs_logical(qt::Quadtree)
+    key = _logical_face_pair_key(qt)
+    cached = get(LOGICAL_FACE_PAIR_CACHE, key, nothing)
+    cached === nothing || return cached
+    out = _build_face_pairs_logical(qt)
+    LOGICAL_FACE_PAIR_CACHE[key] = out
+    return out
+end
+
+function _build_face_pairs_logical(qt::Quadtree)
     out = FacePair[]
     seen = Set{NTuple{7,Int}}()
     for leaf in sort(collect(qt.leaves)), d in 1:4

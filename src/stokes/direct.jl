@@ -20,9 +20,27 @@ const LAST_SEMSTOKES_LAGGED_ITERS = Ref(0)
 const LAST_SEMSTOKES_LAGGED_REFACTOR = Ref(false)
 const SEMSTOKES_LAGGED_REFACTORS = Ref(0)
 
-"""Order-independent fingerprint of the tree plus the solver geometry."""
-function _saddle_key(qt::Quadtree, p::Int, bc::Symbol, nf::Int, nfp::Int)
-    h = hash((p, bc, nf, nfp))
+"""Order-independent fingerprint of the tree plus the solver geometry.
+
+Cut 5: the **geometry identity** is part of the fingerprint.  Before it, the key
+was a hash of `(p, bc, nf, nfp)` plus the leaf list and therefore carried no
+geometry at all: a box and a mapped geometry on the same tree, with the same
+Dirichlet/hanging count, produced the *same* key, so the stale-LU cache and the
+pressure-preconditioner cache would have handed a mapped solve the box
+factorisation (GEOM_DESIGN §2.5, §8 risk 5).  The geometry enters as
+`geometry_stamp`, so the pair of keys can never collide in one process unless
+two different geometries hash to the same 64-bit stamp.
+
+Invalidation rule: the key is the complete validity statement of both caches --
+a tree change (leaf list), a degree/BC/constraint-count change or a geometry
+change is a different key; the *viscosity* is not in the key and the caches
+handle it with their own eta-drift tolerance / iterative-refinement acceptance
+(that is the documented stale-factor design), so the geometry is the only
+silently-changing input this key was missing.
+"""
+function _saddle_key(qt::Quadtree, geom::AbstractGeometry, p::Int, bc::Symbol,
+                     nf::Int, nfp::Int)
+    h = hash((p, bc, nf, nfp, geometry_stamp(geom)))
     lvs = collect(qt.leaves)
     sort!(lvs)
     for lf in lvs
@@ -30,6 +48,15 @@ function _saddle_key(qt::Quadtree, p::Int, bc::Symbol, nf::Int, nfp::Int)
     end
     return h
 end
+
+# Backward-compatible historical form: a 5-argument call means the production
+# box, whose geometry is fully determined by the tree's `Lx` (the validation and
+# annulus geometries must pass themselves explicitly).  This keeps every
+# pre-cut-5 caller -- including the box-only legacy uniform-mesh path in
+# `stokes/solve_const.jl` and the pressure-cache gates -- on the box geometry
+# rather than silently omitting the identity from the key.
+_saddle_key(qt::Quadtree, p::Int, bc::Symbol, nf::Int, nfp::Int) =
+    _saddle_key(qt, CartesianBox(qt), p, bc, nf, nfp)
 
 """
     _lagged_solve!(S, rhs, key; tol=1e-8, maxit=6, force_refactor=false)

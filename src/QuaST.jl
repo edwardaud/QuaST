@@ -177,6 +177,8 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        leaf_vertical_size, minimum_leaf_size, minimum_leaf_height,
        nu_wall_sides, upward_velocity,
        BoxLeafMetric, MappedLeafMetric, BoxFaceMetric, MappedFaceMetric,
+       geometry_stamp, empty_semquad_geometry_cache!, semquad_geometry_cache_stats,
+       AbstractSemQuadKOp, SemQuadKOpMapped,
        make_semquad, semquad_constraints, assemble_semquad_poisson, transfer_semquad,
        semquad_mass, semquad_gradient_jump, semquad_velocity_jump,
        semquad_combined_jump,

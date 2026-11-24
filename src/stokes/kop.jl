@@ -34,6 +34,26 @@
 # dependences through shared nodes.
 
 """
+    AbstractSemQuadKOp
+
+Supertype of the leaf-local matrix-free velocity operators:
+
+* [`SemQuadKOp`](@ref) — the historical box operator, whose per-leaf data are
+  the seven box scalars (`2/hx`, `2/hy`, `hx*hy/4`) and the historical point
+  map.  Its kernel bodies are the current expressions, character for character
+  (GEOM_DESIGN §4: the box path must stay bitwise identical);
+* [`SemQuadKOpMapped`](@ref) — the mapped operator of cut 5, whose per-leaf data
+  are the cached `det J` and `J^{-T}` arrays plus the physical quadrature points.
+
+Keeping them as two concrete types is what lets every kernel method be a
+separate body (the box body is never routed through the general Jacobian,
+GEOM_DESIGN §4.3 F1/F5), while the gather/scatter, the eta sampling/lanes, the
+threaded block partition and the MG plumbing are shared: they only read the
+common fields that both structs declare with the same names.
+"""
+abstract type AbstractSemQuadKOp end
+
+"""
     SemQuadKOp
 
 Leaf-local geometry and 1-D basis data for the matrix-free velocity stiffness.
@@ -42,7 +62,7 @@ Leaf-local geometry and 1-D basis data for the matrix-free velocity stiffness.
 `xq`/`yq` the quadrature-point coordinates (used only when the viscosity is
 supplied as a function).
 """
-struct SemQuadKOp
+struct SemQuadKOp <: AbstractSemQuadKOp
     p::Int
     n::Int
     q::Int
@@ -65,6 +85,55 @@ struct SemQuadKOp
 end
 
 """
+    SemQuadKOpMapped
+
+Leaf-local data of the **mapped** matrix-free velocity stiffness (cut 5).  It
+carries the same gather/scatter and 1-D basis tables as [`SemQuadKOp`](@ref), but
+instead of the box scalars it holds the per-leaf/per-quadrature-point metric
+from the geometry cache (GEOM_DESIGN §2.5/§2.6):
+
+* `detJ[k]` — the volume factor `det J` at quadrature point `k`;
+* `j11..j22[k]` — the four entries of `J^{-T}` in the cut-1 order
+  `(xi_x, eta_x, xi_y, eta_y)`;
+* `xq/yq[k]` — the physical quadrature point (only for sampling a viscosity
+  function, exactly like the box operator's `xq`/`yq`).
+
+The arrays are flat and leaf-major (`(li-1)*nq^2 + k`), so the mapped kernels
+index precomputed `Vector{Float64}`s and never evaluate the map inside a loop.
+"""
+struct SemQuadKOpMapped <: AbstractSemQuadKOp
+    p::Int
+    n::Int
+    q::Int
+    nq::Int
+    deviatoric::Bool
+    nleaf::Int
+    N::Int
+    gl_w::Vector{Float64}
+    phi::Matrix{Float64}
+    dphi::Matrix{Float64}
+    phiT::Matrix{Float64}
+    dphiT::Matrix{Float64}
+    ids::Matrix{Int}
+    detJ::Vector{Float64}                # nleaf*nq*nq
+    j11::Vector{Float64}
+    j12::Vector{Float64}
+    j21::Vector{Float64}
+    j22::Vector{Float64}
+    xq::Vector{Float64}
+    yq::Vector{Float64}
+    blk::Int
+end
+
+# The two concrete operator types as a small union: the caches and the MG
+# hierarchy store operators in heterogeneous containers, and a `Union` of two
+# concrete types lets the compiler union-split the kernel call (a *type-stable*
+# dispatch, measured 0 B per apply) where an `::AbstractSemQuadKOp` annotation
+# would force a dynamic dispatch (measured 96 B per MG apply, i.e. the box path
+# would have regressed against G222's zero-allocation assertion).
+const AnySemQuadKOp = Union{SemQuadKOp,SemQuadKOpMapped}
+
+"""
     SemQuadKScratch
 
 The `SEMQUAD_KBLK`-lane scratch of the leaf-blocked kernel: the gathered nodal
@@ -83,6 +152,12 @@ struct SemQuadKScratch
     buzy::Array{Float64,3}               # (BLK, nq, nq) du_z/dy
     bt1::Array{Float64,3}                # (BLK, n, nq) tensor-product work
     bF::Array{Float64,3}                 # (BLK, nq, nq) weighted gradients
+    # Cut-5 mapped kernels only; `nothing` on the box path so the box solver
+    # allocates exactly the historical scratch (the mapped bodies assert them
+    # non-nothing at their first use).
+    bF2::Union{Nothing,Array{Float64,3}} # (BLK, nq, nq)
+    bF3::Union{Nothing,Array{Float64,3}}
+    bF4::Union{Nothing,Array{Float64,3}}
     box::Array{Float64,3}                # (BLK, n, n) leaf-local x output
     boz::Array{Float64,3}                # (BLK, n, n) leaf-local z output
     bshx::Vector{Float64}                # (BLK) 2/hx per block lane
@@ -92,11 +167,22 @@ struct SemQuadKScratch
     bkofs::Vector{Int}                   # (BLK) per-lane offset into etav
 end
 
-function SemQuadKScratch(n::Int, nq::Int)
+"""
+    SemQuadKScratch(n, nq; mapped=false)
+
+The SIMD-block scratch buffers.  `mapped=true` additionally allocates the three
+extra weighted-gradient planes the cut-5 mapped blocked kernel needs; the box
+kernel keeps the historical set (`mapped=false`), so a box hierarchy build or
+apply allocates no mapped-only scratch (measured: exactly the pre-cut-5 bytes).
+"""
+function SemQuadKScratch(n::Int, nq::Int; mapped::Bool=false)
     B = SEMQUAD_KBLK
+    xs = mapped ? (zeros(B, nq, nq), zeros(B, nq, nq), zeros(B, nq, nq)) :
+                  (nothing, nothing, nothing)
     SemQuadKScratch(zeros(B, n * n), zeros(B, n * n),
                     zeros(B, nq, nq), zeros(B, nq, nq), zeros(B, nq, nq),
                     zeros(B, nq, nq), zeros(B, n, nq), zeros(B, nq, nq),
+                    xs[1], xs[2], xs[3],
                     zeros(B, n, n), zeros(B, n, n),
                     zeros(Float64, B), zeros(Float64, B), zeros(Float64, B),
                     ones(Float64, B), zeros(Int, B))
@@ -122,6 +208,11 @@ struct SemQuadKWork
     t1::Matrix{Float64}
     t2::Matrix{Float64}
     F::Matrix{Float64}
+    # Cut-5 mapped kernels only (`nothing` on the box path: the box assembler,
+    # hierarchy build and apply allocate exactly the historical scratch).
+    F2::Union{Nothing,Matrix{Float64}}
+    F3::Union{Nothing,Matrix{Float64}}
+    F4::Union{Nothing,Matrix{Float64}}
     ox::Matrix{Float64}
     oz::Matrix{Float64}
     full::Vector{Float64}
@@ -129,11 +220,27 @@ struct SemQuadKWork
     bs::SemQuadKScratch
 end
 
-function SemQuadKWork(n::Int, nq::Int, N2::Int)
+function SemQuadKWork(n::Int, nq::Int, N2::Int; mapped::Bool=false)
+    Fs = mapped ? (zeros(nq, nq), zeros(nq, nq), zeros(nq, nq)) :
+                  (nothing, nothing, nothing)
     SemQuadKWork(zeros(n, n), zeros(n, n), zeros(nq, nq), zeros(nq, nq),
                  zeros(nq, nq), zeros(nq, nq), zeros(n, nq), zeros(n, nq),
-                 zeros(nq, nq), zeros(n, n), zeros(n, n), zeros(N2), zeros(N2),
-                 SemQuadKScratch(n, nq))
+                 zeros(nq, nq), Fs[1], Fs[2], Fs[3],
+                 zeros(n, n), zeros(n, n), zeros(N2), zeros(N2),
+                 SemQuadKScratch(n, nq; mapped=mapped))
+end
+
+"""
+    SemQuadKWork(op::AbstractSemQuadKOp)
+
+Scratch sized for `op`, with the cut-5 mapped-only buffers allocated iff the
+operator is mapped.  This is the constructor the solve/hierarchy builders use, so
+a box run allocates exactly the pre-cut-5 scratch and a mapped run has everything
+its kernel needs.
+"""
+function SemQuadKWork(op::AbstractSemQuadKOp)
+    return SemQuadKWork(op.n, op.nq, 2 * op.N;
+                        mapped = op isa SemQuadKOpMapped)
 end
 
 function SemQuadKOp(p::Int, n::Int, q::Int, nq::Int, deviatoric::Bool, nl::Int, N::Int,
@@ -146,16 +253,59 @@ function SemQuadKOp(p::Int, n::Int, q::Int, nq::Int, deviatoric::Bool, nl::Int, 
                ids, ihx, ihy, wfac, xq, yq, SEMQUAD_KBLK)
 end
 
-const SEMQUAD_KOP_CACHE = Dict{Any,SemQuadKOp}()
+const SEMQUAD_KOP_CACHE = Dict{Any,AnySemQuadKOp}()
 
-"""Build (or fetch from cache) the leaf-local data of the matrix-free `K`."""
-function semquad_kop(ss::SemStokes, qt::Quadtree; deviatoric::Bool=false)
+"""
+    _semquad_kop_key(ss, qt, deviatoric) -> Tuple
+
+The cache key of [`semquad_kop`](@ref): the historical layout/degree fields, the
+leaf-set fingerprint and (cut 5) the geometry stamp.  Exposed so the gate can
+assert that two geometries on one tree give two distinct keys (and that the
+pre-cut key, which lacks the stamp, did not).
+"""
+function _semquad_kop_key(ss::SemStokes, qt::Quadtree, deviatoric::Bool)
     su = ss.su
-    key = (ss.p, ss.q, qt.nx0, qt.ny0, qt.Lx, deviatoric,
-           length(qt.leaves), hash(qt.leaves))
+    return (ss.p, ss.q, qt.nx0, qt.ny0, qt.Lx, deviatoric,
+            length(qt.leaves), hash(qt.leaves), geometry_stamp(su.geom))
+end
+
+"""
+    semquad_kop(ss, qt; deviatoric=false) -> AbstractSemQuadKOp
+
+Build (or fetch from cache) the leaf-local data of the matrix-free `K`.
+
+The cache key is the historical `(p, q, nx0, ny0, Lx, deviatoric, nleaf,
+leafhash)` **plus the geometry stamp** (GEOM_DESIGN §2.5; cut 5).  Without the
+geometry the same tree under two geometries (`CartesianBox` and an annulus, or
+two validation geometries) would share one operator: a mapped space would get a
+box operator or vice versa — the collision class §8 risk 5 warns about and G271
+(d) measures.  The box and the mapped geometry also produce different *types*
+(`SemQuadKOp` vs `SemQuadKOpMapped`), so a wrong hit is a wrong operator, not a
+wrong buffer.
+
+Invalidation rule: the operator is a pure function of the key (tree leaf set,
+layout, degree, viscosity input is passed to the apply, not stored here) and the
+entry is never invalidated in place; a tree change or a geometry change is a new
+key.  `empty!(SEMQUAD_KOP_CACHE)` (or the process exit) is the only clearing
+operation, as before.
+"""
+function semquad_kop(ss::SemStokes, qt::Quadtree; deviatoric::Bool=false)
+    key = _semquad_kop_key(ss, qt, deviatoric)
     if haskey(SEMQUAD_KOP_CACHE, key)
-        return SEMQUAD_KOP_CACHE[key]::SemQuadKOp
+        return SEMQUAD_KOP_CACHE[key]::AnySemQuadKOp
     end
+    op = ss.su.geom isa CartesianBox ?
+         _semquad_kop_box(ss, qt, deviatoric) :
+         _semquad_kop_mapped(ss, qt, deviatoric)
+    SEMQUAD_KOP_CACHE[key] = op
+    return op
+end
+
+# Historical box body: the seven box scalars per leaf and the historical point
+# map, character for character (GEOM_DESIGN E6).  Never reachable through the
+# mapped branch below.
+function _semquad_kop_box(ss::SemStokes, qt::Quadtree, deviatoric::Bool)
+    su = ss.su
     p = ss.p
     q = ss.q
     fd = make_fedata(p, q)
@@ -184,16 +334,67 @@ function semquad_kop(ss::SemStokes, qt::Quadtree; deviatoric::Bool=false)
             yq[k] = y0 + 0.5 * (fd.gl_x[qy] + 1.0) * hy
         end
     end
-    op = SemQuadKOp(p, n, q, nq, deviatoric, nl, su.N, fd.gl_w,
-                    copy(fd.phi_v), copy(fd.dphi_v),
-                    Matrix(transpose(fd.phi_v)), Matrix(transpose(fd.dphi_v)),
-                    ids, ihx, ihy, wfac, xq, yq, SEMQUAD_KBLK)
-    SEMQUAD_KOP_CACHE[key] = op
-    return op
+    return SemQuadKOp(p, n, q, nq, deviatoric, nl, su.N, fd.gl_w,
+                      copy(fd.phi_v), copy(fd.dphi_v),
+                      Matrix(transpose(fd.phi_v)), Matrix(transpose(fd.dphi_v)),
+                      ids, ihx, ihy, wfac, xq, yq, SEMQUAD_KBLK)
+end
+
+# Mapped body: the per-leaf/per-quadrature-point metric from the geometry cache
+# (GEOM_DESIGN §2.5/§2.6).  The leaf order is the cache's canonical sorted order,
+# which is also the box operator's `sort(collect(qt.leaves))` order.
+function _semquad_kop_mapped(ss::SemStokes, qt::Quadtree, deviatoric::Bool)
+    su = ss.su
+    g = su.geom
+    p = ss.p
+    q = ss.q
+    fd = make_fedata(p, q)
+    n = p + 1
+    nq = fd.nq
+    n2 = nq * nq
+    table = _geom_cache(g, su, fd)
+    lm = table.lm
+    lm === nothing && (lm = _ensure_leaf_metrics!(table))
+    leaves = table.leaves
+    nl = length(leaves)
+    nl == length(qt.leaves) ||
+        throw(ArgumentError("the mapped operator's space has $(nl) leaves but " *
+                            "the tree has $(length(qt.leaves))"))
+    ids = Matrix{Int}(undef, n * n, nl)
+    detJ = Vector{Float64}(undef, nl * n2)
+    j11 = Vector{Float64}(undef, nl * n2)
+    j12 = Vector{Float64}(undef, nl * n2)
+    j21 = Vector{Float64}(undef, nl * n2)
+    j22 = Vector{Float64}(undef, nl * n2)
+    xq = Vector{Float64}(undef, nl * n2)
+    yq = Vector{Float64}(undef, nl * n2)
+    @inbounds for li in 1:nl
+        lf = leaves[li]
+        uids = su.elem[lf]
+        for idx in 1:(n * n)
+            ids[idx, li] = uids[idx]
+        end
+        m = (lm::Vector{MappedLeafMetric})[table.index[lf]]
+        k0 = (li - 1) * n2
+        for k in 1:n2
+            detJ[k0 + k] = m.detJ[k]
+            j11[k0 + k] = m.jinv[1][k]
+            j12[k0 + k] = m.jinv[2][k]
+            j21[k0 + k] = m.jinv[3][k]
+            j22[k0 + k] = m.jinv[4][k]
+            xq[k0 + k] = m.xq[k]
+            yq[k0 + k] = m.yq[k]
+        end
+    end
+    return SemQuadKOpMapped(p, n, q, nq, deviatoric, nl, su.N, fd.gl_w,
+                            copy(fd.phi_v), copy(fd.dphi_v),
+                            Matrix(transpose(fd.phi_v)),
+                            Matrix(transpose(fd.dphi_v)), ids,
+                            detJ, j11, j12, j21, j22, xq, yq, SEMQUAD_KBLK)
 end
 
 """Viscosity sampled once at every leaf/quadrature point of `op`."""
-function semquad_eta_field(op::SemQuadKOp, eta::Function)
+function semquad_eta_field(op::AbstractSemQuadKOp, eta::Function)
     vals = Vector{Float64}(undef, length(op.xq))
     @inbounds for i in eachindex(vals)
         vals[i] = eta(op.xq[i], op.yq[i])
@@ -201,7 +402,7 @@ function semquad_eta_field(op::SemQuadKOp, eta::Function)
     return vals
 end
 
-@inline function _semquad_resolve_eta(op::SemQuadKOp, eta)
+@inline function _semquad_resolve_eta(op::AbstractSemQuadKOp, eta)
     eta isa Function && return semquad_eta_field(op, eta)
     length(eta) == length(op.xq) ||
         throw(ArgumentError("eta has $(length(eta)) values, expected one per " *
@@ -261,7 +462,7 @@ Cost: one pass over `nleaf*nq^2` doubles and `nblk*nq^2*BLK` of storage, i.e.
 the size of the field rounded up to a whole number of `SEMQUAD_KBLK` blocks
 (`F` level 6: 131 008 -> 131 072 doubles, `P1` level 7: 160 000 -> 160 256).
 """
-function semquad_eta_lanes(op::SemQuadKOp, etav::AbstractVector{Float64})
+function semquad_eta_lanes(op::AbstractSemQuadKOp, etav::AbstractVector{Float64})
     nq2 = op.nq * op.nq
     nl = op.nleaf
     length(etav) == nl * nq2 ||
@@ -288,7 +489,7 @@ function semquad_eta_lanes(op::SemQuadKOp, etav::AbstractVector{Float64})
     return SemQuadEtaLane(scalar, lane, nl, nq2)
 end
 
-function semquad_eta_lanes(op::SemQuadKOp, e::SemQuadEtaLane)
+function semquad_eta_lanes(op::AbstractSemQuadKOp, e::SemQuadEtaLane)
     (e.nleaf == op.nleaf && e.nq2 == op.nq * op.nq) ||
         throw(ArgumentError("SemQuadEtaLane was built for $(e.nleaf) leaves x " *
                             "$(e.nq2) quadrature points, but this operator has " *
@@ -651,6 +852,199 @@ function _semquad_kn_blk_body!(out::Union{Vector{Float64},Nothing},
             end
         end
         _semquad_accum_blk!(oz, dphi, F, phiT, t1, Val(N))
+        if STORE
+            for b in 1:BLK
+                b <= nb || continue          # padded lanes write nothing
+                li = lb + b - 1
+                for idx in 1:n2
+                    elx[idx, li] = ox[b, idx]
+                    elz[idx, li] = oz[b, idx]
+                end
+            end
+        else
+            for b in 1:BLK
+                b <= nb || continue          # padded lanes write nothing
+                li = lb + b - 1
+                for idx in 1:n2
+                    g = ids[idx, li]
+                    out[g] += ox[b, idx]
+                    out[N_ + g] += oz[b, idx]
+                end
+            end
+        end
+    end
+    if STORE
+        return nothing
+    end
+    return out
+end
+
+"""
+    _semquad_kn_blk_mapped!(out, op, etav, v, work, nb, ::Val{N})
+
+Leaf-blocked matrix-free velocity stiffness for the **mapped** operator (cut 5,
+GEOM_DESIGN §2.6).  Same block/lane structure, scratch reuse and scatter order as
+the box kernel [`_semquad_kn_blk!`](@ref) — only the element arithmetic differs:
+
+* the four tensor-product contractions produce the **raw reference** derivatives
+  `u_{x,xi}, u_{x,eta}, u_{z,xi}, u_{z,eta}` (the box kernel folds `2/hx`/`2/hy`
+  into the contraction here instead);
+* at every quadrature point the physical gradient is the chain rule
+  `u_{x,x} = J11 u_{x,xi} + J12 u_{x,eta}`, `u_{x,y} = J21 u_{x,xi} +
+  J22 u_{x,eta}` (and likewise for `u_z`) with the cached `J^{-T}`, and the
+  weighted reference-space right-hand sides are the design's four pieces
+
+      Fx_xi  = W[(a2 ux_x - c2 uz_y) J11 + (ux_y + uz_x) J21]
+      Fx_eta = W[(a2 ux_x - c2 uz_y) J12 + (ux_y + uz_x) J22]
+      Fz_xi  = W[(ux_y + uz_x) J11 + (a2 uz_y - c2 ux_x) J21]
+      Fz_eta = W[(ux_y + uz_x) J12 + (a2 uz_y - c2 ux_x) J22]
+
+  with `W = detJ * gl_w[qx] * gl_w[qy] * eta`;
+* the four accumulations are the box kernel's two separable pieces, so the cost
+  is two extra multiply-adds and seven array reads per quadrature point.
+
+The kernel is bitwise-identical to its scalar twin
+[`_semquad_kn_mapped!`](@ref) in the sense the box blocked/scalar pair is
+(identical per-leaf order, added in leaf order), and it matches the mapped
+sparse `K` to round-off (G271 (a)).  The box operator is never routed through
+this body (GEOM_DESIGN §4.3 F5).
+"""
+function _semquad_kn_blk_mapped!(out::Vector{Float64}, op::SemQuadKOpMapped,
+                                 etav::AbstractVector{Float64},
+                                 v::AbstractVector{Float64},
+                                 work::SemQuadKWork, nbmax::Int,
+                                 ::Val{N}) where {N}
+    return _semquad_kn_blk_mapped_core!(out, nothing, nothing, op, etav, v,
+                                        work.bs, 1, op.nleaf, nbmax, Val(N),
+                                        Val(false))
+end
+
+"""
+    _semquad_kn_blk_mapped_store!(op, etav, v, scr, lo, hi, elx, elz, ::Val{N})
+
+Element-buffer form of [`_semquad_kn_blk_mapped!`](@ref) for the threaded
+V-cycle (the S5-2 pattern): the leaves `lo:hi` of the block are computed with
+the mapped kernel and their element vectors stored in the columns of
+`elx`/`elz`; the caller scatters them serially in leaf order, which is exactly
+the serial accumulation order.
+"""
+function _semquad_kn_blk_mapped_store!(op::SemQuadKOpMapped,
+                                       etav::AbstractVector{Float64},
+                                       v::AbstractVector{Float64},
+                                       scr::SemQuadKScratch, lo::Int, hi::Int,
+                                       elx::Matrix{Float64},
+                                       elz::Matrix{Float64},
+                                       ::Val{N}) where {N}
+    return _semquad_kn_blk_mapped_core!(nothing, elx, elz, op, etav, v, scr,
+                                        lo, hi, SEMQUAD_KBLK, Val(N), Val(true))
+end
+
+function _semquad_kn_blk_mapped_core!(out::Union{Vector{Float64},Nothing},
+                                      elx::Union{Matrix{Float64},Nothing},
+                                      elz::Union{Matrix{Float64},Nothing},
+                                      op::SemQuadKOpMapped,
+                                      etav::AbstractVector{Float64},
+                                      v::AbstractVector{Float64},
+                                      scr::SemQuadKScratch, lo::Int, hi::Int,
+                                      nbmax::Int, ::Val{N},
+                                      ::Val{STORE}) where {N,STORE}
+    if etav isa SemQuadEtaLane && SEMQUAD_MG_ETA_LANES[]
+        return _semquad_kn_blk_mapped_body!(out, elx, elz, op, etav.lane, v,
+                                            scr, lo, hi, nbmax, Val(N),
+                                            Val(STORE), Val(true))
+    end
+    return _semquad_kn_blk_mapped_body!(out, elx, elz, op, etav, v, scr, lo, hi,
+                                        nbmax, Val(N), Val(STORE), Val(false))
+end
+
+function _semquad_kn_blk_mapped_body!(out::Union{Vector{Float64},Nothing},
+                                      elx::Union{Matrix{Float64},Nothing},
+                                      elz::Union{Matrix{Float64},Nothing},
+                                      op::SemQuadKOpMapped,
+                                      etab::AbstractVector{Float64},
+                                      v::AbstractVector{Float64},
+                                      scr::SemQuadKScratch, lo::Int, hi::Int,
+                                      nbmax::Int, ::Val{N}, ::Val{STORE},
+                                      ::Val{LANE}) where {N,STORE,LANE}
+    BLK = SEMQUAD_KBLK
+    nq = N + 1
+    N_ = op.N
+    n2 = N * N
+    nq2 = nq * nq
+    phi = op.phi; dphi = op.dphi; phiT = op.phiT; dphiT = op.dphiT
+    gl_w = op.gl_w
+    ids = op.ids
+    a2 = op.deviatoric ? 4.0 / 3.0 : 2.0
+    c2 = op.deviatoric ? 2.0 / 3.0 : 0.0
+    xv = scr.bxv; zv = scr.bzv
+    uxi_x = scr.buxx; ueta_x = scr.buxy
+    uxi_z = scr.buzx; ueta_z = scr.buzy
+    t1 = scr.bt1
+    Fx1 = scr.bF
+    Fx2 = scr.bF2::Array{Float64,3}
+    Fz1 = scr.bF3::Array{Float64,3}
+    Fz2 = scr.bF4::Array{Float64,3}
+    ox = scr.box; oz = scr.boz
+    one = scr.bone
+    kofs = scr.bkofs
+    detJ = op.detJ
+    j11v = op.j11; j12v = op.j12; j21v = op.j21; j22v = op.j22
+    STORE || fill!(out, 0.0)
+    @inbounds for lb in lo:BLK:hi
+        nb = min(BLK, hi - lb + 1)
+        lplast = lb + nb - 1
+        tbase = LANE ? (((lb - 1) ÷ BLK) * (nq2 * BLK)) : 0
+        for b in 1:BLK
+            li = b <= nb ? (lb + b - 1) : lplast
+            kofs[b] = (li - 1) * nq2
+            for idx in 1:n2
+                g = ids[idx, li]
+                xv[b, idx] = v[g]
+                zv[b, idx] = v[N_ + g]
+            end
+        end
+        # raw reference derivatives: no 2/h scaling (the box kernel's ihx/ihy
+        # are replaced by the chain rule below), so the scale is 1.0 on both
+        # contraction slots.
+        _semquad_contract_blk!(uxi_x, xv, dphi, phi, one, one, t1, Val(N))
+        _semquad_contract_blk!(ueta_x, xv, phi, dphi, one, one, t1, Val(N))
+        _semquad_contract_blk!(uxi_z, zv, dphi, phi, one, one, t1, Val(N))
+        _semquad_contract_blk!(ueta_z, zv, phi, dphi, one, one, t1, Val(N))
+        for idx in 1:n2
+            @simd ivdep for b in 1:BLK
+                ox[b, idx] = 0.0
+                oz[b, idx] = 0.0
+            end
+        end
+        for qy in 1:nq, qx in 1:nq
+            gw = gl_w[qx] * gl_w[qy]
+            kq = (qy - 1) * nq + qx
+            kb = LANE ? (tbase + (kq - 1) * BLK) : 0
+            @simd ivdep for b in 1:BLK
+                etaq = LANE ? etab[kb + b] : etab[kofs[b] + kq]
+                k = kofs[b] + kq
+                W = detJ[k] * gw * etaq
+                j11 = j11v[k]; j12 = j12v[k]
+                j21 = j21v[k]; j22 = j22v[k]
+                ax = uxi_x[b, qx, qy]; bx = ueta_x[b, qx, qy]
+                az = uxi_z[b, qx, qy]; bz = ueta_z[b, qx, qy]
+                uxx = j11 * ax + j12 * bx
+                uxy = j21 * ax + j22 * bx
+                uzx = j11 * az + j12 * bz
+                uzy = j21 * az + j22 * bz
+                A = W * (a2 * uxx - c2 * uzy)
+                Bq = W * (uxy + uzx)
+                Az = W * (a2 * uzy - c2 * uxx)
+                Fx1[b, qx, qy] = A * j11 + Bq * j21
+                Fx2[b, qx, qy] = A * j12 + Bq * j22
+                Fz1[b, qx, qy] = Bq * j11 + Az * j21
+                Fz2[b, qx, qy] = Bq * j12 + Az * j22
+            end
+        end
+        _semquad_accum_blk!(ox, dphi, Fx1, phiT, t1, Val(N))
+        _semquad_accum_blk!(ox, phi, Fx2, dphiT, t1, Val(N))
+        _semquad_accum_blk!(oz, dphi, Fz1, phiT, t1, Val(N))
+        _semquad_accum_blk!(oz, phi, Fz2, dphiT, t1, Val(N))
         if STORE
             for b in 1:BLK
                 b <= nb || continue          # padded lanes write nothing

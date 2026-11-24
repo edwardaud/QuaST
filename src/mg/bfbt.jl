@@ -39,13 +39,46 @@ function SemQuadBFBTDiagWork(nloc::Int, nfp::Int, hcap::Int)
 end
 
 """
-    _semquad_bfbt_diag_block!(wk, su, wfun, fd, rc, rv, rn, leaves, lo, hi)
+    _bfbt_leaf_metric(g, lay, lf, fd)
+
+The leaf metric the exact BFBT diagonal reads: the historical seven-scalar
+`BoxLeafMetric` on the box (3-arg method) or the cached `MappedLeafMetric` on a
+mapped geometry (cut 5).  One helper, so the BFBT body is shared and the box
+arithmetic stays the historical one.
+"""
+@inline _bfbt_leaf_metric(g::CartesianBox, lay, lf::NTuple{3,Int},
+                          fd::FEData) = leaf_metric(g, lay, lf)
+@inline _bfbt_leaf_metric(g::AbstractGeometry, lay, lf::NTuple{3,Int},
+                          fd::FEData) = leaf_metric(g, lay, lf, fd)
+
+"""
+    _bfbt_wq(lm, lay, lf, fd, qx, qy, wfun)
+
+The BFBT quadrature weight `int measure * wfun(x,y)`: on the box
+`quad_measure(BoxLeafMetric)` is the historical `0.25*hx*hy*gl_w*gl_w` (same
+operand and association, G266) and `quad_point` is the historical point map, so
+the shared body reproduces the historical box value bit for bit; on a mapped
+geometry it is the cached `detJ*gl_w*gl_w` at the mapped point.
+"""
+@inline function _bfbt_wq(lm::Union{BoxLeafMetric,MappedLeafMetric}, lay,
+                          lf::NTuple{3,Int}, fd::FEData, qx::Int, qy::Int,
+                          wfun::Function)
+    w = quad_measure(lm, fd, qx, qy)
+    x, y = quad_point(lm, lay, lf, fd, qx, qy)
+    return w * wfun(x, y)
+end
+
+"""
+    _semquad_bfbt_diag_block!(wk, g, su, wfun, fd, rc, rv, rn, leaves, lo, hi)
 
 One block of the leaf-local exact BFBT diagonal: scan `leaves[lo:hi]`, fold the
 hanging-node constraint into the leaf mass block, and scatter-add the result
-into `wk.d`.
+into `wk.d`.  The body is shared by both geometries: only the quadrature weight
+comes from the leaf metric (`_bfbt_wq`), so the box path evaluates exactly the
+historical `0.25*hx*hy*glw*glw*wfun(x,y)` expression.
 """
-function _semquad_bfbt_diag_block!(wk::SemQuadBFBTDiagWork, su::SemQuad,
+function _semquad_bfbt_diag_block!(wk::SemQuadBFBTDiagWork,
+                                   g::AbstractGeometry, su::SemQuad,
                                    wfun::Function, fd::FEData,
                                    rc::Vector{Int}, rv::Vector{Int},
                                    rn::Vector{Float64},
@@ -64,8 +97,7 @@ function _semquad_bfbt_diag_block!(wk::SemQuadBFBTDiagWork, su::SemQuad,
     fill!(d, 0.0)
     @inbounds for li in lo:hi
         lf = leaves[li]
-        hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
-        x0 = lf[2] * hx; y0 = lf[3] * hy
+        lm = _bfbt_leaf_metric(g, su, lf, fd)
         ids = su.elem[lf]
         fill!(dloc, 0.0)
         fill!(wk.tpos, 0)
@@ -132,9 +164,7 @@ function _semquad_bfbt_diag_block!(wk::SemQuadBFBTDiagWork, su::SemQuad,
             fill!(view(wk.m, 1:tlen, 1:tlen), 0.0)
         end
         for qy in 1:nq, qx in 1:nq
-            wq = 0.25 * hx * hy * glw[qx] * glw[qy] *
-                 wfun(x0 + 0.5 * (glx[qx] + 1.0) * hx,
-                      y0 + 0.5 * (glx[qy] + 1.0) * hy)
+            wq = _bfbt_wq(lm, su, lf, fd, qx, qy, wfun)
             for j in 1:n, i in 1:n
                 ph = phi[i, qx] * phi[j, qy]
                 dloc[(j - 1) * n + i] += wq * ph * ph
@@ -280,12 +310,13 @@ function _semquad_bfbt_diag_exact(su::SemQuad,
         off += cnt
         works[b] = SemQuadBFBTDiagWork(nloc, nfp, 2 * nloc * maxdeg)
     end
+    g = su.geom
     if nb == 1
-        _semquad_bfbt_diag_block!(works[1], su, wfun, fd, rc, rv, rn, su.leaves,
-                                  los[1], his[1])
+        _semquad_bfbt_diag_block!(works[1], g, su, wfun, fd, rc, rv, rn,
+                                  su.leaves, los[1], his[1])
     else
         Threads.@threads :static for b in 1:nb
-            _semquad_bfbt_diag_block!(works[b], su, wfun, fd, rc, rv, rn,
+            _semquad_bfbt_diag_block!(works[b], g, su, wfun, fd, rc, rv, rn,
                                       su.leaves, los[b], his[b])
         end
     end

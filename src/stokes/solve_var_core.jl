@@ -733,29 +733,36 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                   mg_threads=0))
     end
     # ------------------------------------------------------------------
-    # Stage 0 cut 2: the mapped-geometry restriction of the solve.
+    # Stage 0 cut 5: the mapped-geometry linear-path restriction of the solve.
     #
-    # Cut 2 routes the **assembled** Stokes operator (K, B, the load, the
-    # traction face integral, the Dirichlet dof set, the net-flux check and the
-    # perimeter) through the geometry.  The matrix-free operator
-    # (`stokes/kop.jl`, `stokes/apply.jl`), the MG hierarchy (`src/mg/`) and the
-    # legacy uniform-mesh reference-matrix path are cut 5 / cut 1 and stay
-    # box-only, so a mapped geometry is accepted for `linear=:direct` only.
-    # These guards are placed after the `:auto` resolution so the user sees the
-    # *resolved* path in the message; `:auto` on a mapped space is refused
-    # rather than silently falling back, because the fallback would hide the
-    # unsupported path.
+    # Cut 1 created the layer, cut 2 routed the assembled Stokes operator, cuts 3
+    # and 4 the energy/step/diagnostics; cut 5 routes the matrix-free operator
+    # and the multigrid hierarchy.  A mapped geometry is therefore accepted for
+    # the **linear** paths `:direct`, `:auto` and `:mg` (`:auto` is resolved above
+    # and becomes one of the two; on a mapped space it decides from the mapped
+    # eta contrast).  `:schur_cg` and `:lagged` still carry box reference-matrix
+    # / gauge assumptions and are refused with an actionable message.
+    #
+    # The remaining mapped restrictions below are *feature* restrictions owned by
+    # later cuts (strain-rate Jacobian, wall BC kinds), not by the linear solver;
+    # they are kept because their elements still run the box-only leaf kernel.
     # ------------------------------------------------------------------
     geom = ss.su.geom
     if !(geom isa CartesianBox)
         gname = geometry_name(geom)
-        if linear !== :direct
+        if !(linear === :direct || linear === :mg)
             throw(ArgumentError("a mapped geometry ($gname) supports " *
-                "linear=:direct only in stage 0 cut 2: the matrix-free " *
-                "operator and the multigrid hierarchy are still the historical " *
-                "box kernels (cut 5), and :schur_cg/:lagged carry box " *
-                "reference-matrix assumptions.  Pass linear=:direct " *
-                "(resolved linear = :$linear)."))
+                "linear=:direct, :auto and :mg (resolved linear = :$linear): " *
+                ":schur_cg carries the box reference-matrix Schur assumption " *
+                "and :lagged the box stale-LU gauge; both stay box-only in " *
+                "stage 0.  Pass linear=:direct, linear=:mg or linear=:auto."))
+        end
+        if linear === :mg && schur_precond !== :mass
+            throw(ArgumentError("a mapped geometry ($gname) with linear=:mg " *
+                "needs schur_precond=:mass: the pressure-block preconditioner " *
+                "is built from the mapped pressure mass / w-BFBT factors, and " *
+                "the :none Schur path has no mapped equivalent.  Pass " *
+                "schur_precond=:mass (the default)."))
         end
         (geo_u === nothing && dp_u === nothing && elastic_stress === nothing) ||
             throw(ArgumentError("a mapped geometry ($gname) does not support " *
@@ -1039,7 +1046,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # sampled once, then laid out for the lane kernel (docs/dev/MG.md
         # §15): the leaf-major field plus its block-major lane table
         mfetav = semquad_eta_lanes(mfop, semquad_eta_field(mfop, eta_fun))
-        mfwork = SemQuadKWork(mfop.n, mfop.nq, Nu2)
+        mfwork = SemQuadKWork(mfop)
         Ku0 = zeros(Float64, Nu2)
         _semquad_apply_K_raw!(Ku0, mfop, mfetav, u0, mfwork)
         fr = Cu' * (fv - Ku0 + Bm' * p0)
@@ -1112,7 +1119,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                                  mode=pmode_arg,
                                                  scale=mg_pressure_scale,
                                                  weight=pweight_arg,
-                                                 key=_saddle_key(qt, p, bc, nf, nfp),
+                                                 key=_saddle_key(qt, geom, p, bc, nf, nfp),
                                                  eta_tol=mg_pressure_eta_tol,
                                                  cache=mg_pressure_cache,
                                                  bfbt_d=bfbt_d,
@@ -1237,7 +1244,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # refinement; refactor only on a cache miss / stall.  The saddle depends
         # on the viscosity field and the tree, not on dt, so between two AMR
         # cycles the stale factor is a good preconditioner.
-        key = _saddle_key(qt, ss.su.p, bc, nf, nfp)
+        key = _saddle_key(qt, geom, ss.su.p, bc, nf, nfp)
         sol, rn = _lagged_solve!(S, rhs, key; tol=1.0e-8, maxit=25)
         LAST_SEMSTOKES_REGULARIZED[] = false
         if rn > 1.0e-8
