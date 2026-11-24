@@ -191,5 +191,6 @@ using QuaST
     include("t_g267_affine_stokes.jl")
     include("t_g268_mapped_consistency.jl")
     include("t_g269_curved_energy.jl")
+    include("t_g270_mapped_diagnostics.jl")
 end
 

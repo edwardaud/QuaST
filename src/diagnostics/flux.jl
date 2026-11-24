@@ -78,6 +78,10 @@ function semquad_nu_cbf(sq::SemQuad, qt::Quadtree, pr::Params,
                         theta::Vector{Float64}, ux::Vector{Float64},
                         uz::Vector{Float64}; ev_field::Union{Nothing,Vector{Float64}}=nothing,
                         kwargs...)
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_nu_cbf_mapped(g, sq, qt, pr, theta, ux, uz;
+                                      ev_field=ev_field, kwargs...)
     A = total_area(qt)
     st = semquad_cbf_theta_flux(sq, qt, pr, theta, ux, uz; wall=:top,
                                 ev_field=ev_field, kwargs...)
@@ -89,4 +93,33 @@ function semquad_nu_cbf(sq::SemQuad, qt::Quadtree, pr::Params,
     # top is +d/dz and at the bottom -d/dz, so the signs are the same as the
     # pointwise version.
     return top_ref - st / A, bot_ref - sb / A
+end
+
+"""
+    _semquad_nu_cbf_mapped(g, sq, qt, pr, theta, ux, uz; ev_field=nothing, kwargs...)
+
+Mapped method of [`semquad_nu_cbf`](@ref).  The consistent-boundary-flux residual
+is geometry-generic: the energy operator it inverts is the mapped assembly of
+cut 3, and the wall-node sum uses the logical wall rows (GEOM_DESIGN §3 cut 4:
+"the exact-residual and CBF paths inherit the assembled operators").  Only the
+normalisation changes: the box's `total_area(qt)` is the wall length because the
+box height is 1; a mapped geometry uses each wall's physical measure
+(`boundary_measure`, GEOM_DESIGN §6.6).
+"""
+function _semquad_nu_cbf_mapped(g::AbstractGeometry, sq::SemQuad,
+                                qt::Quadtree, pr::Params,
+                                theta::Vector{Float64}, ux::Vector{Float64},
+                                uz::Vector{Float64};
+                                ev_field::Union{Nothing,Vector{Float64}}=nothing,
+                                kwargs...)
+    st = semquad_cbf_theta_flux(sq, qt, pr, theta, ux, uz; wall=:top,
+                                ev_field=ev_field, kwargs...)
+    sb = semquad_cbf_theta_flux(sq, qt, pr, theta, ux, uz; wall=:bottom,
+                                ev_field=ev_field, kwargs...)
+    sideb, sidet = nu_wall_sides(g)
+    wt = boundary_measure(g, sq, sidet)
+    wb = boundary_measure(g, sq, sideb)
+    top_ref = -semquad_base_gradient(pr, 1.0)
+    bot_ref = -semquad_base_gradient(pr, 0.0)
+    return top_ref - st / wt, bot_ref - sb / wb
 end

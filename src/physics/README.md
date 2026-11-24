@@ -40,8 +40,14 @@ mapped element.  (2) Its **physics closures are functions of the physical
 height** `h = height(g,x,y)` instead of `y`, and every directional term uses
 `u . grad h` instead of `u_z`: the base-state advection `-rho (u.grad h)
 dTbar/dh`, the adiabatic heating `-Di rho T (u.grad h)`, the latent source
-`-L dGamma/dh (u.grad h)`, and the base Laplacian `Tbar''(h)|grad h|^2 +
-Tbar'(h) lap(h)`.  The entropy-viscosity residual uses the map-curvature
+`-L dGamma/dh (u.grad h)`, and the mapped base-state Laplacian
+`lap(Tbar(h)) + H = Tbar''(h)|grad h|^2 + Tbar'(h) lap(h) + H`, which is the
+`_mapped_base_curvature(pr,g,x,y)` helper (the energy assembly adds it as a
+source and the entropy-viscosity residual subtracts it, so the two cannot
+drift; cut-4 defect B1 fixed the cut-3 body that used the reference-state
+second derivative alone and so silently dropped the Boussinesq
+`H(1-|grad h|^2)` term on a geometry with `|grad h| != 1`).  The
+entropy-viscosity residual uses the map-curvature
 Laplacian of the perturbation and the mapped element length
 `he = sqrt(2|element|)`; the box path keeps its historical `(2/h)^2` Laplacian
 and `sqrt(2)*sqrt(hx*hy)` length (GEOM_DESIGN E14/F4).  The box-dispatched

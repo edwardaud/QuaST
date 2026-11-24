@@ -2,13 +2,13 @@
 
 One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
-test script that starts with `using`; most wrap one `@testset`. The 188 files
-hold the suite's 134 414 assertions (134 412 passed, 2 broken, 0 failed) — the
-count of the stage-0 cut-3 tree, recorded with its evidence in
+test script that starts with `using`; most wrap one `@testset`. The 189 files
+hold the suite's 134 716 assertions (134 714 passed, 2 broken, 0 failed) — the
+count of the stage-0 cut-4 tree, recorded with its evidence in
 `docs/dev/GEOM_PROGRESS.md`. (Cut 1 recorded 134 086 / 134 084 / 0 / 2 on 185
-files; cut 2 adds G267 and G268; cut 3 adds G269, +151 assertions.) The
-top-level README still quotes the pre-cut-1 total (133 716); the top-level
-markdown was outside the cut write scopes.
+files; cut 2 adds G267 and G268; cut 3 adds G269, +151 assertions; cut 4 adds
+G270, +302 assertions.) The top-level README still quotes the pre-cut-1 total
+(133 716); the top-level markdown was outside the cut write scopes.
 
 G266 is the geometry/mapping-layer gate of stage 0 cut 1: it rebuilds the box
 coordinates, node ids, leaf/face metrics, nodal transfer, AMR indicator and the
@@ -40,7 +40,21 @@ non-dyadic and a hanging tree, and the map-curvature second derivatives are
 checked against exact coordinate-Laplacian identities, a fourth-order
 finite-difference Laplacian reference and a `height_laplacian` finite
 difference — with the dropped curvature/cross-metric terms asserted to fail at
-O(1) (measured, printed) rather than assumed impossible. G265 is the gate of
+O(1) (measured, printed) rather than assumed impossible. G270 is the cut-4
+diagnostics gate: on a rotated/translated `AffineBox` every per-step diagnostic
+(wall Nu pair, CBF pair, Vrms, mean T, energy Nu, W/U, base advection, theta²
+div u, max divergence, surface velocities, the heat budget, the exact residual,
+the hmin/CFL sizes and the eta_ref interior band) equals the untouched box
+bodies' value for the same physical problem at ≤2.1e-15; on a general affine map
+the volume integrals and wall fluxes equal an independent high-order quadrature
+of the analytic fields at ≤2.4e-15; the mapped bodies fed the box map reproduce
+the box bodies on a dyadic, a non-dyadic and a hanging tree at ≤5.5e-15 (all
+direct diagnostics; the cancellation-amplified CBF flux is bounded at 1e-13
+with the measured 1.5e-14); a wrong mapped normal and a wrong face Jacobian are
+caught with measured 22.2 % / 25.0 % relative failures; and the mapped driver
+runs end to end on `AffineBox`/`CurvedBox` (heating off/on, latent, CBF and
+exact-residual columns) with the mass-flux identities and the time-step CBF
+energy-budget identity (ID1) closing at ≤6.6e-14. G265 is the gate of
 `examples/subduction_2d.jl` (the
 regional subduction-style case). It pins only the checks the design classifies
 as exact identities or as the mass-flux conservation identity, with their

@@ -493,17 +493,99 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 "iteration.  Pass linear=:direct."))
     end
     max_leaves >= 1 || throw(ArgumentError("max_leaves must be >= 1"))
-    # Stage 0 cut 1 ships the geometry layer, not the mapped operators: the
-    # Stokes and energy assemblers still run their historical box bodies (cuts
-    # 2-3 route them through the metric).  A mapped run would therefore solve a
-    # silently wrong operator, so refuse it explicitly instead of producing
-    # plausible wrong numbers.  Cut 2 removes this guard.
-    geom isa CartesianBox ||
-        throw(ArgumentError("a mapped geometry ($(geometry_name(geom))) is " *
-                            "not runnable yet: stage 0 cut 1 provides the " *
-                            "geometry/mapping layer only, cuts 2-4 route the " *
-                            "Stokes/energy assembly and the diagnostics " *
-                            "through it; use geom=CartesianBox(qt)"))
+    # These three switches decide which physics the run advances; they are
+    # evaluated here (they are pure functions of `pr`) because the mapped-run
+    # restriction below must refuse the paths that are still box-only, before any
+    # setup work.  The fields they unlock are initialised further down.
+    yielding = yield_active(pr)
+    weak = weak_active(pr)
+    stress = pr.shear_modulus > 0.0
+    # Stage 0 cut 4: a mapped geometry now runs the fixed-mesh direct time loop.
+    #
+    # Cut 2 routed the assembled Stokes operator, cut 3 the energy assembly and
+    # this cut every per-step diagnostic through the geometry, so the mapped
+    # energy/Stokes step and its history row are correct.  What remains box-only
+    # is, and is refused here with the cut that owns it:
+    #   * the adaptive machinery -- transfer, indicator, AMR cycles, wall strips
+    #     and the `:x` symmetry mirror (`cut 6`; a mapped tree is fixed);
+    #   * the matrix-free/MG solver (`cut 5`; `solve_var_core.jl` already
+    #     refuses anything but `linear=:direct` on a mapped space);
+    #   * the strain-rate reconstructions of `driver/strain_rate.jl` (`cut 6`),
+    #     which every strain-rate-dependent viscosity law, the yielding branch,
+    #     the weakening field and the Maxwell stress advance use;
+    #   * the per-step Newton path, whose mapped tangent (`_semquad_jvp_ku`) was
+    #     added additively in cut 3 but has no mapped gate yet (cut-3 design
+    #     entry C9), so the mapped driver uses Picard;
+    #   * the Cartesian-y physics wiring of the reference state / density hook /
+    #     phase buoyancy (`cut 0.5`: the annulus stage re-evaluates those
+    #     closures at `height`; the mapped energy assembly of cut 3 already does
+    #     for its own closures, but the driver's buoyancy load does not).
+    # Every refusal names the missing piece instead of running a silently
+    # box-body path on a mapped mesh.
+    if !(geom isa CartesianBox)
+        gname = geometry_name(geom)
+        initial_refine == 0 ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "initial_refine > 0 in stage 0 cut 4: the " *
+                                "AMR cycle, its indicator and its transfer are " *
+                                "cut 6.  Pass initial_refine=0 (a fixed mapped " *
+                                "mesh)."))
+        amr_every == 0 ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "amr_every > 0 in stage 0 cut 4: the AMR " *
+                                "indicator/transfer/balance path is cut 6.  " *
+                                "Pass amr_every=0."))
+        symmetry === :none ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "symmetry=:x: the mirror is logical-x, which is " *
+                                "not a physical symmetry under a mapped geometry " *
+                                "(GEOM_DESIGN §6.5/§8 risk 12, cut 6).  Pass " *
+                                "symmetry=:none."))
+        pic_mode === :picard ||
+            throw(ArgumentError("a mapped geometry ($gname) supports " *
+                                "pic_mode=:picard only in stage 0 cut 4: the " *
+                                "mapped Newton tangent is implemented additively " *
+                                "in cut 3 but has no mapped gate (cut-3 design " *
+                                "entry C9).  Pass pic_mode=:picard."))
+        (pr.eta_law in (:expT, :expTz, :arrhenius)) ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "eta_law=:$(pr.eta_law) in stage 0 cut 4: the " *
+                                "strain-rate reconstruction of " *
+                                "driver/strain_rate.jl is cut 6.  Use a " *
+                                "temperature/depth-only law (:expT, :expTz or " *
+                                ":arrhenius)."))
+        yielding &&
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "plastic yielding in stage 0 cut 4: its eta " *
+                                "closure needs the strain-rate reconstruction " *
+                                "of driver/strain_rate.jl (cut 6)."))
+        weak &&
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "the strain-weakening field in stage 0 cut 4: " *
+                                "its closure needs the strain-rate " *
+                                "reconstruction of driver/strain_rate.jl (cut " *
+                                "6)."))
+        stress &&
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "the Maxwell stress history in stage 0 cut 4: " *
+                                "its advance needs the strain-rate " *
+                                "reconstruction of driver/strain_rate.jl (cut " *
+                                "6)."))
+        pr.refstate === nothing ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "a reference state in stage 0 cut 4: the " *
+                                "driver's TALA/ALA buoyancy closure still " *
+                                "evaluates rho/alpha at the Cartesian y while " *
+                                "the mapped energy assembly evaluates the base " *
+                                "state at height (the physics rewiring belongs " *
+                                "to the annulus stage, GEOM_DESIGN §2.7)."))
+        pr.rho_multiplier === nothing ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                                "Params.rho_multiplier in stage 0 cut 4: its " *
+                                "Cartesian finite-difference hook has no mapped " *
+                                "meaning (see the cut-2 density-hook refusal in " *
+                                "solve_var_core.jl)."))
+    end
     initial_refine >= 0 || throw(ArgumentError("initial_refine must be >= 0"))
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
     wall_min_level >= 0 || throw(ArgumentError("wall_min_level must be >= 0"))
@@ -581,17 +663,22 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # spurious boundary layer and silently invalidates adaptive-vs-static
     # comparisons).  Keep that guard.  With a reference state the wall value is
     # generally nonzero and a cold start (theta0 = 0 there) is a legitimate
-    # initial condition, so only the zero-target case is enforced.
-    for g in 1:sq.N
-        y = sq.coords[g][2]
-        wall = y <= 1.0e-14 ? pr.Twall_bot :
-               (y >= 1.0 - 1.0e-14 ? pr.Twall_top : NaN)
+    # initial condition, so only the zero-target case is enforced.  The wall of a
+    # mapped geometry is a level set of the physical height, and the base state
+    # is a function of the height (cut 3 convention), so the guard evaluates
+    # `height(g,x,y)`; on the box that accessor is `y` exactly.
+    for gid in 1:sq.N
+        x = sq.coords[gid][1]
+        y = sq.coords[gid][2]
+        h = geom isa CartesianBox ? y : height(geom, x, y)
+        wall = h <= 1.0e-14 ? pr.Twall_bot :
+               (h >= 1.0 - 1.0e-14 ? pr.Twall_top : NaN)
         isnan(wall) && continue
-        target = wall - semquad_base_T(pr, y)
-        if target == 0.0 && abs(theta0[g]) > 1.0e-12
+        target = wall - semquad_base_T(pr, h)
+        if target == 0.0 && abs(theta0[gid]) > 1.0e-12
             throw(ArgumentError("theta0 is the perturbation T-Tbar and must " *
-                                "vanish on the top/bottom walls; node $g at " *
-                                "y=$y has theta0=$(theta0[g])"))
+                                "vanish on the top/bottom walls; node $gid at " *
+                                "y=$y has theta0=$(theta0[gid])"))
         end
     end
     theta = copy(theta0)
@@ -746,7 +833,6 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     steady_count = 0
     Nu_prev = NaN
 
-    yielding = yield_active(pr)
     tosi = pr.eta_law === :tosi
     composite = pr.eta_law === :composite
     # Strain-weakening field chi (docs/dev/PHYSICS.md §9); `nothing` when
@@ -754,7 +840,6 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # skipped and the run is bit-identical to the pre-weakening behaviour.
     # `chi` is the start-of-step level chi^n, `chi_prev` is chi^(n-1) and
     # `chi_iter` the running nonlinear iterate (the one eta sees).
-    weak = weak_active(pr)
     chi = nothing
     chi_prev = nothing
     chi_iter = nothing
@@ -787,7 +872,8 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # are advanced once per step, and the previous step's value drives the
     # momentum solve through the elastic force term `div(a tau^n)` (2b step 2);
     # they are carried through AMR and the checkpoint exactly like `chi`.
-    stress = pr.shear_modulus > 0.0
+    # (`stress` itself was evaluated with the other two physics switches before
+    # the mapped-run restriction above.)
     txx = nothing
     tyy = nothing
     txy = nothing
@@ -1301,7 +1387,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 # still exceed the CFL limit.
                 umax = maximum(hypot.(ux, uz))
                 if umax > 0.0
-                    hmin = minimum(min(leaf_hx(qt, lf[1]), leaf_hy(qt, lf[1])) for lf in qt.leaves)
+                    hmin = if sq.geom isa CartesianBox
+                        # historical E15 expression, bit for bit
+                        minimum(min(leaf_hx(qt, lf[1]), leaf_hy(qt, lf[1])) for lf in qt.leaves)
+                    else
+                        minimum_leaf_size(sq.geom, qt)
+                    end
                     dt_cfl = cfl * hmin / umax
                     if step == 0
                         dt = min(dt, dt_cfl)
@@ -1567,7 +1658,12 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         step += 1
 
         if isfinite(cfl_tol)
-            hmin = minimum(min(leaf_hx(qt, lf[1]), leaf_hy(qt, lf[1])) for lf in qt.leaves)
+            hmin = if sq.geom isa CartesianBox
+                # historical E15 expression, bit for bit
+                minimum(min(leaf_hx(qt, lf[1]), leaf_hy(qt, lf[1])) for lf in qt.leaves)
+            else
+                minimum_leaf_size(sq.geom, qt)
+            end
             umax = maximum(hypot.(ux, uz))
             cfl_step = umax * dt / hmin
             if cfl_step > cfl_tol

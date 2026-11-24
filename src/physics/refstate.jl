@@ -340,3 +340,45 @@ adiabat whose first derivative is the `dTad/dz` used by the advection term
 """Base-state temperature used where the full T is needed (adiabatic heating)."""
 @inline semquad_base_T(pr, z::Float64) =
     (pr.refstate === nothing ? Tbar(z, pr.H) : semquad_Tad(pr.refstate, z))::Float64
+
+"""
+    _mapped_base_curvature(pr, g, x, y) -> Float64
+
+The physical Laplacian of the base state in the mapped metric,
+`lap(Tbar(h(x,y)))`, as it enters the theta equation's source — i.e. the term
+the energy assembly adds and the entropy-viscosity residual subtracts.  With
+`h = height(g,x,y)`, `|grad h|` and `lap h = height_laplacian(g,x,y)`:
+
+    lap(Tbar(h)) + H = Tbar''(h)|grad h|^2 + Tbar'(h) lap(h) + H.
+
+For the **Boussinesq base** (`refstate === nothing`, `Tbar(h) = 1-h+H/2 h(1-h)`)
+`Tbar'' = -H`, so
+
+    lap(Tbar(h)) + H = H*(1 - |grad h|^2) + Tbar'(h) lap(h).
+
+On the box (and the annulus) `|grad h| = 1` and the `H*(1-|grad h|^2)` term is
+zero, which is why the historical box body drops it (the `+H` source is absorbed
+by the quadratic `Tbar`); on a mapped validation geometry with `|grad h| != 1`
+it is *not* zero.  Cut 3's first mapped body used `semquad_base_laplacian(pr,h)`
+alone, which is the reference-state second derivative (`0` for the Boussinesq
+base) and therefore silently dropped `H*(1-|grad h|^2)`; this helper is the
+cut-4 correction, shared by the energy assembly and the EV residual so the two
+cannot drift (see `docs/dev/GEOM_PROGRESS.md`, cut-4 defect B1).  For a
+**reference state** the base is the adiabat and the term is exactly
+`lap(Tad(h)) = Tad''(h)|grad h|^2 + Tad'(h) lap(h)` (no absorbed `+H`).
+
+This is a mapped-only helper: the box bodies are the historical statements and
+do not call it.  It is evaluated at one quadrature point, in cold-per-point
+physics code (not an operator kernel of its own).
+"""
+@inline function _mapped_base_curvature(pr, g, x, y)
+    h = height(g, x, y)
+    ghx, ghy = grad_height(g, x, y)
+    lap_h = height_laplacian(g, x, y)
+    gh2 = ghx * ghx + ghy * ghy
+    if pr.refstate === nothing
+        return pr.H * (1.0 - gh2) + semquad_base_gradient(pr, h) * lap_h
+    end
+    return semquad_base_laplacian(pr, h) * gh2 +
+           semquad_base_gradient(pr, h) * lap_h
+end

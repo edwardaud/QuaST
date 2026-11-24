@@ -29,6 +29,10 @@ solve used, i.e. already divided by `Params.eta_ref`.
 """
 function _eta_interior_band_mean(sq::SemQuad, qt::Quadtree, eta_fun::Function;
                                  zlo::Float64=0.25, zhi::Float64=0.75)
+    g = sq.geom
+    g isa CartesianBox ||
+        return _eta_interior_band_mean_mapped(g, sq, qt, eta_fun; zlo=zlo,
+                                              zhi=zhi)
     p = sq.p
     fd = make_fedata(p, p - 1)
     num = 0.0; den = 0.0
@@ -41,6 +45,35 @@ function _eta_interior_band_mean(sq::SemQuad, qt::Quadtree, eta_fun::Function;
             (zlo <= y <= zhi) || continue
             w = 0.25 * hx * hy * fd.gl_w[qx] * fd.gl_w[qy]
             x = x0 + 0.5 * (fd.gl_x[qx] + 1.0) * hx
+            num += w * eta_fun(x, y)
+            den += w
+        end
+    end
+    return num / den
+end
+
+"""
+    _eta_interior_band_mean_mapped(g, sq, qt, eta_fun; zlo=0.25, zhi=0.75)
+
+Mapped method of [`_eta_interior_band_mean`](@ref) (stage 0 cut 4): the interior
+band is the physical **height** band `zlo <= height(g,x,y) <= zhi` — the
+depth-coordinate generalisation of "the middle of the layer" — and the measure
+is the mapped `quad_measure` (GEOM_DESIGN §3 cut 4: "interior band in
+`height`").  The box body above is unchanged.
+"""
+function _eta_interior_band_mean_mapped(g::AbstractGeometry, sq::SemQuad,
+                                        qt::Quadtree, eta_fun::Function;
+                                        zlo::Float64=0.25, zhi::Float64=0.75)
+    p = sq.p
+    fd = make_fedata(p, p - 1)
+    num = 0.0; den = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            x, y = quad_point(m, sq, lf, fd, qx, qy)
+            h = height(g, x, y)
+            (zlo <= h <= zhi) || continue
+            w = quad_measure(m, fd, qx, qy)
             num += w * eta_fun(x, y)
             den += w
         end

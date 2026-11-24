@@ -568,11 +568,15 @@ function _semquad_assemble_energy_block_mapped!(buf::SemQuadEnergyBuf,
                 end
             end
             src = -rho * ugh * semquad_base_gradient(pr, h) + lat_src
-            # lap(Tbar(h)) = Tbar''(h)|grad h|^2 + Tbar'(h) lap(h); the second
-            # term is zero on the box (lap y = 0) and nonzero on a curved map.
-            ghx, ghy = grad_height(g, x, y)
-            src += semquad_base_laplacian(pr, h) * (ghx * ghx + ghy * ghy) +
-                   semquad_base_gradient(pr, h) * height_laplacian(g, x, y)
+            # lap(Tbar(h)): the physical Laplacian of the base state in the
+            # mapped metric, `Tbar''(h)|grad h|^2 + Tbar'(h) lap(h)`, plus the
+            # absorbed `+H` for the Boussinesq base (`_mapped_base_curvature`;
+            # the box body's `semquad_base_laplacian(pr,y)` term is the same
+            # expression with `|grad h| = 1`, `lap y = 0`).  Cut 4 defect B1: the
+            # first mapped body used the reference-state second derivative
+            # alone, which is 0 for the Boussinesq base and silently dropped
+            # `H*(1-|grad h|^2)` on a geometry with `|grad h| != 1`.
+            src += _mapped_base_curvature(pr, g, x, y)
             if rho_heating
                 src -= Tq * pr.H * heating_scale
             end

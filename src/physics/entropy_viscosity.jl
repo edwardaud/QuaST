@@ -323,9 +323,12 @@ function semquad_ev_cell_stats(g::AbstractGeometry, sq::SemQuad, pr::Params,
     for qy in 1:fd_used.nq, qx in 1:fd_used.nq
         x, y = quad_point(lm, sq, lf, fd_used, qx, qy)
         h = height(g, x, y)
-        ghx, ghy = grad_height(g, x, y)
-        lapT = semquad_base_laplacian(pr, h) * (ghx * ghx + ghy * ghy) +
-               semquad_base_gradient(pr, h) * height_laplacian(g, x, y)
+        # The mapped base-state Laplacian (`lap(Tbar(h)) + H`) the residual must
+        # subtract: the same helper the mapped energy assembly adds as a source
+        # (cut-4 defect B1: cut 3 used `semquad_base_laplacian` alone, which is 0
+        # for the Boussinesq base, so `H*(1-|grad h|^2)` was dropped on a
+        # geometry with `|grad h| != 1`).
+        lapT = _mapped_base_curvature(pr, g, x, y)
         uxq = 0.0; uzq = 0.0
         thn = 0.0; thp = 0.0
         gthx = 0.0; gthz = 0.0; lapth = 0.0

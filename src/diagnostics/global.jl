@@ -14,6 +14,8 @@ leaves, integrated over x:
 """
 function semquad_nu_walls(sq::SemQuad, qt::Quadtree, theta::Vector{Float64},
                           pr::Params)
+    g = sq.geom
+    g isa CartesianBox || return _semquad_nu_walls_mapped(g, sq, qt, theta, pr)
     p = sq.p
     n = p + 1
     st = 0.0; sb = 0.0; wt = 0.0; wb = 0.0
@@ -66,6 +68,9 @@ theta/energy budget and the leading candidate for the H=5/AMR closure error.
 """
 function semquad_base_advection_integral(sq::SemQuad, qt::Quadtree, pr::Params,
                                          ux::Vector{Float64}, uz::Vector{Float64})
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_base_advection_integral_mapped(g, sq, qt, pr, ux, uz)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -99,6 +104,9 @@ physical run.
 function semquad_theta2_divu_integral(sq::SemQuad, qt::Quadtree,
                                       theta::Vector{Float64},
                                       ux::Vector{Float64}, uz::Vector{Float64})
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_theta2_divu_integral_mapped(g, sq, qt, theta, ux, uz)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -132,6 +140,9 @@ with the discrete velocity.
 """
 function semquad_max_divergence(sq::SemQuad, qt::Quadtree,
                                 ux::Vector{Float64}, uz::Vector{Float64})
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_max_divergence_mapped(g, sq, qt, ux, uz)
     p = sq.p
     n = p + 1
     worst = 0.0
@@ -167,6 +178,9 @@ function semquad_surface_velocity(sq::SemQuad, qt::Quadtree,
                                   wall::Symbol=:top)
     wall in (:top, :bottom) ||
         throw(ArgumentError("wall must be :top or :bottom"))
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_surface_velocity_mapped(g, sq, qt, ux, uz; wall=wall)
     p = sq.p
     n = p + 1
     jF = wall === :top ? n : 1
@@ -214,6 +228,11 @@ function semquad_work_dissipation(sq::SemQuad, qt::Quadtree, pr::Params,
                                   ux::Vector{Float64}, uz::Vector{Float64},
                                   eta_fun::Function;
                                   rho_multiplier::Union{Nothing,Function}=nothing)
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_work_dissipation_mapped(g, sq, qt, pr, theta, ux, uz,
+                                                eta_fun;
+                                                rho_multiplier=rho_multiplier)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -278,6 +297,8 @@ end
 """Volume RMS velocity on the quadtree (Gauss quadrature, same as `vrms`)."""
 function semquad_vrms(sq::SemQuad, qt::Quadtree, ux::Vector{Float64},
                       uz::Vector{Float64})
+    g = sq.geom
+    g isa CartesianBox || return _semquad_vrms_mapped(g, sq, qt, ux, uz)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -305,6 +326,8 @@ end
 """Volume mean of the full temperature T = Tbar + theta (Gauss quadrature)."""
 function semquad_mean_T(sq::SemQuad, qt::Quadtree, theta::Vector{Float64},
                         pr::Params)
+    g = sq.geom
+    g isa CartesianBox || return _semquad_mean_T_mapped(g, sq, qt, theta, pr)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -331,6 +354,9 @@ end
 function semquad_nu_energy(sq::SemQuad, qt::Quadtree, pr::Params,
                            theta::Vector{Float64}, ux::Vector{Float64},
                            uz::Vector{Float64})
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_nu_energy_mapped(g, sq, qt, pr, theta, ux, uz)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -410,6 +436,10 @@ function semquad_heat_budget(sq::SemQuad, qt::Quadtree, pr::Params,
                              ux::Union{Nothing,Vector{Float64}}=nothing,
                              uz::Union{Nothing,Vector{Float64}}=nothing,
                              eta_fun::Union{Nothing,Function}=nothing)
+    g = sq.geom
+    g isa CartesianBox ||
+        return _semquad_heat_budget_mapped(g, sq, qt, pr, theta; phases=phases,
+                                           ux=ux, uz=uz, eta_fun=eta_fun)
     p = sq.p
     n = p + 1
     fd = make_fedata(p, p - 1)
@@ -571,6 +601,32 @@ function semquad_heat_budget(sq::SemQuad, qt::Quadtree, pr::Params,
 end
 
 """
+    _semquad_base_curvature_integral(g, sq, pr) -> Float64
+
+Volume integral of the mapped base-state Laplacian `lap(Tbar(h))` (plus the
+absorbed `+H` for the Boussinesq base), `int _mapped_base_curvature dV`, on the
+quadrature the mapped diagnostics use.  This is the term the mapped energy
+assembly adds as a source and the mapped entropy-viscosity residual subtracts;
+the mapped exact residual of [`semquad_exact_residual`](@ref) must subtract it
+from its identity.  It is identically zero on the box (`|grad h| = 1`,
+`lap y = 0`), which is why the box body does not evaluate it.  Mapped-only.
+"""
+function _semquad_base_curvature_integral(g::AbstractGeometry, sq::SemQuad,
+                                          pr::Params)
+    p = sq.p
+    fd = make_fedata(p, p - 1)
+    s = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            x, y = quad_point(m, sq, lf, fd, qx, qy)
+            s += quad_measure(m, fd, qx, qy) * _mapped_base_curvature(pr, g, x, y)
+        end
+    end
+    return s
+end
+
+"""
     semquad_exact_residual(sq, qt, pr, theta, theta_n, theta_nm1, ux, uz,
                            dt, dt_prev, firststep, ev_field; advection=:skew,
                            phases=PhaseTransition[], latent_theta=nothing,
@@ -645,7 +701,21 @@ function semquad_exact_residual(sq::SemQuad, qt::Quadtree, pr::Params,
     Ibase = semquad_base_advection_integral(sq, qt, pr, ux, uz)
     latent_src = bud.latent_src === nothing ? 0.0 : bud.latent_src
     rhs = dHdt + sumC + Ibase + latent_src
-    area = total_area(qt)
+    # A mapped geometry's assembled source carries the physical Laplacian of the
+    # base state `lap(Tbar(h))` (`_mapped_base_curvature`), which is identically
+    # zero on the box (|grad h| = 1, lap y = 0) but not on a curved map; the
+    # identity (ID1) of docs/dev/VALIDATION.md §4.1 then reads
+    # `Qc = dHdt + sumC + Ibase + latent_src - int lap(Tbar(h)) dV`.  The box
+    # body keeps the historical `rhs` bit for bit.
+    g = sq.geom
+    if !(g isa CartesianBox)
+        rhs -= _semquad_base_curvature_integral(g, sq, pr)
+    end
+    # The `R/A` normalisation is the Nusselt-unit "area": the box keeps
+    # `total_area(qt)` bit for bit (height 1 makes the area equal the wall
+    # length); a mapped geometry uses the top wall's physical measure
+    # (`_nusselt_area`, GEOM_DESIGN §6.6).
+    area = _nusselt_area(sq, qt)
     R = bud.flux - rhs
     return (R=R, R_over_A=R / area, flux=bud.flux, dHdt=dHdt, sumC=sumC,
             Ibase=Ibase, latent_src=latent_src, rhs=rhs, area=area)
@@ -669,6 +739,535 @@ function semquad_level_stats(qt::Quadtree; strip::Float64=0.1)
         y0 = iy * h
         hist[l] = get(hist, l, 0) + 1
         if y0 + h <= strip || y0 >= 1.0 - strip
+            wall_max = max(wall_max, l)
+        else
+            interior_max = max(interior_max, l)
+        end
+    end
+    return (histogram=hist, wall_max=wall_max, interior_max=interior_max,
+            n=length(qt.leaves))
+end
+
+# ===========================================================================
+# Mapped bodies (stage 0 cut 4)
+# ===========================================================================
+#
+# Every public diagnostics function above dispatches once on `sq.geom`: the
+# `CartesianBox` body above is the historical statement, character for
+# character (that is what keeps the nine state-dump hashes), and the mapped body
+# below is new code that reads the geometry layer's metric, face metric and
+# physical height (GEOM_DESIGN §3 cut 4, §5.5/G270).
+#
+# The routing rules, applied uniformly:
+#   * the quadrature point, the volume measure and the physical basis gradients
+#     come from the leaf metric (`quad_point`/`quad_measure`/`basis_grad`);
+#   * every base-state closure (`Tbar`, `rho`, phase functions) is evaluated at
+#     the physical **height** `h = height(g,x,y)`, and every directional term
+#     uses `u . grad h = upward_velocity(g,x,y,ux,uz)` instead of `u_z`;
+#   * every wall integral uses the **mapped outward unit normal** and the mapped
+#     face Jacobian; the box's one-sided `2/h` derivative and sign table are the
+#     box body's alone (the mapped wall flux is `grad(theta) . n` at the wall GLL
+#     nodes, integrated with the wall GLL rule so that the box-map cross-check is
+#     a round-off comparison; the signs are `+n` on the top side and `-n` on the
+#     bottom, i.e. the same "positive upward" flux convention the box uses);
+#   * every volume mean is normalised by the physical total measure
+#     (`total_measure`), never by `total_area(qt)`.
+#
+# `nu_wall_sides(g)` names the two logical sides the Nusselt pair uses.  For
+# every stage-0 geometry it is `(:yminus, :yplus)`; the annulus's inner/outer
+# circles are `xminus`/`xplus`, which is why the diagnostics ask the geometry.
+
+"""
+    _semquad_wall_flux(g, sq, theta, side) -> (flux, measure)
+
+Mapped wall integral on logical `side` of the perturbation temperature: the
+outward-normal derivative `grad(theta) . n` at the wall GLL nodes, integrated
+with the wall GLL rule (`face_jacobian * sq.w[q]`), and the wall measure with
+the same rule.  The wall-node order and the GLL rule are the box wall bodies'
+(E8), so on the box map the two agree to round-off.  The derivative is the
+one-sided GLL derivative in the wall-normal reference direction composed with
+the physical `J^{-T}` of the mapped element (`chain rule`), i.e. the mapped twin
+of the box's `2/h` one-sided derivative.
+"""
+function _semquad_wall_flux(g::AbstractGeometry, sq::SemQuad,
+                            theta::Vector{Float64}, side::Symbol)
+    n = sq.p + 1
+    isx = side === :xminus || side === :xplus
+    st = 0.0
+    wt = 0.0
+    for lf in sq.leaves
+        _on_logical_wall(lf, side, sq) || continue
+        ids = sq.elem[lf]
+        fm = _mapped_face_metric(g, sq, lf, side, sq.xi)
+        @inbounds for q in 1:n
+            xi, eta = _wall_ref_point(side, sq.xi[q])
+            inv = jacobian_inverse(g, sq, lf, xi, eta)
+            if isx
+                i = side === :xplus ? n : 1
+                j = q
+            else
+                i = q
+                j = side === :yplus ? n : 1
+            end
+            dxi = 0.0
+            deta = 0.0
+            for a in 1:n
+                dxi += sq.D[i, a] * theta[ids[(j - 1) * n + a]]
+                deta += sq.D[j, a] * theta[ids[(a - 1) * n + i]]
+            end
+            gx = dxi * inv[1] + deta * inv[2]
+            gy = dxi * inv[3] + deta * inv[4]
+            nx, ny = face_normal(fm, q)
+            w = face_jacobian(fm, q) * sq.w[q]
+            st += w * (gx * nx + gy * ny)
+            wt += w
+        end
+    end
+    return st, wt
+end
+
+function _semquad_nu_walls_mapped(g::AbstractGeometry, sq::SemQuad,
+                                  qt::Quadtree, theta::Vector{Float64},
+                                  pr::Params)
+    sideb, sidet = nu_wall_sides(g)
+    # outward normal derivative, as the box body's `st`/`sb` are the upward
+    # derivative on both walls; the box sign table (E18) becomes the `+`/`-`
+    # normal convention here: Nu_bot = ref - (-flux_out_bot)/measure.
+    st, wt = _semquad_wall_flux(g, sq, theta, sidet)
+    sb, wb = _semquad_wall_flux(g, sq, theta, sideb)
+    top_ref = -semquad_base_gradient(pr, 1.0)
+    bot_ref = -semquad_base_gradient(pr, 0.0)
+    return top_ref - st / wt, bot_ref + sb / wb
+end
+
+function _semquad_base_advection_integral_mapped(g::AbstractGeometry,
+                                                 sq::SemQuad, qt::Quadtree,
+                                                 pr::Params,
+                                                 ux::Vector{Float64},
+                                                 uz::Vector{Float64})
+    p = sq.p
+    n = p + 1
+    fd = make_fedata(p, p - 1)
+    s = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(m, fd, qx, qy)
+            x, y = quad_point(m, sq, lf, fd, qx, qy)
+            uxq = 0.0
+            uzq = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                b = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                uxq += ux[ids[k]] * b
+                uzq += uz[ids[k]] * b
+            end
+            h = height(g, x, y)
+            ugh = upward_velocity(g, x, y, uxq, uzq)
+            s += w * ugh * dTbar(h, pr.H)
+        end
+    end
+    return s
+end
+
+function _semquad_theta2_divu_integral_mapped(g::AbstractGeometry,
+                                              sq::SemQuad, qt::Quadtree,
+                                              theta::Vector{Float64},
+                                              ux::Vector{Float64},
+                                              uz::Vector{Float64})
+    p = sq.p
+    n = p + 1
+    fd = make_fedata(p, p - 1)
+    s = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(m, fd, qx, qy)
+            thq = 0.0
+            dux = 0.0
+            duz = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                thq += theta[ids[k]] * fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                gx, gz = basis_grad(m, fd, qx, qy, i, j)
+                dux += ux[ids[k]] * gx
+                duz += uz[ids[k]] * gz
+            end
+            s += w * thq * thq * (dux + duz)
+        end
+    end
+    return s
+end
+
+function _semquad_max_divergence_mapped(g::AbstractGeometry, sq::SemQuad,
+                                        qt::Quadtree, ux::Vector{Float64},
+                                        uz::Vector{Float64})
+    n = sq.p + 1
+    worst = 0.0
+    for lf in sq.leaves
+        ids = sq.elem[lf]
+        for j in 1:n, i in 1:n
+            inv = jacobian_inverse(g, sq, lf, sq.xi[i], sq.xi[j])
+            dux_dxi = 0.0
+            dux_deta = 0.0
+            duz_dxi = 0.0
+            duz_deta = 0.0
+            for a in 1:n
+                dux_dxi += sq.D[i, a] * ux[ids[(j - 1) * n + a]]
+                dux_deta += sq.D[j, a] * ux[ids[(a - 1) * n + i]]
+                duz_dxi += sq.D[i, a] * uz[ids[(j - 1) * n + a]]
+                duz_deta += sq.D[j, a] * uz[ids[(a - 1) * n + i]]
+            end
+            dux_dx = dux_dxi * inv[1] + dux_deta * inv[2]
+            duz_dy = duz_dxi * inv[3] + duz_deta * inv[4]
+            worst = max(worst, abs(dux_dx + duz_dy))
+        end
+    end
+    return worst
+end
+
+function _semquad_surface_velocity_mapped(g::AbstractGeometry, sq::SemQuad,
+                                          qt::Quadtree, ux::Vector{Float64},
+                                          uz::Vector{Float64};
+                                          wall::Symbol=:top)
+    sideb, sidet = nu_wall_sides(g)
+    side = wall === :top ? sidet : sideb
+    n = sq.p + 1
+    s2 = 0.0
+    wsum = 0.0
+    vmax = 0.0
+    for lf in sq.leaves
+        _on_logical_wall(lf, side, sq) || continue
+        ids = sq.elem[lf]
+        fm = _mapped_face_metric(g, sq, lf, side, sq.xi)
+        @inbounds for q in 1:n
+            w = face_jacobian(fm, q) * sq.w[q]
+            gid = _logical_wall_node(ids, n, side, q)
+            v = hypot(ux[gid], uz[gid])
+            s2 += w * v * v
+            wsum += w
+            vmax = max(vmax, v)
+        end
+    end
+    return sqrt(s2 / wsum), vmax
+end
+
+function _semquad_work_dissipation_mapped(g::AbstractGeometry, sq::SemQuad,
+                                          qt::Quadtree, pr::Params,
+                                          theta::Vector{Float64},
+                                          ux::Vector{Float64},
+                                          uz::Vector{Float64},
+                                          eta_fun::Function;
+                                          rho_multiplier::Union{Nothing,Function}=nothing)
+    p = sq.p
+    n = p + 1
+    fd = make_fedata(p, p - 1)
+    W = 0.0
+    U = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(m, fd, qx, qy)
+            x, y = quad_point(m, sq, lf, fd, qx, qy)
+            h = height(g, x, y)
+            thq = 0.0
+            uxq = 0.0
+            uzq = 0.0
+            dux_dx = 0.0
+            dux_dy = 0.0
+            duz_dx = 0.0
+            duz_dy = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                b = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                thq += theta[ids[k]] * b
+                uxq += ux[ids[k]] * b
+                uzq += uz[ids[k]] * b
+                gx, gz = basis_grad(m, fd, qx, qy, i, j)
+                dux_dx += ux[ids[k]] * gx
+                dux_dy += ux[ids[k]] * gz
+                duz_dx += uz[ids[k]] * gx
+                duz_dy += uz[ids[k]] * gz
+            end
+            # The buoyancy work is the work of the buoyancy force along the
+            # velocity, i.e. `rho T (u . grad h)` with `grad h` the upward
+            # direction (GEOM_DESIGN §2.7/§6.4): the mapped `u_z`.
+            T = semquad_base_T(pr, h) + thq
+            rho_w = (pr.refstate === nothing ? 1.0 :
+                     semquad_rho(pr.refstate, h))::Float64
+            rho_multiplier === nothing || (rho_w *= rho_multiplier(x, y))
+            ugh = upward_velocity(g, x, y, uxq, uzq)
+            W += w * rho_w * T * ugh
+            exx = dux_dx
+            ezz = duz_dy
+            exz = 0.5 * (dux_dy + duz_dx)
+            eed = exx^2 + ezz^2 + 2.0 * exz^2
+            if pr.deviatoric
+                eed -= (1.0 / 3.0) * (exx + ezz)^2
+            end
+            eta = eta_fun(x, y)
+            U += w * 2.0 * eta * eed
+        end
+    end
+    A = total_measure(g, sq, fd)
+    return W / A, U / A
+end
+
+function _semquad_vrms_mapped(g::AbstractGeometry, sq::SemQuad, qt::Quadtree,
+                              ux::Vector{Float64}, uz::Vector{Float64})
+    p = sq.p
+    n = p + 1
+    fd = make_fedata(p, p - 1)
+    s = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(m, fd, qx, qy)
+            uxq = 0.0
+            uzq = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                b = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                uxq += ux[ids[k]] * b
+                uzq += uz[ids[k]] * b
+            end
+            s += w * (uxq * uxq + uzq * uzq)
+        end
+    end
+    return sqrt(s / total_measure(g, sq, fd))
+end
+
+function _semquad_mean_T_mapped(g::AbstractGeometry, sq::SemQuad,
+                                qt::Quadtree, theta::Vector{Float64},
+                                pr::Params)
+    p = sq.p
+    n = p + 1
+    fd = make_fedata(p, p - 1)
+    s = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(m, fd, qx, qy)
+            x, y = quad_point(m, sq, lf, fd, qx, qy)
+            h = height(g, x, y)
+            thq = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                thq += theta[ids[k]] * fd.phi_v[i, qx] * fd.phi_v[j, qy]
+            end
+            s += w * (semquad_base_T(pr, h) + thq)
+        end
+    end
+    return s / total_measure(g, sq, fd)
+end
+
+function _semquad_nu_energy_mapped(g::AbstractGeometry, sq::SemQuad,
+                                   qt::Quadtree, pr::Params,
+                                   theta::Vector{Float64},
+                                   ux::Vector{Float64}, uz::Vector{Float64})
+    p = sq.p
+    n = p + 1
+    fd = make_fedata(p, p - 1)
+    s = 0.0
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(m, fd, qx, qy)
+            x, y = quad_point(m, sq, lf, fd, qx, qy)
+            uxq = 0.0
+            uzq = 0.0
+            thq = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                b = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                uxq += ux[ids[k]] * b
+                uzq += uz[ids[k]] * b
+                thq += theta[ids[k]] * b
+            end
+            # energy Nusselt: the convective heat flux is `theta (u . grad h)`.
+            s += w * upward_velocity(g, x, y, uxq, uzq) * thq
+        end
+    end
+    return 1.0 + 0.5 * pr.H + s / total_measure(g, sq, fd)
+end
+
+function _semquad_heat_budget_mapped(g::AbstractGeometry, sq::SemQuad,
+                                     qt::Quadtree, pr::Params,
+                                     theta::Vector{Float64};
+                                     phases::Vector{PhaseTransition}=PhaseTransition[],
+                                     ux::Union{Nothing,Vector{Float64}}=nothing,
+                                     uz::Union{Nothing,Vector{Float64}}=nothing,
+                                     eta_fun::Union{Nothing,Function}=nothing)
+    p = sq.p
+    n = p + 1
+    fd = make_fedata(p, p - 1)
+    L = pr.latent_L
+    use_lat = semquad_latent_active(pr, phases)
+    per_phase = pr.latent_mode === :per_phase
+    lcoef = use_lat ? semquad_latent_coefficients(pr, phases) : Float64[]
+    theta_int = 0.0
+    latent_int = 0.0
+    latent_src = 0.0
+    latent_adv = 0.0
+    u_grad_theta = 0.0
+    heating = 0.0
+    base_adv = 0.0
+    latent_bal = use_lat && ux !== nothing && uz !== nothing
+    need_u = pr.heating_adiabatic || (uz !== nothing && ux !== nothing)
+    need_u && (ux === nothing || uz === nothing) &&
+        throw(ArgumentError("semquad_heat_budget needs ux and uz for the " *
+                            "adiabatic heating / base advection"))
+    if pr.heating_dissipation && eta_fun === nothing
+        throw(ArgumentError("semquad_heat_budget needs eta_fun when " *
+                            "heating_dissipation is on"))
+    end
+    for lf in sq.leaves
+        m = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(m, fd, qx, qy)
+            x, y = quad_point(m, sq, lf, fd, qx, qy)
+            h = height(g, x, y)
+            thq = 0.0
+            uxq = 0.0
+            uzq = 0.0
+            dth_dx = 0.0
+            dth_dy = 0.0
+            dux_dx = 0.0
+            dux_dy = 0.0
+            duz_dx = 0.0
+            duz_dy = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                b = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                thq += theta[ids[k]] * b
+                if need_u
+                    # both components: `upward_velocity` needs the full `u`.
+                    uxq += ux[ids[k]] * b
+                    uzq += uz[ids[k]] * b
+                end
+                if latent_bal
+                    gx, gz = basis_grad(m, fd, qx, qy, i, j)
+                    dth_dx += theta[ids[k]] * gx
+                    dth_dy += theta[ids[k]] * gz
+                end
+                if pr.heating_dissipation
+                    gx, gz = basis_grad(m, fd, qx, qy, i, j)
+                    dux_dx += ux[ids[k]] * gx
+                    dux_dy += ux[ids[k]] * gz
+                    duz_dx += uz[ids[k]] * gx
+                    duz_dy += uz[ids[k]] * gz
+                end
+            end
+            # directional velocity of the mapped geometry (GEOM_DESIGN §6.4).
+            ugh = need_u ? upward_velocity(g, x, y, uxq, uzq) : 0.0
+            theta_int += w * thq
+            T = semquad_base_T(pr, h) + thq
+            if use_lat
+                gg = 0.0
+                gz_u = 0.0
+                gt_ug = 0.0
+                ugrad = latent_bal ? (uxq * dth_dx + uzq * dth_dy) : 0.0
+                if per_phase
+                    for i in eachindex(phases)
+                        pt = phases[i]
+                        lc = lcoef[i]
+                        Tb = semquad_base_T(pr, h)
+                        gg += lc * (phase_gamma(pt, h, T) - phase_gamma(pt, h, Tb))
+                        if latent_bal
+                            gz_u += lc * phase_dgamma_dz(pt, h, T) * ugh
+                            gt_ug += lc * phase_dgamma_dT(pt, h, T) * ugrad
+                        end
+                    end
+                    latent_int += w * gg
+                else
+                    for pt in phases
+                        gg += phase_gamma(pt, h, T) -
+                              phase_gamma(pt, h, semquad_base_T(pr, h))
+                        if latent_bal
+                            gz_u += L * phase_dgamma_dz(pt, h, T) * ugh
+                            gt_ug += L * phase_dgamma_dT(pt, h, T) * ugrad
+                        end
+                    end
+                    latent_int += w * L * gg
+                end
+                if latent_bal
+                    latent_src += w * gz_u
+                    latent_adv += w * gt_ug
+                end
+            end
+            if pr.rho_heating
+                heating += w * (-T * pr.H)
+            end
+            if pr.Di > 0.0 && (pr.heating_adiabatic || pr.heating_dissipation)
+                if pr.heating_adiabatic
+                    rho_ad = (pr.refstate === nothing ? 1.0 :
+                              semquad_rho(pr.refstate, h))::Float64
+                    heating += w * (-pr.Di * rho_ad * T * ugh)
+                end
+                if pr.heating_dissipation
+                    exz = 0.5 * (dux_dy + duz_dx)
+                    eed = dux_dx^2 + duz_dy^2 + 2.0 * exz^2
+                    if pr.deviatoric
+                        eed -= (1.0 / 3.0) * (dux_dx + duz_dy)^2
+                    end
+                    heating += w * (pr.Di / pr.Ra) * 2.0 * eta_fun(x, y) * eed
+                end
+            end
+            if need_u
+                base_adv += w * ugh * semquad_base_gradient(pr, h)
+            end
+            use_lat && (u_grad_theta += w * ugrad)
+        end
+    end
+    # Wall fluxes with the mapped outward normal, in the box's "positive upward"
+    # convention: `flux_top = int dtheta/dn_top`, `flux_bot = -int dtheta/dn_bot`.
+    sideb, sidet = nu_wall_sides(g)
+    f_top, _ = _semquad_wall_flux(g, sq, theta, sidet)
+    f_bot, _ = _semquad_wall_flux(g, sq, theta, sideb)
+    st = f_top
+    sb = -f_bot
+    return (theta_int=theta_int, latent_int=latent_int,
+            enthalpy=theta_int + latent_int,
+            flux_top=st, flux_bot=sb, flux=st - sb,
+            heating=heating, base_adv=base_adv,
+            latent_src=(use_lat ? (latent_bal ? latent_src : nothing) : 0.0),
+            latent_adv=(use_lat ? (latent_bal ? latent_adv : nothing) : 0.0),
+            latent_dgdt=(use_lat ? (latent_bal ? latent_src + latent_adv : nothing) : 0.0),
+            u_grad_theta=(use_lat ? (latent_bal ? u_grad_theta : nothing) : 0.0))
+end
+
+"""
+    semquad_level_stats(g::AbstractGeometry, qt; strip=0.1)
+
+Mapped method of [`semquad_level_stats`](@ref): a leaf is in a wall strip when
+its **physical height** extent lies inside `h <= strip` (bottom) or
+`h >= 1-strip` (top), tested on the four mapped leaf corners.  The box method
+above keeps its historical physical-`y` leaf test (E16).
+"""
+function semquad_level_stats(g::AbstractGeometry, qt::Quadtree;
+                             strip::Float64=0.1)
+    hist = Dict{Int,Int}()
+    wall_max = 0
+    interior_max = 0
+    for lf in qt.leaves
+        l = lf[1]
+        hist[l] = get(hist, l, 0) + 1
+        hlo = Inf
+        hhi = -Inf
+        for (xi, eta) in ((-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0))
+            x, y = element_map(g, qt, lf, xi, eta)
+            h = height(g, x, y)
+            hlo = min(hlo, h)
+            hhi = max(hhi, h)
+        end
+        if hhi <= strip || hlo >= 1.0 - strip
             wall_max = max(wall_max, l)
         else
             interior_max = max(interior_max, l)

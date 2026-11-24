@@ -51,3 +51,17 @@ with `h = leaf_hy` and zero cross/curvature terms, because the historical box EV
 body assumes square leaves (`GEOM_DESIGN` §1.6 item 1/F4) and stays bitwise.
 `upward_velocity` is the `u . grad h` accessor the mapped directional physics
 terms use (the box method is the historical `u_z`).
+
+The **physical measures** (cut 4, `GEOM_DESIGN` §2.3) are the diagnostics' entry
+to the metric: `leaf_measure`, `total_measure`, `boundary_measure`,
+`leaf_min_size`, `leaf_vertical_size`, the tree-wide `minimum_leaf_size` /
+`minimum_leaf_height`, and `nu_wall_sides` (which logical sides the Nusselt pair
+integrates).  Their box methods are the historical expressions bit for bit
+(`total_area = sum(leaf_hx*leaf_hy)` E13, the E8 GLL wall weights,
+`min(leaf_hx,leaf_hy)` / `leaf_hy` E15); the mapped methods integrate
+`quad_measure`, the face Jacobian at the wall GLL nodes and the physical extents.
+The wall-integrating diagnostics use the mapped face metric at the **GLL** nodes
+(`_mapped_face_metric` with `sq.xi`) because the box wall bodies use the GLL
+wall rule (E8), so the box-map cross-check in G270 is a round-off comparison.
+The measures are cold code: they are never called inside an operator kernel.
+

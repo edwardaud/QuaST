@@ -911,7 +911,22 @@ end
 
 function face_metric(g::AbstractGeometry, lay, lf::NTuple{3,Int},
                      side::Symbol, fd::FEData)
-    nq = fd.nq
+    return _mapped_face_metric(g, lay, lf, side, fd.gl_x)
+end
+
+"""
+    _mapped_face_metric(g, lay, lf, side, qs) -> MappedFaceMetric
+
+The mapped face metric evaluated at the **arbitrary** face parameters `qs`
+(face parameter in `[-1,1]`; the physical point is the map image).  This is the
+core of [`face_metric(g, lay, lf, side, fd)`](@ref), which feeds the Gauss
+quadrature points of `fd`; the diagnostics call it with the **GLL nodes**
+(`sq.xi`) because the box wall bodies integrate with the GLL rule (E8), and a
+mapped wall integral must use the same rule to be comparable.
+"""
+function _mapped_face_metric(g::AbstractGeometry, lay, lf::NTuple{3,Int},
+                             side::Symbol, qs::Vector{Float64})
+    nq = length(qs)
     xq = Vector{Float64}(undef, nq)
     yq = Vector{Float64}(undef, nq)
     jac = Vector{Float64}(undef, nq)
@@ -924,7 +939,7 @@ function face_metric(g::AbstractGeometry, lay, lf::NTuple{3,Int},
         throw(ArgumentError("unknown face side $side"))
     sgn = (side === :xplus || side === :yplus) ? 1.0 : -1.0
     @inbounds for q in 1:nq
-        qr = fd.gl_x[q]
+        qr = qs[q]
         xi, eta = is_x ? (sgn, qr) : (qr, sgn)
         J, _ = element_jacobian(g, lay, lf, xi, eta)
         xq[q], yq[q] = element_map(g, lay, lf, xi, eta)
@@ -1111,6 +1126,305 @@ theta`) without a kernel change.  Not read by the box methods, which are the
 historical expressions.
 """
 @inline measure_weight(::AbstractGeometry, x::Float64, y::Float64) = 1.0
+
+# ---------------------------------------------------------------------------
+# 7b. Physical measures (diagnostics; cut 4)
+# ---------------------------------------------------------------------------
+#
+# The diagnostics of cut 4 are the first consumers of the layer's measures
+# (GEOM_DESIGN §2.3, rows 462-471; the cut-1 record deferred them).  The box
+# methods are the historical expressions, bit for bit:
+#   * `leaf_measure` is the E13 leaf term `leaf_hx*leaf_hy` and `total_measure`
+#     the E13 sum `total_area(qt)`, so a diagnostics normalisation cannot move a
+#     single bit on the box path;
+#   * `boundary_measure` is the E8 GLL wall sum `0.5*h*sq.w[i]`, exactly the
+#     `wt`/`wb` normaliser `semquad_nu_walls` accumulates internally;
+#   * `leaf_vertical_size` is E15's `leaf_hy` (the history `hmin`) and
+#     `leaf_min_size` E15's `min(leaf_hx, leaf_hy)` (the CFL `hmin`).
+# The mapped methods are the general integrals: `quad_measure` over the leaf for
+# the volume, the face Jacobian at the wall GLL nodes for the wall, the physical
+# extents for the sizes.
+
+"""
+    leaf_measure(g, lay, lf) -> Float64
+
+Physical 2-D measure of one leaf.  Box method: the historical E13 leaf term
+`leaf_hx*leaf_hy` (the operand `total_area` sums).  Mapped method: the integral
+of `det J` over the leaf, i.e. `sum quad_measure` on an 8-point Gauss rule
+(exact for the affine validation geometries and at machine precision for
+`CurvedBox`'s smooth `det J`).  The mapped diagnostics that need the same
+discrete measure as their own quadrature use [`total_measure`](@ref) with the
+diagnostics' rule instead.
+"""
+@inline leaf_measure(g::CartesianBox, lay, lf::NTuple{3,Int}) =
+    leaf_hx(lay, lf[1]) * leaf_hy(lay, lf[1])
+
+"""
+    leaf_measure(g::AbstractGeometry, lay, lf, fd::FEData) -> Float64
+
+The mapped leaf measure integrated with the caller's quadrature `fd` (the fully
+weighted `quad_measure`), so a mean computed with that rule divides by the
+measure of the same rule.
+"""
+function leaf_measure(g::AbstractGeometry, lay, lf::NTuple{3,Int}, fd::FEData)
+    m = leaf_metric(g, lay, lf, fd)
+    s = 0.0
+    @inbounds for qy in 1:fd.nq, qx in 1:fd.nq
+        s += quad_measure(m, fd, qx, qy)
+    end
+    return s
+end
+function leaf_measure(g::AbstractGeometry, lay, lf::NTuple{3,Int})
+    return leaf_measure(g, lay, lf, make_fedata(2, 1; nq=8))
+end
+
+"""
+    total_measure(g, lay[, fd]) -> Float64
+
+Physical measure of the whole domain (area in 2-D).  The box method is the
+historical E13 `total_area(qt) = sum(leaf_hx*leaf_hy)` over the tree's leaf set,
+**bit for bit** (that is the expression every box diagnostics divides by; see
+`docs/dev/GEOM_DESIGN.md` E13).  A mapped geometry integrates `quad_measure`
+over the leaves; with the caller's `fd` it is the measure of the caller's
+quadrature rule, which is what a mapped mean must divide by (so a constant field
+has the constant as its mean up to round-off).
+
+`total_measure(g::CartesianBox, sq::SemQuad)` sums the E13 leaf terms in the
+space's sorted leaf order instead of the tree's hash-set order.  It exists for
+API completeness only: the box diagnostics use the `Quadtree` method so that
+their normalisation is the historical `total_area` bit for bit.
+"""
+function total_measure(g::CartesianBox, lay)
+    # `lay` is a `Quadtree` on the historical path: E13's sum, bit for bit.
+    lay isa Quadtree && return total_area(lay)
+    # A `SemQuad`: sum the same leaf terms in the space's sorted leaf order.
+    s = 0.0
+    for lf in lay.leaves
+        s += leaf_measure(g, lay, lf)
+    end
+    return s
+end
+function total_measure(g::AbstractGeometry, lay, fd::FEData)
+    s = 0.0
+    for lf in lay.leaves
+        s += leaf_measure(g, lay, lf, fd)
+    end
+    return s
+end
+function total_measure(g::AbstractGeometry, lay)
+    return total_measure(g, lay, make_fedata(lay.p, lay.p - 1))
+end
+
+"""
+    boundary_measure(g, sq, side) -> Float64
+
+Physical length of one logical boundary side, integrated with the **GLL wall
+rule** the box wall bodies use (E8).  The box method reproduces the historical
+`sum 0.5*hx*sq.w[i]` (resp. `0.5*hy*sq.w[j]`) accumulation, so the mapped
+`semquad_nu_walls`/`semquad_nu_cbf` normalisers are the box ones on the box map.
+The mapped method integrates the face Jacobian at the same GLL nodes; this is a
+cold measure (the diagnostics call it once per side).
+"""
+function boundary_measure(g::CartesianBox, sq, side::Symbol)
+    n = sq.p + 1
+    s = 0.0
+    if side === :xminus || side === :xplus
+        xplus = side === :xplus
+        for lf in sq.leaves
+            (xplus ? lf[2] == leaf_nside_x(sq, lf[1]) - 1 : lf[2] == 0) || continue
+            hy = leaf_hy(sq, lf[1])
+            @inbounds for j in 1:n
+                s += 0.5 * hy * sq.w[j]
+            end
+        end
+    elseif side === :yminus || side === :yplus
+        yplus = side === :yplus
+        for lf in sq.leaves
+            (yplus ? lf[3] == leaf_nside_y(sq, lf[1]) - 1 : lf[3] == 0) || continue
+            hx = leaf_hx(sq, lf[1])
+            @inbounds for i in 1:n
+                s += 0.5 * hx * sq.w[i]
+            end
+        end
+    else
+        throw(ArgumentError("unknown face side $side"))
+    end
+    return s
+end
+function boundary_measure(g::AbstractGeometry, sq, side::Symbol)
+    n = sq.p + 1
+    s = 0.0
+    for lf in sq.leaves
+        _on_logical_wall(lf, side, sq) || continue
+        fm = _mapped_face_metric(g, sq, lf, side, sq.xi)
+        @inbounds for q in 1:n
+            s += face_jacobian(fm, q) * sq.w[q]
+        end
+    end
+    return s
+end
+
+"""
+    leaf_min_size(g, lay, lf) -> Float64
+
+Physical element size for the CFL/hmin path (GEOM_DESIGN E15).  Box method:
+the historical `min(leaf_hx, leaf_hy)` bit for bit.  Mapped method: the smaller
+of the two physical edge extents at the leaf centre, `min(2|J e_xi|, 2|J e_eta|)`
+(the reference extent is 2 in each direction; for the box map this is exactly
+`min(hx, hy)`).  `docs/dev/GEOM_DESIGN.md` §6.6: on the annulus the angular cell
+size grows with `r`, so the CFL minimum is at the inner boundary.
+"""
+@inline leaf_min_size(g::CartesianBox, lay, lf::NTuple{3,Int}) =
+    min(leaf_hx(lay, lf[1]), leaf_hy(lay, lf[1]))
+@inline function leaf_min_size(g::AbstractGeometry, lay, lf::NTuple{3,Int})
+    J, _ = element_jacobian(g, lay, lf, 0.0, 0.0)
+    return min(2.0 * hypot(J[1], J[3]), 2.0 * hypot(J[2], J[4]))
+end
+
+"""
+    leaf_vertical_size(g, lay, lf) -> Float64
+
+Physical extent of one leaf **along the height direction** (max `height` minus
+min `height` over the leaf corners: for a linear `h` that is the projection of
+the element onto `grad h`; for the box it is the leaf's vertical size).  Box
+method: the historical E15 `leaf_hy` (the history `hmin`), bit for bit.
+"""
+@inline leaf_vertical_size(g::CartesianBox, lay, lf::NTuple{3,Int}) =
+    leaf_hy(lay, lf[1])
+function leaf_vertical_size(g::AbstractGeometry, lay, lf::NTuple{3,Int})
+    h11 = _height_at(g, lay, lf, -1.0, -1.0)
+    h21 = _height_at(g, lay, lf, 1.0, -1.0)
+    h22 = _height_at(g, lay, lf, 1.0, 1.0)
+    h12 = _height_at(g, lay, lf, -1.0, 1.0)
+    hlo = min(h11, h21, h22, h12)
+    hhi = max(h11, h21, h22, h12)
+    return hhi - hlo
+end
+@inline function _height_at(g::AbstractGeometry, lay, lf::NTuple{3,Int},
+                            xi::Float64, eta::Float64)
+    x, y = element_map(g, lay, lf, xi, eta)
+    return height(g, x, y)
+end
+
+"""
+    minimum_leaf_size(g, qt) -> Float64
+
+Minimum [`leaf_min_size`](@ref) over the tree: the CFL `hmin` of
+`driver/run.jl`.  The box method is the historical E15 expression
+`minimum(min(leaf_hx, leaf_hy) for lf in qt.leaves)`, bit for bit.
+"""
+@inline minimum_leaf_size(g::CartesianBox, qt::Quadtree) =
+    minimum(min(leaf_hx(qt, lf[1]), leaf_hy(qt, lf[1])) for lf in qt.leaves)
+function minimum_leaf_size(g::AbstractGeometry, qt::Quadtree)
+    hmin = Inf
+    for lf in qt.leaves
+        h = leaf_min_size(g, qt, lf)
+        h < hmin && (hmin = h)
+    end
+    return hmin
+end
+
+"""
+    minimum_leaf_height(g, qt) -> Float64
+
+Minimum [`leaf_vertical_size`](@ref) over the tree: the history `hmin` of
+`driver/diagnostics_row.jl`.  The box method is the historical E15
+`minimum(leaf_hy(sq, lf[1]) for lf in qt.leaves)`, bit for bit.
+"""
+@inline minimum_leaf_height(g::CartesianBox, qt::Quadtree) =
+    minimum(leaf_hy(qt, lf[1]) for lf in qt.leaves)
+function minimum_leaf_height(g::AbstractGeometry, qt::Quadtree)
+    hmin = Inf
+    for lf in qt.leaves
+        h = leaf_vertical_size(g, qt, lf)
+        h < hmin && (hmin = h)
+    end
+    return hmin
+end
+
+"""
+    nu_wall_sides(g) -> (bottom_side, top_side)
+
+The two logical sides whose wall heat flux defines the Nusselt pair, ordered
+`(bottom/hot, top/cold)`.  All stage-0 geometries are the box (or its images),
+so the default is `(:yminus, :yplus)`: their `height` increases with logical
+`y` and the box Nu definition integrates the two `y`-walls.  The annulus
+(stage 0.5) overrides this to the two circles (`xminus`/`xplus`, GEOM_DESIGN
+§6.3/§6.6), which is why the diagnostics ask the geometry instead of
+hard-coding the logical sides.
+"""
+@inline nu_wall_sides(::AbstractGeometry) = (:yminus, :yplus)
+
+"""
+    _nusselt_area(sq, qt) -> Float64
+
+The normalisation "area" of the Nusselt-unit diagnostics: the `R/A` of
+[`semquad_exact_residual`](@ref), the wall flux normalisation of
+[`semquad_nu_cbf`](@ref) and the latent `closure` term of the history row.  The
+box method is the historical `total_area(qt)` bit for bit (the box height is 1,
+so the area equals the wall length the quantities divide by); a mapped geometry
+uses the top wall's physical measure, the annulus generalisation of "Lx"
+(GEOM_DESIGN §6.6).
+"""
+@inline function _nusselt_area(sq, qt::Quadtree)
+    g = sq.geom
+    g isa CartesianBox && return total_area(qt)
+    return boundary_measure(g, sq, nu_wall_sides(g)[2])
+end
+
+# --- logical wall helpers used by the mapped diagnostics (cold paths) -------
+
+"""
+    _on_logical_wall(lf, side, lay) -> Bool
+
+Whether the leaf `lf` has a face on the domain boundary logical `side`.  This is
+the **logical** wall classification the box bodies also use (`lf[3] == 0`,
+`lf[3] == nside-1`, ...; GEOM_DESIGN E16): the physical row tests of the box
+diagnostics are equivalent to it for the axis-aligned box, and it stays correct
+for every mapped geometry.
+"""
+@inline function _on_logical_wall(lf::NTuple{3,Int}, side::Symbol, lay)
+    if side === :xminus
+        return lf[2] == 0
+    elseif side === :xplus
+        return lf[2] == leaf_nside_x(lay, lf[1]) - 1
+    elseif side === :yminus
+        return lf[3] == 0
+    elseif side === :yplus
+        return lf[3] == leaf_nside_y(lay, lf[1]) - 1
+    end
+    throw(ArgumentError("unknown face side $side"))
+end
+
+"""
+    _wall_ref_point(side, t) -> (xi, eta)
+
+Leaf reference coordinates of the point at face parameter `t in [-1,1]` on
+logical `side`.
+"""
+@inline function _wall_ref_point(side::Symbol, t::Float64)
+    side === :xminus && return (-1.0, t)
+    side === :xplus && return (1.0, t)
+    side === :yminus && return (t, -1.0)
+    side === :yplus && return (t, 1.0)
+    throw(ArgumentError("unknown face side $side"))
+end
+
+"""
+    _logical_wall_node(ids, n, side, q) -> Int
+
+Global id of the `q`-th wall-node of a leaf with element ids `ids` on logical
+`side`, in the order the box wall bodies use (moving face index `i`/`j`).
+"""
+@inline function _logical_wall_node(ids::Vector{Int}, n::Int, side::Symbol,
+                                    q::Int)
+    if side === :xminus || side === :xplus
+        i = side === :xplus ? n : 1
+        return ids[(q - 1) * n + i]
+    end
+    j = side === :yplus ? n : 1
+    return ids[(j - 1) * n + q]
+end
 
 # ---------------------------------------------------------------------------
 # 8. Logical boundary registry

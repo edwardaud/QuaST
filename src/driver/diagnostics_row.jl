@@ -26,7 +26,15 @@ function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
     Nut, Nub = semquad_nu_walls(sq, qt, theta, pr)
     Vr = semquad_vrms(sq, qt, ux, uz)
     Ta = semquad_mean_T(sq, qt, theta, pr)
-    hmin_hist = minimum(leaf_hy(sq, lf[1]) for lf in qt.leaves)
+    g = sq.geom
+    # CFL/hmin history (GEOM_DESIGN E15): the box keeps the historical
+    # `minimum(leaf_hy)` bit for bit; a mapped geometry uses the physical extent
+    # of each leaf along the height direction.
+    hmin_hist = if g isa CartesianBox
+        minimum(leaf_hy(sq, lf[1]) for lf in qt.leaves)
+    else
+        minimum_leaf_height(g, qt)
+    end
     umax_hist = maximum(hypot.(ux, uz))
     div_max = semquad_max_divergence(sq, qt, ux, uz)
     Ibase = semquad_base_advection_integral(sq, qt, pr, ux, uz)
@@ -59,7 +67,10 @@ function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
         lb = semquad_heat_budget(sq, qt, pr, theta; phases=phases,
                                  ux=ux, uz=uz, eta_fun=eta_for_energy)
         # `latent_dgdt` is a Float64 here: the velocity is always supplied.
-        closure += (lb.latent_dgdt::Float64) / total_area(qt)
+        # The Nusselt-unit normalisation is the box's `total_area(qt)` (bit for
+        # bit); a mapped geometry uses the top wall measure (see
+        # `semquad_exact_residual`).
+        closure += (lb.latent_dgdt::Float64) / _nusselt_area(sq, qt)
     end
     # Opt-in exact residual of the quoted pointwise pair, per unit area:
     #   R/A = (F_pt - (dH/dt + sum(C theta) + Ibase + latent_src)) / A

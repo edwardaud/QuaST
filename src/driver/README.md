@@ -26,3 +26,20 @@ only composes them.
 | `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. |
 | `run_diagnostics.jl` | The driver-owned snapshot of the solver and AMR diagnostic out-parameters. |
 | `step_newton.jl` | Globalization of the per-time-step nonlinear solve. |
+
+Stage 0 cut 4 lifts the mapped-geometry refusal: with cuts 1–4 the assembled
+Stokes operator, the energy assembly and every per-step diagnostics path are
+routed through the geometry, so `run_semquad_simulation(...; geom=
+AffineBox/CurvedBox)` runs a **fixed-mesh, `linear=:direct`, Picard** time loop.
+What remains box-only is refused up front, naming the owning cut: adaptive
+transfer/indicator/AMR and the `:x` symmetry mirror (cut 6), the matrix-free/MG
+solver (cut 5), the strain-rate reconstructions of `driver/strain_rate.jl` (cut 6,
+which every strain-rate-dependent law, yielding, weakening and the Maxwell
+stress advance need), the per-step Newton path (its mapped tangent has no gate
+yet), and the Cartesian-`y` reference-state / density-hook / phase-buoyancy
+physics wiring (the annulus stage re-evaluates those closures at `height`).  The
+history row of a mapped run is the mapped diagnostics: G270 runs the driver on
+both validation geometries with heating off/on, the CBF and exact-residual
+columns on, and the latent-heat closure path, and closes the time-step CBF
+energy budget identity of `docs/dev/VALIDATION.md` §4.1 to the solver's floor.
+
