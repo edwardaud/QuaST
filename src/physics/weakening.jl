@@ -203,6 +203,19 @@ layout is the `Kp` one with the pressure test function replaced by `phi_j`.
 """
 function assemble_semquad_deta_chi(sq::SemQuad, qt::Quadtree, coef::Function,
                                    u::Vector{Float64})
+    # Cut 3: dispatch on the stored geometry.  The box body below is the
+    # historical arithmetic (no `su.geom` read inside it); the mapped method
+    # evaluates the strain rate with the chain-rule basis gradients and the
+    # coefficient at the mapped quadrature point.
+    sq.geom isa CartesianBox &&
+        return _assemble_semquad_deta_chi_box(sq, qt, coef, u)
+    return _assemble_semquad_deta_chi_mapped(sq.geom, sq, qt, coef, u)
+end
+
+# Historical box body, character for character.
+function _assemble_semquad_deta_chi_box(sq::SemQuad, qt::Quadtree,
+                                        coef::Function,
+                                        u::Vector{Float64})
     N = sq.N
     p = sq.p
     n = p + 1
@@ -248,6 +261,62 @@ function assemble_semquad_deta_chi(sq::SemQuad, qt::Quadtree, coef::Function,
                     g = ids[k]
                     push!(I, g); push!(J, gj); push!(V, ph * (exd * gx[k] + exz * gz[k]))
                     push!(I, N + g); push!(J, gj); push!(V, ph * (ezd * gz[k] + exz * gx[k]))
+                end
+            end
+        end
+    end
+    return sparse(I, J, V, 2 * N, N)
+end
+
+# Mapped body (cut 3): the same `(Kchi)_{i,j} = int 2 (d eta/d chi)
+# eps(u):eps(v_i) phi_j` block with the mapped quadrature measure, the
+# chain-rule physical basis gradients, and the coefficient evaluated at the
+# mapped physical point.  `u` keeps the [ux; uz] layout of the velocity space.
+function _assemble_semquad_deta_chi_mapped(g::AbstractGeometry, sq::SemQuad,
+                                           qt::Quadtree, coef::Function,
+                                           u::Vector{Float64})
+    N = sq.N
+    p = sq.p
+    n = p + 1
+    nv = n * n
+    fd = make_fedata(p, p)
+    phi = zeros(Float64, nv)
+    gx = zeros(Float64, nv)
+    gz = zeros(Float64, nv)
+    I = Int[]; J = Int[]; V = Float64[]
+    sizehint!(I, 2 * nv * nv * length(sq.leaves))
+    sizehint!(J, 2 * nv * nv * length(sq.leaves))
+    sizehint!(V, 2 * nv * nv * length(sq.leaves))
+    for lf in sq.leaves
+        ids = sq.elem[lf]
+        lm = leaf_metric(g, sq, lf, fd)
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            x, y = quad_point(lm, sq, lf, fd, qx, qy)
+            w = quad_measure(lm, fd, qx, qy)
+            duxdx = 0.0; duxdy = 0.0; duzdx = 0.0; duzdy = 0.0
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                phi[k] = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                gx[k], gz[k] = basis_grad(lm, fd, qx, qy, i, j)
+                duxdx += u[ids[k]] * gx[k]
+                duxdy += u[ids[k]] * gz[k]
+                duzdx += u[N + ids[k]] * gx[k]
+                duzdy += u[N + ids[k]] * gz[k]
+            end
+            exd = duxdx; ezd = duzdy
+            exz = 0.5 * (duxdy + duzdx)
+            edot = sqrt(max(0.5 * (exd * exd + ezd * ezd + 2.0 * exz * exz),
+                            0.0))
+            c = coef(x, y, edot)
+            c == 0.0 && continue
+            for j in 1:nv
+                gj = ids[j]
+                wc = 2.0 * c * w
+                for k in 1:nv
+                    ph = wc * phi[j]
+                    gg = ids[k]
+                    push!(I, gg); push!(J, gj); push!(V, ph * (exd * gx[k] + exz * gz[k]))
+                    push!(I, N + gg); push!(J, gj); push!(V, ph * (ezd * gz[k] + exz * gx[k]))
                 end
             end
         end

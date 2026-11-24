@@ -658,6 +658,196 @@ end
 end
 
 # ---------------------------------------------------------------------------
+# 5b. Map curvature: the second derivatives of the map (cut 3)
+# ---------------------------------------------------------------------------
+#
+# The energy path is the only part of the solver that differentiates twice: the
+# entropy-viscosity residual needs the physical Laplacian of the temperature
+# perturbation, and the base-state source needs `lap(Tbar(h))` (`GEOM_DESIGN`
+# §2.7/§4.3 F4/§8 risk 10).  The physical Laplacian of a function represented on
+# the reference element is, with `Jinv = J^{-T}` (the `jacobian_inverse` order
+# `(xi_x, eta_x, xi_y, eta_y)`) and `H_p` the Hessian of the physical coordinate
+# `p` in the leaf reference coordinates,
+#
+#     lap f = sum_{j,k} M[j,k] f_{xi_j xi_k} + sum_j C[j] f_{xi_j}
+#     M     = Jinv^T Jinv                       (the metric tensor)
+#     C[j]  = -sum_p Jinv[p,j] * tr(M * H_p)    (the map-curvature term)
+#
+# The `C` term is the one a naive implementation drops: it vanishes for an
+# affine map (`H_p = 0`) and for the axis-aligned box, so the box cannot see it,
+# but on any map whose Jacobian varies it is the same order as the `M` term
+# (the measured failure is in `test/t_g269_curved_energy.jl`, part (d)).  The
+# cross metric `M[xi,eta]` is nonzero whenever `x_eta != 0` or `y_xi != 0`
+# (a sheared or curved element), so the mixed reference second derivative
+# `f_{xi eta}` cannot be dropped either.
+#
+# THE BOX METHOD IS THE HISTORICAL EXPRESSION, NOT THE TRUE BOX CURVATURE.
+# The historical entropy-viscosity code uses `(2/h)^2` for **both** directions
+# with the single `h = leaf_hy` (it assumes square leaves, `GEOM_DESIGN` §1.6
+# item 1) and no cross/curvature term (F4).  The box path keeps that body
+# verbatim, so its `map_curvature` method returns exactly those historical
+# coefficients (`m11 = m22 = (2.0/h)^2`, `h = leaf_hy`, `m12 = c1 = c2 = 0`);
+# a stretched box (`Lx != 1`) is therefore *not* reproduced by the mapped
+# formula, deliberately, because the nine state-dump hashes are the stronger
+# contract and the historical EV is what produced every recorded run.  The
+# mapped method below is the true curvature.  The two coincide on square leaves
+# (the measured cross-check is in G269 (c)).
+
+@inline _lap_index(m, qx::Int, qy::Int) = (qy - 1) * m.nq + qx
+
+"""
+    element_hessian(g, lay, lf, xi, eta) -> (x11, x12, x22, y11, y12, y22)
+
+Second derivatives of the map with respect to the **leaf reference**
+coordinates `(xi, eta)`, in the order
+
+    x_{xi xi}, x_{xi eta}, x_{eta eta}, y_{xi xi}, y_{xi eta}, y_{eta eta}.
+
+Affine geometries (`CartesianBox`, `AffineBox`) have a constant Jacobian, so
+this is identically zero; `CurvedBox` carries the analytic values.  A curved
+geometry added later (the annulus) must implement this method — it is part of
+the geometry interface from cut 3 on, because the energy path cannot build a
+correct physical Laplacian without it.
+"""
+@inline element_hessian(::CartesianBox, lay, lf::NTuple{3,Int},
+                        xi::Float64, eta::Float64) =
+    (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+@inline element_hessian(::AffineBox, lay, lf::NTuple{3,Int},
+                        xi::Float64, eta::Float64) =
+    (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+@inline function element_hessian(g::CurvedBox, lay, lf::NTuple{3,Int},
+                                 xi::Float64, eta::Float64)
+    # x = Lx*S (affine in S, so x'' = 0); y = T*d(S) with
+    #   y_xi  = T*d'(S)*dS,  y_xi xi = T*d''(S)*dS^2,  y_xi eta = d'(S)*dS*dT.
+    S, T = global_logical(lay, lf, xi, eta)
+    l = lf[1]
+    dS = (1.0 / leaf_nside_x(lay, l)) * 0.5
+    dT = (1.0 / leaf_nside_y(lay, l)) * 0.5
+    dp = _curved_dp(g, S)
+    dpp = _curved_dpp(g, S)
+    return (0.0, 0.0, 0.0,
+            T * dpp * dS * dS, dp * dS * dT, 0.0)
+end
+
+"""
+    BoxMapCurvature
+
+The box map-curvature coefficients: the historical entropy-viscosity values
+`m11 = m22 = (2.0/h)^2` with the single `h = leaf_hy`, and zero elsewhere
+(`GEOM_DESIGN` §1.6 item 1/F4).  Not the true box curvature; see the section
+header.
+"""
+struct BoxMapCurvature
+    m11::Float64   # coefficient of f_{xi xi}
+    m12::Float64   # coefficient of f_{xi eta} (metric tensor entry; lap uses 2*m12)
+    m22::Float64   # coefficient of f_{eta eta}
+    c1::Float64    # coefficient of f_xi   (map-curvature term)
+    c2::Float64    # coefficient of f_eta  (map-curvature term)
+end
+
+"""
+    MappedMapCurvature
+
+The mapped map-curvature coefficients, flat leaf-major arrays over the
+`nq x nq` quadrature points (built once per leaf by `map_curvature`):
+`m11/m12/m22` are the entries of the metric tensor `Jinv^T Jinv` and
+`c1/c2` the map-curvature coefficients `C[xi]`, `C[eta]` above.
+"""
+struct MappedMapCurvature
+    m11::Vector{Float64}
+    m12::Vector{Float64}
+    m22::Vector{Float64}
+    c1::Vector{Float64}
+    c2::Vector{Float64}
+    nq::Int
+end
+
+"""
+    map_curvature(::CartesianBox, lay, lf, fd) -> BoxMapCurvature
+    map_curvature(g::AbstractGeometry, lay, lf, fd) -> MappedMapCurvature
+
+Second-derivative coefficients of the physical Laplacian at the quadrature
+points of leaf `lf`.  The `CartesianBox` method returns the **historical**
+entropy-viscosity coefficients (`(2.0/h)^2` in both directions with
+`h = leaf_hy`, no cross or curvature term), so a box kernel routed through it
+would reproduce the historical `semquad_ev_cell_stats` arithmetic bit for bit;
+the production box body is not routed through it (F4), it stays verbatim.  The
+mapped method is the chain rule of the section header, evaluated from
+`jacobian_inverse` and `element_hessian`:
+`M11 = xi_x^2 + xi_y^2`, `M12 = xi_x eta_x + xi_y eta_y`, `M22 = eta_x^2 + eta_y^2`,
+`C[xi] = -(xi_x tr(M H_x) + xi_y tr(M H_y))`, `C[eta] = -(eta_x tr(M H_x) + eta_y tr(M H_y))`
+with `tr(M H_p) = M11 Hp11 + 2 M12 Hp12 + M22 Hp22`.
+"""
+@inline function map_curvature(::CartesianBox, lay, lf::NTuple{3,Int},
+                               fd::FEData)
+    h = leaf_hy(lay, lf[1])          # the historical single scale, not hx
+    ihe2 = (2.0 / h)^2
+    return BoxMapCurvature(ihe2, 0.0, ihe2, 0.0, 0.0)
+end
+
+function map_curvature(g::AbstractGeometry, lay, lf::NTuple{3,Int}, fd::FEData)
+    nq = fd.nq
+    n2 = nq * nq
+    m11 = Vector{Float64}(undef, n2)
+    m12 = Vector{Float64}(undef, n2)
+    m22 = Vector{Float64}(undef, n2)
+    c1 = Vector{Float64}(undef, n2)
+    c2 = Vector{Float64}(undef, n2)
+    @inbounds for qy in 1:nq, qx in 1:nq
+        k = (qy - 1) * nq + qx
+        xi = fd.gl_x[qx]
+        eta = fd.gl_x[qy]
+        inv = jacobian_inverse(g, lay, lf, xi, eta)
+        xi_x, eta_x, xi_y, eta_y = inv
+        m11k = xi_x * xi_x + xi_y * xi_y
+        m12k = xi_x * eta_x + xi_y * eta_y
+        m22k = eta_x * eta_x + eta_y * eta_y
+        H = element_hessian(g, lay, lf, xi, eta)
+        tHx = m11k * H[1] + 2.0 * m12k * H[2] + m22k * H[3]
+        tHy = m11k * H[4] + 2.0 * m12k * H[5] + m22k * H[6]
+        m11[k] = m11k
+        m12[k] = m12k
+        m22[k] = m22k
+        c1[k] = -(xi_x * tHx + xi_y * tHy)
+        c2[k] = -(eta_x * tHx + eta_y * tHy)
+    end
+    return MappedMapCurvature(m11, m12, m22, c1, c2, nq)
+end
+
+"""
+    lap_phi(mc, fd, d2tab, qx, qy, i, j) -> Float64
+
+Physical Laplacian of the tensor-product nodal basis function `(i,j)` at the
+quadrature point `(qx,qy)`.  `d2tab[q][a]` is the second derivative of the 1-D
+GLL basis function `a` at the 1-D quadrature point `q` (the table
+`semquad_ev_cell_stats` builds from `lagrange_d2`).  The box method is the
+historical entropy-viscosity term
+`d2x[i] * phi[j] * (2.0/h)^2 + phi[i] * d2y[j] * (2.0/h)^2` in its exact
+association; the mapped method applies the chain rule of the section header:
+
+    m11 * f_{xi xi} + 2*m12 * f_{xi eta} + m22 * f_{eta eta}
+        + c1 * f_xi + c2 * f_eta.
+"""
+@inline function lap_phi(mc::BoxMapCurvature, fd::FEData,
+                         d2tab::Vector{Vector{Float64}}, qx::Int, qy::Int,
+                         i::Int, j::Int)
+    return d2tab[qx][i] * fd.phi_v[j, qy] * mc.m11 +
+           fd.phi_v[i, qx] * d2tab[qy][j] * mc.m22
+end
+@inline function lap_phi(mc::MappedMapCurvature, fd::FEData,
+                         d2tab::Vector{Vector{Float64}}, qx::Int, qy::Int,
+                         i::Int, j::Int)
+    k = _lap_index(mc, qx, qy)
+    dxi = fd.dphi_v[i, qx] * fd.phi_v[j, qy]
+    deta = fd.phi_v[i, qx] * fd.dphi_v[j, qy]
+    d2xi = d2tab[qx][i] * fd.phi_v[j, qy]
+    d2eta = fd.phi_v[i, qx] * d2tab[qy][j]
+    return mc.m11[k] * d2xi +
+           2.0 * mc.m12[k] * (fd.dphi_v[i, qx] * fd.dphi_v[j, qy]) +
+           mc.m22[k] * d2eta + mc.c1[k] * dxi + mc.c2[k] * deta
+end
+
+# ---------------------------------------------------------------------------
 # 6. Face metric and the face-loop accessors
 # ---------------------------------------------------------------------------
 
@@ -889,6 +1079,27 @@ end
     return (-hx / n, -hy / n)
 end
 @inline gravity_magnitude(::CurvedBox, x::Float64, y::Float64) = 1.0
+
+"""
+    upward_velocity(g, x, y, ux, uz) -> Float64
+
+The velocity component along the physical height gradient `u . grad h` — the
+generalisation of the Cartesian `u_z` used by every directional physics term
+(base-state advection, adiabatic heating, latent source; `GEOM_DESIGN` §2.7,
+§6.4).  The box method is the historical factor `uz` itself, an accessor with no
+arithmetic (so a box kernel that used it would be unchanged bit for bit); the
+box energy body does not read it (it keeps its `uzq` statements verbatim), the
+box method exists so the interface is total and so a future wiring change is a
+one-line dispatch.  Mapped: `ux*grad_height[1] + uz*grad_height[2]`; for the
+annulus (`|grad h| = 1`, radial) this is the radial velocity.
+"""
+@inline upward_velocity(::CartesianBox, x::Float64, y::Float64,
+                        ux::Float64, uz::Float64) = uz
+@inline function upward_velocity(g::AbstractGeometry, x::Float64, y::Float64,
+                                 ux::Float64, uz::Float64)
+    ghx, ghy = grad_height(g, x, y)
+    return ux * ghx + uz * ghy
+end
 
 """
     measure_weight(g, x, y) -> Float64

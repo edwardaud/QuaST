@@ -14,7 +14,7 @@ those live in `physics/`, `stokes/` and `amr/`.
 | `constraints.jl` | Hanging-node constraints: a fine face node is the coarse face's GLL interpolation (historical box body plus a logical mapped method). |
 | `eval.jl` | Point evaluation of a quadtree SEM field: leaf search and a reusable Lagrange workspace. |
 | `fe.jl` | Reference-element data: GLL nodes for the basis, Gauss–Legendre points for quadrature. |
-| `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), point map and inverse, Jacobian/metric and face normals, logical boundary registry, depth/gravity, checkpoint identity. |
+| `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), point map and inverse, Jacobian/metric and face normals, the map-curvature second derivatives, logical boundary registry, height/depth/gravity, checkpoint identity. |
 | `gll.jl` | GLL nodes and weights, the barycentric Lagrange basis, Gauss–Legendre quadrature. |
 | `parallel.jl` | Threading helpers shared by the leaf-blocked assembly loops. |
 | `poisson.jl` | SIPG/Nitsche Poisson operator: a verification-only assembler and its constrained solve. |
@@ -37,3 +37,17 @@ bitwise identical, `docs/dev/GEOM_DESIGN.md` §4), the two validation geometries
 exercise the general mapped path, and the logical topology helpers
 (`global_logical`, `leaf_ref`, `locate_leaf_logical`, `face_pairs_logical`) keep
 node identity and face pairing independent of the metric.
+
+The **map curvature** (`element_hessian`, `map_curvature`, `lap_phi`, cut 3) is
+the second-derivative surface the energy path needs: the physical Laplacian of a
+reference-basis function is `sum M[j,k] f,xi_j xi_k + sum C[j] f,xi_j`, with
+`M = J^{-T} J^{-T}` the metric tensor and
+`C[j] = -sum_p Jinv[p,j] tr(M H_p)` the map-Hessian term `H_p` that vanishes for
+an affine map.  The mapped method evaluates it from `jacobian_inverse` and
+`element_hessian` (implemented analytically for `CurvedBox`; a new curved
+geometry must implement `element_hessian`); the `CartesianBox` method returns
+the **historical** entropy-viscosity coefficients `(2.0/h)^2` in both directions
+with `h = leaf_hy` and zero cross/curvature terms, because the historical box EV
+body assumes square leaves (`GEOM_DESIGN` §1.6 item 1/F4) and stays bitwise.
+`upward_velocity` is the `u . grad h` accessor the mapped directional physics
+terms use (the box method is the historical `u_z`).

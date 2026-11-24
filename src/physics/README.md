@@ -11,9 +11,9 @@ those belong here.
 | File | What it is |
 |---|---|
 | `constitutive.jl` | Viscosity bounds and the `:expT`, `:expTz`, `:arrhenius` and `:composite` laws. |
-| `energy.jl` | The BDF2 energy step on the quadtree mesh and its wall-flux condition. |
-| `energy_assembly.jl` | Per-block buffers for the threaded energy assembly. |
-| `entropy_viscosity.jl` | Entropy viscosity on the quadtree (ASPECT port), including the recorded field. |
+| `energy.jl` | The BDF2 energy step on the quadtree mesh and its wall-flux condition (box bodies verbatim; a mapped geometry has its own fixed-dof, side-temperature and wall-flux methods). |
+| `energy_assembly.jl` | The energy operator: mass, diffusion, advection and the entropy-viscosity/source terms. The box leaf kernel is the historical body; the mapped leaf kernel (cut 3) routes the quadrature, the base state and the second derivatives through the geometry. |
+| `entropy_viscosity.jl` | Entropy viscosity on the quadtree (ASPECT port), including the recorded field. The mapped method takes gradients/Laplacians from the geometry (map curvature), the base state from the physical height and the element length from the mapped area. |
 | `eta.jl` | The visco-plastic branch: yield stress, plastic viscosity and the strain-rate field. |
 | `eta_laws.jl` | The `semquad_eta_at` viscosity closures and their analytic derivatives. |
 | `eta_plastic.jl` | The Drucker-Prager branch and the strain-rate helpers it needs. |
@@ -31,4 +31,24 @@ those belong here.
 | `refstate.jl` | The closed-form/EOS reference state: adiabat, rho, alpha and cp. |
 | `revision.jl` | `PHYSICS_REVISION`: the dated changelog of behaviour changes a checkpoint must not cross, plus the hashed list of the behaviour-defining sources that makes forgetting to bump it fail G252. |
 | `tosi_law.jl` | The Tosi et al. (2015) viscoplastic law and its derivatives. |
-| `weakening.jl` | Strain weakening: the advected chi field, its source and its JVP. |
+| `weakening.jl` | Strain weakening: the advected chi field, its source and its JVP (including the mapped `d eta/d chi` momentum block). |
+
+The energy path carries the geometry in two ways.  (1) Its **quadrature data**
+come from the leaf metric (`quad_point`, `quad_measure`, `basis_grad`), so the
+mass, diffusion, advection and load integrals are the physical integrals of the
+mapped element.  (2) Its **physics closures are functions of the physical
+height** `h = height(g,x,y)` instead of `y`, and every directional term uses
+`u . grad h` instead of `u_z`: the base-state advection `-rho (u.grad h)
+dTbar/dh`, the adiabatic heating `-Di rho T (u.grad h)`, the latent source
+`-L dGamma/dh (u.grad h)`, and the base Laplacian `Tbar''(h)|grad h|^2 +
+Tbar'(h) lap(h)`.  The entropy-viscosity residual uses the map-curvature
+Laplacian of the perturbation and the mapped element length
+`he = sqrt(2|element|)`; the box path keeps its historical `(2/h)^2` Laplacian
+and `sqrt(2)*sqrt(hx*hy)` length (GEOM_DESIGN E14/F4).  The box-dispatched
+bodies are the historical statements character for character and the nine
+state-dump hashes pin them; the mapped bodies are selected once per assembly
+(`assemble_semquad_energy`, `solve_semquad_energy`, `semquad_ev_*`,
+`assemble_semquad_energy_latent_jvp`, `assemble_semquad_deta_chi`,
+`_semquad_jvp_ku`).  `test/t_g269_curved_energy.jl` is the gate: affine
+exactness, CurvedBox convergence orders, the mapped-vs-box operator
+cross-check and the map-curvature wrong-term catches.

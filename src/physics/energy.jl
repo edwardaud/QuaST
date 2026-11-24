@@ -51,9 +51,16 @@ function solve_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
                               return_parts::Bool=false)
     rho_ref = (pr.rho_ref_weight && pr.refstate !== nothing) ?
               (y -> semquad_rho(pr.refstate, y) * pr.refstate.cp) : nothing
+    # Cut 3: the entropy-viscosity globals are evaluated on the physical
+    # geometry; the box call is the historical one (static), the mapped method
+    # of `semquad_ev_globals` reads the mapped coordinates/height.
+    geom = sq.geom
     evg = ev > 0.0 ?
-          semquad_ev_globals(sq, qt, pr, theta_n, theta_nm1, ux, uz,
-                             dt / dt_prev) : nothing
+          (geom isa CartesianBox ?
+           semquad_ev_globals(sq, qt, pr, theta_n, theta_nm1, ux, uz,
+                              dt / dt_prev) :
+           semquad_ev_globals(geom, sq, qt, pr, theta_n, theta_nm1, ux, uz,
+                              dt / dt_prev)) : nothing
     # `return_parts` hands the assembled operator back to the caller instead of
     # solving it (the per-step Newton needs `A_E`, `rhs` and the constraint map
     # for its residual and its `d r_E / d theta` block).  The EV field is
@@ -83,24 +90,7 @@ function solve_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
     side_fixed = pr.side_thermal === :fixed
     side_fixed && flux_side !== nothing &&
         throw(ArgumentError("side_thermal=:fixed and flux_side are exclusive"))
-    for g in 1:sq.N
-        x = sq.coords[g][1]
-        y = sq.coords[g][2]
-        # theta_wall = Twall - Tad: zero for the Boussinesq base (Tad = Tbar,
-        # Twall = 1 at the bottom and 0 at the top), non-zero once a reference
-        # state shifts the base off the physical wall temperature.  A wall with a
-        # prescribed flux is left free; the flux enters the right-hand side.
-        y <= 1.0e-14 && flux_bot === nothing &&
-            (fixed[g] = pr.Twall_bot - semquad_base_T(pr, y))
-        y >= 1.0 - 1.0e-14 && flux_top === nothing &&
-            (fixed[g] = pr.Twall_top - semquad_base_T(pr, y))
-        if side_fixed
-            x <= 1.0e-14 &&
-                (fixed[g] = pr.Twall_left - semquad_base_T(pr, y))
-            x >= sq.Lx - 1.0e-14 &&
-                (fixed[g] = pr.Twall_right - semquad_base_T(pr, y))
-        end
-    end
+    _semquad_energy_fixed!(fixed, sq, pr, flux_top, flux_bot, side_fixed)
     if flux_top !== nothing || flux_bot !== nothing
         flux_top !== nothing && flux_bot !== nothing &&
             throw(ArgumentError("at least one wall must keep a Dirichlet condition; " *
@@ -143,15 +133,119 @@ function solve_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
 end
 
 """
+    _semquad_energy_fixed!(fixed, sq, pr, flux_top, flux_bot, side_fixed)
+
+Fill the Dirichlet map of the energy step.  The `CartesianBox` method is the
+historical physical-row loop, verbatim (GEOM_DESIGN E16: the box keeps its
+`y <= 1e-14`/`x >= Lx-1e-14` tests).  A mapped geometry detects the four walls
+from the **logical leaf index** (`lf[2] == 0`/`last`, `lf[3] == 0`/`last`, node
+at the face) and evaluates the base temperature at the mapped node's physical
+height; the assignment order (bottom, top, left, right) is the box body's, so a
+corner keeps the same value as on the box path.  Nodes shared by several leaves
+are assigned the same value once per leaf, so the repeated writes are
+idempotent.
+"""
+function _semquad_energy_fixed!(fixed::Dict{Int,Float64}, sq::SemQuad,
+                                pr::Params,
+                                flux_top::Union{Nothing,Float64},
+                                flux_bot::Union{Nothing,Float64},
+                                side_fixed::Bool)
+    geom = sq.geom
+    if geom isa CartesianBox
+        return _semquad_energy_fixed_box!(fixed, sq, pr, flux_top, flux_bot,
+                                          side_fixed)
+    end
+    return _semquad_energy_fixed_mapped!(fixed, geom, sq, pr, flux_top,
+                                         flux_bot, side_fixed)
+end
+
+# Historical box body, verbatim: physical coordinate row tests (E16).
+function _semquad_energy_fixed_box!(fixed::Dict{Int,Float64}, sq::SemQuad,
+                                    pr::Params,
+                                    flux_top::Union{Nothing,Float64},
+                                    flux_bot::Union{Nothing,Float64},
+                                    side_fixed::Bool)
+    for g in 1:sq.N
+        x = sq.coords[g][1]
+        y = sq.coords[g][2]
+        # theta_wall = Twall - Tad: zero for the Boussinesq base (Tad = Tbar,
+        # Twall = 1 at the bottom and 0 at the top), non-zero once a reference
+        # state shifts the base off the physical wall temperature.  A wall with a
+        # prescribed flux is left free; the flux enters the right-hand side.
+        y <= 1.0e-14 && flux_bot === nothing &&
+            (fixed[g] = pr.Twall_bot - semquad_base_T(pr, y))
+        y >= 1.0 - 1.0e-14 && flux_top === nothing &&
+            (fixed[g] = pr.Twall_top - semquad_base_T(pr, y))
+        if side_fixed
+            x <= 1.0e-14 &&
+                (fixed[g] = pr.Twall_left - semquad_base_T(pr, y))
+            x >= sq.Lx - 1.0e-14 &&
+                (fixed[g] = pr.Twall_right - semquad_base_T(pr, y))
+        end
+    end
+    return fixed
+end
+
+function _semquad_energy_fixed_mapped!(fixed::Dict{Int,Float64},
+                                       g::AbstractGeometry, sq::SemQuad,
+                                       pr::Params,
+                                       flux_top::Union{Nothing,Float64},
+                                       flux_bot::Union{Nothing,Float64},
+                                       side_fixed::Bool)
+    n = sq.p + 1
+    for lf in sq.leaves
+        nsidex = leaf_nside_x(sq, lf[1])
+        nsidey = leaf_nside_y(sq, lf[1])
+        ids = sq.elem[lf]
+        for j in 1:n, i in 1:n
+            on_bot = j == 1 && lf[3] == 0
+            on_top = j == n && lf[3] == nsidey - 1
+            on_left = i == 1 && lf[2] == 0
+            on_right = i == n && lf[2] == nsidex - 1
+            (on_bot || on_top || (side_fixed && (on_left || on_right))) ||
+                continue
+            gid = ids[(j - 1) * n + i]
+            x, y = sq.coords[gid]
+            base = semquad_base_T(pr, height(g, x, y))
+            on_bot && flux_bot === nothing &&
+                (fixed[gid] = pr.Twall_bot - base)
+            on_top && flux_top === nothing &&
+                (fixed[gid] = pr.Twall_top - base)
+            if side_fixed
+                on_left && (fixed[gid] = pr.Twall_left - base)
+                on_right && (fixed[gid] = pr.Twall_right - base)
+            end
+        end
+    end
+    return fixed
+end
+
+"""
     _add_semquad_wall_flux!(F, sq, qt, q, wall)
 
 Add the boundary term `int_wall q phi ds` to the energy right-hand side.  `q` is
 the prescribed *outward normal* derivative `dtheta/dn` on that wall (for the
 bottom wall, where the outward normal is -z, a positive `q` therefore means
 `-dtheta/dz > 0`, i.e. heat entering from below).
+
+The `CartesianBox` method is the historical body, verbatim: the GLL weights
+`0.5*hx*sq.w[i]` integrate the wall basis exactly.  The mapped method integrates
+the same form with the leaf's mapped face Jacobian and Gauss face weights, on
+the logical wall row; on the box map the two agree to round-off (they are the
+same integral, `t_g269_curved_energy.jl` part (c)).
 """
 function _add_semquad_wall_flux!(F::Vector{Float64}, sq::SemQuad, qt::Quadtree,
                                  q::Float64, wall::Symbol)
+    wall in (:top, :bottom) || throw(ArgumentError("wall must be :top or :bottom"))
+    geom = sq.geom
+    geom isa CartesianBox &&
+        return _add_semquad_wall_flux_box!(F, sq, qt, q, wall)
+    return _add_semquad_wall_flux_mapped!(F, geom, sq, q, wall)
+end
+
+# Historical box body, verbatim.
+function _add_semquad_wall_flux_box!(F::Vector{Float64}, sq::SemQuad,
+                                     qt::Quadtree, q::Float64, wall::Symbol)
     wall in (:top, :bottom) || throw(ArgumentError("wall must be :top or :bottom"))
     n = sq.p + 1
     for lf in sq.leaves
@@ -161,6 +255,29 @@ function _add_semquad_wall_flux!(F::Vector{Float64}, sq::SemQuad, qt::Quadtree,
         row = wall === :top ? n : 1
         for i in 1:n
             F[ids[(row - 1) * n + i]] += 0.5 * hx * sq.w[i] * q
+        end
+    end
+    return F
+end
+
+function _add_semquad_wall_flux_mapped!(F::Vector{Float64}, g::AbstractGeometry,
+                                        sq::SemQuad, q::Float64,
+                                        wall::Symbol)
+    wall in (:top, :bottom) || throw(ArgumentError("wall must be :top or :bottom"))
+    n = sq.p + 1
+    side = wall === :top ? :yplus : :yminus
+    fd = make_fedata(sq.p, sq.p)
+    for lf in sq.leaves
+        row = wall === :top ? n : 1
+        nsidey = leaf_nside_y(sq, lf[1])
+        (wall === :top ? lf[3] == nsidey - 1 : lf[3] == 0) || continue
+        ids = sq.elem[lf]
+        fm = face_metric(g, sq, lf, side, fd)
+        for qq in 1:fd.nq
+            wq = face_weight(fm, fd, qq) * q
+            for i in 1:n
+                F[ids[(row - 1) * n + i]] += wq * fd.phi_v[i, qq]
+            end
         end
     end
     return F
