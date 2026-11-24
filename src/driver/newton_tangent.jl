@@ -130,7 +130,11 @@ function _semquad_jvp_ku_mapped(g::AbstractGeometry, sq::SemQuad, q::Int,
                 Tq += theta[ids[k]] * phi[k]
                 dTq += v[ids[k]] * phi[k]
             end
-            T = Tbar(h, pr.H) + Tq
+            # Stage 0.5b1: the geometry's conductive base state (the annulus's
+            # radial log/H profile; the box-in-height validation maps keep the
+            # historical `Tbar(h,H)`).  The mapped Newton path is refused by the
+            # driver in this stage, so this is only reachable by a direct call.
+            T = semquad_base_T(pr, g, x, y) + Tq
             # `deta_T_fun` overrides the built-in d eta/d T of the temperature
             # laws; it is a function of the physical point on both paths.
             deta = deta_T_fun === nothing ? deta_dT_at(T, h, pr) :

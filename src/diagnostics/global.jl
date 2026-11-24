@@ -835,9 +835,54 @@ function _semquad_nu_walls_mapped(g::AbstractGeometry, sq::SemQuad,
     # normal convention here: Nu_bot = ref - (-flux_out_bot)/measure.
     st, wt = _semquad_wall_flux(g, sq, theta, sidet)
     sb, wb = _semquad_wall_flux(g, sq, theta, sideb)
-    top_ref = -semquad_base_gradient(pr, 1.0)
-    bot_ref = -semquad_base_gradient(pr, 0.0)
+    bot_ref, top_ref = semquad_base_wall_refs(pr, g)
     return top_ref - st / wt, bot_ref + sb / wb
+end
+
+# ---------------------------------------------------------------------------
+# Stage 0.5b1: the annulus Nusselt pair
+# ---------------------------------------------------------------------------
+# The annulus normalisation is the benchmark one (ANNULUS_REFS §6.2/§6.5): the
+# *per-wall* radial conduction flux.  With the arc-length weighted wall average
+# `⟨·⟩`, the outer (top) wall has
+#
+#     ⟨-∂T/∂r⟩_top = -dTbar/dr(R1) - ⟨∂θ/∂r⟩_top,   st/wt = ⟨∂θ/∂r⟩_top
+#     Nu_top = ⟨-∂T/∂r⟩_top / (-dTbar/dr(R1)) = (top_ref - st/wt) / top_ref
+#
+# and the inner wall (outward normal `-e_r`, so `sb/wb = -⟨∂θ/∂r⟩_inner`)
+#
+#     Nu_bot = (bot_ref + sb/wb) / bot_ref,   bot_ref = -dTbar/dr(R0).
+#
+# At `H = 0` the reference gradient is `1/(R |ln f|)`, so this is exactly the
+# documented multiplier form `Nu_wall = R_wall |ln f| ⟨-∂T/∂r⟩ / ΔT` with
+# `ΔT = 1` (ANNULUS_REFS §6.2; the published gadopt scales 1.3290170684486309 /
+# 0.7303607313096079 are `R1 |ln f|` and `R0 |ln f|`), and a conductive state
+# (`θ = 0`) gives `Nu = 1` exactly at both walls.  With `H ≠ 0` the per-wall
+# reference is the H-inclusive base flux `Q_ref(r) = -2πr dTbar/dr`, i.e. this
+# numerator is exactly `Q_wall/Q_ref(r_wall)`; the documented identity then
+# reads `Nu_top Q_ref(R1) - Nu_bot Q_ref(R0) = H A` (ANNULUS_REFS §6.5), which
+# the annulus gate checks.  The generic mapped body above keeps the box's
+# single-gradient convention (it is the mapped twin of the box body and is used
+# only by the box-in-height validation geometries), so the annulus dispatches to
+# this method.
+function _semquad_nu_walls_mapped(g::PolarAnnulus, sq::SemQuad,
+                                  qt::Quadtree, theta::Vector{Float64},
+                                  pr::Params)
+    sideb, sidet = nu_wall_sides(g)
+    st, wt = _semquad_wall_flux(g, sq, theta, sidet)
+    sb, wb = _semquad_wall_flux(g, sq, theta, sideb)
+    bot_ref, top_ref = semquad_base_wall_refs(pr, g)
+    (top_ref > 0.0 && bot_ref > 0.0) ||
+        throw(ArgumentError("the annulus wall Nusselt normalisation needs a " *
+                            "positive conductive reference flux at both walls " *
+                            "(-dTbar/dr = ($bot_ref, $top_ref) at r = " *
+                            "($(g.R0), $(g.R1))); with H = $(pr.H) the " *
+                            "internal heating has changed the sign of the " *
+                            "radial base flux at a wall.  Reduce H so that " *
+                            "-dTbar/dr > 0 at both radii (the per-wall " *
+                            "Q_ref(r_wall) normalisation of ANNULUS_REFS " *
+                            "§6.5)."))
+    return (top_ref - st / wt) / top_ref, (bot_ref + sb / wb) / bot_ref
 end
 
 function _semquad_base_advection_integral_mapped(g::AbstractGeometry,
@@ -863,9 +908,8 @@ function _semquad_base_advection_integral_mapped(g::AbstractGeometry,
                 uxq += ux[ids[k]] * b
                 uzq += uz[ids[k]] * b
             end
-            h = height(g, x, y)
             ugh = upward_velocity(g, x, y, uxq, uzq)
-            s += w * ugh * dTbar(h, pr.H)
+            s += w * ugh * semquad_base_gradient(pr, g, x, y)
         end
     end
     return s
@@ -995,7 +1039,9 @@ function _semquad_work_dissipation_mapped(g::AbstractGeometry, sq::SemQuad,
             # The buoyancy work is the work of the buoyancy force along the
             # velocity, i.e. `rho T (u . grad h)` with `grad h` the upward
             # direction (GEOM_DESIGN §2.7/§6.4): the mapped `u_z`.
-            T = semquad_base_T(pr, h) + thq
+            # Stage 0.5b1: the geometry's conductive base state (radial log/H on
+            # the annulus; the historical quadratic on the validation maps).
+            T = semquad_base_T(pr, g, x, y) + thq
             rho_w = (pr.refstate === nothing ? 1.0 :
                      semquad_rho(pr.refstate, h))::Float64
             rho_multiplier === nothing || (rho_w *= rho_multiplier(x, y))
@@ -1054,13 +1100,12 @@ function _semquad_mean_T_mapped(g::AbstractGeometry, sq::SemQuad,
         for qy in 1:fd.nq, qx in 1:fd.nq
             w = quad_measure(m, fd, qx, qy)
             x, y = quad_point(m, sq, lf, fd, qx, qy)
-            h = height(g, x, y)
             thq = 0.0
             for j in 1:n, i in 1:n
                 k = (j - 1) * n + i
                 thq += theta[ids[k]] * fd.phi_v[i, qx] * fd.phi_v[j, qy]
             end
-            s += w * (semquad_base_T(pr, h) + thq)
+            s += w * (semquad_base_T(pr, g, x, y) + thq)
         end
     end
     return s / total_measure(g, sq, fd)
@@ -1168,7 +1213,11 @@ function _semquad_heat_budget_mapped(g::AbstractGeometry, sq::SemQuad,
             # directional velocity of the mapped geometry (GEOM_DESIGN §6.4).
             ugh = need_u ? upward_velocity(g, x, y, uxq, uzq) : 0.0
             theta_int += w * thq
-            T = semquad_base_T(pr, h) + thq
+            # Stage 0.5b1: the geometry's conductive base state (radial log/H on
+            # the annulus; the historical quadratic-in-`h` on the validation
+            # maps), not the Cartesian profile evaluated at `h`.
+            T = semquad_base_T(pr, g, x, y) + thq
+            Tb = semquad_base_T(pr, g, x, y)
             if use_lat
                 gg = 0.0
                 gz_u = 0.0
@@ -1178,7 +1227,6 @@ function _semquad_heat_budget_mapped(g::AbstractGeometry, sq::SemQuad,
                     for i in eachindex(phases)
                         pt = phases[i]
                         lc = lcoef[i]
-                        Tb = semquad_base_T(pr, h)
                         gg += lc * (phase_gamma(pt, h, T) - phase_gamma(pt, h, Tb))
                         if latent_bal
                             gz_u += lc * phase_dgamma_dz(pt, h, T) * ugh
@@ -1188,8 +1236,7 @@ function _semquad_heat_budget_mapped(g::AbstractGeometry, sq::SemQuad,
                     latent_int += w * gg
                 else
                     for pt in phases
-                        gg += phase_gamma(pt, h, T) -
-                              phase_gamma(pt, h, semquad_base_T(pr, h))
+                        gg += phase_gamma(pt, h, T) - phase_gamma(pt, h, Tb)
                         if latent_bal
                             gz_u += L * phase_dgamma_dz(pt, h, T) * ugh
                             gt_ug += L * phase_dgamma_dT(pt, h, T) * ugrad
@@ -1221,7 +1268,7 @@ function _semquad_heat_budget_mapped(g::AbstractGeometry, sq::SemQuad,
                 end
             end
             if need_u
-                base_adv += w * ugh * semquad_base_gradient(pr, h)
+                base_adv += w * ugh * semquad_base_gradient(pr, g, x, y)
             end
             use_lat && (u_grad_theta += w * ugrad)
         end

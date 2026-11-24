@@ -30,6 +30,22 @@ against the box bodies, a 1e-14 mapped-vs-box cross-check on the box map, an
 O(20 %) measured failure for a wrong normal or face Jacobian, and the end-to-end
 mapped driver with the (ID1) energy-budget identity.
 
+**Stage 0.5b1: the annulus Nusselt pair and the geometry base state.**  The
+mapped bodies evaluate the base temperature/gradient through
+`semquad_base_T(pr, g, x, y)`/`semquad_base_gradient(pr, g, x, y)`, so the
+annulus's radial log/H conduction state (not the Cartesian quadratic in `h`)
+drives `mean_T`, the work integral and the base-advection diagnostic.  The wall
+Nusselt pair has an annulus method: the arc-length wall flux is normalised by
+the **per-wall** radial conduction flux, `Nu_wall = <−dT/dr>_wall /
+(−dTbar/dr|_{r_wall})`, i.e. `Nu_wall = r_wall |ln f| <−dT/dr>_wall` at
+`H = 0` (the ANNULUS_REFS §6.2 multiplier form) and the H-inclusive
+`Q_wall/Q_ref(r_wall)` in general.  The generic mapped body keeps the box's
+single-gradient convention for the box-in-height validation geometries.  The
+box-only CBF and exact-residual families are refused by the annulus driver
+until the curved-wall residual rows exist (stage 0.5b2), because they sum the
+residual on the logical `y` wall rows; the pointwise mapped pair is the
+benchmark definition G274 gates.
+
 | File | What it is |
 |---|---|
 | `flux.jl` | Consistent boundary flux for the temperature equation and `semquad_nu_cbf`. |

@@ -46,12 +46,24 @@ function semquad_weakening_source_g(sq::SemQuad, sp::SemQuad, qt::Quadtree,
     leaves = Set(qt.leaves)
     pleaves = Set(sp.leaves)
     inv_ref = 1.0 / pr.weak_eps_ref
+    g = sq.geom
     return (x, y) -> begin
-        T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+        # Box: the historical viscosity row (`Tbar(y,H)`, depth `y`), even with
+        # a reference state (docs/dev/PHYSICS.md §3.3, frozen box behaviour).
+        # Mapped (stage 0.5b1): the geometry's base state and `height(g,x,y)`.
+        local h, T
+        if g isa CartesianBox
+            h = y
+            T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+        else
+            h = height(g, x, y)
+            T = semquad_base_T(pr, g, x, y) +
+                _semquad_eval_at(sq, theta, x, y, leaves)
+        end
         ed = semquad_strain_rate_at(sq, ux, uz, x, y, leaves)
         p = _semquad_eval_at(sp, pv, x, y, pleaves)
         c = _semquad_eval_at(sq, chi, x, y, leaves)
-        semquad_plastic_strain_rate(T, y, ed, p, c, pr) * inv_ref
+        semquad_plastic_strain_rate(T, h, ed, p, c, pr) * inv_ref
     end
 end
 

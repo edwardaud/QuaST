@@ -193,20 +193,37 @@ function _semquad_energy_fixed_mapped!(fixed::Dict{Int,Float64},
                                        flux_bot::Union{Nothing,Float64},
                                        side_fixed::Bool)
     n = sq.p + 1
+    # Stage 0.5b1: the two thermal Dirichlet walls are the geometry's Nusselt
+    # pair, not the logical `y` sides.  On the box-in-height validation
+    # geometries that pair is `(:yminus,:yplus)`, so the loop below is the
+    # historical bottom/top body verbatim; on the annulus it is
+    # `(:xminus,:xplus)` (the inner and outer circles), which is where the
+    # physical `T = 1/0` boundary data live.  `side_thermal=:fixed` pins the
+    # *other* logical pair (the Cartesian x sides on a validation geometry; the
+    # wedge cuts on the annulus, which the driver refuses).
+    sideb, sidet = nu_wall_sides(g)
+    sides_left = (sideb === :xminus || sidet === :xminus) ?
+                 (:yminus, :yplus) : (:xminus, :xplus)
     for lf in sq.leaves
         nsidex = leaf_nside_x(sq, lf[1])
         nsidey = leaf_nside_y(sq, lf[1])
         ids = sq.elem[lf]
         for j in 1:n, i in 1:n
-            on_bot = j == 1 && lf[3] == 0
-            on_top = j == n && lf[3] == nsidey - 1
-            on_left = i == 1 && lf[2] == 0
-            on_right = i == n && lf[2] == nsidex - 1
-            (on_bot || on_top || (side_fixed && (on_left || on_right))) ||
-                continue
+            on_bot = _energy_node_on_side(sideb, i, j, n, lf, nsidex, nsidey)
+            on_top = _energy_node_on_side(sidet, i, j, n, lf, nsidex, nsidey)
+            on_left = side_fixed &&
+                      _energy_node_on_side(sides_left[1], i, j, n, lf,
+                                           nsidex, nsidey)
+            on_right = side_fixed &&
+                       _energy_node_on_side(sides_left[2], i, j, n, lf,
+                                            nsidex, nsidey)
+            (on_bot || on_top || on_left || on_right) || continue
             gid = ids[(j - 1) * n + i]
             x, y = sq.coords[gid]
-            base = semquad_base_T(pr, height(g, x, y))
+            # Stage 0.5b1: the base state is the geometry's conductive profile
+            # (the annulus's radial log/H state); on the box-in-height
+            # validation geometries this is exactly `semquad_base_T(pr, h)`.
+            base = semquad_base_T(pr, g, x, y)
             on_bot && flux_bot === nothing &&
                 (fixed[gid] = pr.Twall_bot - base)
             on_top && flux_top === nothing &&
@@ -218,6 +235,17 @@ function _semquad_energy_fixed_mapped!(fixed::Dict{Int,Float64},
         end
     end
     return fixed
+end
+
+# Is node `(i,j)` of leaf `lf` on logical side `side`?  The same leaf-index test
+# the mapped diagnostics use (`_on_logical_wall`), at node granularity.
+@inline function _energy_node_on_side(side::Symbol, i::Int, j::Int, n::Int,
+                                      lf::NTuple{3,Int}, nsidex::Int,
+                                      nsidey::Int)
+    side === :xminus && return i == 1 && lf[2] == 0
+    side === :xplus && return i == n && lf[2] == nsidex - 1
+    side === :yminus && return j == 1 && lf[3] == 0
+    return j == n && lf[3] == nsidey - 1
 end
 
 """

@@ -44,3 +44,33 @@ height `y` and perturbation temperature `theta`.  Zero for an empty `phases`.
     end
     return -s
 end
+
+"""
+    semquad_phase_buoyancy(pr, phases, g, x, y, theta) -> Float64
+
+Mapped-geometry method of [`semquad_phase_buoyancy`](@ref) (stage 0.5b1): the
+upward body force of the phase anomalies at the physical point `(x,y)` of the
+geometry `g`.  The phase depth argument is the physical **height**
+`h = height(g,x,y)` (the phase `z0`/`width`/`slope` are nondimensional heights,
+so on the annulus `h = r - R0` is the same coordinate the box calls `y`), and
+the comparison base temperature is the geometry's conductive base state
+(`semquad_base_T(pr, g, x, y)`; the annulus's radial log/H profile) rather than
+the Cartesian `Tbar(h,H)`.  On the box-in-height validation geometries this is
+exactly the box method's value, so the box body keeps its own historical method
+and is not routed through this one.
+"""
+@inline function semquad_phase_buoyancy(pr::Params,
+                                        phases::Vector{PhaseTransition},
+                                        g::AbstractGeometry, x::Float64,
+                                        y::Float64, theta::Float64)
+    isempty(phases) && return 0.0
+    h = height(g, x, y)
+    Tad = semquad_base_T(pr, g, x, y)
+    T = Tad + theta
+    s = 0.0
+    for pt in phases
+        dG = phase_gamma(pt, h, T) - phase_gamma(pt, h, Tad)
+        s += pr.Ra * pt.B * dG
+    end
+    return -s
+end

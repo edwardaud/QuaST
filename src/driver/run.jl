@@ -30,6 +30,95 @@ const _SEMQUAD_ETA_CALLS = Ref(0)
     return nothing
 end
 
+# ---------------------------------------------------------------------------
+# Stage 0.5b1: the buoyancy load, `+Ra rho alpha theta grad h` (two components)
+# ---------------------------------------------------------------------------
+#
+# The momentum equation the assembled operator solves is
+#
+#     -div(2 eta eps(u)) + grad p = f,        f = Ra rho alpha theta grad h,
+#
+# where `grad h` is the "up" direction opposite gravity (`gravity = -grad h`,
+# GEOM_DESIGN §2.7): on the box `grad h = (0,1)` and the load is the historical
+# vertical `fz = Ra T` (the box body is reproduced here verbatim, so the nine
+# state-dump hashes and the box allocation are untouched); on a mapped geometry
+# `grad h` is the mapped unit normal of the level sets of `height` and *both*
+# Cartesian components are non-zero — for the annulus `grad h = e_r`, so
+# `f = Ra theta e_r`, the radially outward buoyancy of the Boussinesq
+# perturbation (ANNULUS_REFS §5.1/§5.5: gravity `-e_r`, constant unit magnitude).
+#
+# The conduction base state is *not* part of `f`: the Boussinesq perturbation
+# formulation subtracts it together with the hydrostatic pressure it balances,
+# so the solved `p` is the dynamic pressure and `theta = 0` is force-free (the
+# hydrostatic balance of the base state is checked in the annulus gate).  The
+# phase-transition anomaly is part of the same upward scalar (`−Ra B dGamma`) and
+# therefore also follows `grad h`; the mapped `semquad_phase_buoyancy` evaluates
+# the phase depth at `h` and the base temperature at the geometry's base state.
+#
+# `Tfun` is the perturbation `theta` interpolant; `phases` empty skips the phase
+# closure entirely (bit-identical to the pre-phase behaviour).
+function _semquad_buoyancy_load(pr::Params, geom::G, Tfun::F,
+                                phases::Vector{PhaseTransition}) where {G<:AbstractGeometry,F<:Function}
+    rmul = pr.rho_multiplier
+    if geom isa CartesianBox
+        # Historical box body, verbatim (see `run.jl` before stage 0.5b1): the
+        # upward scalar is the buoyancy and the horizontal load is identically
+        # zero.
+        fz = if pr.refstate === nothing
+            rmul === nothing ? ((x, y) -> pr.Ra * Tfun(x, y)) :
+                ((x, y) -> pr.Ra * rmul(x, y) * Tfun(x, y))
+        else
+            rs = pr.refstate
+            # Tfun is already the perturbation theta = T - Tad, so the TALA
+            # buoyancy rho alpha (T - Tad) is rho alpha theta; subtracting Tad
+            # again here would be a double count.
+            rmul === nothing ?
+                ((x, y) -> pr.Ra * semquad_rho(rs, y) * semquad_alpha(rs, y) *
+                           Tfun(x, y)) :
+                ((x, y) -> pr.Ra * semquad_rho(rs, y) * semquad_alpha(rs, y) *
+                           rmul(x, y) * Tfun(x, y))
+        end
+        if !isempty(phases)
+            fz_thermal = fz
+            fz = (x, y) -> fz_thermal(x, y) +
+                           semquad_phase_buoyancy(pr, phases, y, Tfun(x, y))
+        end
+        return ((x, y) -> 0.0, fz)
+    end
+    # Mapped geometry: the same upward scalar, projected on `grad h`.  The
+    # reference-state density/expansivity (TALA/ALA) is not wired for a mapped
+    # geometry (the driver refuses `pr.refstate` there); the branch is kept so a
+    # direct call cannot silently drop it.
+    g = geom
+    scalar = if pr.refstate === nothing
+        rmul === nothing ? ((x, y) -> pr.Ra * Tfun(x, y)) :
+            ((x, y) -> pr.Ra * rmul(x, y) * Tfun(x, y))
+    else
+        rs = pr.refstate
+        rmul === nothing ?
+            ((x, y) -> pr.Ra * semquad_rho(rs, height(g, x, y)) *
+                       semquad_alpha(rs, height(g, x, y)) * Tfun(x, y)) :
+            ((x, y) -> pr.Ra * semquad_rho(rs, height(g, x, y)) *
+                       semquad_alpha(rs, height(g, x, y)) * rmul(x, y) *
+                       Tfun(x, y))
+    end
+    if !isempty(phases)
+        s_thermal = scalar
+        scalar = (x, y) -> s_thermal(x, y) +
+                           semquad_phase_buoyancy(pr, phases, g, x, y,
+                                                  Tfun(x, y))
+    end
+    fx = (x, y) -> begin
+        gh = grad_height(g, x, y)
+        scalar(x, y) * gh[1]
+    end
+    fz = (x, y) -> begin
+        gh = grad_height(g, x, y)
+        scalar(x, y) * gh[2]
+    end
+    return fx, fz
+end
+
 """
     run_semquad_simulation(qt, pr, theta0; p=2, tstop, dt0, amr_every=0,
                            refine_frac=0.2, coarsen_frac=0.0, maxsteps=10000,
@@ -235,9 +324,67 @@ the run is bit-identical to the pre-2b one.  `cooldown` is the run's final
 driver owns it for the whole run, restores it from a checkpoint on a resume and
 writes it back through `save_semquad_state`, so a caller can inspect the state the
 last AMR cycle left without reading a module global.
+
+**Geometry (stage 0.5b1).**  `geom` selects the geometry: `geom=:annulus` with
+`annulus_R0`/`annulus_R1`/`annulus_Phi` builds the 2-D polar annulus
+(`PolarAnnulus(R0, R1, Phi)`, `seam = :wall`; the closed ring needs the periodic
+seam of stage 0.5b2 and is refused by the geometry constructor), and any
+`AbstractGeometry` is accepted unchanged (the stage-0 validation geometries, or
+a caller-built `PolarAnnulus`).  The default `CartesianBox(qt)` keeps every
+historical card bitwise identical.  An annulus run uses the radial log/H
+conduction base state (`docs/dev/ANNULUS_REFS.md` §5.4/§6.5), the
+two-component radial buoyancy `+Ra rho alpha theta e_r`, and the per-wall
+Nusselt normalisation of ANNULUS_REFS §6.2.  Its contract: `R1 - R0 = 1` (the
+gap is the physics length unit and the closures' height is `r - R0`), every
+logical wall rigid (`bc=:rigid`; free-slip curved walls need the general
+normal-velocity constraint rows of stage 0.5b2, `:open` walls are not wired),
+`side_thermal=:insulating` (a wedge has no Cartesian side walls — its radial
+cuts are insulating symmetry cuts) and no `nu_cbf`/`extdiag` (those diagnostic
+families are box-only until the curved-wall residual rows exist).
 """
-function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64};
-                                p::Int=2, tstop::Float64=1.0e-3,
+function run_semquad_simulation(qt::Quadtree, pr::Params,
+                                theta0::Vector{Float64};
+                                # Stage 0.5b1: the geometry card knob.  `:annulus`
+                                # builds `PolarAnnulus(annulus_R0, annulus_R1,
+                                # annulus_Phi)`; any `AbstractGeometry` is
+                                # accepted unchanged.  The box default keeps
+                                # every historical card bitwise identical.
+                                geom::Union{Symbol,AbstractGeometry}=CartesianBox(qt),
+                                annulus_R0::Real=1.22,
+                                annulus_R1::Real=2.22,
+                                annulus_Phi::Real=0.5 * pi,
+                                kwargs...)
+    # The knob is resolved before the implementation body, which is dispatched
+    # on the concrete geometry type: a concrete `G` keeps every geometry
+    # accessor in the physics closures statically dispatched (the box closures
+    # keep the concrete types and zero allocation of the historical path, and
+    # the mapped closures are specialised), which is the stage-0 recipe the
+    # design uses for the mapped kernels.
+    g = _resolve_run_geometry(geom, annulus_R0, annulus_R1, annulus_Phi)
+    return _run_semquad_simulation(qt, pr, theta0, g; kwargs...)
+end
+
+# Resolve the `geom` card knob: an `AbstractGeometry` passes through; the
+# `:annulus` symbol builds the 2-D polar annulus from the three shape keywords.
+function _resolve_run_geometry(geom::AbstractGeometry, ::Real, ::Real, ::Real)
+    return geom
+end
+function _resolve_run_geometry(geom::Symbol, R0::Real, R1::Real, Phi::Real)
+    geom === :annulus ||
+        throw(ArgumentError("geom must be :annulus or an AbstractGeometry " *
+                            "(got :$geom).  Use geom=:annulus with " *
+                            "annulus_R0/annulus_R1/annulus_Phi for the 2-D " *
+                            "polar annulus, or pass a geometry object " *
+                            "(geom=CartesianBox(qt), geom=PolarAnnulus(...), ...)."))
+    return PolarAnnulus(R0, R1, Phi)
+end
+
+# The implementation body (everything from here to the end of the function was
+# the body of `run_semquad_simulation` before stage 0.5b1; the only change is
+# that `geom` is now a positional, concretely typed argument).
+function _run_semquad_simulation(qt::Quadtree, pr::Params,
+                                 theta0::Vector{Float64}, geom::G;
+                                 p::Int=2, tstop::Float64=1.0e-3,
                                 dt0::Float64=1.0e-4, amr_every::Int=0,
                                 refine_frac::Float64=0.2,
                                 amr_passes::Int=1,
@@ -341,12 +488,11 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 # Stage 0 cut 1: the geometry/mapping layer.
                                 # The box default keeps every historical card
                                 # bitwise unchanged; a mapped geometry (a
-                                # validation geometry now, the annulus later)
-                                # is stored on the spaces and recorded in the
-                                # checkpoint config (`geometry=...`), and a
-                                # restart under another geometry is refused.
-                                geom::AbstractGeometry=CartesianBox(qt),
-                                verbose::Bool=false)
+                                # validation geometry, or the annulus) is stored
+                                # on the spaces and recorded in the checkpoint
+                                # config (`geometry=...`), and a restart under
+                                # another geometry is refused.
+                                verbose::Bool=false) where {G<:AbstractGeometry}
     pr.eta_law in (:expT, :expTz, :arrhenius, :tosi, :composite) ||
         throw(ArgumentError("run_semquad_simulation requires eta_law=:expT, " *
                             ":expTz, :arrhenius, :tosi or :composite"))
@@ -587,18 +733,94 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 "hotspot_min_level=0 and zero_side_eta=false."))
         pr.refstate === nothing ||
             throw(ArgumentError("a mapped geometry ($gname) does not support " *
-                                "a reference state in stage 0 cut 4: the " *
-                                "driver's TALA/ALA buoyancy closure still " *
-                                "evaluates rho/alpha at the Cartesian y while " *
-                                "the mapped energy assembly evaluates the base " *
-                                "state at height (the physics rewiring belongs " *
-                                "to the annulus stage, GEOM_DESIGN §2.7)."))
+                                "a reference state in stage 0.5b1: the mapped " *
+                                "base state is the geometry's Boussinesq " *
+                                "conductive profile (the annulus implements the " *
+                                "radial log/H state), while a reference state is " *
+                                "an adiabat in `height` whose rho/alpha buoyancy " *
+                                "weighting is not wired for a mapped geometry.  " *
+                                "Keep refstate = nothing on the annulus; a " *
+                                "TALA/ALA annulus is a later stage."))
         pr.rho_multiplier === nothing ||
             throw(ArgumentError("a mapped geometry ($gname) does not support " *
-                                "Params.rho_multiplier in stage 0 cut 4: its " *
+                                "Params.rho_multiplier in stage 0.5b1: its " *
                                 "Cartesian finite-difference hook has no mapped " *
                                 "meaning (see the cut-2 density-hook refusal in " *
-                                "solve_var_core.jl)."))
+                                "solve_var_core.jl), and the annulus keeps the " *
+                                "refusal: a mapped density must be a " *
+                                "height/reference-state density, which is itself " *
+                                "not wired in this stage."))
+    end
+    if geom isa PolarAnnulus
+        # ------------------------------------------------------------------
+        # Stage 0.5b1: the annulus physics contract and its restrictions.
+        # ------------------------------------------------------------------
+        # * The closures take the nondimensional height h in [0,1]: the gap is
+        #   the length unit of Ra and of every depth law (ANNULUS_REFS §4.1/§4.4,
+        #   the stage-0.5a gap contract), so the geometry must have R1-R0 = 1.
+        #   The published radii give 1 + 2^-52 in Float64, hence the tolerance.
+        abs((geom.R1 - geom.R0) - 1.0) <= 1.0e-12 ||
+            throw(ArgumentError("the annulus physics requires R1 - R0 = 1: the " *
+                                "nondimensional height the closures take is " *
+                                "h = r - R0 in [0,1], i.e. the gap is the length " *
+                                "unit of Ra and of every depth law " *
+                                "(docs/dev/ANNULUS_REFS.md §4.1/§4.4).  Got " *
+                                "R1 - R0 = $(geom.R1 - geom.R0) for R0 = " *
+                                "$(geom.R0), R1 = $(geom.R1); build the card with " *
+                                "gap-1 radii (the published benchmark is " *
+                                "R0 = 1.22, R1 = 2.22)."))
+        # * A wedge has no Cartesian side walls: the two radial cuts are
+        #   symmetry cuts with the natural (insulating) condition.  `:fixed`
+        #   would impose a Cartesian Twall_left/right on a radial cut, which is
+        #   not a physical boundary condition of the annulus.
+        pr.side_thermal === :insulating ||
+            throw(ArgumentError("the annulus does not support " *
+                                "side_thermal=:fixed: the wedge's radial sides " *
+                                "are symmetry cuts with the natural insulating " *
+                                "condition, not Cartesian side walls with a " *
+                                "prescribed temperature.  Keep " *
+                                "side_thermal=:insulating."))
+        # * Stage 0.5b1 runs rigid circles (and rigid wedge cuts): the mapped
+        #   solver's Dirichlet rows fix both Cartesian components, i.e. u = 0.
+        #   Free slip on a circle is u.n = 0 + zero tangential traction, a
+        #   position-dependent linear combination of the two components whose
+        #   constraint rows are stage 0.5b2's work.  An :open wall changes the
+        #   pressure gauge and is not wired for the annulus either.
+        (pr.bc === :rigid &&
+         all(w -> w === :same || w === :rigid, pr.wall_bc)) ||
+            throw(ArgumentError("the annulus runs rigid walls in stage 0.5b1: " *
+                                "pass bc=:rigid with the default per-wall " *
+                                "wall_bc = (:same, :same, :same, :same) (or " *
+                                "explicit :rigid entries).  A :free curved wall " *
+                                "needs the general normal-velocity constraint " *
+                                "rows of stage 0.5b2, and :open walls change the " *
+                                "pressure gauge (they are not wired for the " *
+                                "annulus).  Got bc=:$(pr.bc), wall_bc=" *
+                                "$(pr.wall_bc)."))
+        # * `nu_cbf` and `extdiag` sum the residual on the box's logical y wall
+        #   rows and normalise by `total_area`; on the annulus the thermal walls
+        #   are the circles (`nu_wall_sides = (:xminus, :xplus)`), so those
+        #   diagnostics would silently read the wrong rows.  The mapped
+        #   pointwise `semquad_nu_walls` pair is wired and is the benchmark
+        #   definition; the CBF / exact-residual families stay box-only until the
+        #   curved-wall residual rows exist.
+        nu_cbf &&
+            throw(ArgumentError("the annulus does not support nu_cbf in stage " *
+                                "0.5b1: the consistent-boundary-flux family sums " *
+                                "the residual on the logical y wall rows and " *
+                                "normalises by the box area, while the annulus " *
+                                "thermal walls are the circles (xminus/xplus).  " *
+                                "Use the pointwise mapped Nusselt pair in the " *
+                                "history (columns 3/4); the curved-wall CBF is " *
+                                "stage 0.5b2 work."))
+        extdiag &&
+            throw(ArgumentError("the annulus does not support extdiag in stage " *
+                                "0.5b1: the exact-residual diagnostic is " *
+                                "derived and normalised for the box wall rows " *
+                                "(docs/dev/VALIDATION.md §3.2).  Use the " *
+                                "pointwise mapped Nusselt pair; the exact " *
+                                "residual of the curved-wall family is stage " *
+                                "0.5b2/0.5c work."))
     end
     initial_refine >= 0 || throw(ArgumentError("initial_refine must be >= 0"))
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
@@ -680,7 +902,9 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     # initial condition, so only the zero-target case is enforced.  The wall of a
     # mapped geometry is a level set of the physical height, and the base state
     # is a function of the height (cut 3 convention), so the guard evaluates
-    # `height(g,x,y)`; on the box that accessor is `y` exactly.
+    # `height(g,x,y)`; on the box that accessor is `y` exactly.  Stage 0.5b1:
+    # the base temperature is the geometry's base state at the point (the
+    # annulus: the radial log/H profile; the box: `Tbar(y,H)` verbatim).
     for gid in 1:sq.N
         x = sq.coords[gid][1]
         y = sq.coords[gid][2]
@@ -688,7 +912,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         wall = h <= 1.0e-14 ? pr.Twall_bot :
                (h >= 1.0 - 1.0e-14 ? pr.Twall_top : NaN)
         isnan(wall) && continue
-        target = wall - semquad_base_T(pr, h)
+        target = wall - semquad_base_T(pr, geom, x, y)
         if target == 0.0 && abs(theta0[gid]) > 1.0e-12
             throw(ArgumentError("theta0 is the perturbation T-Tbar and must " *
                                 "vanish on the top/bottom walls; node $gid at " *
@@ -1003,20 +1227,44 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
         local eta_fun
         if tosi
             # Tosi et al. (2015) law: needs T, the strain rate and the height.
+            # Stage 0.5b1: T is the geometry's base state plus theta and the
+            # height argument is `height(g,x,y)` (the box returns exactly
+            # `Tbar(y,H)` and `y`, so the historical arithmetic is unchanged).
             if pic_eta_relax >= 1.0
                 eta_fun = (x, y) -> begin
-                    T = Tbar(y, pr.H) + _semquad_eval_at(sq, th, x, y, leaves)
+                    local T, h
+                    if geom isa CartesianBox
+                        # Historical box viscosity row (the box path is frozen:
+                        # `Tbar(y,H)`/`y`, even with a reference state; see
+                        # docs/dev/PHYSICS.md §3.3 and `semquad_eta_at`).
+                        T = Tbar(y, pr.H) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = y
+                    else
+                        T = semquad_base_T(pr, geom, x, y) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = height(geom, x, y)
+                    end
                     ed = semquad_strain_rate_at(sq, ux, uz, x, y, leaves)
-                    semquad_eta_tosi(T, ed, y, pr.tosi)[1]
+                    semquad_eta_tosi(T, ed, h, pr.tosi)[1]
                 end
             else
                 ed_new = semquad_strain_rate_field(sq, ux, uz)
                 edot_field = edot_field === nothing ? ed_new :
                              blend_field(edot_field, ed_new, pic_eta_relax)
                 eta_fun = (x, y) -> begin
-                    T = Tbar(y, pr.H) + _semquad_eval_at(sq, th, x, y, leaves)
+                    local T, h
+                    if geom isa CartesianBox
+                        T = Tbar(y, pr.H) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = y
+                    else
+                        T = semquad_base_T(pr, geom, x, y) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = height(geom, x, y)
+                    end
                     ed = _semquad_eval_at(sq, edot_field, x, y, leaves)
-                    semquad_eta_tosi(T, ed, y, pr.tosi)[1]
+                    semquad_eta_tosi(T, ed, h, pr.tosi)[1]
                 end
             end
         elseif yielding
@@ -1038,9 +1286,20 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             # field over the Picard iterations (ASPECT-style damping).
             if pic_eta_relax >= 1.0
                 eta_fun = (x, y) -> begin
-                    T = Tbar(y, pr.H) + _semquad_eval_at(sq, th, x, y, leaves)
+                    local T, h
+                    if geom isa CartesianBox
+                        # Historical box viscosity row (frozen; see
+                        # docs/dev/PHYSICS.md §3.3).
+                        T = Tbar(y, pr.H) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = y
+                    else
+                        T = semquad_base_T(pr, geom, x, y) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = height(geom, x, y)
+                    end
                     ed = semquad_strain_rate_at(sq, ux, uz, x, y, leaves)
-                    e, cl = eta_composite_at(T, ed, y, pr)
+                    e, cl = eta_composite_at(T, ed, h, pr)
                     pic_diag && _count_eta_clamp(cl)
                     e
                 end
@@ -1049,9 +1308,18 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 edot_field = edot_field === nothing ? ed_new :
                              blend_field(edot_field, ed_new, pic_eta_relax)
                 eta_fun = (x, y) -> begin
-                    T = Tbar(y, pr.H) + _semquad_eval_at(sq, th, x, y, leaves)
+                    local T, h
+                    if geom isa CartesianBox
+                        T = Tbar(y, pr.H) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = y
+                    else
+                        T = semquad_base_T(pr, geom, x, y) +
+                            _semquad_eval_at(sq, th, x, y, leaves)
+                        h = height(geom, x, y)
+                    end
                     ed = _semquad_eval_at(sq, edot_field, x, y, leaves)
-                    e, cl = eta_composite_at(T, ed, y, pr)
+                    e, cl = eta_composite_at(T, ed, h, pr)
                     pic_diag && _count_eta_clamp(cl)
                     e
                 end
@@ -1112,44 +1380,25 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                 txx, tyy, txy, _nodal_eta(base_ve, sq), dt, Gv)
         end
         eta_for_energy = eta_fun
-        # Buoyancy.  With a reference state this is the TALA/ALA form
-        # rho(y) alpha(y) (T - Tad) instead of the full T: the hydrostatic part of
-        # the base state is then balanced exactly, so theta = 0 with u = 0 is a
-        # genuine fixed point (and the depth-dependent terms of the reference
-        # state do not drive a spurious flow).  Without a reference state the
-        # expression is unchanged, bit for bit.
-        # Density hook (G248): `rho_multiplier` multiplies the density where the
-        # buoyancy uses it; `nothing` keeps the historical closure and never
-        # evaluates it.  A uniform `c` is exactly `Ra -> Ra*c`.
-        rmul = pr.rho_multiplier
-        fz = if pr.refstate === nothing
-            rmul === nothing ? ((x, y) -> pr.Ra * Tfun(x, y)) :
-                ((x, y) -> pr.Ra * rmul(x, y) * Tfun(x, y))
-        else
-            rs = pr.refstate
-            # Tfun is already the perturbation theta = T - Tad, so the TALA
-            # buoyancy rho alpha (T - Tad) is rho alpha theta; subtracting Tad
-            # again here would be a double count.
-            rmul === nothing ?
-                ((x, y) -> pr.Ra * semquad_rho(rs, y) * semquad_alpha(rs, y) *
-                           Tfun(x, y)) :
-                ((x, y) -> pr.Ra * semquad_rho(rs, y) * semquad_alpha(rs, y) *
-                           rmul(x, y) * Tfun(x, y))
-        end
-        # Phase transitions: the anomaly with respect to the base state adds a
-        # buoyancy term; with no phases `fz` is used as is (bit identical).
-        if !isempty(phases)
-            fz_thermal = fz
-            fz = (x, y) -> fz_thermal(x, y) +
-                           semquad_phase_buoyancy(pr, phases, y, Tfun(x, y))
-        end
+        # Buoyancy (stage 0.5b1): `+Ra rho alpha theta grad h`, with `grad h` the
+        # direction opposite gravity.  On the box this is the historical vertical
+        # `fz = Ra T` with `fx = 0` (the box branch of `_semquad_buoyancy_load` is
+        # the historical closure verbatim); on a mapped geometry both Cartesian
+        # components are non-zero — for the annulus `f = Ra theta e_r`, the
+        # radially outward buoyancy of the perturbation.  The conduction base
+        # state is not part of the load: the Boussinesq perturbation formulation
+        # subtracts it with the hydrostatic pressure it balances, so `theta = 0`
+        # is force-free (checked by the annulus hydrostatic gate).  Density hook
+        # (G248) and phase-transition anomalies are inside the same upward
+        # scalar, so they follow `grad h` too.
+        fx, fz = _semquad_buoyancy_load(pr, geom, Tfun, phases)
         # Keep the viscosity closure of the state this solve *used*, so the
         # Stokes-failure diagnostic can report the eta range without rebuilding
         # it from a later state (the error is raised after `solve_flow!`).
         eta_probe[] = eta_fun
         tp = profile_steps ? time_ns() : 0
         u, pp, _, _, _ = solve_semquad_stokes_var(ss, qt, eta_fun,
-                                                  (x, y) -> 0.0, fz,
+                                                  fx, fz,
                                                   (x, y) -> 0.0, (x, y) -> 0.0;
                                                   mass_rho=mass_rho_fun(pr),
                                                   mass_form=mass_form,

@@ -21,8 +21,24 @@ exactly the same formula and `eta_min/eta_max` bounds as the uniform assembler.
 """
 function semquad_eta_at(sq::SemQuad, theta::Vector{Float64}, x::Float64,
                         y::Float64, pr::Params, leaves::Set{NTuple{3,Int}})
-    T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
-    return eta_at(T, y, pr)[1]
+    # Stage 0.5b1: on a mapped geometry the temperature is `base + theta` with
+    # the *geometry's* conductive base state (the annulus's radial log/H
+    # profile) and the depth argument of the law is the physical height
+    # `h = height(g,x,y)`.  The box keeps its historical viscosity row
+    # *verbatim*: `Tbar(y,H)` and the depth `y`, even when a reference state is
+    # set — docs/dev/PHYSICS.md §3.3 records that the box viscosity sees the
+    # Boussinesq base while the buoyancy/energy use the adiabat, and the box
+    # path must stay bitwise (G197 pins it).  The branch on the concrete
+    # geometry keeps the box arithmetic identical; the mapped branch is only
+    # reached on a mapped space (where the driver refuses a reference state).
+    g = sq.geom
+    if g isa CartesianBox
+        T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+        return eta_at(T, y, pr)[1]
+    end
+    h = height(g, x, y)
+    T = semquad_base_T(pr, g, x, y) + _semquad_eval_at(sq, theta, x, y, leaves)
+    return eta_at(T, h, pr)[1]
 end
 
 """
@@ -37,10 +53,19 @@ function semquad_eta_at(sq::SemQuad, theta::Vector{Float64},
                         pv::Vector{Float64}, sp::SemQuad,
                         x::Float64, y::Float64, pr::Params,
                         leaves::Set{NTuple{3,Int}})
-    T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    g = sq.geom
+    local h, T
+    if g isa CartesianBox
+        h = y
+        T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    else
+        h = height(g, x, y)
+        T = semquad_base_T(pr, g, x, y) +
+            _semquad_eval_at(sq, theta, x, y, leaves)
+    end
     edot = _semquad_eval_at(sq, edot_field, x, y, leaves)
     p = _semquad_eval_at(sp, pv, x, y, leaves)
-    return semquad_visco_plastic_eta(T, y, edot, p, pr)
+    return semquad_visco_plastic_eta(T, h, edot, p, pr)
 end
 
 """
@@ -55,11 +80,20 @@ function semquad_eta_at(sq::SemQuad, theta::Vector{Float64},
                         pv::Vector{Float64}, sp::SemQuad,
                         x::Float64, y::Float64, pr::Params,
                         leaves::Set{NTuple{3,Int}})
-    T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
-    yield_active(pr) || return eta_at(T, y, pr)[1]
+    g = sq.geom
+    local h, T
+    if g isa CartesianBox
+        h = y
+        T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    else
+        h = height(g, x, y)
+        T = semquad_base_T(pr, g, x, y) +
+            _semquad_eval_at(sq, theta, x, y, leaves)
+    end
+    yield_active(pr) || return eta_at(T, h, pr)[1]
     edot = semquad_strain_rate_at(sq, ux, uz, x, y, leaves)
     p = _semquad_eval_at(sp, pv, x, y, leaves)
-    return semquad_visco_plastic_eta(T, y, edot, p, pr)
+    return semquad_visco_plastic_eta(T, h, edot, p, pr)
 end
 
 """
@@ -79,12 +113,21 @@ function semquad_eta_at(sq::SemQuad, theta::Vector{Float64},
                         leaves::Set{NTuple{3,Int}})
     chi === nothing && return semquad_eta_at(sq, theta, ux, uz, pv, sp, x, y,
                                              pr, leaves)
-    T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
-    yield_active(pr) || return eta_at(T, y, pr)[1]
+    g = sq.geom
+    local h, T
+    if g isa CartesianBox
+        h = y
+        T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    else
+        h = height(g, x, y)
+        T = semquad_base_T(pr, g, x, y) +
+            _semquad_eval_at(sq, theta, x, y, leaves)
+    end
+    yield_active(pr) || return eta_at(T, h, pr)[1]
     edot = semquad_strain_rate_at(sq, ux, uz, x, y, leaves)
     p = _semquad_eval_at(sp, pv, x, y, leaves)
     c = _semquad_eval_at(sq, chi, x, y, leaves)
-    return semquad_visco_plastic_eta(T, y, edot, p, c, pr)
+    return semquad_visco_plastic_eta(T, h, edot, p, c, pr)
 end
 
 function semquad_eta_at(sq::SemQuad, theta::Vector{Float64},
@@ -95,11 +138,20 @@ function semquad_eta_at(sq::SemQuad, theta::Vector{Float64},
                         leaves::Set{NTuple{3,Int}})
     chi === nothing && return semquad_eta_at(sq, theta, edot_field, pv, sp, x,
                                              y, pr, leaves)
-    T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    g = sq.geom
+    local h, T
+    if g isa CartesianBox
+        h = y
+        T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    else
+        h = height(g, x, y)
+        T = semquad_base_T(pr, g, x, y) +
+            _semquad_eval_at(sq, theta, x, y, leaves)
+    end
     edot = _semquad_eval_at(sq, edot_field, x, y, leaves)
     p = _semquad_eval_at(sp, pv, x, y, leaves)
     c = _semquad_eval_at(sq, chi, x, y, leaves)
-    return semquad_visco_plastic_eta(T, y, edot, p, c, pr)
+    return semquad_visco_plastic_eta(T, h, edot, p, c, pr)
 end
 
 

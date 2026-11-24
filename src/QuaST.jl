@@ -49,6 +49,12 @@ include("core/quadtree_balance.jl")
 # the tree (it names `Quadtree` in `CartesianBox(qt)`) and before the SEM space
 # (whose constructors call it).  No card selects a mapped geometry in cut 1.
 include("core/geometry.jl")
+# Stage 0.5b1: the geometry-dependent conductive base state.  It adds methods to
+# `semquad_base_T`/`semquad_base_gradient`/`_mapped_base_curvature` (defined in
+# `physics/refstate.jl`, which is included before the geometry layer) that
+# dispatch on the concrete geometry types, so it must come after
+# `core/geometry.jl`.  Nothing earlier calls it at definition time.
+include("physics/annulus_base.jl")
 include("core/semquad.jl")
 include("core/parallel.jl")
 include("core/constraints.jl")

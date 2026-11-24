@@ -199,13 +199,25 @@ function semquad_plastic_strain_rate_field(sq::SemQuad, sp::SemQuad,
                                            pv::Vector{Float64},
                                            chi::Vector{Float64})
     leaves = Set(qt.leaves)
+    g = sq.geom
     out = zeros(Float64, sq.N)
-    for (g, (x, y)) in enumerate(sq.coords)
-        T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+    for (gid, (x, y)) in enumerate(sq.coords)
+        # Box: the historical viscosity row (`Tbar(y,H)`, depth `y`), even with
+        # a reference state (docs/dev/PHYSICS.md §3.3, frozen box behaviour).
+        # Mapped (stage 0.5b1): the geometry's base state and `height(g,x,y)`.
+        local h, T
+        if g isa CartesianBox
+            h = y
+            T = Tbar(y, pr.H) + _semquad_eval_at(sq, theta, x, y, leaves)
+        else
+            h = height(g, x, y)
+            T = semquad_base_T(pr, g, x, y) +
+                _semquad_eval_at(sq, theta, x, y, leaves)
+        end
         ed = semquad_strain_rate_at(sq, ux, uz, x, y, leaves)
         p = _semquad_eval_at(sp, pv, x, y, leaves)
         c = _semquad_eval_at(sq, chi, x, y, leaves)
-        out[g] = semquad_plastic_strain_rate(T, y, ed, p, c, pr)
+        out[gid] = semquad_plastic_strain_rate(T, h, ed, p, c, pr)
     end
     return out
 end

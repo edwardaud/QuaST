@@ -39,11 +39,10 @@ composite / yielding / weakening law paths.  What is still refused up front is
 refused because it is not correct yet, not for missing plumbing: the
 `symmetry=:x` mirror (logical x is not a physical symmetry under a map; the
 annulus must run `:none`), the Cartesian-y AMR policies (`top_wall_level`,
-`hotspot_*`, `zero_side_eta`; rewired in the annulus stage), the per-step Newton
+`hotspot_*`, `zero_side_eta`), the per-step Newton
 path, the Maxwell stress history (the advance is mapped but its elastic force
 load into the Stokes right-hand side is still the cut-2 box-only kernel), and
-the Cartesian-y reference-state / density-hook physics wiring (the annulus stage
-re-evaluates those closures at `height`).  `:schur_cg`/`:lagged` stay box-only
+the Cartesian-y reference-state / density-hook physics wiring.  `:schur_cg`/`:lagged` stay box-only
 for their reference-matrix / stale-LU gauge assumptions.  The history row of a
 mapped run is the mapped diagnostics: G270 runs the driver on both validation
 geometries with heating off/on, the CBF and exact-residual columns on, and the
@@ -51,4 +50,28 @@ latent-heat closure path, and closes the time-step CBF energy budget identity of
 `docs/dev/VALIDATION.md` §4.1 to the solver's floor; G272 runs the mapped
 adaptive driver end to end (several steps, `initial_refine` and `amr_every` both
 on, checkpoint and bit-identical resume) and the strain-rate-dependent law paths.
+
+**Stage 0.5b1: the annulus card and the radial physics.**  `run.jl` resolves the
+geometry knob `geom::Union{Symbol,AbstractGeometry}` (`:annulus` builds
+`PolarAnnulus(annulus_R0, annulus_R1, annulus_Phi)`; any geometry object passes
+through) and dispatches the implementation body on the **concrete** geometry
+type, so every geometry accessor in the physics closures is statically
+dispatched and the box closures keep their concrete types and allocation.  The
+buoyancy load is `+Ra rho alpha theta grad h` (`_semquad_buoyancy_load`): the
+box branch is the historical vertical closure verbatim with `fx = 0`, the
+mapped branch projects the same upward scalar on `grad h`, so the annulus gets
+the two-component radial load `Ra theta e_r`; phase anomalies and the density
+hook ride in the same scalar.  The driver's eta closures evaluate the base
+temperature and the depth argument through the geometry
+(`semquad_base_T(pr,geom,x,y)`/`height(geom,x,y)`), so the annulus uses the
+radial log/H base state and `r - R0`.  The annulus card requires
+`R1 - R0 = 1` (the gap is the physics length unit), all four logical walls
+`:rigid` (free-slip curved walls need the general normal-velocity constraint
+rows of stage 0.5b2), `side_thermal=:insulating` (the wedge cuts are symmetry
+cuts, not Cartesian side walls) and refuses the box-only `nu_cbf`/`extdiag`
+diagnostics and, through the mapped-geometry block, the reference state,
+density hook, `symmetry=:x`, per-step Newton and `:periodic` seam.  G274 is the
+gate: conduction fixed point, H-inclusive flux identity, hydrostatic balance,
+the end-to-end run with checkpoint/resume and every refusal, and the
+depth-dependent closure wiring.
 

@@ -195,5 +195,6 @@ using QuaST
     include("t_g271_mapped_mg.jl")
     include("t_g272_mapped_amr.jl")
     include("t_g273_annulus_geometry.jl")
+    include("t_g274_annulus_conduction.jl")
 end
 

@@ -253,8 +253,7 @@ function semquad_ev_globals(g::AbstractGeometry, sq::SemQuad, qt::Quadtree,
     minT = Inf; maxT = -Inf; uinf = 0.0
     for gi in 1:sq.N
         x, y = sq.coords[gi]
-        h = height(g, x, y)
-        tb = Tbar(h, pr.H)
+        tb = semquad_base_T(pr, g, x, y)
         tn = tb + theta[gi]
         t = if dt_ratio > 0.0 && theta_prev !== nothing
             (1.0 + dt_ratio) * tn - dt_ratio * (tb + theta_prev[gi])
@@ -273,7 +272,6 @@ function semquad_ev_globals(g::AbstractGeometry, sq::SemQuad, qt::Quadtree,
         ids = sq.elem[lf]
         for qy in 1:fd.nq, qx in 1:fd.nq
             x, y = quad_point(lm, sq, lf, fd, qx, qy)
-            h = height(g, x, y)
             thn = 0.0; thp = 0.0
             for j in 1:n, i in 1:n
                 b = fd.phi_v[i, qx] * fd.phi_v[j, qy]
@@ -283,7 +281,7 @@ function semquad_ev_globals(g::AbstractGeometry, sq::SemQuad, qt::Quadtree,
                     thp += theta_prev[ids[k]] * b
                 end
             end
-            Tmid = Tbar(h, pr.H) + 0.5 * (thn + thp)
+            Tmid = semquad_base_T(pr, g, x, y) + 0.5 * (thn + thp)
             e = (Tmid - avgT)^2
             w = quad_measure(lm, fd, qx, qy)
             eint += w * e; area += w
@@ -322,7 +320,6 @@ function semquad_ev_cell_stats(g::AbstractGeometry, sq::SemQuad, pr::Params,
     Rmax = 0.0; umax = 0.0
     for qy in 1:fd_used.nq, qx in 1:fd_used.nq
         x, y = quad_point(lm, sq, lf, fd_used, qx, qy)
-        h = height(g, x, y)
         # The mapped base-state Laplacian (`lap(Tbar(h)) + H`) the residual must
         # subtract: the same helper the mapped energy assembly adds as a source
         # (cut-4 defect B1: cut 3 used `semquad_base_laplacian` alone, which is 0
@@ -351,11 +348,12 @@ function semquad_ev_cell_stats(g::AbstractGeometry, sq::SemQuad, pr::Params,
                 lapp += theta_prev[ids[k]] * lphi
             end
         end
-        Tmid = Tbar(h, pr.H) + 0.5 * (thn + thp)
+        Tmid = semquad_base_T(pr, g, x, y) + 0.5 * (thn + thp)
         dTdt = dt > 0.0 ? (thn - thp) / dt : 0.0
         ugh = upward_velocity(g, x, y, uxq, uzq)
         adv = 0.5 * uxq * (gthx + gthxp) +
-              0.5 * uzq * (gthz + gthzp) + ugh * dTbar(h, pr.H)
+              0.5 * uzq * (gthz + gthzp) +
+              ugh * semquad_base_gradient(pr, g, x, y)
         lap = 0.5 * (lapth + lapp) + lapT
         R = abs(dTdt + adv - lap)
         alpha == 2 && (R *= abs(Tmid - evg.avgT))

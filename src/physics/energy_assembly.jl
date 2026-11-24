@@ -536,7 +536,11 @@ function _semquad_assemble_energy_block_mapped!(buf::SemQuadEnergyBuf,
                 for k in 1:nv
                     thq += (theta::Vector{Float64})[ids[k]] * phi[k]
                 end
-                Tq = semquad_base_T(pr, h) + thq
+                # Stage 0.5b1: the base state is the geometry's conductive
+                # profile (the annulus's radial log/H state), not the Cartesian
+                # quadratic evaluated at `h`; on the box/validation geometries
+                # the dispatch returns exactly the historical `Tbar(h,H)`.
+                Tq = semquad_base_T(pr, g, x, y) + thq
                 (rho_heating || rho_cp) && (rho = max(1.0 - Tq, 1.0e-6))
             end
             # `u.grad h`: the mapped generalisation of `u_z` in every
@@ -551,7 +555,7 @@ function _semquad_assemble_energy_block_mapped!(buf::SemQuadEnergyBuf,
                     for k in 1:nv
                         thl += (theta_lat::Vector{Float64})[ids[k]] * phi[k]
                     end
-                    Tl = semquad_base_T(pr, h) + thl
+                    Tl = semquad_base_T(pr, g, x, y) + thl
                 end
                 for i in eachindex(phases)
                     Li = lcoef[i]
@@ -567,7 +571,7 @@ function _semquad_assemble_energy_block_mapped!(buf::SemQuadEnergyBuf,
                                         "the phase transitions"))
                 end
             end
-            src = -rho * ugh * semquad_base_gradient(pr, h) + lat_src
+            src = -rho * ugh * semquad_base_gradient(pr, g, x, y) + lat_src
             # lap(Tbar(h)): the physical Laplacian of the base state in the
             # mapped metric, `Tbar''(h)|grad h|^2 + Tbar'(h) lap(h)`, plus the
             # absorbed `+H` for the Boussinesq base (`_mapped_base_curvature`;
@@ -598,7 +602,7 @@ function _semquad_assemble_energy_block_mapped!(buf::SemQuadEnergyBuf,
                     src += (pr.Di / pr.Ra) * 2.0 * eta_q * eed
                 end
                 if heating_adiabatic
-                    Tfull = theta === nothing ? semquad_base_T(pr, h) : Tq
+                    Tfull = theta === nothing ? semquad_base_T(pr, g, x, y) : Tq
                     rho_ad = (pr.refstate === nothing ? 1.0 :
                               semquad_rho(pr.refstate, h))::Float64
                     src -= pr.Di * rho_ad * Tfull * ugh
