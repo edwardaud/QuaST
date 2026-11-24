@@ -1628,6 +1628,46 @@ end
 end
 
 """
+    leaf_normal_size(g, lay, lf, side) -> Float64
+
+Physical extent of one leaf **along the outward normal of the logical face
+`side`** — the `h` of the `(h/2) * int [du/dn]^2 ds` AMR indicator and of every
+other face-normal length scale (GEOM_DESIGN §2.3, §6.8: "the distance between
+opposite faces along the normal").
+
+* Box method: the historical face-normal element size `leaf_hx` on the x-sides
+  and `leaf_hy` on the y-sides (E15's normal scale; the box indicator's `h`).
+* Mapped method: the distance between the two opposite faces at the face
+  midpoint, which for a leaf reference coordinate `s` is `2 / |grad s|` (the
+  reference interval has length 2 in `s`).  For the box map this is
+  `2 / |2/hx| = hx` (resp. `hy`) up to the reciprocal round-off; it is the
+  quantity whose factor-`(R1/R0)` variation across the annulus the physical
+  indicator must see (GEOM_DESIGN §6.8).  At the face midpoint, with
+  `Jinv = (xi_x, eta_x, xi_y, eta_y)` the rows are `grad xi = (inv1, inv3)` and
+  `grad eta = (inv2, inv4)`.
+"""
+@inline function leaf_normal_size(g::CartesianBox, lay, lf::NTuple{3,Int},
+                                  side::Symbol)
+    if side === :xminus || side === :xplus
+        return leaf_hx(lay, lf[1])
+    elseif side === :yminus || side === :yplus
+        return leaf_hy(lay, lf[1])
+    end
+    throw(ArgumentError("unknown face side $side"))
+end
+@inline function leaf_normal_size(g::AbstractGeometry, lay, lf::NTuple{3,Int},
+                                  side::Symbol)
+    is_x = side === :xminus || side === :xplus
+    is_x || side === :yminus || side === :yplus ||
+        throw(ArgumentError("unknown face side $side"))
+    sgn = (side === :xplus || side === :yplus) ? 1.0 : -1.0
+    xi, eta = is_x ? (sgn, 0.0) : (0.0, sgn)
+    inv = jacobian_inverse(g, lay, lf, xi, eta)
+    nrm = is_x ? hypot(inv[1], inv[3]) : hypot(inv[2], inv[4])
+    return 2.0 / nrm
+end
+
+"""
     minimum_leaf_size(g, qt) -> Float64
 
 Minimum [`leaf_min_size`](@ref) over the tree: the CFL `hmin` of

@@ -12,17 +12,17 @@ those live in `physics/`, `stokes/` and `amr/`.
 | File | What it is |
 |---|---|
 | `constraints.jl` | Hanging-node constraints: a fine face node is the coarse face's GLL interpolation (historical box body plus a logical mapped method). |
-| `eval.jl` | Point evaluation of a quadtree SEM field: leaf search and a reusable Lagrange workspace. |
+| `eval.jl` | Point evaluation of a quadtree SEM field: leaf search, the logical-point evaluation and gradient primitives the mapped transfer/indicator use, and a reusable Lagrange workspace. |
 | `fe.jl` | Reference-element data: GLL nodes for the basis, Gauss–Legendre points for quadrature. |
-| `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), point map and inverse, Jacobian/metric and face normals, the map-curvature second derivatives, logical boundary registry, height/depth/gravity, checkpoint identity. |
+| `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), point map and inverse, Jacobian/metric and face normals, the map-curvature second derivatives, logical boundary registry, height/depth/gravity, physical measures and normal leaf size, checkpoint identity. |
 | `gll.jl` | GLL nodes and weights, the barycentric Lagrange basis, Gauss–Legendre quadrature. |
 | `parallel.jl` | Threading helpers shared by the leaf-blocked assembly loops. |
 | `poisson.jl` | SIPG/Nitsche Poisson operator: a verification-only assembler and its constrained solve. |
-| `quadtree.jl` | The 2:1-balanced quadtree: refine, coarsen, neighbours, balance and wall grading. |
+| `quadtree.jl` | The 2:1-balanced quadtree: refine, coarsen, neighbours, balance and wall grading (the cut-6 height-based wall grading of `wall_graded_tree`). |
 | `quadtree_balance.jl` | The x-mirror symmetry and the 2:1 balancing policy. |
 | `quadtree_table.jl` | The flat face table the quadtree queries are answered from. |
 | `semquad.jl` | The continuous Q_p space on the quadtree, its mass matrix and constraints. |
-| `transfer.jl` | Solution transfer between quadtree SEM meshes: nodal restriction and L2 projection. |
+| `transfer.jl` | Solution transfer between quadtree SEM meshes: nodal restriction and L2 projection; the mapped method evaluates the old field at the new node's logical position and uses the mapped mass. |
 
 `quadtree.jl`, `quadtree_table.jl` and `quadtree_balance.jl` are three views of
 one object: the refinement primitives maintain the flat face table, the table
@@ -89,4 +89,23 @@ invalidates it.  Before cut 5 every mapped `semquad_constraints` rebuilt the
 list (~1.5 MB per call at 1024 leaves, cut-2 record); the mapped constraints and
 assemblies now reuse it, with the same read-only contract as the box
 `face_pairs` cache.
+
+The **transfer and the AMR indicator** are the cut-6 consumers of that logical
+identity.  `transfer_semquad` dispatches on the two spaces' geometries: the
+`CartesianBox` pair runs the historical body verbatim (bit for bit), and a
+mapped pair evaluates the old field at the new node's **logical** position
+(`global_logical` + `locate_leaf_logical` + `leaf_ref`) while the node's
+coordinate is the map image — the map is a global diffeomorphism, so the
+transfer is exact for a logical polynomial of the space's degree.  The L2 arm
+uses the mapped `semquad_mass` (the historical box body plus a mapped body whose
+weight is the cached `quad_measure`).  The gradient-jump indicator's mapped body
+is the **physical** estimator `sum (h/2) int [du/dn]^2 ds` with the true
+one-sided physical normal derivative, the physical face Jacobian and the
+physical normal leaf size `leaf_normal_size`; its box body is the historical
+arithmetic, which contains an index defect on the fine side of a horizontal face
+(see `docs/dev/GEOM_PROGRESS.md`, cut 6) kept for the bitwise invariant.
+`_semquad_eval_ref!` and `_semquad_grad_ref` are the logical-point evaluation
+and physical-gradient primitives both use; `leaf_normal_size` (box: the
+historical `leaf_hx`/`leaf_hy`; mapped: `2/|grad xi|` at the face midpoint)
+completes the §2.3 measure API.
 

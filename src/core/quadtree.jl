@@ -372,7 +372,7 @@ function max_face_level_jump(qt::Quadtree)
 end
 
 """
-    wall_graded_tree(base, wall_level; strip=0.1)
+    wall_graded_tree(base, wall_level; strip=0.1, geom=nothing)
 
 Uniform tree at `base`, then geometric wall refinement: a leaf at distance `d`
 from the nearest wall is refined while its level is below
@@ -380,11 +380,28 @@ from the nearest wall is refined while its level is below
 the level increases, so the number of wall leaves grows linearly with
 `wall_level` rather than quadratically.  This is the quadtree analogue of the
 tanh-graded static mesh used by the high-Ra runs.
+
+`geom` (stage 0 cut 6, GEOM_DESIGN §3 cut 6) makes the wall strip a **physical
+distance from the walls in the height coordinate**: with `geom=nothing` or a
+`CartesianBox` the body is the historical Cartesian-`y` one, bit for bit; with a
+mapped geometry the distance is measured in `height(g,x,y)` (the layer
+coordinate the physics uses), so the annulus strips are radial strips instead of
+logical y rows.  Every stage-0 geometry has `height = logical T` by
+construction, so the tree is the same for the box and the validation geometries;
+the difference becomes physical for the annulus (`height = r - R0`).
 """
-function wall_graded_tree(base::Int, wall_level::Int; strip::Float64=0.1)
+function wall_graded_tree(base::Int, wall_level::Int; strip::Float64=0.1,
+                          geom=nothing)
     base >= 0 || throw(ArgumentError("base must be >= 0"))
     wall_level >= base || throw(ArgumentError("wall_level must be >= base"))
     0.0 < strip <= 0.5 || throw(ArgumentError("strip must be in (0, 0.5]"))
+    (geom === nothing || geom isa CartesianBox) &&
+        return _wall_graded_tree_box(base, wall_level; strip=strip)
+    return _wall_graded_tree_height(geom, base, wall_level; strip=strip)
+end
+
+# Historical box body, verbatim: do not rewrite it.
+function _wall_graded_tree_box(base::Int, wall_level::Int; strip::Float64=0.1)
     qt = Quadtree(wall_level + 2)
     for _ in 1:base
         for lf in collect(qt.leaves)
@@ -414,6 +431,41 @@ function wall_graded_tree(base::Int, wall_level::Int; strip::Float64=0.1)
     balance!(qt)
     return qt
 end
+
+# Mapped body (cut 6): the same geometric grading with the distance measured in
+# the physical height (`_height_at` maps the leaf corners through the geometry).
+function _wall_graded_tree_height(g, base::Int, wall_level::Int;
+                                  strip::Float64=0.1)
+    qt = Quadtree(wall_level + 2)
+    for _ in 1:base
+        for lf in collect(qt.leaves)
+            refine!(qt, lf)
+        end
+    end
+    for _ in 1:(wall_level - base)
+        changed = false
+        for lf in collect(qt.leaves)
+            l = lf[1]
+            h11 = _height_at(g, qt, lf, -1.0, -1.0)
+            h21 = _height_at(g, qt, lf, 1.0, -1.0)
+            h22 = _height_at(g, qt, lf, 1.0, 1.0)
+            h12 = _height_at(g, qt, lf, -1.0, 1.0)
+            lo = min(h11, h21, h22, h12)
+            hi = max(h11, h21, h22, h12)
+            d = min(lo, 1.0 - hi)
+            target = d <= 0.0 ? wall_level :
+                     d < strip ? min(wall_level, base + ceil(Int, log2(strip / d))) : l
+            if l < target
+                refine!(qt, lf)
+                changed = true
+            end
+        end
+        changed || break
+    end
+    balance!(qt)
+    return qt
+end
+
 
 """Physical `(x0, y0, hx, hy)` of a leaf."""
 function leaf_box(qt::Quadtree, leaf::NTuple{3,Int})

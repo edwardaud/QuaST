@@ -21,25 +21,34 @@ only composes them.
 | `newton_tangent.jl` | The matrix-free tangent-vector product of the per-step Newton. |
 | `picard.jl` | Lagged viscosity, strain-rate averaging and adaptive Picard relaxation. |
 | `picard_control.jl` | The field blend, the divergence test and the adaptive relaxation. |
-| `strain_rate.jl` | The nodal strain-rate and spin fields of the SEM velocity. |
+| `strain_rate.jl` | The nodal strain-rate and spin fields of the SEM velocity: historical box bodies plus cut-6 mapped bodies (physical gradient by the chain rule) for the strain-rate-dependent laws, yielding, weakening and the Maxwell advance. |
 | `restart_guard.jl` | The `run_config` builder and the restart guard of `run_semquad_simulation`. |
 | `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. |
 | `run_diagnostics.jl` | The driver-owned snapshot of the solver and AMR diagnostic out-parameters. |
 | `step_newton.jl` | Globalization of the per-time-step nonlinear solve. |
 
-Stage 0 cut 4 lifts the mapped-geometry refusal: with cuts 1–4 the assembled
-Stokes operator, the energy assembly and every per-step diagnostics path are
-routed through the geometry, so `run_semquad_simulation(...; geom=
-AffineBox/CurvedBox)` runs a **fixed-mesh, `linear=:direct`, Picard** time loop.
-What remains box-only is refused up front, naming the owning cut: adaptive
-transfer/indicator/AMR and the `:x` symmetry mirror (cut 6), the matrix-free/MG
-solver (cut 5), the strain-rate reconstructions of `driver/strain_rate.jl` (cut 6,
-which every strain-rate-dependent law, yielding, weakening and the Maxwell
-stress advance need), the per-step Newton path (its mapped tangent has no gate
-yet), and the Cartesian-`y` reference-state / density-hook / phase-buoyancy
-physics wiring (the annulus stage re-evaluates those closures at `height`).  The
-history row of a mapped run is the mapped diagnostics: G270 runs the driver on
-both validation geometries with heating off/on, the CBF and exact-residual
-columns on, and the latent-heat closure path, and closes the time-step CBF
-energy budget identity of `docs/dev/VALIDATION.md` §4.1 to the solver's floor.
+Stage 0 cut 4 lifted the mapped-geometry refusal for the fixed mesh: with cuts
+1–4 the assembled Stokes operator, the energy assembly and every per-step
+diagnostics path are routed through the geometry, and cut 5 added the mapped
+matrix-free/MG solver.  Cut 6 routes the adaptive layer: the mapped indicator,
+transfer, balanced cycle, wall strips, level limits and the strain-rate
+reconstructions of `strain_rate.jl` are geometry-aware, so a mapped card may run
+`initial_refine > 0`, `amr_every > 0`, `amr_indicator=:theta/:velocity/:both`,
+`transfer_mode=:nodal/:l2`, `wall_min_level`/`wall_strip`, and the Tosi /
+composite / yielding / weakening law paths.  What is still refused up front is
+refused because it is not correct yet, not for missing plumbing: the
+`symmetry=:x` mirror (logical x is not a physical symmetry under a map; the
+annulus must run `:none`), the Cartesian-y AMR policies (`top_wall_level`,
+`hotspot_*`, `zero_side_eta`; rewired in the annulus stage), the per-step Newton
+path, the Maxwell stress history (the advance is mapped but its elastic force
+load into the Stokes right-hand side is still the cut-2 box-only kernel), and
+the Cartesian-y reference-state / density-hook physics wiring (the annulus stage
+re-evaluates those closures at `height`).  `:schur_cg`/`:lagged` stay box-only
+for their reference-matrix / stale-LU gauge assumptions.  The history row of a
+mapped run is the mapped diagnostics: G270 runs the driver on both validation
+geometries with heating off/on, the CBF and exact-residual columns on, and the
+latent-heat closure path, and closes the time-step CBF energy budget identity of
+`docs/dev/VALIDATION.md` §4.1 to the solver's floor; G272 runs the mapped
+adaptive driver end to end (several steps, `initial_refine` and `amr_every` both
+on, checkpoint and bit-identical resume) and the strain-rate-dependent law paths.
 

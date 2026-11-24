@@ -2,14 +2,14 @@
 
 One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
-test script that starts with `using`; most wrap one `@testset`. The 190 files
-hold the suite's 134 852 assertions (134 850 passed, 2 broken, 0 failed) — the
-count of the stage-0 cut-5 tree, recorded with its evidence in
-`docs/dev/GEOM_PROGRESS.md`. (Cut 1 recorded 134 086 / 134 084 / 0 / 2 on 185
-files; cut 2 adds G267 and G268; cut 3 adds G269, +151 assertions; cut 4 adds
-G270, +302 assertions; cut 5 adds G271, +136 assertions.) The top-level README
-still quotes the pre-cut-1 total (133 716); the top-level markdown was outside
-the cut write scopes.
+test script that starts with `using`; most wrap one `@testset`. The 191 files
+hold the suite's 135 097 assertions (135 095 passed, 2
+broken, 0 failed) — the count of the stage-0 cut-6 tree, recorded with its
+evidence in `docs/dev/GEOM_PROGRESS.md`. (Cut 1 recorded 134 086 / 134 084 / 0 / 2
+on 185 files; cut 2 adds G267 and G268; cut 3 adds G269, +151 assertions; cut 4
+adds G270, +302 assertions; cut 5 adds G271, +136 assertions; cut 6 adds G272,
++245 assertions.) The top-level README still quotes the pre-cut-1 total
+(133 716); the top-level markdown was outside the cut write scopes.
 
 G266 is the geometry/mapping-layer gate of stage 0 cut 1: it rebuilds the box
 coordinates, node ids, leaf/face metrics, nodal transfer, AMR indicator and the
@@ -69,7 +69,7 @@ coarsenings with mapped coarse operators and bitwise-equal prolongation, the
 threaded mapped V-cycle is bitwise the serial one, and the mapped driver runs
 `:direct`/`:mg`/`:auto` (auto resolves to `:mg` above the selector crossover)
 with `:schur_cg`/`:lagged` still refused with their box-assumption message.
-G265 is the gate of
+G272 is the cut-6 mapped transfer/indicator/AMR gate: a logical P2 is transferred exactly (max error 0.0) by the nodal transfer on an `AffineBox` and a `CurvedBox` (refinement and coarsening) and by the mapped L2 transfer (3-4e-15), the mapped nodal transfer on the box map is bit-identical to the historical box body, a deliberately wrong ``box-formula'' evaluation point on `CurvedBox` is caught with a measured 4.4e-1 error (correct: 0.0), and a smooth coarsening shows L2 beating nodal by four orders of magnitude on the G80 wall-graded trees.  The mapped indicator equals an independent analytic-map oracle (closed-form map, Jacobian, face normals and normal sizes written in the gate) to 3.7e-16, is invariant under a rigid rotation of geometry+field (7e-15), is non-negative, reproduces a corrected box oracle bitwise on the box map -- and differs from the **historical** box body by 9.96e-1, because the pre-cut box body computes the fine-side horizontal-face derivative in the x index (a pre-existing defect, kept for the nine-hash bitwise invariant and recorded as the cut's main finding); the linear-field probe measures the spurious interior term (6.25e-4) and the mapped body's zero.  The physical-vs-logical decision is measured on a `CurvedBox` whose layer-direction physical cell size varies by the annulus's `(R0+1)/R0 = 2.818`: the per-leaf `eta_phys/eta_log` equals the analytic map factor (7.9e-11 ... 8.4e-16 at levels 4-6), the compressed/tall span converges 2.592 -> 2.716 -> 2.770 towards 2.818, and on a similarity (box) map the two estimators coincide exactly -- the physical choice is justified by a number, not an opinion.  End to end, a mapped driver run with `initial_refine = 2` and `amr_every = 2` completes four steps, evolves 16 -> 28 leaves, writes 4x18 history rows, keeps every state finite, and checkpoints/resumes bit-identically to the uninterrupted run (the geometry record is in the checkpoint config); the Tosi / yielding law paths and the velocity indicator run mapped; the still-refused mapped paths (`symmetry=:x`, the Cartesian-y AMR policies, Newton, the Maxwell elastic load, `:schur_cg`) name their missing piece.  The box half (158 assertions) pins the indicator, nodal transfer, wall-strip/protect predicates, the box-default cycle/wall refinement/`wall_graded_tree` and the box-map transfer against the historical bodies carried in the gate.  G265 is the gate of
 `examples/subduction_2d.jl` (the
 regional subduction-style case). It pins only the checks the design classifies
 as exact identities or as the mass-flux conservation identity, with their

@@ -163,6 +163,81 @@ function _semquad_eval_at_leaf!(w::SemQuadEvalWork, g::AbstractGeometry,
     return v
 end
 
+"""
+    _semquad_eval_ref!(w, sq, u, xi, eta, lf) -> Float64
+
+Evaluate the field `u` of `sq` at the leaf reference point `(xi,eta)` of leaf
+`lf`, without a point search and without a map inversion: the caller already
+knows the logical point and the leaf.  This is the evaluation primitive of the
+mapped nodal transfer (cut 6): the new node's *coordinate* is the map image, but
+the old field is evaluated at the same **logical** point (GEOM_DESIGN §2.1 rule
+4, §6.5), which is the canonical identity of the node.  Same arithmetic as
+[`_semquad_eval_at_leaf!`](@ref) once the reference coordinates are known.
+"""
+function _semquad_eval_ref!(w::SemQuadEvalWork, sq::SemQuad,
+                            u::Vector{Float64}, xi::Float64, eta::Float64,
+                            lf::NTuple{3,Int})
+    n = sq.p + 1
+    rule = gll_rule_cached(sq.p)
+    lagrange_values!(w.Lb, rule, xi)
+    lagrange_values!(w.Lc, rule, eta)
+    ids = sq.elem[lf]
+    v = 0.0
+    for j in 1:n, i in 1:n
+        v += u[ids[(j - 1) * n + i]] * w.Lb[i] * w.Lc[j]
+    end
+    return v
+end
+
+"""
+    _semquad_grad_ref(sq, u, lf, xi, eta) -> (du/dx, du/dy)
+
+Physical gradient of the field `u` at the leaf reference point `(xi,eta)` of the
+known leaf `lf` (no point search).  Box method: the historical `2.0/h`
+derivative scaling; mapped method: the chain rule with the inverse Jacobian at
+the point.  The mapped gradient-jump indicator (cut 6) evaluates the one-sided
+physical normal derivative of each side of a face with this primitive.
+"""
+function _semquad_grad_ref(sq::SemQuad, u::Vector{Float64},
+                           lf::NTuple{3,Int}, xi::Float64, eta::Float64)
+    return _semquad_grad_ref(sq.geom, sq, u, lf, xi, eta)
+end
+
+function _semquad_grad_ref(::CartesianBox, sq::SemQuad, u::Vector{Float64},
+                           lf::NTuple{3,Int}, xi::Float64, eta::Float64)
+    n = sq.p + 1
+    lm = leaf_metric(sq.geom, sq, lf)
+    rule = gll_rule_cached(sq.p)
+    Lb, dLb = lagrange_eval(rule, xi)
+    Lc, dLc = lagrange_eval(rule, eta)
+    ids = sq.elem[lf]
+    dxi = 0.0; deta = 0.0
+    for j in 1:n, i in 1:n
+        v = u[ids[(j - 1) * n + i]]
+        dxi += v * dLb[i] * Lc[j]
+        deta += v * Lb[i] * dLc[j]
+    end
+    return dxi * lm.ihx, deta * lm.ihy
+end
+
+function _semquad_grad_ref(g::AbstractGeometry, sq::SemQuad,
+                           u::Vector{Float64}, lf::NTuple{3,Int},
+                           xi::Float64, eta::Float64)
+    n = sq.p + 1
+    rule = gll_rule_cached(sq.p)
+    Lb, dLb = lagrange_eval(rule, xi)
+    Lc, dLc = lagrange_eval(rule, eta)
+    ids = sq.elem[lf]
+    dxi = 0.0; deta = 0.0
+    for j in 1:n, i in 1:n
+        v = u[ids[(j - 1) * n + i]]
+        dxi += v * dLb[i] * Lc[j]
+        deta += v * Lb[i] * dLc[j]
+    end
+    inv = jacobian_inverse(g, sq, lf, xi, eta)
+    return (inv[1] * dxi + inv[2] * deta, inv[3] * dxi + inv[4] * deta)
+end
+
 """Evaluate a quadtree SEM field at (x,y) with an O(maxlevel) point search."""
 function _semquad_eval_at(sq::SemQuad, u::Vector{Float64},
                           x::Float64, y::Float64,

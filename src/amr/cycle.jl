@@ -122,6 +122,13 @@ leaves, none is protected, every child has `level > l_min` (`l_min` is
 and the mirror quartet (`symmetry=:x`) passes the same test.  `coarsen_cells`
 caps the leaves dropped per cycle (default `round(coarsen_frac * n)`).
 
+The wall strip is a **physical distance from the Dirichlet walls** (stage 0 cut
+6): `geom` (default the box) selects the criterion -- the historical Cartesian
+`y` rows on the box, the physical `height` and `nu_wall_sides` of a mapped
+geometry through [`_amr_in_wall_strip`](@ref).  The refinement and coarsening
+thresholds themselves are geometry-independent: they consume the indicator
+dictionary, whose mapped body is physical.
+
 `coarsen_gate` (default `true`) adds deal.II's `coarsening_allowed()` pre-check
 (`docs/dev/AMR.md`, `docs/dev/AMR.md` §4): a
 quartet is merged only when its parent's external faces keep the 2:1 rule after
@@ -147,7 +154,8 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
                              cooldown::Union{Nothing,AmrCooldown}=nothing,
                              hysteresis_cycles::Int=1,
                              coarsen_cells::Union{Nothing,Int}=nothing,
-                             coarsen_gate::Bool=true)
+                             coarsen_gate::Bool=true,
+                             geom::AbstractGeometry=CartesianBox(qt))
     symmetry in (:none, :x) ||
         throw(ArgumentError("symmetry must be :none or :x"))
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
@@ -179,12 +187,10 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
     eof(lf) = max(get(eta, lf, 0.0), 0.0)
 
     # --- minimum-refinement function `l_min(x)`: the wall strip floor ---------
-    in_strip(lf) = begin
-        lf[3] == 0 && return true
-        lf[3] == qt.ny0 * (1 << lf[1]) - 1 && return true
-        zc = (lf[3] + 0.5) * leaf_hy(qt, lf[1])
-        return zc <= wall_strip || zc >= 1.0 - wall_strip
-    end
+    # The strip is a physical distance from the Dirichlet walls; `geom` (cut 6)
+    # selects the box's historical `y` criterion or the mapped geometry's
+    # physical height.  `_amr_in_wall_strip` keeps the historical box body.
+    in_strip(lf) = _amr_in_wall_strip(geom, qt, lf, wall_strip)
     lmin(lf) = (wall_min_level > 0 && in_strip(lf)) ? wall_min_level : 0
 
     # --- (a') the two cumulative-error thresholds (exact, by sorting) --------

@@ -239,8 +239,43 @@ Per-leaf indicator `(h/2) * int_face [du.n]^2 ds` summed over interior faces,
 plus `(h/2) * int_boundary (du.n)^2 ds` on the domain boundary.  The boundary
 term is needed for thermal boundary layers; without it the estimator only sees
 interior jumps.
+
+The value is continuous, but the normal derivative is not; the jump between the
+coarse and fine one-sided derivatives is the same indicator the DG prototype
+used, with the coarse side interpolated at the fine-side quadrature points.
+
+Stage 0 cut 6: the box body below is the historical arithmetic, verbatim; a
+mapped geometry uses the **physical** variant (GEOM_DESIGN §6.8):
+
+  * the normal derivative is the true physical one-sided `n . grad u`, with
+    `n` the outward unit normal of the fine side's face (from the cached
+    `MappedFaceMetric`) and `grad u` the chain rule at the same physical point;
+  * the face measure is the physical face Jacobian `ds/dq` (not the reference
+    length) and the coarse side is evaluated at the fine node's **logical**
+    position on the coarse face (`global_logical` + `leaf_ref`), never at a
+    rounded physical position (GEOM_DESIGN §2.1 rule 4, §6.8);
+  * the `(h/2)` scale is `leaf_normal_size`, the physical normal extent of the
+    element ([`leaf_normal_size`](@ref)), which varies with the map — the whole
+    point of the physical choice: a logical-gradient estimator would be wrong
+    by the local physical cell-size ratio (`test/t_g272_mapped_amr.jl` (c));
+  * the boundary term is added on the geometry's physical Dirichlet walls
+    (`nu_wall_sides`, `:yminus`/`:yplus` for every stage-0 geometry; the
+    annulus will register its circles there).
+
+On the box map this reduces to the box estimator up to floating-point
+association (the chain rule with the cached `J^{-1}` instead of the precomputed
+`2/h` coefficients, and `2/|grad xi|` instead of `leaf_hx`): the measured
+relative difference is ~1e-16 and is printed by G272 (b).  The box path itself
+never takes this body.
 """
 function semquad_gradient_jump(sq::SemQuad, qt::Quadtree, u::Vector{Float64})
+    return _semquad_gradient_jump(sq.geom, sq, qt, u)
+end
+
+# Historical box body, verbatim: do not rewrite it (the nine-hash dump and G266
+# pin it bit for bit).
+function _semquad_gradient_jump(::CartesianBox, sq::SemQuad, qt::Quadtree,
+                               u::Vector{Float64})
     n = sq.p + 1
     eta = Dict{NTuple{3,Int},Float64}()
     # `Dict` growth is O(#leaves) rehashes; every consumer either looks a leaf
@@ -307,3 +342,73 @@ function semquad_gradient_jump(sq::SemQuad, qt::Quadtree, u::Vector{Float64})
     return eta
 end
 
+# ---------------------------------------------------------------------------
+# Mapped body (cut 6): physical normal derivatives and physical face measures.
+# ---------------------------------------------------------------------------
+
+# One-sided physical normal derivative of `u` on leaf `lf` at the face point
+# `(xi,eta)` with face normal `(nx,ny)`.
+@inline function _mapped_normal_derivative(g::AbstractGeometry, sq::SemQuad,
+                                          u::Vector{Float64},
+                                          lf::NTuple{3,Int}, xi::Float64,
+                                          eta::Float64, nx::Float64,
+                                          ny::Float64)
+    gx, gy = _semquad_grad_ref(g, sq, u, lf, xi, eta)
+    return nx * gx + ny * gy
+end
+
+function _semquad_gradient_jump(g::AbstractGeometry, sq::SemQuad,
+                                qt::Quadtree, u::Vector{Float64})
+    n = sq.p + 1
+    eta = Dict{NTuple{3,Int},Float64}()
+    sizehint!(eta, length(sq.leaves))
+    for lf in sq.leaves
+        eta[lf] = 0.0
+    end
+    # Interior sub-faces: the coarse leaf is `leafL`, the fine side `leafR`; the
+    # physical normal is taken from the fine side's cached face metric and both
+    # one-sided gradients are dotted with the same vector, so the jump is
+    # orientation-independent.
+    for pf in face_pairs(qt, g)
+        L, R, dir = pf.leafL, pf.leafR, pf.dir
+        sideR = _flip_dir(dir)
+        fm = _mapped_face_metric(g, sq, R, sideR, sq.xi)
+        J = 0.0
+        @inbounds for q in 1:n
+            tq = sq.xi[q]
+            xiR, etaR = _wall_ref_point(sideR, tq)
+            dR = _mapped_normal_derivative(g, sq, u, R, xiR, etaR,
+                                           fm.nx[q], fm.ny[q])
+            # Coarse side: evaluate at the same logical face point, located on
+            # the coarse leaf by logical arithmetic only.
+            S, T = global_logical(sq, R, xiR, etaR)
+            xiL, etaL = leaf_ref(sq, L, S, T)
+            dL = _mapped_normal_derivative(g, sq, u, L, xiL, etaL,
+                                           fm.nx[q], fm.ny[q])
+            J += fm.jac[q] * sq.w[q] * (dL - dR)^2
+        end
+        hL = leaf_normal_size(g, sq, L, dir)
+        hR = leaf_normal_size(g, sq, R, sideR)
+        eta[L] += 0.5 * hL * J
+        eta[R] += 0.5 * hR * J
+    end
+    # Boundary faces on the physical Dirichlet walls only (the logical sides the
+    # geometry's Nusselt pair names; the insulating sides add no physical jump,
+    # exactly the box body's "skip the left/right walls").
+    for lf in sq.leaves
+        for dir in nu_wall_sides(g)
+            has_no_face_neighbor(qt, lf, dir) || continue
+            fm = _mapped_face_metric(g, sq, lf, dir, sq.xi)
+            h = leaf_normal_size(g, sq, lf, dir)
+            acc = 0.0
+            @inbounds for q in 1:n
+                xiq, etaq = _wall_ref_point(dir, sq.xi[q])
+                d = _mapped_normal_derivative(g, sq, u, lf, xiq, etaq,
+                                              fm.nx[q], fm.ny[q])
+                acc += fm.jac[q] * sq.w[q] * d^2
+            end
+            eta[lf] += 0.5 * h * acc
+        end
+    end
+    return eta
+end

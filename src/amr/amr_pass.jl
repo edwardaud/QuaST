@@ -82,6 +82,25 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         throw(ArgumentError("indicator must be :theta, :velocity or :both"))
     cool = amr_cooldown === nothing ? AmrCooldown() : amr_cooldown
     sq = ss.su
+    g = sq.geom
+    # Stage 0 cut 6: the indicator, the transfer and the balanced cycle are
+    # mapped.  The remaining Cartesian-y AMR *policies* (top-wall forcing,
+    # hotspot temperature binning, side-strip eta zeroing) are written against
+    # the physical `y`/`x` and are not routed through the geometry yet; refuse
+    # them on a mapped geometry instead of running the box bodies silently on a
+    # mapped mesh (the driver refuses them before setup too).
+    if !(g isa CartesianBox)
+        (top_wall_level == 0 && hotspot_weight == 0.0 &&
+         hotspot_min_level == 0 && !zero_side_eta) ||
+            throw(ArgumentError("a mapped geometry ($(geometry_name(g))) does " *
+                                "not support the Cartesian-y AMR policies " *
+                                "(top_wall_level, hotspot_weight/" *
+                                "hotspot_min_level, zero_side_eta) in stage 0: " *
+                                "their wall rows and bins are physical-y " *
+                                "criteria.  Pass top_wall_level=0, " *
+                                "hotspot_weight=0.0, hotspot_min_level=0 and " *
+                                "zero_side_eta=false."))
+    end
     if indicator !== :theta
         ux === nothing &&
             throw(ArgumentError("indicator=$(indicator) needs the velocity " *
@@ -115,14 +134,25 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
               semquad_gradient_jump(sq, qt, theta)
 
         protect = Set{NTuple{3,Int}}()
-        # (c') Only the first/last leaf rows are protected: the strip's minimum
+        # (c') Only the first/last wall rows are protected: the strip's minimum
         # level is guaranteed by `refine_wall_to_min!` below, and the absolute
         # theta-range guard of the removed `:classic` policy has no replacement
         # -- the relative Dörfler cut inside `amr_cycle_balanced!` decides which
-        # quartets may be coarsened.
-        for lf in qt.leaves
-            if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
-                push!(protect, lf)
+        # quartets may be coarsened.  On a mapped geometry these are the rows on
+        # the geometry's physical Dirichlet walls (`nu_wall_sides`, the annulus's
+        # circles), not the logical top/bottom rows.  The box branch is the
+        # historical body, so the box path pays no new abstract-typed dispatch.
+        if g isa CartesianBox
+            for lf in qt.leaves
+                if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
+                    push!(protect, lf)
+                end
+            end
+        else
+            for lf in qt.leaves
+                if _amr_wall_leaf(g, qt, lf)
+                    push!(protect, lf)
+                end
             end
         end
         if zero_side_eta
@@ -215,16 +245,31 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         end
         # (a')+(b')+(d'): relative coarsening, budget exchange, hysteresis.
         # The exchange has to be able to trade on every pass, so the coarsen
-        # fraction is not zeroed after pass 1.
-        n, nc0, _nex = amr_cycle_balanced!(qt, eta;
-                    refine_frac=refine_frac, coarsen_frac=coarsen_frac,
-                    max_level=max_level, max_leaves=max_leaves,
-                    symmetry=symmetry, protect=protect,
-                    wall_min_level=wall_min_level, wall_strip=wall_strip,
-                    cooldown=cool, hysteresis_cycles=amr_hysteresis,
-                    coarsen_gate=amr_coarsen_gate)
-        refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
-                            symmetry=symmetry)
+        # fraction is not zeroed after pass 1.  The box branch is the historical
+        # call (no `geom` keyword), so the box path's keyword container keeps its
+        # concrete types and the box path allocates exactly the historical
+        # amount (measured in the cut-6 A/B).
+        if g isa CartesianBox
+            n, nc0, _nex = amr_cycle_balanced!(qt, eta;
+                        refine_frac=refine_frac, coarsen_frac=coarsen_frac,
+                        max_level=max_level, max_leaves=max_leaves,
+                        symmetry=symmetry, protect=protect,
+                        wall_min_level=wall_min_level, wall_strip=wall_strip,
+                        cooldown=cool, hysteresis_cycles=amr_hysteresis,
+                        coarsen_gate=amr_coarsen_gate)
+            refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
+                                symmetry=symmetry)
+        else
+            n, nc0, _nex = amr_cycle_balanced!(qt, eta;
+                        refine_frac=refine_frac, coarsen_frac=coarsen_frac,
+                        max_level=max_level, max_leaves=max_leaves,
+                        symmetry=symmetry, protect=protect,
+                        wall_min_level=wall_min_level, wall_strip=wall_strip,
+                        cooldown=cool, hysteresis_cycles=amr_hysteresis,
+                        coarsen_gate=amr_coarsen_gate, geom=g)
+            refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
+                                symmetry=symmetry, geom=g)
+        end
         # The wall refinement runs after the cycle's budget exchange and can push
         # the tree over max_leaves.  Re-run the budget pass (no refine / no
         # coarsen fractions) so leaves <= max_leaves is a hard invariant.

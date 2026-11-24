@@ -105,9 +105,17 @@ end
 """
     semquad_mass(sq)
 
-Global SEM mass matrix on `sq`, assembled with a `p+2` quadrature rule.
+Global SEM mass matrix on `sq`, assembled with a `p+2` quadrature rule.  Box
+body: the historical `0.25*hx*hy*gl_w*gl_w` volume weight, verbatim.  A mapped
+geometry integrates the same basis products with the mapped `quad_measure`
+(cut 6: the L2 transfer's mass through the metric, GEOM_DESIGN §3 cut 6).
 """
 function semquad_mass(sq::SemQuad)
+    return _semquad_mass(sq.geom, sq)
+end
+
+# Historical box body, verbatim (GEOM_DESIGN E4): do not rewrite it.
+function _semquad_mass(::CartesianBox, sq::SemQuad)
     p = sq.p
     n = p + 1
     nv = n * n
@@ -125,6 +133,37 @@ function semquad_mass(sq::SemQuad)
         ids = sq.elem[lf]
         for qy in 1:fd.nq, qx in 1:fd.nq
             w = 0.25 * hx * hy * fd.gl_w[qx] * fd.gl_w[qy]
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                phi_k = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                for l in 1:n, m in 1:n
+                    q = (l - 1) * n + m
+                    phi_q = fd.phi_v[m, qx] * fd.phi_v[l, qy]
+                    v = w * phi_k * phi_q
+                    v != 0.0 && (push!(I, ids[k]); push!(J, ids[q]); push!(V, v))
+                end
+            end
+        end
+    end
+    return sparse(I, J, V, sq.N, sq.N)
+end
+
+# Mapped body: the same assembly with the cached metric's `quad_measure`
+# (cut 6; the L2 transfer and every mapped consumer read the mapped mass).
+function _semquad_mass(g::AbstractGeometry, sq::SemQuad)
+    p = sq.p
+    n = p + 1
+    nv = n * n
+    fd = make_fedata(p, p + 2)
+    I = Int[]; J = Int[]; V = Float64[]
+    sizehint!(I, fd.nq^2 * nv * nv * length(sq.leaves))
+    sizehint!(J, fd.nq^2 * nv * nv * length(sq.leaves))
+    sizehint!(V, fd.nq^2 * nv * nv * length(sq.leaves))
+    for lf in sq.leaves
+        lm = leaf_metric(g, sq, lf, fd)
+        ids = sq.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(lm, fd, qx, qy)
             for j in 1:n, i in 1:n
                 k = (j - 1) * n + i
                 phi_k = fd.phi_v[i, qx] * fd.phi_v[j, qy]
