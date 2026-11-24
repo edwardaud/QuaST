@@ -57,6 +57,13 @@ weighted mass matrix uses the same rule as the energy mass matrix.
 function assemble_semquad_pressure_mass(sp::SemQuad;
                                         weight::Union{Nothing,Function}=nothing,
                                         nq::Int=0)
+    return _assemble_semquad_pressure_mass(sp.geom, sp; weight=weight, nq=nq)
+end
+
+# Historical box body, verbatim; the geometry argument is not read here.
+function _assemble_semquad_pressure_mass(::CartesianBox, sp::SemQuad;
+                                         weight::Union{Nothing,Function}=nothing,
+                                         nq::Int=0)
     p = sp.p
     n = p + 1
     fd = make_fedata(2, p; nq=nq)   # Gauss points; fd.phi_p is the Q_p basis
@@ -84,6 +91,48 @@ function assemble_semquad_pressure_mass(sp::SemQuad;
     return sparse(I, J, V, sp.N, sp.N)
 end
 
+# Mapped body: `M_ij = int weight(x,y) q_i q_j detJ dS`, with the mapped volume
+# measure `quad_measure = detJ * gl_w * gl_w` and the physical quadrature point
+# for the weight function.  Cut-2 scope note: GEOM_DESIGN §3 cut 2 says the
+# pressure mass/stiffness are "left box-only with a guard" (their only mapped
+# consumer would be the cut-5 MG pressure preconditioner).  The block is
+# implemented here anyway, additively, because the cut-2 gate list requires
+# comparing it against the box kernel through the box map (G268) and it is the
+# cheapest possible scalar proof that the mapped measure is right; no mapped
+# production path reaches it before cut 5 (a mapped solve accepts
+# `linear=:direct` only, and `:schur_cg` is refused).  It is imported capital in
+# cut 5, not a behaviour change now.
+function _assemble_semquad_pressure_mass(g::AbstractGeometry, sp::SemQuad;
+                                         weight::Union{Nothing,Function}=nothing,
+                                         nq::Int=0)
+    p = sp.p
+    n = p + 1
+    fd = make_fedata(2, p; nq=nq)
+    I = Int[]; J = Int[]; V = Float64[]
+    for lf in sp.leaves
+        lm = leaf_metric(g, sp, lf, fd)
+        pids = sp.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(lm, fd, qx, qy)
+            if weight !== nothing
+                x, y = quad_point(lm, sp, lf, fd, qx, qy)
+                w *= weight(x, y)
+            end
+            for b in 1:n, a in 1:n
+                pa = fd.phi_p[a, qx] * fd.phi_p[b, qy]
+                ga = pids[(b - 1) * n + a]
+                for b2 in 1:n, a2 in 1:n
+                    pb = fd.phi_p[a2, qx] * fd.phi_p[b2, qy]
+                    gb = pids[(b2 - 1) * n + a2]
+                    v = w * pa * pb
+                    v != 0.0 && (push!(I, ga); push!(J, gb); push!(V, v))
+                end
+            end
+        end
+    end
+    return sparse(I, J, V, sp.N, sp.N)
+end
+
 """
     assemble_semquad_pressure_stiffness(sp; weight=nothing)
 
@@ -93,6 +142,12 @@ can serve as a Schur-complement preconditioner for strongly variable viscosity,
 where a (weighted) pressure mass matrix is a poorer approximation.
 """
 function assemble_semquad_pressure_stiffness(sp::SemQuad;
+                                              weight::Union{Nothing,Function}=nothing)
+    return _assemble_semquad_pressure_stiffness(sp.geom, sp; weight=weight)
+end
+
+# Historical box body, verbatim; the geometry argument is not read here.
+function _assemble_semquad_pressure_stiffness(::CartesianBox, sp::SemQuad;
                                               weight::Union{Nothing,Function}=nothing)
     p = sp.p
     n = p + 1
@@ -113,6 +168,39 @@ function assemble_semquad_pressure_stiffness(sp::SemQuad;
                 for b2 in 1:n, a2 in 1:n
                     gxb = fd.dphi_p[a2, qx] * fd.phi_p[b2, qy] * (2.0 / hx)
                     gzb = fd.phi_p[a2, qx] * fd.dphi_p[b2, qy] * (2.0 / hy)
+                    gb = pids[(b2 - 1) * n + a2]
+                    v = w * (gxa * gxb + gza * gzb)
+                    v != 0.0 && (push!(I, ga); push!(J, gb); push!(V, v))
+                end
+            end
+        end
+    end
+    return sparse(I, J, V, sp.N, sp.N)
+end
+
+# Mapped body of the pressure stiffness: `int weight grad q_i . grad q_j dV`
+# with the physical mapped gradients (chain rule).  See the cut-2 scope note on
+# the mapped pressure mass above; the box body is untouched.
+function _assemble_semquad_pressure_stiffness(g::AbstractGeometry, sp::SemQuad;
+                                              weight::Union{Nothing,Function}=nothing)
+    p = sp.p
+    n = p + 1
+    fd = make_fedata(2, p)
+    I = Int[]; J = Int[]; V = Float64[]
+    for lf in sp.leaves
+        lm = leaf_metric(g, sp, lf, fd)
+        pids = sp.elem[lf]
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            w = quad_measure(lm, fd, qx, qy)
+            if weight !== nothing
+                x, y = quad_point(lm, sp, lf, fd, qx, qy)
+                w *= weight(x, y)
+            end
+            for b in 1:n, a in 1:n
+                gxa, gza = basis_grad_p(lm, fd, qx, qy, a, b)
+                ga = pids[(b - 1) * n + a]
+                for b2 in 1:n, a2 in 1:n
+                    gxb, gzb = basis_grad_p(lm, fd, qx, qy, a2, b2)
                     gb = pids[(b2 - 1) * n + a2]
                     v = w * (gxa * gxb + gza * gzb)
                     v != 0.0 && (push!(I, ga); push!(J, gb); push!(V, v))

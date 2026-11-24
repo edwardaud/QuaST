@@ -39,6 +39,31 @@ The cycle is therefore accepted, with two rules that keep it from spreading:
 the calls out of this directory are confined to the four files named above, and
 `solve_var_core.jl` remains the only place that decides *which* linear path runs.
 
+## Geometry: the box path is a specialization, the mapped path a second kernel
+
+Stage 0 cut 2 (docs/dev/GEOM_DESIGN.md §3, docs/dev/GEOM_PROGRESS.md) routed the
+**assembled** Stokes operator through the geometry layer (`core/geometry.jl`):
+the leaf kernel of `assembly_var.jl`, the load/traction face integral, the
+divergence `B`/`Pcm` of `operators.jl`, the pressure mass/stiffness of
+`assembly.jl` and the fixed-dof/net-flux/perimeter passes of
+`solve_var_core.jl` now dispatch on the space's `geom`.  The dispatch rule is
+the project's bitwise rule:
+
+* the `CartesianBox` methods are the historical bodies, character for
+  character (`2.0/hx` folded into the gradient, `0.25*hx*hy`, `0.5*h*gl_w`, the
+  Cartesian wall assignment tables).  They must not be routed through
+  `J = diag(hx/2, hy/2)`; the nine-hash dump (`GEOM_DESIGN` §4.3 F1–F7) is the
+  gate;
+* the mapped methods are new bodies that read the precomputed leaf/face metric
+  (`quad_point`, `quad_measure`, `basis_grad`, `face_point`, `face_weight`,
+  `face_normal`, `face_tangent`).  They are proved by G267 (affine exactness,
+  traction and mapping independence) and G268 (the mapped kernel fed the box
+  map reproduces the box operator);
+* the mapped assembly is reachable only through `make_semstokes(qt, p;
+  geom=…)`; in cut 2 a mapped solve accepts `linear=:direct` only, and the
+  driver still refuses mapped cards until the energy assembly/diagnostics cuts
+  land.
+
 ## Diagnostics are published through module state
 
 The `LAST_SEMSTOKES_*`, `LAST_AUTO_FALLBACK` and `SEMSTOKES_*` counters in

@@ -570,6 +570,29 @@ weights), i.e. the historical `0.25*hx*hy*gl_w[qx]*gl_w[qy]` (GEOM_DESIGN E4).
     m.detJ[_leaf_metric_index(m, qx, qy)]
 
 """
+    quad_measure(m, fd, qx, qy) -> Float64
+
+The **fully weighted** quadrature volume measure `|det J| * gl_w[qx] * gl_w[qy]`
+— the single quantity a volume quadrature loop sums.  The box method is the
+historical expression of GEOM_DESIGN E4, `wfac * gl_w[qx] * gl_w[qy]` with
+`wfac = 0.25*hx*hy` (the same operand and association as
+`0.25*hx*hy*gl_w[qx]*gl_w[qy]`).
+
+*Cut-2 interface note.*  `quad_weight` above is **not** interchangeable between
+the two metric types: its box method keeps the historical E4 form, which already
+contains the rule weights, because G266 pins it bit for bit against
+`0.25*hx*hy*gl_w`; its mapped method returns the bare `detJ`, as the cut-1
+docstring states.  A generic kernel that must run on both metrics therefore
+uses this accessor, which includes the rule weights on both sides.  The two
+accessors are pinned separately: `quad_weight` by G266 (per-metric historical
+form), `quad_measure` by the cut-2 gates (assembled operators).
+"""
+@inline quad_measure(m::BoxLeafMetric, fd::FEData, qx::Int, qy::Int) =
+    m.wfac * fd.gl_w[qx] * fd.gl_w[qy]
+@inline quad_measure(m::MappedLeafMetric, fd::FEData, qx::Int, qy::Int) =
+    m.detJ[_leaf_metric_index(m, qx, qy)] * fd.gl_w[qx] * fd.gl_w[qy]
+
+"""
     quad_point(m, lay, lf, fd, qx, qy) -> (x, y)
 
 Physical quadrature point.  The box method is the historical point map
@@ -604,6 +627,31 @@ end
     k = _leaf_metric_index(m, qx, qy)
     dxi = fd.dphi_v[i, qx] * fd.phi_v[j, qy]
     deta = fd.phi_v[i, qx] * fd.dphi_v[j, qy]
+    gx = dxi * m.jinv[1][k] + deta * m.jinv[2][k]
+    gz = dxi * m.jinv[3][k] + deta * m.jinv[4][k]
+    return (gx, gz)
+end
+
+"""
+    basis_grad_p(m, fd, qx, qy, i, j) -> (gx, gz)
+
+Physical gradient of the **pressure** tensor-product basis function `(i,j)`
+(the `fd.phi_p`/`fd.dphi_p` family, degree `fd.q`) at the quadrature point.
+Needed because the pressure mass/stiffness of `stokes/assembly.jl` live on the
+lower-degree pressure space; `basis_grad` is the velocity (degree `fd.p`)
+family.  The box method is `dphi_p*phi_p*ihx` in the historical association; the
+mapped method is the same chain rule as `basis_grad`.
+"""
+@inline function basis_grad_p(m::BoxLeafMetric, fd::FEData, qx::Int, qy::Int,
+                              i::Int, j::Int)
+    return (fd.dphi_p[i, qx] * fd.phi_p[j, qy] * m.ihx,
+            fd.phi_p[i, qx] * fd.dphi_p[j, qy] * m.ihy)
+end
+@inline function basis_grad_p(m::MappedLeafMetric, fd::FEData, qx::Int,
+                              qy::Int, i::Int, j::Int)
+    k = _leaf_metric_index(m, qx, qy)
+    dxi = fd.dphi_p[i, qx] * fd.phi_p[j, qy]
+    deta = fd.phi_p[i, qx] * fd.dphi_p[j, qy]
     gx = dxi * m.jinv[1][k] + deta * m.jinv[2][k]
     gz = dxi * m.jinv[3][k] + deta * m.jinv[4][k]
     return (gx, gz)
@@ -902,11 +950,42 @@ end
 """
     perimeter(g::CartesianBox) -> Float64
 
-Analytic perimeter `2*(Lx + 1)` of the box (GEOM_DESIGN E12).  Mapped
-geometries add their own once a consumer needs it (cut 4); the box path must
+Analytic perimeter `2*(Lx + 1)` of the box (GEOM_DESIGN E12).  The box path must
 return the historical expression.
 """
 @inline perimeter(g::CartesianBox) = 2.0 * (g.Lx + 1.0)
+
+"""
+    perimeter(g::AbstractGeometry, lay, bmask) -> Float64
+
+Physical perimeter of a mapped geometry, integrated from the face Jacobian over
+every domain-boundary face (`bmask` is the serial boundary mask of
+[`_semquad_boundary_face_mask`](@ref); entry `4*(it-1) + side` non-zero means
+that leaf face is on `∂Ω`).  This is the mapped `perimeter` of GEOM_DESIGN
+§2.3/E12: the box path keeps its analytic `2*(Lx+1)` (a mapped method for a box
+would integrate a different Float64), so the two are separate methods.
+
+It is a cold measure — used by the net-flux compatibility threshold in the
+solve, never in an operator kernel — so it may build its own face quadrature;
+an 8-point Gauss rule integrates a smooth face Jacobian accurately and the
+value only scales a round-off-level threshold.
+"""
+function perimeter(g::AbstractGeometry, lay, bmask::Vector{UInt8})
+    fd = make_fedata(2, 1; nq=8)
+    tot = 0.0
+    @inbounds for it in eachindex(lay.leaves)
+        lf = lay.leaves[it]
+        b = 4 * (it - 1)
+        for (s, side) in enumerate(LOGICAL_SIDES)
+            bmask[b + s] != 0x00 || continue
+            fm = face_metric(g, lay, lf, side, fd)
+            for q in 1:fd.nq
+                tot += face_jacobian(fm, q) * fd.gl_w[q]
+            end
+        end
+    end
+    return tot
+end
 
 
 # ---------------------------------------------------------------------------

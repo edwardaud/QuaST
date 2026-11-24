@@ -36,6 +36,14 @@ never queries the quadtree neighbour table either.
 function _semquad_wall_normal_flux(ss::SemStokes,
                                    fixed::Dict{Int,Float64}, fd::FEData,
                                    n::Int, nu::Int, bmask::Vector{UInt8})
+    return _semquad_wall_normal_flux(ss, ss.su.geom, fixed, fd, n, nu, bmask)
+end
+
+# Historical box body, verbatim (no coordinate is read: the data live in
+# `fixed`, and the outward sign is the wall's, see the docstring above).
+function _semquad_wall_normal_flux(ss::SemStokes, ::CartesianBox,
+                                   fixed::Dict{Int,Float64}, fd::FEData,
+                                   n::Int, nu::Int, bmask::Vector{UInt8})
     su = ss.su
     flux = 0.0
     umax = 0.0
@@ -74,6 +82,53 @@ function _semquad_wall_normal_flux(ss::SemStokes,
                     end
                     flux += sgn * (0.5 * hx * fd.gl_w[q]) * val
                 end
+            end
+        end
+    end
+    return flux, umax
+end
+
+# The node index of face node `j` in the leaf's element id table, for the four
+# logical sides (the same ordering the box body enumerates explicitly).
+@inline function _face_node(uids::Vector{Int}, n::Int, side::Symbol, j::Int)
+    side === :xminus && return uids[(j - 1) * n + 1]
+    side === :xplus && return uids[(j - 1) * n + n]
+    side === :yminus && return uids[j]
+    return uids[(n - 1) * n + j]
+end
+
+# Mapped body: the prescribed data are global Cartesian components on the
+# Dirichlet walls, so the outward flux is `int (u . n) dS` with the mapped
+# outward unit normal and the mapped face Jacobian.  The interpolation uses the
+# same 1-D face basis/quadrature as the box body (`fd.phi_v`, `fd.gl_w`).  On the
+# box map this equals the box expression, but it is a separate body: the box
+# path keeps its historical sign table.
+function _semquad_wall_normal_flux(ss::SemStokes, g::AbstractGeometry,
+                                   fixed::Dict{Int,Float64}, fd::FEData,
+                                   n::Int, nu::Int, bmask::Vector{UInt8})
+    su = ss.su
+    flux = 0.0
+    umax = 0.0
+    phi = fd.phi_v
+    for it in eachindex(su.leaves)
+        lf = su.leaves[it]
+        uids = su.elem[lf]
+        b = 4 * (it - 1)
+        for (s, side) in enumerate(LOGICAL_SIDES)
+            bmask[b + s] != 0x00 || continue
+            fm = face_metric(g, su, lf, side, fd)
+            for q in 1:fd.nq
+                vx = 0.0
+                vy = 0.0
+                for j in 1:n
+                    node = _face_node(uids, n, side, j)
+                    vx += get(fixed, node, 0.0) * phi[j, q]
+                    vy += get(fixed, nu + node, 0.0) * phi[j, q]
+                end
+                nx_, ny_ = face_normal(fm, q)
+                un = vx * nx_ + vy * ny_
+                flux += face_weight(fm, fd, q) * un
+                umax = max(umax, abs(un))
             end
         end
     end
@@ -184,6 +239,161 @@ function _semquad_check_rigid_modes(ss::SemStokes,
         "wall_bc = ($(join(String.(resolved_wall_bc), ","))).  Test: " *
         "_semquad_rigid_mode_gram, docs/dev/BC_DESIGN.md §3.5, G262."))
 end
+
+"""
+    _semquad_dirichlet_fixed_mapped!(fixed, g, su, bmask, resolved_wall_bc, wall_u, uDx, uDz)
+
+Mapped Dirichlet dof selection (cut 2, GEOM_DESIGN §3 cut 2: "fixed-dof loop
+physical positions through the map").  The wall bookkeeping is the same as the
+box body — the boundary mask is the precomputed logical face flag, the resolved
+wall condition decides which components are written, the wall order is
+`(xminus, xplus, yminus, yplus)` and normal-before-tangential, so the corner
+overwrite order is preserved — and the only difference is that the evaluation
+points of the closure data are the **mapped** physical positions
+`element_map(g, su, lf, +-1, su.xi[j])`, not the box formulas.
+
+`uDx`/`uDz` are the global Cartesian components of the exact Dirichlet field,
+evaluated at those physical points (a `:rigid` wall fixes both components, so
+this is coordinate-free); `wall_u` overrides the tangential component on a
+`:rigid` wall exactly as on the box.  `:free` walls and `wall_un` are refused
+for a mapped geometry by the caller: "normal component" there is a global
+component, which is only the wall-normal direction for an axis-aligned wall.
+"""
+function _semquad_dirichlet_fixed_mapped!(fixed::Dict{Int,Float64},
+                                          g::AbstractGeometry, su::SemQuad,
+                                          bmask::Vector{UInt8},
+                                          resolved_wall_bc,
+                                          wall_u, uDx::Function, uDz::Function)
+    n = su.p + 1
+    nu = su.N
+    @inbounds for it in eachindex(su.leaves)
+        lf = su.leaves[it]
+        uids = su.elem[lf]
+        fb = 4 * (it - 1)
+        for (wi, dir) in enumerate(LOGICAL_SIDES)
+            bmask[fb + wi] != 0x00 || continue
+            wbc = resolved_wall_bc[wi]
+            wbc === :open && continue
+            rigid_wall = wbc === :rigid
+            if dir === :xminus || dir === :xplus
+                xipm = dir === :xminus ? -1.0 : 1.0
+                iF = dir === :xminus ? 1 : n
+                for j in 1:n
+                    xf, yv = element_map(g, su, lf, xipm, su.xi[j])
+                    gidx = uids[(j - 1) * n + iF]
+                    fixed[gidx] = uDx(xf, yv)
+                    tang = wall_u[wi]
+                    rigid_wall && (fixed[nu + gidx] =
+                                   tang === nothing ? uDz(xf, yv) : tang(xf, yv))
+                end
+            else
+                etpm = dir === :yminus ? -1.0 : 1.0
+                jF = dir === :yminus ? 1 : n
+                for i in 1:n
+                    xv, yf = element_map(g, su, lf, su.xi[i], etpm)
+                    gidx = uids[(jF - 1) * n + i]
+                    fixed[nu + gidx] = uDz(xv, yf)
+                    tang = wall_u[wi]
+                    rigid_wall && (fixed[gidx] =
+                                   tang === nothing ? uDx(xv, yf) : tang(xv, yf))
+                end
+            end
+        end
+    end
+    return fixed
+end
+
+# Historical box body of the Dirichlet dof selection, moved verbatim out of the
+# core solve so the mapped geometry can have its own method.  The statements,
+# the write order and the corner overwrites are unchanged; only `n`/`nu` are
+# recomputed from `su` (the same values the caller had).  This is the *only*
+# structural change the box path receives in cut 2.
+function _semquad_fill_fixed!(fixed::Dict{Int,Float64}, ::CartesianBox,
+                              su::SemQuad, bmask::Vector{UInt8},
+                              resolved_wall_bc, wall_u, wall_un,
+                              uDx::Function, uDz::Function)
+    n = su.p + 1
+    nu = su.N
+    for it in eachindex(su.leaves)
+        lf = su.leaves[it]
+        hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
+        x0 = lf[2] * hx; y0 = lf[3] * hy
+        uids = su.elem[lf]
+        fb = 4 * (it - 1)
+        for dir in (:xminus, :xplus, :yminus, :yplus)
+            # per-wall condition: :same follows the global bc; this is what
+            # keeps the historical single-bc runs bit-identical
+            wi = _wall_index(dir)
+            bmask[fb + wi] != 0x00 || continue
+            wbc = resolved_wall_bc[wi]
+            # BC stage 3: an `:open` wall has **no** Dirichlet component -- both
+            # components are free and the natural traction condition applies,
+            # with `wall_t`/`wall_tn` as data.  It writes nothing, so every
+            # legacy (:free/:rigid) `fixed` dict stays bit-identical.
+            wbc === :open && continue
+            rigid_wall = wbc === :rigid
+            # per-wall normal value: `wall_un[wi] === nothing` reproduces the
+            # historical global closure for that wall bit for bit (G258);
+            # `wall_un[wi]` is the normal *component* in the positive
+            # coordinate direction, exactly like `uDx`/`uDz`, not the outward
+            # flux.  The write order (x walls, then y walls, normal before
+            # tangential) is unchanged, so every corner overwrite of the legacy
+            # paths is preserved (docs/dev/BC_DESIGN.md §1.4/§3.4).
+            un = wall_un[wi]
+            if dir === :xminus || dir === :xplus
+                iF = dir === :xminus ? 1 : n
+                xf = dir === :xplus ? x0 + hx : x0
+                for j in 1:n
+                    yv = y0 + 0.5 * (su.xi[j] + 1.0) * hy
+                    g = uids[(j - 1) * n + iF]
+                    fixed[g] = un === nothing ? uDx(xf, yv) : un(xf, yv)
+                    tang = wall_u[wi]
+                    rigid_wall && (fixed[nu + g] =
+                                   tang === nothing ? uDz(xf, yv) : tang(xf, yv))
+                end
+            else
+                jF = dir === :yminus ? 1 : n
+                yf = dir === :yplus ? y0 + hy : y0
+                for i in 1:n
+                    xv = x0 + 0.5 * (su.xi[i] + 1.0) * hx
+                    g = uids[(jF - 1) * n + i]
+                    fixed[nu + g] = un === nothing ? uDz(xv, yf) : un(xv, yf)
+                    tang = wall_u[wi]
+                    rigid_wall && (fixed[g] =
+                                   tang === nothing ? uDx(xv, yf) : tang(xv, yf))
+                end
+            end
+        end
+    end
+    return fixed
+end
+
+function _semquad_fill_fixed!(fixed::Dict{Int,Float64}, g::AbstractGeometry,
+                              su::SemQuad, bmask::Vector{UInt8},
+                              resolved_wall_bc, wall_u, wall_un,
+                              uDx::Function, uDz::Function)
+    all(t -> t === nothing, wall_un) ||
+        throw(ArgumentError("_semquad_fill_fixed!: wall_un is box-only for a " *
+                            "mapped geometry"))
+    return _semquad_dirichlet_fixed_mapped!(fixed, g, su, bmask,
+                                            resolved_wall_bc, wall_u, uDx, uDz)
+end
+
+"""
+    _semquad_perimeter(su, bmask) -> Float64
+
+Scale of the domain boundary used by the net-flux compatibility threshold.  The
+box is the historical analytic expression `2*(Lx+1)` (GEOM_DESIGN E12) bit for
+bit; a mapped geometry integrates its face Jacobians with [`perimeter`](@ref).
+This is a cold path (only evaluated when some prescribed wall velocity is
+non-zero) and only scales a round-off-level threshold, never an operator.
+"""
+@inline _semquad_perimeter(su::SemQuad, bmask::Vector{UInt8}) =
+    _semquad_perimeter(su.geom, su, bmask)
+@inline _semquad_perimeter(g::CartesianBox, su::SemQuad,
+                           bmask::Vector{UInt8}) = perimeter(g)
+@inline _semquad_perimeter(g::AbstractGeometry, su::SemQuad,
+                           bmask::Vector{UInt8}) = perimeter(g, su, bmask)
 
 function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,
@@ -522,6 +732,63 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                   saddle_dofs=0, contrast=1.0, samples=0, sample_ms=0.0,
                   mg_threads=0))
     end
+    # ------------------------------------------------------------------
+    # Stage 0 cut 2: the mapped-geometry restriction of the solve.
+    #
+    # Cut 2 routes the **assembled** Stokes operator (K, B, the load, the
+    # traction face integral, the Dirichlet dof set, the net-flux check and the
+    # perimeter) through the geometry.  The matrix-free operator
+    # (`stokes/kop.jl`, `stokes/apply.jl`), the MG hierarchy (`src/mg/`) and the
+    # legacy uniform-mesh reference-matrix path are cut 5 / cut 1 and stay
+    # box-only, so a mapped geometry is accepted for `linear=:direct` only.
+    # These guards are placed after the `:auto` resolution so the user sees the
+    # *resolved* path in the message; `:auto` on a mapped space is refused
+    # rather than silently falling back, because the fallback would hide the
+    # unsupported path.
+    # ------------------------------------------------------------------
+    geom = ss.su.geom
+    if !(geom isa CartesianBox)
+        gname = geometry_name(geom)
+        if linear !== :direct
+            throw(ArgumentError("a mapped geometry ($gname) supports " *
+                "linear=:direct only in stage 0 cut 2: the matrix-free " *
+                "operator and the multigrid hierarchy are still the historical " *
+                "box kernels (cut 5), and :schur_cg/:lagged carry box " *
+                "reference-matrix assumptions.  Pass linear=:direct " *
+                "(resolved linear = :$linear)."))
+        end
+        (geo_u === nothing && dp_u === nothing && elastic_stress === nothing) ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                "the strain-rate Jacobian (geo_u), the pressure-derivative " *
+                "block (dp_u) or the elastic force (elastic_stress) in cut 2: " *
+                "their elements still run the box-only leaf kernel.  Use a " *
+                "CartesianBox geometry for those."))
+        for (wi, wbc) in enumerate(resolved_wall_bc)
+            (wbc === :rigid || wbc === :open) ||
+                throw(ArgumentError("a mapped geometry ($gname) supports only " *
+                    ":rigid and :open walls in stage 0 cut 2 (wall $(wi) " *
+                    "resolves to :$wbc).  A :free wall prescribes the normal " *
+                    "*global component*, which is the wall-normal velocity only " *
+                    "on an axis-aligned wall; the general normal-velocity " *
+                    "Dirichlet row is the annulus BC-stage work " *
+                    "(docs/dev/GEOM_DESIGN.md §6.5).  Use bc=:rigid (or " *
+                    "wall_bc = :rigid/:open)."))
+            wall_un[wi] === nothing ||
+                throw(ArgumentError("a mapped geometry ($gname) does not " *
+                    "support wall_un (wall $(wi)): it is the normal velocity " *
+                    "as a *global component in the positive coordinate " *
+                    "direction*, which is a wall-normal component only on an " *
+                    "axis-aligned wall.  On a mapped geometry use bc=:rigid " *
+                    "with the global-component closures uDx/uDz, or the " *
+                    "traction data wall_tn = t.n / wall_t = t.tau."))
+        end
+        mass_rho_mult === nothing ||
+            throw(ArgumentError("a mapped geometry ($gname) does not support " *
+                "the Cartesian density multiplier (mass_rho_mult): its " *
+                "gradient is a finite-difference hook clamped to [0,1]^2, " *
+                "which has no mapped meaning.  Use a height-dependent " *
+                "reference state (mass_rho/mass_drho) instead."))
+    end
     # BFBT weight: the exact restricted diagonal
     # `diag(Cu' M_u(sqrt(eta)) Cu)` is the shipped default on the matrix-free
     # path (docs/dev/MG.md).  It is a zero-per-apply-cost change
@@ -595,8 +862,13 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     asm_cfg = SemQuadAsmCfg(a2, deviatoric, mf_path, geo_u, geo_coef,
                             geo_spd_safety, dp_u, dp_pfield, dp_coef,
                             elastic_stress)
+    # Cut 2: dispatch on the concrete geometry here (the guard block above has
+    # already read it into `geom`).  No forwarding method is in this hot path:
+    # the 9-argument `_semquad_assemble_blocks` shim exists for the G181/G188
+    # call sites, and going through it costs one constant 560 B dispatch frame
+    # per assembly (measured; 0 B per leaf) — avoided on the production path.
     asm = _semquad_assemble_blocks(
-        _semquad_asm_thread_count(assemble_threads), asm_cfg, su, sp,
+        geom, _semquad_asm_thread_count(assemble_threads), asm_cfg, su, sp,
         eta_fun, fx, fz, fd, pleaves)
     IK = asm.IK; JK = asm.JK; VK = asm.VK
     IB = asm.IB; JB = asm.JB; VB = asm.VB
@@ -614,7 +886,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # which is what keeps the default path bit-identical (G260).  The pass runs
     # after the threaded leaf assembly and touches no operator (`K`, `Kred`,
     # `B`, the matrix-free path and the multigrid hierarchy never see it).
-    _semquad_boundary_traction!(fv, su, bmask, fd, wall_t, wall_tn,
+    _semquad_boundary_traction!(fv, geom, su, bmask, fd, wall_t, wall_tn,
                                 resolved_wall_bc)
 
     if mf_path
@@ -656,59 +928,12 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                 "nonsymmetric (Bm != Bc'); use linear=:direct"))
     end
 
-    # affine Dirichlet data on the domain boundary
+    # affine Dirichlet data on the domain boundary.  Cut 2: the box method is
+    # the historical loop moved verbatim into `_semquad_fill_fixed!`; a mapped
+    # geometry evaluates the closures at the mapped wall-node positions.
     fixed = Dict{Int,Float64}()
-    for it in eachindex(su.leaves)
-        lf = su.leaves[it]
-        hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
-        x0 = lf[2] * hx; y0 = lf[3] * hy
-        uids = su.elem[lf]
-        fb = 4 * (it - 1)
-        for dir in (:xminus, :xplus, :yminus, :yplus)
-            # per-wall condition: :same follows the global bc; this is what
-            # keeps the historical single-bc runs bit-identical
-            wi = _wall_index(dir)
-            bmask[fb + wi] != 0x00 || continue
-            wbc = resolved_wall_bc[wi]
-            # BC stage 3: an `:open` wall has **no** Dirichlet component -- both
-            # components are free and the natural traction condition applies,
-            # with `wall_t`/`wall_tn` as data.  It writes nothing, so every
-            # legacy (:free/:rigid) `fixed` dict stays bit-identical.
-            wbc === :open && continue
-            rigid_wall = wbc === :rigid
-            # per-wall normal value: `wall_un[wi] === nothing` reproduces the
-            # historical global closure for that wall bit for bit (G258);
-            # `wall_un[wi]` is the normal *component* in the positive
-            # coordinate direction, exactly like `uDx`/`uDz`, not the outward
-            # flux.  The write order (x walls, then y walls, normal before
-            # tangential) is unchanged, so every corner overwrite of the legacy
-            # paths is preserved (docs/dev/BC_DESIGN.md §1.4/§3.4).
-            un = wall_un[wi]
-            if dir === :xminus || dir === :xplus
-                iF = dir === :xminus ? 1 : n
-                xf = dir === :xplus ? x0 + hx : x0
-                for j in 1:n
-                    yv = y0 + 0.5 * (su.xi[j] + 1.0) * hy
-                    g = uids[(j - 1) * n + iF]
-                    fixed[g] = un === nothing ? uDx(xf, yv) : un(xf, yv)
-                    tang = wall_u[wi]
-                    rigid_wall && (fixed[nu + g] =
-                                   tang === nothing ? uDz(xf, yv) : tang(xf, yv))
-                end
-            else
-                jF = dir === :yminus ? 1 : n
-                yf = dir === :yplus ? y0 + hy : y0
-                for i in 1:n
-                    xv = x0 + 0.5 * (su.xi[i] + 1.0) * hx
-                    g = uids[(jF - 1) * n + i]
-                    fixed[nu + g] = un === nothing ? uDz(xv, yf) : un(xv, yf)
-                    tang = wall_u[wi]
-                    rigid_wall && (fixed[g] =
-                                   tang === nothing ? uDx(xv, yf) : tang(xv, yf))
-                end
-            end
-        end
-    end
+    _semquad_fill_fixed!(fixed, geom, su, bmask, resolved_wall_bc, wall_u,
+                         wall_un, uDx, uDz)
     # BC stage 3: is there an `:open` wall?  It decides two things below: the
     # pressure gauge (pin only when *no* wall is open) and the well-posedness
     # test / net-flux skip.
@@ -733,9 +958,13 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # free of extra arithmetic.  BC stage 3: with an `:open` wall the free
         # normal velocity absorbs any imbalance by construction, so the check is
         # skipped above -- the free normal component is the compatibility.
-        netflux, wumax = _semquad_wall_normal_flux(ss, fixed, fd, n, nu, bmask)
+        netflux, wumax = _semquad_wall_normal_flux(ss, geom, fixed, fd, n, nu,
+                                                   bmask)
         if wumax > 0.0
-            perimeter = 2.0 * (qt.Lx + 1.0)
+            # Cut 2: the box keeps the historical analytic `2*(Lx+1)`
+            # (GEOM_DESIGN E12, bit for bit); a mapped geometry integrates its
+            # mapped boundary.
+            perimeter = _semquad_perimeter(su, bmask)
             # The relative threshold is the design's `1e-12 * u_scale *
             # perimeter`, with one necessary correction: an **absolute floor** of
             # `1e-12` (in the solver's nondimensional velocity unit).  A

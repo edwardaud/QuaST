@@ -314,6 +314,26 @@ walls and the walls are written in the order above, so a later wall owns the
 corner: in particular, a rigid top/bottom wall's tangential value overrides the
 side walls' normal value at its two corners (docs/dev/BC_DESIGN.md §1.4;
 G258 (d)).
+
+**Mapped geometry (stage 0 cut 2).**  When `ss` was built with a non-box
+geometry (`make_semstokes(qt, p; geom=AffineBox(...))`), the assembled Stokes
+operator is routed through the geometry's Jacobian: the leaf kernel takes
+`(x, y, w, gx, gz)` from the leaf metric, the traction load integrates
+`t.n`/`t.tau` with the mapped outward normal and positive tangent, the
+fixed-dof loop evaluates the Dirichlet closures at the mapped wall-node
+positions, and the net-flux check/perimeter use the mapped face measure.  Cut 2
+accepts `linear=:direct` only (`:mg`, `:schur_cg` and `:lagged` still run the
+historical box kernels / box reference-matrix assumptions and are refused with
+an actionable message; `:mg` is cut 5), `:rigid`/`:open` walls only (a `:free`
+wall or `wall_un` prescribe a *global component*, which is the wall-normal
+direction only on an axis-aligned wall; the general normal-velocity row is the
+annulus BC stage), and it refuses `geo_u`/`dp_u`/`elastic_stress` and the
+Cartesian density multiplier (their leaves are box-only until a later cut).
+`wall_t`/`wall_tn` on a mapped geometry are the wall-local components `t.tau`
+and `t.n` of the total traction (GEOM_DESIGN §6.3), not the box's global
+components.  The box path is unchanged and bitwise: the box methods are the
+historical bodies (GEOM_DESIGN §4), and the mapped kernel is a separate body
+(G267 exactness, G268 cross-path consistency).
 """
 function solve_semquad_stokes_var(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,

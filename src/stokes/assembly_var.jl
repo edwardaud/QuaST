@@ -391,11 +391,164 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
     return buf
 end
 
+# ---------------------------------------------------------------------------
+# Cut 2: the **mapped** leaf kernel.
+#
+# This is a separate body, not a reroute of the box one.  The box body above is
+# the historical arithmetic character for character (`2.0/hx` folded into the
+# gradient, `0.25*hx*hy*gl_w`, Cartesian point map) and it is what keeps the
+# nine state-dump hashes; GEOM_DESIGN §4.1/§4.3 forbid routing it through
+# `J = diag(hx/2, hy/2)` (F1) or re-associating the weight tree (F3).  The mapped
+# body below gets the same three quantities from the geometry metric instead:
+#
+#   (x, y)    = quad_point(lm, su, lf, fd, qx, qy)      # element_map at the
+#                                                        # Gauss point (cached)
+#   w         = quad_measure(lm, fd, qx, qy)            # detJ * gl_w * gl_w
+#   (gx, gz)  = basis_grad(lm, fd, qx, qy, i, j)        # J^{-T} chain rule
+#
+# and everything downstream — the viscosity closure, the four stiffness
+# accumulations, the deviatoric correction, the elastic/geometric branches, the
+# B block, the load — is the same expression tree as the box kernel, which is
+# why the two kernels agree to round-off when the mapped metric is fed the box
+# map (G268).  `metrics` is the precomputed per-leaf metric vector (built once
+# per assembly call, `leaf_metric(g, su, lf, fd)`), so the quadrature loop only
+# indexes flat `Vector{Float64}`s (GEOM_DESIGN §2.5: no map evaluation in the
+# loop).
+#
+# Features that are not routed through the metric in cut 2 (the strain-rate
+# Jacobian `Kgeo`, the pressure-derivative block `Kp`, the 2b elastic load, the
+# density-multiplier finite differences) are **refused** for a mapped geometry in
+# `_solve_semquad_stokes_var_core`; they stay box-only until a cut gates them.
+# ---------------------------------------------------------------------------
+function _semquad_assemble_block_mapped!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
+                                         metrics::Vector{MappedLeafMetric},
+                                         su::SemQuad, sp::SemQuad,
+                                         leaves::Vector{NTuple{3,Int}},
+                                         lo::Int, hi::Int,
+                                         eta_fun::Function, fx::Function,
+                                         fz::Function, fd::FEData)
+    hi < lo && return buf
+    n = su.p + 1
+    q = sp.p
+    nv = n * n
+    npq = (q + 1)^2
+    nu = su.N
+    a2 = cfg.a2
+    deviatoric = cfg.deviatoric
+    mf_path = cfg.mf_path
+    IK = buf.IK; JK = buf.JK; VK = buf.VK
+    IB = buf.IB; JB = buf.JB; VB = buf.VB
+    fv = buf.fv
+    scr = buf.scr
+    phi = scr.phi; gx = scr.gx; gz = scr.gz
+    Kloc = scr.Kloc; Bloc = scr.Bloc; floc = scr.floc
+    for it in lo:hi
+        lf = leaves[it]
+        lm = metrics[it]
+        uids = su.elem[lf]
+        pids = sp.elem[lf]
+        fill!(Kloc, 0.0); fill!(Bloc, 0.0); fill!(floc, 0.0)
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            x, y = quad_point(lm, su, lf, fd, qx, qy)
+            w = quad_measure(lm, fd, qx, qy)
+            etaq = 0.0
+            if !mf_path
+                etaq = eta_fun(x, y)
+            end
+            for j in 1:n, i in 1:n
+                k = (j - 1) * n + i
+                phi[k] = fd.phi_v[i, qx] * fd.phi_v[j, qy]
+                gx[k], gz[k] = basis_grad(lm, fd, qx, qy, i, j)
+            end
+            fxv = fx(x, y)
+            fzv = fz(x, y)
+            for k in 1:nv
+                floc[k] += w * fxv * phi[k]
+                floc[nv + k] += w * fzv * phi[k]
+            end
+            if !mf_path
+                if deviatoric
+                    for l in 1:nv
+                        xl = gx[l]; zl = gz[l]
+                        @simd for k in 1:nv
+                            Kloc[k, l] += etaq * (a2 * gx[k] * xl + gz[k] * zl) * w
+                            Kloc[k, nv + l] += etaq * (gz[k] * xl -
+                                                       (2.0 / 3.0) * gx[k] * zl) * w
+                            Kloc[nv + k, l] += etaq * (gx[k] * zl -
+                                                       (2.0 / 3.0) * gz[k] * xl) * w
+                            Kloc[nv + k, nv + l] += etaq * (a2 * gz[k] * zl + gx[k] * xl) * w
+                        end
+                    end
+                else
+                    for l in 1:nv
+                        xl = gx[l]; zl = gz[l]
+                        @simd for k in 1:nv
+                            Kloc[k, l] += etaq * (a2 * gx[k] * xl + gz[k] * zl) * w
+                            Kloc[k, nv + l] += etaq * (gz[k] * xl) * w
+                            Kloc[nv + k, l] += etaq * (gx[k] * zl) * w
+                            Kloc[nv + k, nv + l] += etaq * (a2 * gz[k] * zl + gx[k] * xl) * w
+                        end
+                    end
+                end
+            end
+            for b in 1:(q + 1), a in 1:(q + 1)
+                l = (b - 1) * (q + 1) + a
+                ps = fd.phi_p[a, qx] * fd.phi_p[b, qy]
+                for k in 1:nv
+                    Bloc[l, k] += ps * gx[k] * w
+                    Bloc[l, nv + k] += ps * gz[k] * w
+                end
+            end
+        end
+        for k in 1:nv
+            g = uids[k]
+            fv[g] += floc[k]
+            fv[nu + g] += floc[nv + k]
+            mf_path && continue
+            for l in 1:nv
+                gl = uids[l]
+                push!(IK, g); push!(JK, gl); push!(VK, Kloc[k, l])
+                push!(IK, nu + g); push!(JK, nu + gl); push!(VK, Kloc[nv + k, nv + l])
+                push!(IK, g); push!(JK, nu + gl); push!(VK, Kloc[k, nv + l])
+                push!(IK, nu + g); push!(JK, gl); push!(VK, Kloc[nv + k, l])
+            end
+        end
+        for l in 1:npq
+            pg = pids[l]
+            for k in 1:nv
+                push!(IB, pg); push!(JB, uids[k]); push!(VB, Bloc[l, k])
+                push!(IB, pg); push!(JB, nu + uids[k]); push!(VB, Bloc[l, nv + k])
+            end
+        end
+    end
+    return buf
+end
+
 # Split the leaves into `nt` contiguous blocks, assemble them (in parallel when
 # Julia has more than one thread) and merge the block buffers in block order.
 # `nt == 1` is the historical serial path: one buffer over all leaves, returned
 # as-is (no copy, no re-ordering).
+"""
+    _semquad_assemble_blocks(nt, cfg, su, sp, eta_fun, fx, fz, fd, pleaves)
+
+Assemble the Stokes leaf blocks and merge them.  This entry point dispatches on
+the geometry the space carries (`su.geom`) and forwards a **concrete** geometry
+to the geometry-typed method below (GEOM_DESIGN §2.5: one dispatch at the
+entry, no `sq.geom` read inside a kernel loop).  The box method is the
+historical body, character for character; the mapped method precomputes the
+leaf metrics and runs `_semquad_assemble_block_mapped!`.
+"""
 function _semquad_assemble_blocks(nt::Int, cfg::SemQuadAsmCfg,
+                                  su::SemQuad, sp::SemQuad,
+                                  eta_fun::Function, fx::Function, fz::Function,
+                                  fd::FEData, pleaves::Set{NTuple{3,Int}})
+    return _semquad_assemble_blocks(su.geom, nt, cfg, su, sp, eta_fun, fx, fz,
+                                    fd, pleaves)
+end
+
+# Historical box body, verbatim (`su.geom` is a CartesianBox; the geometry
+# argument is not read by any arithmetic in this method).
+function _semquad_assemble_blocks(::CartesianBox, nt::Int, cfg::SemQuadAsmCfg,
                                   su::SemQuad, sp::SemQuad,
                                   eta_fun::Function, fx::Function, fz::Function,
                                   fd::FEData, pleaves::Set{NTuple{3,Int}})
@@ -453,6 +606,76 @@ function _semquad_assemble_blocks(nt::Int, cfg::SemQuadAsmCfg,
     VP = has_dp ? _semquad_concat_blocks([b.VP for b in bufs]) : Float64[]
     return (IK=IK, JK=JK, VK=VK, IB=IB, JB=JB, VB=VB,
             IG=IG, JG=JG, VG=VG, IP=IP, JP=JP, VP=VP, fv=fv)
+end
+
+# Mapped body of the block assembler: the leaf metric is built once per leaf
+# (serial, cold) and the leaf blocks only read it, so no map evaluation happens
+# in the quadrature loops.  `Kgeo`/`Kp`/`elastic` are box-only in cut 2 and are
+# refused before the assembly (see `_solve_semquad_stokes_var_core`), so the
+# buffers for them are not created here.
+function _semquad_assemble_blocks(g::AbstractGeometry, nt::Int,
+                                  cfg::SemQuadAsmCfg,
+                                  su::SemQuad, sp::SemQuad,
+                                  eta_fun::Function, fx::Function, fz::Function,
+                                  fd::FEData, pleaves::Set{NTuple{3,Int}})
+    (cfg.geo_u === nothing && cfg.dp_u === nothing && cfg.elastic === nothing) ||
+        throw(ArgumentError("the mapped Stokes leaf assembly does not implement " *
+                            "the strain-rate Jacobian (geo_u), the " *
+                            "pressure-derivative block (dp_u) or the elastic " *
+                            "force (elastic_stress) in cut 2; use a " *
+                            "CartesianBox geometry for those, or drop the " *
+                            "keyword."))
+    nleaf = length(su.leaves)
+    n = su.p + 1
+    nv = n * n
+    npq = (sp.p + 1)^2
+    Nu2 = 2 * su.N
+    has_K = !cfg.mf_path
+    metrics = Vector{MappedLeafMetric}(undef, nleaf)
+    @inbounds for it in 1:nleaf
+        metrics[it] = leaf_metric(g, su, su.leaves[it], fd)
+    end
+    if nt <= 1
+        buf = _semquad_asm_buf(nleaf, nv, npq, Nu2; has_K=has_K,
+                               has_geo=false, has_dp=false)
+        _semquad_assemble_block_mapped!(buf, cfg, metrics, su, sp, su.leaves,
+                                        1, nleaf, eta_fun, fx, fz, fd)
+        return (IK=buf.IK, JK=buf.JK, VK=buf.VK,
+                IB=buf.IB, JB=buf.JB, VB=buf.VB,
+                IG=Int[], JG=Int[], VG=Float64[],
+                IP=Int[], JP=Int[], VP=Float64[],
+                fv=buf.fv)
+    end
+    bufs = Vector{SemQuadAsmBuf}(undef, nt)
+    los = Vector{Int}(undef, nt)
+    his = Vector{Int}(undef, nt)
+    base, rem = divrem(nleaf, nt)
+    off = 1
+    for t in 1:nt
+        cnt = base + (t <= rem ? 1 : 0)
+        los[t] = off
+        his[t] = off + cnt - 1
+        off += cnt
+        bufs[t] = _semquad_asm_buf(cnt, nv, npq, Nu2; has_K=has_K,
+                                   has_geo=false, has_dp=false)
+    end
+    Threads.@threads :static for t in 1:nt
+        _semquad_assemble_block_mapped!(bufs[t], cfg, metrics, su, sp, su.leaves,
+                                        los[t], his[t], eta_fun, fx, fz, fd)
+    end
+    fv = zeros(Float64, Nu2)
+    for t in 1:nt
+        fv .+= bufs[t].fv
+    end
+    IK = has_K ? _semquad_concat_blocks([b.IK for b in bufs]) : Int[]
+    JK = has_K ? _semquad_concat_blocks([b.JK for b in bufs]) : Int[]
+    VK = has_K ? _semquad_concat_blocks([b.VK for b in bufs]) : Float64[]
+    IB = _semquad_concat_blocks([b.IB for b in bufs])
+    JB = _semquad_concat_blocks([b.JB for b in bufs])
+    VB = _semquad_concat_blocks([b.VB for b in bufs])
+    return (IK=IK, JK=JK, VK=VK, IB=IB, JB=JB, VB=VB,
+            IG=Int[], JG=Int[], VG=Float64[],
+            IP=Int[], JP=Int[], VP=Float64[], fv=fv)
 end
 
 # ---------------------------------------------------------------------------
@@ -664,8 +887,29 @@ and the four directions in a fixed order, so the result is deterministic and
 does not depend on the leaf assembly's thread count.  It is a bitwise no-op
 when every entry of both tuples is `nothing`; a zero closure adds `+-0.0`,
 which leaves `fv` bitwise unchanged as well (G260).
+
+**Mapped geometry (stage 0 cut 2).**  The method above dispatches on
+`su.geom`; the `CartesianBox` method is exactly the historical body documented
+here, while the mapped method reads the data as the **wall-local** components
+of the total traction `tbar = sigma.n` (GEOM_DESIGN §6.3): `wall_tn` is `t.n`
+with the mapped outward unit normal and `wall_t` is `t.tau` with the positive
+logical tangent, so the load is `int (wall_tn*n + wall_t*tau).phi dS`.  The two
+conventions agree on the box map up to the outward sign that the box convention
+absorbs (`wall_tn_box = +-t.n` on the four walls, `wall_t_box = t.tau`); G268
+wires that sign explicitly and compares the loads.
 """
 function _semquad_boundary_traction!(fv::Vector{Float64}, su::SemQuad,
+                                     bmask::Vector{UInt8}, fd::FEData,
+                                     wall_t::NTuple{4,Union{Nothing,Function}},
+                                     wall_tn::NTuple{4,Union{Nothing,Function}},
+                                     resolved_wall_bc)
+    return _semquad_boundary_traction!(fv, su.geom, su, bmask, fd, wall_t,
+                                       wall_tn, resolved_wall_bc)
+end
+
+# Historical box body, verbatim (global-component convention, no normal sign):
+function _semquad_boundary_traction!(fv::Vector{Float64}, ::CartesianBox,
+                                     su::SemQuad,
                                      bmask::Vector{UInt8}, fd::FEData,
                                      wall_t::NTuple{4,Union{Nothing,Function}},
                                      wall_tn::NTuple{4,Union{Nothing,Function}},
@@ -782,6 +1026,82 @@ function _semquad_boundary_traction!(fv::Vector{Float64}, su::SemQuad,
                     for i in 1:n
                         fv[nu + uids[(n - 1) * n + i]] += wt * phi[i, q]
                     end
+                end
+            end
+        end
+    end
+    return fv
+end
+
+# Mapped body of the traction load.  The two data functions are the wall-local
+# components of the **total** Cauchy traction `tbar = sigma.n` (GEOM_DESIGN
+# §6.3): `wall_tn` is `t.n` (outward unit normal) and `wall_t` is `t.tau`
+# (positive logical tangent), so the load in the two global velocity components
+# is `int (wall_tn*n + wall_t*tau) . phi dS` and there is no hand-written sign
+# table: the outward direction is the mapped unit normal.  The face weight is
+# the mapped face Jacobian times the Gauss weight.
+#
+# The box data convention is the *global component in the positive coordinate
+# direction* (see the box body and BC_DESIGN §3.2 eq. 7), because a box wall is
+# axis aligned and the outward sign is already in `tbar = sigma.n`.  On the box
+# map the two conventions differ only by that sign on `xminus`/`yminus`:
+# `wall_tn_box = +-t.n`, `wall_t_box = t.tau`, which is what G268's traction
+# comparison wires explicitly.
+function _semquad_boundary_traction!(fv::Vector{Float64}, g::AbstractGeometry,
+                                     su::SemQuad, bmask::Vector{UInt8},
+                                     fd::FEData,
+                                     wall_t::NTuple{4,Union{Nothing,Function}},
+                                     wall_tn::NTuple{4,Union{Nothing,Function}},
+                                     resolved_wall_bc)
+    has_t = _semquad_validate_wall_traction(wall_t, resolved_wall_bc)
+    has_tn = _semquad_validate_wall_tnormal(wall_tn, resolved_wall_bc)
+    (has_t || has_tn) || return fv
+    n = su.p + 1
+    nu = su.N
+    phi = fd.phi_v
+    leaves = su.leaves
+    @inbounds for it in eachindex(leaves)
+        b = 4 * (it - 1)
+        (bmask[b + 1] | bmask[b + 2] | bmask[b + 3] | bmask[b + 4]) != 0x00 ||
+            continue
+        lf = leaves[it]
+        uids = su.elem[lf]
+        for (s, side) in enumerate(LOGICAL_SIDES)
+            bmask[b + s] != 0x00 || continue
+            tfun = has_t ? wall_t[s] : nothing
+            nfun = has_tn ? wall_tn[s] : nothing
+            (tfun === nothing && nfun === nothing) && continue
+            fm = face_metric(g, su, lf, side, fd)
+            for q in 1:fd.nq
+                xq, yq = face_point(fm, q)
+                wt = face_weight(fm, fd, q)
+                fnx = 0.0
+                fny = 0.0
+                if tfun !== nothing
+                    tv = tfun(xq, yq)
+                    tx_, ty_ = face_tangent(fm, q)
+                    fnx += tv * tx_
+                    fny += tv * ty_
+                end
+                if nfun !== nothing
+                    nv_ = nfun(xq, yq)
+                    nx_, ny_ = face_normal(fm, q)
+                    fnx += nv_ * nx_
+                    fny += nv_ * ny_
+                end
+                for j in 1:n
+                    node = if side === :xminus
+                        uids[(j - 1) * n + 1]
+                    elseif side === :xplus
+                        uids[(j - 1) * n + n]
+                    elseif side === :yminus
+                        uids[j]
+                    else
+                        uids[(n - 1) * n + j]
+                    end
+                    pj = wt * phi[j, q]
+                    fv[node] += pj * fnx
+                    fv[nu + node] += pj * fny
                 end
             end
         end

@@ -188,5 +188,7 @@ using QuaST
     include("t_g264_channel_flow.jl")
     include("t_g265_regional_channel.jl")
     include("t_g266_geometry_identity.jl")
+    include("t_g267_affine_stokes.jl")
+    include("t_g268_mapped_consistency.jl")
 end
 

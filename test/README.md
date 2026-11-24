@@ -2,13 +2,13 @@
 
 One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
-test script that starts with `using`; most wrap one `@testset`. The 185 files
-hold the suite's 134 086 assertions (134 084 passed, 2 broken, 0 failed) — the
-count of the stage-0 cut-1 tree, recorded with its evidence in
-`docs/dev/GEOM_PROGRESS.md`. The top-level README still quotes the pre-cut-1
-total (133 716); the top-level markdown was outside that cut's write scope.
-`docs/dev/FILES.md` lists the one-line header of every gate, so they are not
-repeated here.
+test script that starts with `using`; most wrap one `@testset`. The 187 files
+hold the suite's 134 263 assertions (134 261 passed, 2 broken, 0 failed) — the
+count of the stage-0 cut-2 tree, recorded with its evidence in
+`docs/dev/GEOM_PROGRESS.md`. (Cut 1 recorded 134 086 / 134 084 / 0 / 2 on 185
+files; cut 2 adds G267 and G268.) The top-level README still quotes the
+pre-cut-1 total (133 716); the top-level markdown was outside the cut write
+scopes.
 
 G266 is the geometry/mapping-layer gate of stage 0 cut 1: it rebuilds the box
 coordinates, node ids, leaf/face metrics, nodal transfer, AMR indicator and the
@@ -17,7 +17,17 @@ process, with the historical implementations carried in the gate (no recorded
 cross-machine SHA literal), and it checks the map identities of the two
 validation geometries `AffineBox`/`CurvedBox` (roundtrip, analytic `det J`,
 outward normals, face/volume measures, patch test) plus the checkpoint
-geometry record/rejection. G265 is the gate of `examples/subduction_2d.jl` (the
+geometry record/rejection. G267 is the cut-2 affine exactness gate: a general
+`AffineBox` (rotation + shear + anisotropic scale + shift) reproduces a
+polynomial Stokes solution, a linear-shear traction solution and the
+mapping-independence statement to round-off, because an affine element contains
+the physical P2/P1 spaces and the Gauss rule is exact. G268 is the cut-2
+cross-path gate: the mapped Stokes kernel fed the box map reproduces the
+untouched box kernel entry by entry (K/Kred/B/Bm'/pressure mass and stiffness,
+anelastic mass, compressibility block, traction load, loads/state pieces,
+perimeter) and the direct-solve result, on a dyadic tree, a non-dyadic tree and
+a hanging tree; both gates state why their assertions are not tautological in
+their headers. G265 is the gate of `examples/subduction_2d.jl` (the
 regional subduction-style case). It pins only the checks the design classifies
 as exact identities or as the mass-flux conservation identity, with their
 stated tolerances. The example's open-box heat budget, plate-cooling profile
