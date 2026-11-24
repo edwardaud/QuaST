@@ -187,5 +187,6 @@ using QuaST
     include("t_g263_open_validation.jl")
     include("t_g264_channel_flow.jl")
     include("t_g265_regional_channel.jl")
+    include("t_g266_geometry_identity.jl")
 end
 

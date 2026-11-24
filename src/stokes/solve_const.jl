@@ -5,6 +5,16 @@ function solve_semquad_stokes(ss::SemStokes, qt::Quadtree,
                               uDx::Function, uDz::Function;
                               linear::Symbol=:direct, schur_maxiter::Int=200,
                               schur_precond::Symbol=:mass)
+    # This entry point is the legacy uniform-mesh path: its element matrices are
+    # the *reference* matrices, which are the physical ones only because the
+    # area Jacobian cancels the derivative factors on an axis-aligned map
+    # (GEOM_DESIGN §1.6 item 2).  A mapped geometry must not silently take that
+    # shortcut: refuse instead (cut 2 routes the variable-viscosity assembly
+    # through the metric).
+    ss.su.geom isa CartesianBox ||
+        throw(ArgumentError("solve_semquad_stokes is the box-only " *
+                            "reference-matrix path; a mapped geometry needs " *
+                            "the metric-based assembly (GEOM_DESIGN cut 2)"))
     linear in (:direct, :schur_cg) ||
         throw(ArgumentError("linear must be :direct or :schur_cg"))
     schur_precond in (:none, :mass) ||
@@ -217,6 +227,12 @@ end
 """Evaluate a quadtree velocity/pressure field at (x,y)."""
 function semstokes_eval(ss::SemStokes, u::Vector{Float64}, pv::Vector{Float64},
                         x::Float64, y::Float64)
+    # Legacy box-only point search (physical coordinate interval test); the
+    # mapped path uses `core/eval.jl`'s geometry-dispatched evaluation.
+    ss.su.geom isa CartesianBox ||
+        throw(ArgumentError("semstokes_eval is the box-only physical-point " *
+                            "search; use the geometry-aware evaluation of " *
+                            "core/eval.jl for a mapped geometry"))
     nu = ss.su.N
     n = ss.p + 1
     rule = gll_rule(ss.p)

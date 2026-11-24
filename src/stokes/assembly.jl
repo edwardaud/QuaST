@@ -1,6 +1,16 @@
 # Reference Stokes element matrices, make_semstokes and the sparse pressure mass/stiffness.
-function make_semstokes(qt::Quadtree, p::Int)
-    return SemStokes(p, p - 1, make_semquad(qt, p), make_semquad(qt, p - 1))
+"""
+    make_semstokes(qt, p; geom=CartesianBox(qt))
+
+Velocity Q_p and pressure Q_{p-1} spaces on the same tree and geometry.  The
+box default keeps every historical call site bitwise unchanged; a mapped
+geometry (validation geometry or, later, the annulus) is passed explicitly and
+stored on both `SemQuad`s (GEOM_DESIGN §2.5).
+"""
+function make_semstokes(qt::Quadtree, p::Int;
+                        geom::AbstractGeometry=CartesianBox(qt))
+    return SemStokes(p, p - 1, make_semquad(qt, p; geom=geom),
+                     make_semquad(qt, p - 1; geom=geom))
 end
 
 """Reference element matrices for Q_p velocity / Q_q pressure (constant eta)."""

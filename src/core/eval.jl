@@ -1,6 +1,18 @@
 # Point evaluation of a quadtree SEM field: leaf search and the reusable Lagrange workspace.
+#
+# The construction of the reference coordinates is dispatched on `sq.geom`
+# (stage 0 cut 1): the `CartesianBox` methods are the historical bodies,
+# character for character, so the box path is bitwise unchanged; a mapped
+# geometry inverts its global map and descends the quadtree in logical
+# coordinates instead of locating the point by physical coordinates.
 """Evaluate a quadtree SEM field at (x,y)."""
 function semquad_eval(sq::SemQuad, u::Vector{Float64}, x::Float64, y::Float64)
+    return _semquad_eval(sq.geom, sq, u, x, y)
+end
+
+# Historical box body, verbatim (GEOM_DESIGN E2/E3/E11): do not rewrite it.
+function _semquad_eval(::CartesianBox, sq::SemQuad, u::Vector{Float64},
+                       x::Float64, y::Float64)
     n = sq.p + 1
     rule = gll_rule(sq.p)
     for lf in sq.leaves
@@ -23,14 +35,40 @@ function semquad_eval(sq::SemQuad, u::Vector{Float64}, x::Float64, y::Float64)
     throw(ArgumentError("point ($x,$y) not in the tree"))
 end
 
+# Mapped body: locate the leaf logically, then the same Lagrange evaluation at
+# the reference coordinates the inverse map gives for that leaf.
+function _semquad_eval(g::AbstractGeometry, sq::SemQuad, u::Vector{Float64},
+                       x::Float64, y::Float64)
+    n = sq.p + 1
+    rule = gll_rule(sq.p)
+    lf = locate_leaf(g, sq, x, y, Set(sq.leaves))
+    xi, eta = element_inverse(g, sq, lf, x, y)
+    Lb, _ = lagrange_eval(rule, xi)
+    Lc, _ = lagrange_eval(rule, eta)
+    ids = sq.elem[lf]
+    v = 0.0
+    for j in 1:n, i in 1:n
+        v += u[ids[(j - 1) * n + i]] * Lb[i] * Lc[j]
+    end
+    return v
+end
+
 """
     _semquad_leaf_at(sq, x, y, leaves)
 
 Locate the leaf containing `(x,y)` by descending the quadtree from the root.
 `leaves` is the set of `sq.leaves`, passed in to avoid rebuilding it per point.
+The box method is the historical physical floor search; a mapped geometry
+inverts the global map and descends in logical coordinates, so no physical
+coordinate is compared with a tolerance.
 """
 function _semquad_leaf_at(sq::SemQuad, x::Float64, y::Float64,
                           leaves::Set{NTuple{3,Int}})
+    return _semquad_leaf_at(sq.geom, sq, x, y, leaves)
+end
+
+function _semquad_leaf_at(::CartesianBox, sq::SemQuad, x::Float64,
+                          y::Float64, leaves::Set{NTuple{3,Int}})
     # Start from the *actual* level-0 base cell, not (0,0): a multi-root tree
     # (cells_x/cells_y > 1) has several base leaves, and checking only (0,0,0)
     # would return the first base cell for every point.  Refined trees hid this
@@ -48,6 +86,11 @@ function _semquad_leaf_at(sq::SemQuad, x::Float64, y::Float64,
         ix = clamp(floor(Int, x / leaf_hx(sq, l)), 0, sq.nx0 * (1 << l) - 1)
         iy = clamp(floor(Int, y / leaf_hy(sq, l)), 0, sq.ny0 * (1 << l) - 1)
     end
+end
+
+function _semquad_leaf_at(g::AbstractGeometry, sq::SemQuad, x::Float64,
+                          y::Float64, leaves::Set{NTuple{3,Int}})
+    return locate_leaf(g, sq, x, y, leaves)
 end
 
 """
@@ -74,16 +117,41 @@ Evaluate the field `u` at `(x,y)` knowing that the point lies in leaf `lf`
 (the energy assembly's quadrature points and the transfer's per-leaf loop do).
 Identical arithmetic to [`_semquad_eval_at`](@ref); only the point search is
 skipped.  The caller is responsible for the leaf being the one the search
-would return (true for every interior point).
+would return (true for every interior point).  The box method is the historical
+body; a mapped geometry obtains `(xi,eta)` from the inverse map of the leaf.
 """
 function _semquad_eval_at_leaf!(w::SemQuadEvalWork, sq::SemQuad,
                                 u::Vector{Float64}, x::Float64, y::Float64,
+                                lf::NTuple{3,Int})
+    return _semquad_eval_at_leaf!(w, sq.geom, sq, u, x, y, lf)
+end
+
+function _semquad_eval_at_leaf!(w::SemQuadEvalWork, ::CartesianBox,
+                                sq::SemQuad, u::Vector{Float64},
+                                x::Float64, y::Float64,
                                 lf::NTuple{3,Int})
     n = sq.p + 1
     hx = leaf_hx(sq, lf[1]); hy = leaf_hy(sq, lf[1])
     x0 = lf[2] * hx; y0 = lf[3] * hy
     xi = 2.0 * (x - x0) / hx - 1.0
     eta = 2.0 * (y - y0) / hy - 1.0
+    rule = gll_rule_cached(sq.p)
+    lagrange_values!(w.Lb, rule, xi)
+    lagrange_values!(w.Lc, rule, eta)
+    ids = sq.elem[lf]
+    v = 0.0
+    for j in 1:n, i in 1:n
+        v += u[ids[(j - 1) * n + i]] * w.Lb[i] * w.Lc[j]
+    end
+    return v
+end
+
+function _semquad_eval_at_leaf!(w::SemQuadEvalWork, g::AbstractGeometry,
+                                sq::SemQuad, u::Vector{Float64},
+                                x::Float64, y::Float64,
+                                lf::NTuple{3,Int})
+    n = sq.p + 1
+    xi, eta = element_inverse(g, sq, lf, x, y)
     rule = gll_rule_cached(sq.p)
     lagrange_values!(w.Lb, rule, xi)
     lagrange_values!(w.Lc, rule, eta)
@@ -114,9 +182,17 @@ end
     _semquad_grad_at(sq, u, x, y, leaves)
 
 Gradient `(du/dx, du/dy)` of a quadtree SEM field at `(x,y)`, using the element
-own GLL derivative matrices and the physical scaling `2/h`.
+own GLL derivative matrices and the physical scaling `2/h`.  The box method is
+the historical body; a mapped geometry multiplies the reference derivatives by
+the inverse Jacobian at the point (chain rule).
 """
 function _semquad_grad_at(sq::SemQuad, u::Vector{Float64},
+                          x::Float64, y::Float64,
+                          leaves::Set{NTuple{3,Int}})
+    return _semquad_grad_at(sq.geom, sq, u, x, y, leaves)
+end
+
+function _semquad_grad_at(::CartesianBox, sq::SemQuad, u::Vector{Float64},
                           x::Float64, y::Float64,
                           leaves::Set{NTuple{3,Int}})
     lf = _semquad_leaf_at(sq, x, y, leaves)
@@ -138,3 +214,22 @@ function _semquad_grad_at(sq::SemQuad, u::Vector{Float64},
     return dx * 2.0 / hx, dy * 2.0 / hy
 end
 
+function _semquad_grad_at(g::AbstractGeometry, sq::SemQuad, u::Vector{Float64},
+                          x::Float64, y::Float64,
+                          leaves::Set{NTuple{3,Int}})
+    lf = _semquad_leaf_at(sq, x, y, leaves)
+    n = sq.p + 1
+    xi, eta = element_inverse(g, sq, lf, x, y)
+    rule = gll_rule_cached(sq.p)
+    Lb, dLb = lagrange_eval(rule, xi)
+    Lc, dLc = lagrange_eval(rule, eta)
+    ids = sq.elem[lf]
+    dxi = 0.0; deta = 0.0
+    for j in 1:n, i in 1:n
+        v = u[ids[(j - 1) * n + i]]
+        dxi += v * dLb[i] * Lc[j]
+        deta += v * Lb[i] * dLc[j]
+    end
+    inv = jacobian_inverse(g, sq, lf, xi, eta)
+    return (inv[1] * dxi + inv[2] * deta, inv[3] * dxi + inv[4] * deta)
+end

@@ -338,6 +338,14 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 checkpoint_path::String="",
                                 checkpoint_every::Int=0,
                                 checkpoint_meta::AbstractDict=Dict{String,Any}(),
+                                # Stage 0 cut 1: the geometry/mapping layer.
+                                # The box default keeps every historical card
+                                # bitwise unchanged; a mapped geometry (a
+                                # validation geometry now, the annulus later)
+                                # is stored on the spaces and recorded in the
+                                # checkpoint config (`geometry=...`), and a
+                                # restart under another geometry is refused.
+                                geom::AbstractGeometry=CartesianBox(qt),
                                 verbose::Bool=false)
     pr.eta_law in (:expT, :expTz, :arrhenius, :tosi, :composite) ||
         throw(ArgumentError("run_semquad_simulation requires eta_law=:expT, " *
@@ -485,6 +493,17 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                                 "iteration.  Pass linear=:direct."))
     end
     max_leaves >= 1 || throw(ArgumentError("max_leaves must be >= 1"))
+    # Stage 0 cut 1 ships the geometry layer, not the mapped operators: the
+    # Stokes and energy assemblers still run their historical box bodies (cuts
+    # 2-3 route them through the metric).  A mapped run would therefore solve a
+    # silently wrong operator, so refuse it explicitly instead of producing
+    # plausible wrong numbers.  Cut 2 removes this guard.
+    geom isa CartesianBox ||
+        throw(ArgumentError("a mapped geometry ($(geometry_name(geom))) is " *
+                            "not runnable yet: stage 0 cut 1 provides the " *
+                            "geometry/mapping layer only, cuts 2-4 route the " *
+                            "Stokes/energy assembly and the diagnostics " *
+                            "through it; use geom=CartesianBox(qt)"))
     initial_refine >= 0 || throw(ArgumentError("initial_refine must be >= 0"))
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
     wall_min_level >= 0 || throw(ArgumentError("wall_min_level must be >= 0"))
@@ -543,7 +562,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
                              mass_form=mass_form,
                              stokes_scaling=stokes_scaling,
                              latent_scheme=latent_scheme, phases=phases,
-                             weak_chi0=weak_chi0)
+                             weak_chi0=weak_chi0, geom=geom)
     # The restart guard: load the checkpoint, refuse another physics revision,
     # warn for a key-less file, compare the configuration and check theta; it
     # returns the resumed state (the arguments unchanged when there is none).
@@ -552,7 +571,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
     qt = guard.qt
     p = guard.p
     theta0 = guard.theta0
-    ss = make_semstokes(qt, p)
+    ss = make_semstokes(qt, p; geom=geom)
     sq = ss.su
     length(theta0) == sq.N ||
         throw(ArgumentError("theta0 has $(length(theta0)) entries, mesh needs $(sq.N)"))
@@ -649,7 +668,7 @@ function run_semquad_simulation(qt::Quadtree, pr::Params, theta0::Vector{Float64
             @printf("    AMR budget: merged %d quartets -> %d leaves\n", merged,
                     length(qt.leaves))
         budget_ok || @warn "leaf budget not reachable: $(length(qt.leaves)) leaves > max_leaves=$max_leaves (all remaining quartets are protected or unbalanced)"
-        ss2 = make_semstokes(qt, p)
+        ss2 = make_semstokes(qt, p; geom=geom)
         if theta_ic === nothing
             theta = transfer_semquad(sq, theta, ss2.su; mode=transfer_mode,
                                      zero_walls=true, qt_new=qt)

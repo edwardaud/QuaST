@@ -55,7 +55,8 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
         end
         if lv === nothing
             fine = idx == nlev && fine_Cu !== nothing
-            s = fine && fine_ss !== nothing ? fine_ss : make_semstokes(q, p)
+            s = fine && fine_ss !== nothing ? fine_ss :
+                make_semstokes(q, p; geom=ss.su.geom)
             Cu = if fine
                 size(fine_Cu, 1) == 2 * s.su.N ||
                     throw(ArgumentError("fine_Cu has $(size(fine_Cu, 1)) rows, " *

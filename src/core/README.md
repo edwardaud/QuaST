@@ -2,17 +2,19 @@
 
 The numerical substrate every other layer stands on: GLL nodes and
 Gauss–Legendre quadrature, the reference element, the 2:1-balanced quadtree,
-the continuous Q_p space with exact hanging-node constraints, point evaluation,
-solution transfer between meshes, and the threading helpers for leaf-blocked
-assembly. `poisson.jl` is a verification-only SIPG/Nitsche operator, not part of
-the mantle solve. There is no viscosity, buoyancy, Stokes or AMR policy here;
+the geometry/mapping layer the discretisation lives on, the continuous Q_p
+space with exact hanging-node constraints, point evaluation, solution transfer
+between meshes, and the threading helpers for leaf-blocked assembly.
+`poisson.jl` is a verification-only SIPG/Nitsche operator, not part of the
+mantle solve. There is no viscosity, buoyancy, Stokes or AMR policy here;
 those live in `physics/`, `stokes/` and `amr/`.
 
 | File | What it is |
 |---|---|
-| `constraints.jl` | Hanging-node constraints: a fine face node is the coarse face's GLL interpolation. |
+| `constraints.jl` | Hanging-node constraints: a fine face node is the coarse face's GLL interpolation (historical box body plus a logical mapped method). |
 | `eval.jl` | Point evaluation of a quadtree SEM field: leaf search and a reusable Lagrange workspace. |
 | `fe.jl` | Reference-element data: GLL nodes for the basis, Gauss–Legendre points for quadrature. |
+| `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), point map and inverse, Jacobian/metric and face normals, logical boundary registry, depth/gravity, checkpoint identity. |
 | `gll.jl` | GLL nodes and weights, the barycentric Lagrange basis, Gauss–Legendre quadrature. |
 | `parallel.jl` | Threading helpers shared by the leaf-blocked assembly loops. |
 | `poisson.jl` | SIPG/Nitsche Poisson operator: a verification-only assembler and its constrained solve. |
@@ -28,3 +30,10 @@ build asks the balancer whether a leaf set is legal, and the balancer splits
 leaves.  The call graph between the three is therefore cyclic *by construction*;
 they are split for readability, and a change to any of them is a change to the
 tree itself.
+
+`geometry.jl` is the layer the discretisation is expressed on: the
+`CartesianBox` methods are the historical box arithmetic (they must stay
+bitwise identical, `docs/dev/GEOM_DESIGN.md` §4), the two validation geometries
+exercise the general mapped path, and the logical topology helpers
+(`global_logical`, `leaf_ref`, `locate_leaf_logical`, `face_pairs_logical`) keep
+node identity and face pairing independent of the metric.

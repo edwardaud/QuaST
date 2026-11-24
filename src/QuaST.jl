@@ -44,6 +44,11 @@ include("core/fe.jl")
 include("core/quadtree.jl")
 include("core/quadtree_table.jl")
 include("core/quadtree_balance.jl")
+# The geometry/mapping layer (stage 0): the global map, the leaf/face metrics,
+# the logical boundary registry and the checkpoint identity.  Included after
+# the tree (it names `Quadtree` in `CartesianBox(qt)`) and before the SEM space
+# (whose constructors call it).  No card selects a mapped geometry in cut 1.
+include("core/geometry.jl")
 include("core/semquad.jl")
 include("core/parallel.jl")
 include("core/constraints.jl")
@@ -159,8 +164,16 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        semquad_latent_coeff, semquad_latent_active, semquad_latent_coefficients,
        spd_factor, Quadtree, refine!, coarsen!, neighbors, balance!, rebalance_local!,
        LocalBalance, LOCAL_BALANCE, refine_where!, max_face_level_jump, leaf_box,
-       total_area, face_pairs, wall_graded_tree, mirror_defect, mirror_close!,
+       total_area, face_pairs, face_pairs_logical, wall_graded_tree, mirror_defect, mirror_close!,
        LAST_MIRROR_CLOSE, semquad_enforce_leaf_budget!, LAST_BUDGET_PASS, SemQuad,
+       AbstractGeometry, CartesianBox, AffineBox, CurvedBox, LogicalBoundary,
+       boundaries, geometry_name, geometry_identity, logical_map,
+       element_map, element_inverse, element_jacobian, jacobian_inverse,
+       global_logical, leaf_ref, locate_leaf, locate_leaf_logical, leaf_metric,
+       quad_weight, quad_point, basis_grad, face_metric, face_point, face_weight,
+       face_jacobian, face_normal, face_tangent, height, depth, grad_height,
+       height_laplacian, gravity, gravity_magnitude, measure_weight, perimeter,
+       BoxLeafMetric, MappedLeafMetric, BoxFaceMetric, MappedFaceMetric,
        make_semquad, semquad_constraints, assemble_semquad_poisson, transfer_semquad,
        semquad_mass, semquad_gradient_jump, semquad_velocity_jump,
        semquad_combined_jump,

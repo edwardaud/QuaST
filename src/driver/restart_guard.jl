@@ -73,7 +73,8 @@ function _run_config(pr::Params;
                      stokes_scaling::Symbol,
                      latent_scheme::Symbol,
                      phases::Vector{PhaseTransition},
-                     weak_chi0::Float64)
+                     weak_chi0::Float64,
+                     geom::AbstractGeometry)
     run_config = Dict{String,Any}(
         "amr_every" => amr_every,
         "refine_frac" => refine_frac, "coarsen_frac" => coarsen_frac,
@@ -246,6 +247,16 @@ function _run_config(pr::Params;
             run_config["ref_K0prime"] = rs.prof.K0prime
         end
     end
+    # The geometry/mapping layer is part of the trajectory: the same tree on
+    # another geometry is another physical problem (the box path is the
+    # identity map; a mapped geometry moves every leaf and every wall measure).
+    # The record is the canonical `geometry_identity` string, so it carries the
+    # kind *and* every shape parameter; a restart under a different geometry is
+    # refused by the same key-by-key comparison below.  Old checkpoints have no
+    # key and were necessarily written by the box (stage 0 has no other
+    # production geometry); the guard reads them as the box and refuses a
+    # mapped run's attempt to continue one.
+    run_config["geometry"] = geometry_identity(geom)
     return run_config
 end
 
@@ -358,14 +369,32 @@ function _restart_guard(qt::Quadtree, p::Int, theta0::Vector{Float64},
             # the equilibration changes the answer of a failing solve, so a
             # resume must not switch it on silently.
             if !haskey(restart.config, "stokes_scaling")
-                cur = config_value_string(run_config["stokes_scaling"])
+                cur = config_value_string(get(run_config, "stokes_scaling",
+                                              "none"))
                 cur == "none" ||
                     push!(mism, "stokes_scaling: checkpoint=none (key absent), " *
                                 "current=$cur")
             end
+            # The geometry key postdates the old checkpoints, which were all
+            # written by the box (stage 0's only production geometry).  Absent
+            # therefore means `CartesianBox`; a mapped geometry must not resume
+            # a box state silently, so it is a mismatch rather than a skip.
             isempty(mism) ||
                 throw(ArgumentError("restart configuration mismatch in " *
                                     "$(restart_from):\n  " * join(mism, "\n  ")))
+        end
+        # The geometry record is new with stage 0 cut 1 and the check above only
+        # sees files that carry *some* config.  A file without the key (including
+        # one whose whole config string is empty, which the old writer could
+        # produce from a raw `save_semquad_state` call) was written by the box,
+        # so an absent record may be resumed as the box but never as a mapped
+        # geometry.
+        if !haskey(restart.config, "geometry")
+            cur = config_value_string(get(run_config, "geometry", "CartesianBox"))
+            startswith(cur, "CartesianBox(") ||
+                throw(ArgumentError("restart configuration mismatch in " *
+                    "$(restart_from):\n  geometry: checkpoint=CartesianBox " *
+                    "(key absent), current=$cur"))
         end
         qt = restart.qt
         p = restart.p

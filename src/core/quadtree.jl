@@ -483,4 +483,87 @@ function face_pairs(qt::Quadtree)
     return out
 end
 
+"""
+    face_pairs_logical(qt)
+
+Interior sub-faces of the balanced tree rebuilt **from the neighbour table**
+with index arithmetic only (GEOM_DESIGN §1.5(b)/§4.4): this is the topology the
+mapped path uses.  It returns the same [`FacePair`](@ref) list as
+[`face_pairs`](@ref) — same pairs, same order, same `dir` — but it never tests a
+physical interval: the direction comes from the leaf indices (`b[2] > a[2]` is
+`:xplus`, etc.) and the containment is guaranteed by the flat neighbour table.
+Because the pair order follows `sort(collect(qt.leaves))` and the table's
+increasing-coordinate neighbour order, it equals the historical list exactly on
+a box with equal logical and physical units.
+
+`offset` and `len` are **logical** face coordinates here (the fine leaf's start
+and extent in `S`/`T`, in `[0,1]`); the historical `face_pairs` stores physical
+ones.  The two agree on a square-leaf single-root unit box; a mapped geometry
+passes the physical face point/measure to its kernels instead of using these
+(the annulus stage).  The current consumers (indicator, constraints, assembly)
+read only `leafL`, `leafR` and `dir`, so no caller depends on the units.
+"""
+@inline function _flip_dir(dir::Symbol)
+    dir === :xplus && return :xminus
+    dir === :xminus && return :xplus
+    dir === :yplus && return :yminus
+    return :yplus
+end
+
+function face_pairs_logical(qt::Quadtree)
+    out = FacePair[]
+    seen = Set{NTuple{7,Int}}()
+    for leaf in sort(collect(qt.leaves)), d in 1:4
+        id = _table_leaf_id!(qt, leaf)
+        id == Int32(0) && continue
+        tab = _table_ready!(qt, id)
+        o, n = _face_slot(tab, id, d)
+        dir = FACE_DIRS[d]
+        @inbounds for k in 0:(n - 1)
+            nb = tab.keys[tab.pool[o + k]]
+            a, b = leaf, nb
+            if a[1] > b[1]
+                a, b = b, a
+            elseif a[1] == b[1] && !(a < b)
+                continue
+            end
+            ddir = a === leaf ? dir : _flip_dir(dir)
+            # The direction must agree with the leaf *intervals*: compare the
+            # coarse interval (scaled to the fine leaf's index units) with the
+            # fine one.  Same level is the sh == 0 case.  No floating point.
+            la = a[1]
+            lb = b[1]
+            sh = lb - la
+            sh >= 0 || continue
+            if ddir === :xplus
+                (b[2] == (a[2] + 1) << sh) || continue
+                b[3] >= (a[3] << sh) && b[3] + 1 <= ((a[3] + 1) << sh) || continue
+            elseif ddir === :xminus
+                ((b[2] + 1) == (a[2] << sh)) || continue
+                b[3] >= (a[3] << sh) && b[3] + 1 <= ((a[3] + 1) << sh) || continue
+            elseif ddir === :yplus
+                (b[3] == (a[3] + 1) << sh) || continue
+                b[2] >= (a[2] << sh) && b[2] + 1 <= ((a[2] + 1) << sh) || continue
+            else
+                ((b[3] + 1) == (a[3] << sh)) || continue
+                b[2] >= (a[2] << sh) && b[2] + 1 <= ((a[2] + 1) << sh) || continue
+            end
+            if ddir === :xplus || ddir === :xminus
+                len = 1.0 / (qt.ny0 * (1 << lb))
+                off = b[3] * len
+            else
+                len = 1.0 / (qt.nx0 * (1 << lb))
+                off = b[2] * len
+            end
+            key = (a[1], a[2], a[3], b[1], b[2], b[3],
+                   ddir === :xplus ? 1 : ddir === :xminus ? 2 :
+                   ddir === :yplus ? 3 : 4)
+            key in seen && continue
+            push!(seen, key)
+            push!(out, (leafL=a, leafR=b, dir=ddir, offset=off, len=len))
+        end
+    end
+    return out
+end
+
 

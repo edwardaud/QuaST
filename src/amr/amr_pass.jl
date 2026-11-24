@@ -253,7 +253,7 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         budget_ok || @warn "leaf budget not reachable: $(length(qt.leaves)) leaves > max_leaves=$max_leaves (all remaining quartets are protected or unbalanced)"
         nr += n
         nc += nc0
-        ss2 = make_semstokes(qt, ss.p)
+        ss2 = make_semstokes(qt, ss.p; geom=ss.su.geom)
         theta = transfer_semquad(sq, theta, ss2.su; mode=transfer_mode,
                                  zero_walls=true, qt_new=qt)
         theta_prev = transfer_semquad(sq, theta_prev, ss2.su;
