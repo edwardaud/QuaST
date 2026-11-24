@@ -344,6 +344,8 @@ $Q\_2$ velocity and $Q\_1$ pressure contain this solution exactly, and the face 
 
 If the outflow tangential traction is omitted (`wall_t = nothing`), the open wall is a free-slip outlet. The Poiseuille profile is then **not** the solution, because its outflow shear $G(H/2-y)$ violates the zero-tangential-traction condition; the free-slip solution keeps the same inflow data and mass flux, and differs from Poiseuille by exactly the response to the withheld shear traction. That difference is bounded and localised: on the plane channel it is 18% of the centreline velocity, and its strain energy is 2.4% of the derived scale $L\,\lVert\eta u'\rVert^2/(2\eta^2)$. G264 (d) checks the exact linearity in the withheld-traction scale and the response identities, and the script's page in [examples](examples.md) lists the run.
 
+The production use of the recipe is `examples/subduction_2d.jl`, a regional subduction-style case with five modes (`validate`, `rheology`, `phases`, `full`, `converge`); its command, its checks and its honest limitations are on the [examples](examples.md) page.
+
 ## 2. The discretization
 
 ### 2.1 Mesh and spaces

@@ -2,7 +2,7 @@
 
 # 算例
 
-五个可以直接跑的例子。每个都给出命令、物理设置、八线程实测墙钟，以及一个用来核对的数。命令都在仓库根目录执行，第一条只需跑一次：
+六个可以直接跑的例子。每个都给出命令、物理设置、八线程实测墙钟，以及一个用来核对的数。命令都在仓库根目录执行，第一条只需跑一次：
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
@@ -16,6 +16,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 | blob | `run_blob_kelly_1024.jl` | 141 s | `Tmax25` 与两个摘要 |
 | 真实算例 smoke | `case_realistic_2d.jl smoke` | 首次约 2 分钟 | `Nu_top = 5.999881` |
 | 区域通道 | `channel_flow_2d.jl` | 首次约 70 s，仿真不到 1 s | 剖面误差低于 `1e-10` |
+| 区域俯冲型算例 | `subduction_2d.jl rheology` | 首次约 8 分钟 | `Nu_top = 31.383`、`delta(0.8) = 0.0522` |
 | 程序化运行 | `build_and_run.jl` | 首次约 84 s | `Nu_top = Nu_bot = 1.000783` |
 
 ## Blankenbach 2b
@@ -167,6 +168,45 @@ $$
 `err_u` 是最大剖面误差除以中心速度 `G H^2/(8 eta) = 0.25` ， `err_uz` 用同一尺度， `err_p` 是绝对误差。Q2 速度与 Q1 压力精确包含这个解，所以这几个 `1e-14` 是线性求解的误差而不是离散误差。驱动编译好之后，运行本身只要 0.04 s；全新进程约 70 s 花在首次编译上，`julia -O0 --project=. examples/channel_flow_2d.jl` 把启动时间压到约 55 s，在这个精度下答案不变。
 
 通道的门禁 G264 还会跑同一个解在常数体力驱动下的形式（此时 `p` 为常数、 `wall_tn = -p0`），以及自由滑移出流变体（ `wall_t = nothing` ）：后者是另一个有界的流动，因为精确的 Poiseuille 出流本身带有非零剪切，自由滑移解与 Poiseuille 的差恰好是被扣掉那份牵引的响应（这里为中心速度的 18%）。门禁在进程内直接调用本脚本，所以这一页不是只写在文档里的。
+
+## 区域俯冲型算例
+
+`examples/subduction_2d.jl` 是[用户指南](guide.md) 1.10 节区域通道配方的生产用法。2 × 1 盒子（2 000 × 1 000 km）里，热软流圈从远场壁 `x = 0` 流入，在仰冲板块下方穿过，从海沟侧的开出流壁 `x = 2` 流出；冷表面随物质向海沟运动长出板块冷却边界层。这是运动学热模型：`Ra = 0`，热浮力与相变浮力都关闭，两个相变只通过潜热起作用。
+
+五个模式就是 `docs/dev/REGIONAL_DESIGN.md` 的分阶段计划：
+
+```bash
+julia --project=. --threads=8 examples/subduction_2d.jl validate
+julia --project=. --threads=8 examples/subduction_2d.jl rheology
+julia --project=. --threads=8 examples/subduction_2d.jl phases
+julia --project=. --threads=8 examples/subduction_2d.jl full
+julia --project=. --threads=8 examples/subduction_2d.jl converge
+```
+
+`validate` 是解析阶段：黏度恒定，精确解是运动板块与无滑移底面之间的 Couette-Poiseuille 流动，
+
+$$
+u_x = u_{\text{ref}}(y) = U_p\,y + G\,y(1-y)/2, \qquad u_y = 0,
+\qquad p = p_{\text{out}} + G\,(L_x-x),
+$$
+
+其中 `U_p = 1.6e3`、`G = 1e3`、`p_out = 1e3`、`L_x = 2`、黏度 1。上游壁给定法向速度 `u_ref(y)`，板块壁给定 `U_p`，开出流壁给定远场总牵引 `wall_tn = -p_out` 与 `wall_t = tau_ref(y) = U_p + G(1/2-y)`。Q2 速度与 Q1 压力精确包含该解，所以打印的误差是直接线性求解而不是离散误差。该模式以
+
+```text
+[regional] check  1 u-field        max|ux-uref|/Up    measured=1.4211e-14 ... PASS
+[regional] check  2 p-field        max|p-pref|/pscale measured=1.2738e-12 ... PASS
+[regional] check  3 flux-net       |sum Q|/Qref       measured=9.0091e-16 ... PASS
+[regional] validate: 13 checks (13 gated): 13 PASS, 0 FAIL, 0 DIAG, 0 SKIP
+[regional] validate: PASS
+```
+
+结束。`rheology` 加入 10^3 温度依赖黏度并把热场积分到发育的板块冷却状态。本机上它收尾于 `Nu_top = 31.383`、`Nu_bot = 0.212`、`max|u| = 1.600e3 = U_p` ，两站给出 `delta(0.8) = 0.0522`（半空间 0.0519）与 `delta(1.6) = 0.0739`（0.0734），表面异常热流 24.28 与 16.55 对比 25.25 与 17.87——重跑后拿这些数核对。`phases` 加入 410 km 与 660 km 两个相变及其潜热，并打印两个系数（实测 `-0.051193` 与 `+0.105288`）；`full` 跑扩散-位错复合流变，写帧并带 `nu_cbf`/`extdiag` 额外列；`converge` 是设计 6.6 节的网格分辨率序列。每个模式逐项打印检查，并在 `out_julia/regional_channel/<mode>/` 下写 `checks.csv`（模式、检查号、物理量、实测值、容差、PASS/FAIL/DIAG/SKIP）与 `history.csv`。
+
+检查分类是明确的。精确类：阶段 (i) 的场、壁面通量与 `deta_T = 1` 延拓（1e-10，线性求解）。守恒类：逐壁质量通量与净通量为零的恒等式。渐近类：相对半空间解 `T = T_inf erf((1-y)/(2 sqrt(x/U_p)))` 的板块冷却剖面，温度与边界层厚度 10%、表面热流 15%。设计 6.3 节的开盒热收支与 6.7 节的潜热焓恒等式（检查 10）都只作为诊断量报告，不作为门禁；原因见下面的局限。
+
+诚实的局限就是设计第 7、9 节列的那些。没有倾斜俯冲板片界面：海沟侧是竖直开出流壁，板片在盒子之外，算例建模的是"进入的板块加上其下的地幔通道"，不是楔形地幔。没有自由表面、没有地形、没有成分场、没有自洽的板片拉曳。`Ra = 0` 让速度由壁面给定、热演化是运动学的，因此相变只贡献潜热。侧壁温度是标量，无法施加随深度变化的板片顶温度剖面，发表的板片顶温度曲线不是本温度场的目标。因此本算例不能与 van Keken 一类发表的楔形流数字比较；它对应角流的平板块极限，也就是精确的 Couette-Poiseuille。
+
+还有两个读者必须知道的实现事实。壁面数据是参考通道的远场运动学，所以开出流切向牵引是 `wall_t = tau_ref(y) * eta_far(y)/eta_ref`，`eta_far` 取参数卡热侧壁温度下的远场黏度；设计字面上的等黏度*应力*（`CASE_WALL_T=stress`）在 10^3 反差下实测会困住一层 `max|u| ~ 1.7e5` 的出流剪切层，所以不是默认。其次，用单侧壁面梯度拼出的开盒热收支对"侧壁固定温度"的参数卡不闭合：侧壁换热是 Dirichlet 反力，不是已解析层的一侧导数，而库只在上下壁实现了一致边界通量（`docs/dev/VALIDATION.md` 4.1 节）。这两件事与实测数字都记在 `docs/dev/REGIONAL_PROGRESS.md`。
 
 ## 程序化调用
 

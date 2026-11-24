@@ -2,7 +2,7 @@
 
 # Examples
 
-Five runs you can start immediately. Each comes with its command, the physics it computes, the measured runtime on eight threads, and a number to check against. Run everything from the repository root. The first command is needed once:
+Six runs you can start immediately. Each comes with its command, the physics it computes, the measured runtime on eight threads, and a number to check against. Run everything from the repository root. The first command is needed once:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
@@ -16,6 +16,7 @@ The timings are wall clock on eight Julia threads, not CPU time. The direct solv
 | Blob | `run_blob_kelly_1024.jl` | about two minutes | `Tmax25` and the two digests |
 | Realistic case, smoke | `case_realistic_2d.jl smoke` | about two minutes the first time | `Nu_top = 5.999881` |
 | Regional channel | `channel_flow_2d.jl` | about 70 s the first time, under a second of simulation | profile error below `1e-10` |
+| Regional subduction-style case | `subduction_2d.jl rheology` | about 8 min the first time | `Nu_top = 31.383` and `delta(0.8) = 0.0522` |
 | Programmatic run | `build_and_run.jl` | about 84 s the first time | `Nu_top = Nu_bot = 1.000783` |
 
 ## Blankenbach 2b
@@ -167,6 +168,45 @@ so the card carries `wall_un = y(1-y)`, `wall_t = 1 - 2y` (the shear traction `e
 `err_u` is the maximum profile error divided by the centreline velocity `G H^2/(8 eta) = 0.25`, and `err_uz` uses the same scale; `err_p` is absolute. Q2 velocity and Q1 pressure contain this solution exactly, so the few `1e-14` are the linear solve, not the discretization. The run itself is 0.04 s once the driver is compiled; a fresh process spends about 70 s on that first-call compilation, and `julia -O0 --project=. examples/channel_flow_2d.jl` cuts the start-up to about 55 s without changing the answer at this accuracy.
 
 The channel's gate, G264, also runs the same solution driven by a constant body force (`p` then constant, with `wall_tn = -p0`), and the free-slip outflow variant (`wall_t = nothing`): that variant is a different, bounded flow, because the exact Poiseuille outflow carries a non-zero shear, so the free-slip solution differs from Poiseuille by exactly the response to the withheld traction (18% of the centreline velocity here). The gate exercises this script in-process; the section is not documentation-only.
+
+## A regional subduction-style case
+
+`examples/subduction_2d.jl` is the production use of the regional-channel recipe of the [guide](guide.md), section 1.10. A 2 x 1 box (2 000 x 1 000 km) of asthenosphere enters through the far-field wall at `x = 0`, crosses under the overriding plate and leaves through the open trench-side wall at `x = 2`, while the cold surface grows the plate-cooling boundary layer as the material moves trenchward. It is a kinematic thermal model: `Ra = 0`, so the thermal and phase buoyancy are off and the two phase transitions act through their latent heat only.
+
+The five modes are the staged plan of `docs/dev/REGIONAL_DESIGN.md`:
+
+```bash
+julia --project=. --threads=8 examples/subduction_2d.jl validate
+julia --project=. --threads=8 examples/subduction_2d.jl rheology
+julia --project=. --threads=8 examples/subduction_2d.jl phases
+julia --project=. --threads=8 examples/subduction_2d.jl full
+julia --project=. --threads=8 examples/subduction_2d.jl converge
+```
+
+`validate` is the analytic stage: constant viscosity, and the exact solution is the Couette-Poiseuille flow between the moving plate and the no-slip base,
+
+$$
+u_x = u_{\text{ref}}(y) = U_p\,y + G\,y(1-y)/2, \qquad u_y = 0,
+\qquad p = p_{\text{out}} + G\,(L_x-x),
+$$
+
+with `U_p = 1.6e3`, `G = 1e3`, `p_out = 1e3`, `L_x = 2` and constant viscosity 1. The upstream wall carries the normal velocity `u_ref(y)`, the plate carries `U_p`, and the open outflow carries the far-field total traction: `wall_tn = -p_out` and `wall_t = tau_ref(y) = U_p + G(1/2-y)`. Q2 velocity and Q1 pressure contain that solution exactly, so the printed errors are the direct linear solve, not the discretization. The mode ends with
+
+```text
+[regional] check  1 u-field        max|ux-uref|/Up   measured=1.4211e-14 ... PASS
+[regional] check  2 p-field        max|p-pref|/pscale measured=1.2738e-12 ... PASS
+[regional] check  3 flux-net       |sum Q|/Qref      measured=9.0091e-16 ... PASS
+[regional] validate: 13 checks (13 gated): 13 PASS, 0 FAIL, 0 DIAG, 0 SKIP
+[regional] validate: PASS
+```
+
+`rheology` adds the 10^3 temperature-dependent viscosity and integrates the thermal field to the developed plate-cooling state. On this machine it ends with `Nu_top = 31.383`, `Nu_bot = 0.212`, `max|u| = 1.600e3 = U_p`, and the two stations report `delta(0.8) = 0.0522` (half-space 0.0519) and `delta(1.6) = 0.0739` (0.0734) with the surface anomaly flux 24.28 and 16.55 against 25.25 and 17.87: those are the numbers to compare after a rerun. `phases` adds the 410-km and 660-km transitions with their latent heat and prints the two coefficients (measured `-0.051193` and `+0.105288`); `full` runs the composite diffusion-dislocation law with frames and the extra `nu_cbf`/`extdiag` columns; `converge` is the resolution sequence of the design's section 6.6. Every mode prints one line per check and writes `checks.csv` (mode, check id, quantity, measured value, tolerance, PASS/FAIL/DIAG/SKIP) and `history.csv` under `out_julia/regional_channel/<mode>/`.
+
+The check classes are explicit. Exact: the stage-(i) fields, the wall fluxes and the `deta_T = 1` continuation (1e-10, the linear solve). Conservation: the per-wall mass flux and its net-zero identity. Asymptotic: the plate-cooling profile against the half-space solution `T = T_inf erf((1-y)/(2 sqrt(x/U_p)))`, with 10 % in temperature and boundary-layer thickness and 15 % in the surface flux. The open-box heat budget (design section 6.3) and the latent-heat enthalpy identity (section 6.7, check 10) are reported as diagnostics, not gates; the reason is in the limitations below.
+
+The honest limitations are the design's sections 7 and 9. There is no dipping slab interface: the trench side is a vertical open wall, the slab is outside the box, and the case models the incoming plate plus the mantle channel beneath it, not the wedge. There is no free surface, no topography, no compositional field and no self-consistent slab pull. `Ra = 0` makes the velocity prescribed at the walls and the thermal evolution kinematic, so the phase transitions contribute only latent heat. The side-wall temperature is a scalar, so a depth-dependent slab-top profile cannot be imposed and a published slab-top temperature curve is not a target for this field. For those reasons the case is not comparable to van Keken-class published wedge-flow numbers; it is the flat-slab limit of the corner flow, which is exactly Couette-Poiseuille.
+
+Two further implementation facts a reader should know. The wall data are the reference channel's far-field *kinematics*, so the outflow tangential traction is `wall_t = tau_ref(y) * eta_far(y)/eta_ref` with `eta_far` the far-field viscosity at the card's hot side-wall temperature; the design's literal isoviscous *stress* (`CASE_WALL_T=stress`) was measured to trap an outflow shear layer of `max|u| ~ 1.7e5` against the 10^3 contrast, and is not the default. And the open-box heat budget built from the pointwise wall gradient does not close for a card with fixed side walls: the side-wall exchange is a Dirichlet reaction, not a resolved one-sided derivative, and the library's consistent boundary flux exists for the top and bottom walls only (`docs/dev/VALIDATION.md`, section 4.1). Both facts are recorded with the measured numbers in `docs/dev/REGIONAL_PROGRESS.md`.
 
 ## A programmatic run
 
