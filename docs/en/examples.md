@@ -2,98 +2,44 @@
 
 # Examples
 
-Six runs you can start immediately. Each comes with its command, the physics it computes, the measured runtime on eight threads, and a number to check against. Run everything from the repository root. The first command is needed once:
+Six runs you can start immediately. Each comes with its command and a number to check against. Run everything from the repository root, and run the first command once:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
 
-The timings are wall clock on eight Julia threads, not CPU time. The direct solver is serial inside the process, so a run on that path leaves seven threads idle. A first run in a fresh Julia process is dominated by compiling the driver (about 70 s, the repository-wide cost of the first `run_semquad_simulation` call); the simulations themselves are short.
+The timings are wall clock on eight Julia threads, not CPU time. The direct solver is serial inside the process, so a run on that path leaves seven threads idle. A first run in a fresh Julia process is dominated by compiling the driver, about 70 s for the first `run_semquad_simulation` call; the simulations themselves are short.
 
-| Example | Command | Wall clock, eight threads | What to check |
-|---|---|---|---|
-| Blankenbach 2b, steady | `benchmark_cases.jl 2b 3 0.2` | about 45 minutes | `Nu_top = Nu_bot` |
-| Blob | `run_blob_kelly_1024.jl` | about two minutes | `Tmax25` and the two digests |
-| Realistic case, smoke | `case_realistic_2d.jl smoke` | about two minutes the first time | `Nu_top = 5.999881` |
-| Regional channel | `channel_flow_2d.jl` | about 70 s the first time, under a second of simulation | profile error below `1e-10` |
-| Regional subduction-style case | `subduction_2d.jl rheology` | about 8 min the first time | `Nu_top = 31.383` and `delta(0.8) = 0.0522` |
-| Programmatic run | `build_and_run.jl` | about 84 s the first time | `Nu_top = Nu_bot = 1.000783` |
+| Example | Command | What to check |
+|---|---|---|
+| Realistic case, smoke | `julia --project=. --threads=8 examples/case_realistic_2d.jl smoke` | `Nu_top = 5.999881` |
+| Blankenbach 2b, steady | `julia --project=. --threads=8 examples/benchmark_cases.jl 2b 3 0.2` | `Nu_top` and `Nu_bot` agree to 0.03% |
+| Blob regression | `julia --project=. --threads=8 examples/run_blob_kelly_1024.jl` | `Tmax25 = 1.264329738` and the two digests |
+| Regional channel | `julia --project=. --threads=8 examples/channel_flow_2d.jl` | `err_u` below `1e-10` |
+| Regional subduction-style case | `julia --project=. --threads=8 examples/subduction_2d.jl rheology` | `Nu_top = 31.383` and `delta(0.8) = 0.0522` |
+| Programmatic run | `julia --project=. --threads=8 build_and_run.jl` | `Nu_top = Nu_bot = 1.000783` |
 
-## Blankenbach 2b
+## The realistic card's modes
 
-The 2b benchmark is a 2.5 x 1 box with free-slip walls, `Ra = 1e4`, no internal heating, and a viscosity that depends on both temperature and depth:
+### Modes and step budgets
 
-$$
-\eta = \exp(-bT + c(1-z)),
-\qquad
-b = \ln 16384,
-\qquad
-c = \ln 64,
-$$
-
-where $T$ is temperature, $z$ is height, and $\eta$ is viscosity. The reference values are those of Blankenbach et al. (1989), Table 9; the script prints them next to its own result.
-
-### Running to a steady state
-
-`examples/benchmark_cases.jl` is the entry point. It starts from ASPECT's own temperature field, which is already close to the steady state, so a run needs hundreds or thousands of steps instead of tens of thousands:
+`examples/case_realistic_2d.jl` is the production card. Its physics is in guide section 1, its initial condition in guide section 1.7, and its seven modes (`smoke`, `short`, `spinup`, `freeze`, `wallrefine`, `resume`, `symseed`) and their step budgets are in guide section 6.1:
 
 ```bash
-julia --project=. --threads=8 examples/benchmark_cases.jl 2b 3 0.2
+CASE_OUT="$HOME/quast/demo" julia --project=. --threads=8 \
+  examples/case_realistic_2d.jl <mode> [checkpoint]
 ```
 
-The arguments are `case level tstop`. Level 3 refines a 5 x 2 base grid three times, giving 40 x 16 square leaves at `p = 2`; the `:auto` selector resolves to the direct solver at this size (guide section 4.3). The run ends with
+### The ten-step smoke test
 
-```text
-[2b] steps=5492 t=2.0001e-01 wall=<s> s  Nu_top=7.248805 Nu_bot=7.250974 Vrms=170.213063  leaves=640
-```
-
-The two wall fluxes agree to 0.03%, so the state is steady. Agreement between the top and bottom fluxes is the acceptance test: with no internal heating, a steady state cannot have them differ. The second printed line gives both differences from the published values; the level-by-level convergence record is in [validation](validation.md).
-
-### Why the wall needs its own refinement
-
-`Nu` is a one-sided gradient inside the boundary layer, and uniform refinement spends its cells in the interior where nothing depends on them. The wall rule of guide section 3.3 is what fixes that. Turn it on with
-
-```bash
-CASE_WALLMIN=5 CASE_INITREF=1 julia --project=. --threads=8 examples/benchmark_cases.jl 2b 4 0.2
-```
-
-`CASE_WALLMIN` and `CASE_INITREF` are knobs of `benchmark_cases.jl`, not of the realistic case. `CASE_WALLMIN` sets the minimum level for the wall strip and the wall rows, and `CASE_INITREF=1` runs one adaptation pass on the initial condition. The measured effect of the wall rule is part of the convergence table in [validation](validation.md).
-
-## The blob regression
-
-The blob is the `Ra = 1e8` regression that pins the adaptive path. The box is 1 x 1, the walls are free slip, the heating is `H = 5`, the viscosity is the same two-exponent law, and the initial condition is the conductive base state plus one Gaussian:
-
-$$
-\theta_0(x,z) = 0.12\exp\left[-\left(\frac{x-0.5}{0.12}\right)^2-\left(\frac{z-0.35}{0.10}\right)^2\right]\sin(\pi z),
-$$
-
-where $\theta\_0$ is the initial temperature anomaly and $x$ and $z$ are the horizontal and vertical coordinates.
-
-```bash
-julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
-```
-
-The script runs with `p = 4` on the direct solver, adapts every 5 steps, keeps a 1 024-leaf hard cap with a largest level of 6, and writes 256 x 256 frames every `4e-10` up to `t = 1e-8`. It clears its output directory at start when that directory holds nothing but its own output, so point `BLOB_OUT` elsewhere if you want a different path. The run ends at 898 leaves and 25 frames. On this machine, eight threads finish the 126 steps in about two minutes including Julia startup.
-
-The last two lines are
-
-```text
-done t=1.008e-08 steps=126 leaves=898 N=15361 frames=25 in 141.3 s
-FINAL frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce56ea105542b8cdeda end_u_sha256=1cfcb5c63a476ed2e9a62e9700917ae718bc3165d9a485a9d54609a4844b0b51 Tmax25=1.264329738
-```
-
-`end_theta_sha256` is the bitwise pin and `Tmax25` is the scalar to compare. The digest holds bitwise only on the pinned Julia, BLAS and thread stack; `Tmax25` is the check that tolerates a different machine. The comparison of this run against ASPECT is in [validation](validation.md).
-
-## The realistic case
-
-This is the production card; its physics is in guide section 1, and its initial condition is in section 1.7. The smoke test runs 10 steps with the full case:
+The smoke test runs 10 steps with the full card:
 
 ```bash
 CASE_OUT="$HOME/quast/demo_smoke" CASE_STEPS=10 \
   julia --project=. --threads=8 examples/case_realistic_2d.jl smoke
 ```
 
-The first run takes about two minutes, mostly Julia compilation and the first Stokes solve; on a warm machine it is 47.6 s. It must end with `[case] DONE mode=smoke steps=10` followed by
+The first run is dominated by compiling the driver; the [quick start](quickstart.md) gives the first-run expectation. The run must end with `[case] DONE mode=smoke steps=10` followed by
 
 ```text
 [case] final: Nu_top=5.999881 Nu_bot=-4.029590 Vrms=6.808435e+03 meanT=1.333328 closure=-8.794e-04 leaves=2644 N=11233
@@ -101,9 +47,11 @@ The first run takes about two minutes, mostly Julia compilation and the first St
 
 The conductive reference for this base state is `Nu_top = 6`, so the top flux is right to **2e-5 relative** after ten steps. The bottom sits 0.74% below its `-4` reference because the bottom boundary layer is still forming.
 
-The production spin-up of the same card is the first real run of the [quick start](quickstart.md): that command starts the tree from the same initial condition. The tree grows from 640 leaves to the 10 000-leaf cap within the first 100 steps, and `spinup.h5` is written every 200 steps and again at exit. The case has no analytic reference, and after 2 000 steps it is still in the startup transient. Compare a short run against another run of the same card, not against the 20 000-step endpoint (`Nu_top = 18.2892`, `Nu_bot = -2.7636`), which is a different regime.
+### Spin-up, freeze and resume
 
-`resume` and `freeze` are two ways to continue the same checkpoint. `resume` keeps adaptation on and is the quick start's stopping and resuming step; `freeze` rewrites only `amr_every` to 0 and continues on the frozen mesh:
+The production spin-up of the same card is the first real run of the [quick start](quickstart.md): that command starts the tree from the same initial condition and grows it toward the 10 000-leaf cap, writing `spinup.h5` every 200 steps and again at exit. The case has no analytic reference, and after 2 000 steps it is still in the startup transient. Compare a short run against another run of the same card, not against the 20 000-step endpoint (`Nu_top = 18.2892`, `Nu_bot = -2.7636`), which is a different regime.
+
+`resume` keeps adaptation on and is the quick start's stopping and resuming step. `freeze` rewrites only `amr_every` to 0 and continues on the frozen mesh:
 
 ```bash
 CASE_OUT="$HOME/quast/frozen" CASE_STEPS=4000 \
@@ -124,34 +72,91 @@ CASE_OUT="$HOME/quast/demo_ve" CASE_STEPS=10 CASE_SHEAR_MODULUS=3.55e6 \
 
 $G$ is nondimensional: it is scaled by the card's reference viscosity and time unit, so the same physical shear modulus is a different number when `Ra`, the reference viscosity or the scale set changes. The first header line of this run ends with `eta_ref=1 shear_modulus=3.55e+06`, and with `shear_modulus > 0` the driver adds the two Maxwell regime reports that guide section 1.8 describes, one at the first stress step and one at the end of the run. The smoke test writes no checkpoint, so the checkpoint cost of the stress history first appears on a spin-up.
 
-### Freezing the mesh
+## The Blankenbach 2b case
 
-`resume` and `freeze` continue from the same checkpoint. `resume` keeps the adaptive mesh;
-`freeze` sets `amr_every = 0` and continues on the frozen tree:
+The 2b benchmark is a 2.5 x 1 box with free-slip walls, `Ra = 1e4`, no internal heating, and a viscosity that depends on both temperature and depth:
+
+$$
+\eta = \exp(-bT + c(1-z)),
+\qquad
+b = \ln 16384,
+\qquad
+c = \ln 64,
+$$
+
+where $T$ is temperature, $z$ is height, and $\eta$ is viscosity. The reference values are those of Blankenbach et al. (1989), Table 9, `Nu = 6.9299` and `Vrms = 171.755`; the script prints them next to its own result.
+
+`examples/benchmark_cases.jl` is the entry point. It starts from ASPECT's own temperature field, which is already close to the steady state, so a run needs thousands of steps instead of tens of thousands:
 
 ```bash
-CASE_OUT=out_julia/demo_frozen CASE_STEPS=4000 \
-  julia --project=. --threads=8 examples/case_realistic_2d.jl freeze \
-  out_julia/demo/spinup.h5
-
-CASE_OUT=out_julia/demo_resume CASE_STEPS=4000 \
-  julia --project=. --threads=8 examples/case_realistic_2d.jl resume \
-  out_julia/demo/spinup.h5
+julia --project=. --threads=8 examples/benchmark_cases.jl 2b 3 0.2
 ```
 
-Both carry the state from step 2 000 to step 4 000. Give each its own `CASE_OUT`: they write
-their own `frames/` and `history.csv`. `CASE_STEPS` is an absolute step number, so a budget
-at or below the checkpoint step runs nothing.
+The arguments are `case level tstop`. Level 3 refines a 5 x 2 base grid three times, giving 40 x 16 square leaves and 640 leaves in total at `p = 2`; the `:auto` selector resolves to the direct solver at this size (guide section 5.3). The run ends with
+
+```text
+[2b] steps=5492 t=2.0001e-01 wall=<s> s  Nu_top=7.248805 Nu_bot=7.250974 Vrms=170.213063  leaves=640
+```
+
+The two wall fluxes agree to 0.03%, so the state is steady. Agreement between the top and bottom fluxes is the acceptance test: with no internal heating, a steady state cannot have them differ. The second printed line gives both differences from the published values; the level-by-level convergence record is in [validation](validation.md).
+
+`Nu` is a one-sided gradient inside the boundary layer, and uniform refinement spends its cells in the interior where nothing depends on them. The wall rule of guide section 4.3 is what fixes that. Turn it on with
+
+```bash
+CASE_WALLMIN=5 CASE_INITREF=1 julia --project=. --threads=8 examples/benchmark_cases.jl 2b 4 0.2
+```
+
+`CASE_WALLMIN` and `CASE_INITREF` are knobs of `benchmark_cases.jl`, not of the realistic case. `CASE_WALLMIN` sets the minimum level for the wall strip and the wall rows, and `CASE_INITREF=1` runs one adaptation pass on the initial condition. The measured effect of the wall rule is part of the convergence table in [validation](validation.md).
+
+## The blob regression
+
+The blob is the `Ra = 1e8` regression that pins the adaptive path. The box is 1 x 1, the walls are free slip, the heating is `H = 5`, the viscosity is the same two-exponent law as 2b, and the initial condition is the conductive base state plus one Gaussian:
+
+$$
+\theta_0(x,z) = 0.12\exp\left[-\left(\frac{x-0.5}{0.12}\right)^2-\left(\frac{z-0.35}{0.10}\right)^2\right]\sin(\pi z),
+$$
+
+where $\theta\_0$ is the initial temperature anomaly and $x$ and $z$ are the horizontal and vertical coordinates.
+
+```bash
+julia --project=. --threads=8 examples/run_blob_kelly_1024.jl
+```
+
+The script runs with `p = 4` on the direct solver, adapts every 5 steps, keeps a 1 024-leaf hard cap with a largest level of 6, and writes 256 x 256 frames every `4e-10` up to `t = 1e-8`. It clears its output directory at start when that directory holds nothing but its own output, so point `BLOB_OUT` elsewhere if you want a different path. The run ends at 898 leaves and 25 frames, 126 steps. On this machine, eight threads finish in about two minutes including Julia startup. The last line is
+
+```text
+FINAL frames=25 end_theta_sha256=a4fb8248558a5c8fb7c776a7d3364a981374f27533528ce56ea105542b8cdeda end_u_sha256=1cfcb5c63a476ed2e9a62e9700917ae718bc3165d9a485a9d54609a4844b0b51 Tmax25=1.264329738
+```
+
+`end_theta_sha256` is the bitwise pin and `Tmax25` is the scalar to compare. The digest holds bitwise only on the pinned Julia, BLAS and thread stack; `Tmax25` is the check that tolerates a different machine. The comparison of this run against ASPECT is in [validation](validation.md).
 
 ## A regional channel
 
-`examples/channel_flow_2d.jl` is the combined boundary-condition demonstration: a plane channel whose upstream wall prescribes the normal velocity of the inflow, whose downstream wall is `:open` with the exact total traction, and whose top and bottom are no-slip. The card is a plain `Params`, run through `run_semquad_simulation` for one step:
+`examples/channel_flow_2d.jl` is the combined boundary-condition demonstration: a plane channel whose upstream wall prescribes the normal velocity of the inflow, whose downstream wall is `:open` with the exact total traction, and whose top and bottom are no-slip. Guide section 2 defines the wall types, the data arrays and their sign conventions; this section composes them into the regional recipe.
+
+The card has this shape, in the wall order `(xminus, xplus, yminus, yplus)`:
+
+| Wall | `wall_bc` | Data |
+|---|---|---|
+| Upstream x-wall | `:rigid` | `wall_un` = the normal velocity $u\_x(y)$ of the inflow profile; `wall_u` = the tangential velocity (zero for a normal inflow) |
+| Downstream x-wall | `:open` | `wall_tn` = $-p\_{\mathrm{out}}$ (the dynamic pressure of the outflow) and `wall_t` = $\eta\,\mathrm du\_x/\mathrm dy$ (the shear traction) |
+| Top and bottom | `:rigid` or `:free` | Nothing; `:rigid` is no slip and `:free` is free slip |
+
+The inflow wall must be `:rigid`: a `:free` wall has zero tangential traction and cannot carry the shear $\eta\,\mathrm du\_x/\mathrm dy$ that a shear-carrying profile has at its entrance. Prescribing the same normal velocity on a `:free` wall is a genuinely different flow, measured at 5.6% of the centreline velocity; the recipe therefore always uses `:rigid` on the inflow, with `wall_u` carrying any tangential part. The velocity of a flow entering through a normal-velocity boundary is prescribed completely by `wall_un` and `wall_u`, and the interior sees the same Dirichlet data whichever of the two mechanisms writes the value: the per-wall `wall_un` route and the legacy global closure produce bit-identical solutions.
+
+Three compatibility conditions make the combination well posed:
+
+- **Mass.** Continuity fixes the flux. The integral of the inflow data is the flux the outflow must carry, and the discrete continuity equations enforce the balance. The net-flux guard of guide section 2.6 cannot double as the check here: with an open wall an inlet whose integral does not match is not an error, because its imbalance moves the outflow velocity. The open wall's free normal velocity absorbs it, and that is the regional model's outflow.
+- **Pressure level.** The open wall removes the nodal pressure pin (guide section 2.4), so the pressure level is not fixed by a pin but by the normal traction data: `wall_tn` is the dynamic pressure of the outflow, $p\_{\mathrm{out}}$, with the sign of the outward normal. It is a dynamic pressure, not a lithostatic one.
+- **Well-posedness.** At least one x-wall and one y-wall keep a Dirichlet normal component; the channel satisfies this with the rigid inflow, the two channel walls and the open outflow.
+
+The card is a plain `Params`, run through `run_semquad_simulation` for one step:
 
 ```bash
 julia --project=. --threads=8 examples/channel_flow_2d.jl
 ```
 
-The channel is 2 x 1, the viscosity is constant, and the flow is driven by a pressure gradient `dp/dx = -G` with `G = 2`; the driver has no horizontal body force. With the open outflow held at dynamic pressure `p_out = 2`, the exact solution is plane Poiseuille,
+The channel is 2 x 1, the viscosity is constant, and the flow is driven by a pressure gradient `dp/dx = -G` with `G = 2`; the driver's body force is the buoyancy and has no horizontal component, so the pressure-driven mode is the one the card uses. With the open outflow held at dynamic pressure `p_out = 2`, the exact solution is plane Poiseuille,
 
 $$
 u_x = \frac{G\,y\,(H-y)}{2\eta},
@@ -159,21 +164,35 @@ u_x = \frac{G\,y\,(H-y)}{2\eta},
 p = p_{\text{out}} + G\,(L-x),
 $$
 
-so the card carries `wall_un = y(1-y)`, `wall_t = 1 - 2y` (the shear traction `eta du/dy`) and `wall_tn = -2` (the outflow dynamic pressure with the outward normal). Guide section 1.10 is the recipe. The run ends with
+so the card carries `wall_un = y(1-y)`, `wall_t = 1 - 2y` (the shear traction $\eta\,\mathrm du/\mathrm dy$) and `wall_tn = -2` (the outflow dynamic pressure with the outward normal). The run ends with
 
 ```text
 [channel] steps=1 leaves=128 err_u=1.832e-14 err_uz=3.289e-14 err_p=4.567e-13 max|u|=0.250000
 ```
 
-`err_u` is the maximum profile error divided by the centreline velocity `G H^2/(8 eta) = 0.25`, and `err_uz` uses the same scale; `err_p` is absolute. Q2 velocity and Q1 pressure contain this solution exactly, so the few `1e-14` are the linear solve, not the discretization. The run itself is 0.04 s once the driver is compiled; a fresh process spends about 70 s on that first-call compilation, and `julia -O0 --project=. examples/channel_flow_2d.jl` cuts the start-up to about 55 s without changing the answer at this accuracy.
+`err_u` is the maximum profile error divided by the centreline velocity `G H^2/(8 eta) = 0.25`, and `err_uz` uses the same scale; `err_p` is absolute. Q2 velocity and Q1 pressure contain this solution exactly, so the few `1e-14` are the linear solve, not the discretization. The simulation itself is 0.04 s once the driver is compiled; the first-call compile in a fresh process is the process cost quoted in the introduction.
 
-The channel's gate, G264, also runs the same solution driven by a constant body force (`p` then constant, with `wall_tn = -p0`), and the free-slip outflow variant (`wall_t = nothing`): that variant is a different, bounded flow, because the exact Poiseuille outflow carries a non-zero shear, so the free-slip solution differs from Poiseuille by exactly the response to the withheld traction (18% of the centreline velocity here). The gate exercises this script in-process; the section is not documentation-only.
+The same analytic solution also exists with a constant body force `f_x = G` and no pressure gradient, in which case the pressure is constant and `wall_tn` is $-p\_0$; the shipped script uses the pressure-driven form.
+
+If the outflow tangential traction is omitted (`wall_t = nothing`), the open wall is a free-slip outlet. The Poiseuille profile is then **not** the solution, because its outflow shear $G(H/2-y)$ violates the zero-tangential-traction condition. The free-slip solution keeps the same inflow data and mass flux and differs from Poiseuille by exactly the response to the withheld shear traction: on this channel that difference is 18% of the centreline velocity, its strain energy is 2.4% of the derived energy scale $L\,\lVert\eta u'\rVert^2/(2\eta^2)$, and the difference is exactly linear in the withheld-traction scale.
+
+The production use of the recipe is the regional subduction-style case below.
 
 ## A regional subduction-style case
 
-`examples/subduction_2d.jl` is the production use of the regional-channel recipe of the [guide](guide.md), section 1.10. A 2 x 1 box (2 000 x 1 000 km) of asthenosphere enters through the far-field wall at `x = 0`, crosses under the overriding plate and leaves through the open trench-side wall at `x = 2`, while the cold surface grows the plate-cooling boundary layer as the material moves trenchward. It is a kinematic thermal model: `Ra = 0`, so the thermal and phase buoyancy are off and the two phase transitions act through their latent heat only.
+`examples/subduction_2d.jl` is the regional subduction-style case built from the regional-channel recipe above. A 2 x 1 box (2 000 x 1 000 km) of asthenosphere enters through the far-field wall at `x = 0`, crosses under the overriding plate and leaves through the open trench-side wall at `x = 2`, while the cold surface grows the plate-cooling boundary layer as the material moves trenchward. It is a kinematic thermal model: `Ra = 0`, so the thermal and phase buoyancy are off and the two phase transitions act through their latent heat only. The inflow wall (`xminus`) is `:rigid` with `wall_un` = the reference-channel normal velocity, the top (`yplus`) is `:rigid` with `wall_u = U_p` for the overriding plate, the base (`yminus`) is no slip, and the outflow (`xplus`) is `:open` with `wall_tn = -p_out` and the far-field shear traction.
 
-The five modes are the staged plan of `docs/dev/REGIONAL_DESIGN.md`:
+The five modes are:
+
+| Mode | What it runs | Measured wall clock |
+|---|---|---|
+| `validate` | The isoviscous (`deta_T = 1`) analytic channel on the 512-leaf tree, `linear = :direct` | 15 s |
+| `rheology` | The `deta_T = 1e3` plate-cooling stage on the production tree, 240 steps | 409 s |
+| `phases` | The same stage with the 410-km and 660-km transitions and their latent heat, 240 steps | 463 s |
+| `full` | The composite diffusion–dislocation law with frames and the `nu_cbf`/`extdiag` columns, 120 steps | 154 s |
+| `converge` | The resolution sequence on the uniform level-3, uniform level-4 and production trees | 149 s at `CASE_STEPS=60` (220 s including the first-call compile); the full 200-step sequence is the manual run |
+
+The wall clocks are the time each mode itself reports, on eight threads; they exclude the compile that a fresh process pays before the mode starts, about another minute.
 
 ```bash
 julia --project=. --threads=8 examples/subduction_2d.jl validate
@@ -183,7 +202,7 @@ julia --project=. --threads=8 examples/subduction_2d.jl full
 julia --project=. --threads=8 examples/subduction_2d.jl converge
 ```
 
-`validate` is the analytic stage: constant viscosity, and the exact solution is the Couette-Poiseuille flow between the moving plate and the no-slip base,
+`validate` is the analytic stage: constant viscosity, and the exact solution is the Couette–Poiseuille flow between the moving plate and the no-slip base,
 
 $$
 u_x = u_{\text{ref}}(y) = U_p\,y + G\,y(1-y)/2, \qquad u_y = 0,
@@ -200,13 +219,9 @@ with `U_p = 1.6e3`, `G = 1e3`, `p_out = 1e3`, `L_x = 2` and constant viscosity 1
 [regional] validate: PASS
 ```
 
-`rheology` adds the 10^3 temperature-dependent viscosity and integrates the thermal field to the developed plate-cooling state. On this machine it ends with `Nu_top = 31.383`, `Nu_bot = 0.212`, `max|u| = 1.600e3 = U_p`, and the two stations report `delta(0.8) = 0.0522` (half-space 0.0519) and `delta(1.6) = 0.0739` (0.0734) with the surface anomaly flux 24.28 and 16.55 against 25.25 and 17.87: those are the numbers to compare after a rerun. `phases` adds the 410-km and 660-km transitions with their latent heat and prints the two coefficients (measured `-0.051193` and `+0.105288`); `full` runs the composite diffusion-dislocation law with frames and the extra `nu_cbf`/`extdiag` columns; `converge` is the resolution sequence of the design's section 6.6. Every mode prints one line per check and writes `checks.csv` (mode, check id, quantity, measured value, tolerance, PASS/FAIL/DIAG/SKIP) and `history.csv` under `out_julia/regional_channel/<mode>/`.
+`rheology` adds the $10^3$ temperature-dependent viscosity and integrates the thermal field to the developed plate-cooling state. It ends with `Nu_top = 31.383`, `Nu_bot = 0.212`, `max|u| = 1.600e3 = U_p`, and the two stations report `delta(0.8) = 0.0522` (half-space 0.0519) and `delta(1.6) = 0.0739` (0.0734) with the surface anomaly flux 24.28 and 16.55 against 25.25 and 17.87: those are the numbers to compare after a rerun. `phases` adds the 410-km and 660-km transitions with their latent heat and prints the two coefficients (measured `-0.051193` and `+0.105288`); `full` runs the composite law and ends with `Nu_top = 31.374`, `Nu_bot = 0.283` and `max|u| = 1.6001e3`; `converge` is the resolution sequence and gates the production-versus-uniform-4 agreement once every arm reaches steady state. Each mode prints one line per check and writes `checks.csv` under `$CASE_OUT/<mode>/`; `validate`, `rheology`, `phases` and `full` also write `history.csv` there, while `converge` writes one history per arm under its own subdirectory.
 
-The check classes are explicit. Exact: the stage-(i) fields, the wall fluxes and the `deta_T = 1` continuation (1e-10, the linear solve). Conservation: the per-wall mass flux and its net-zero identity. Asymptotic: the plate-cooling profile against the half-space solution `T = T_inf erf((1-y)/(2 sqrt(x/U_p)))`, with 10 % in temperature and boundary-layer thickness and 15 % in the surface flux. The open-box heat budget (design section 6.3) and the latent-heat enthalpy identity (section 6.7, check 10) are reported as diagnostics, not gates; the reason is in the limitations below.
-
-The honest limitations are the design's sections 7 and 9. There is no dipping slab interface: the trench side is a vertical open wall, the slab is outside the box, and the case models the incoming plate plus the mantle channel beneath it, not the wedge. There is no free surface, no topography, no compositional field and no self-consistent slab pull. `Ra = 0` makes the velocity prescribed at the walls and the thermal evolution kinematic, so the phase transitions contribute only latent heat. The side-wall temperature is a scalar, so a depth-dependent slab-top profile cannot be imposed and a published slab-top temperature curve is not a target for this field. For those reasons the case is not comparable to van Keken-class published wedge-flow numbers; it is the flat-slab limit of the corner flow, which is exactly Couette-Poiseuille.
-
-Two further implementation facts a reader should know. The wall data are the reference channel's far-field *kinematics*, so the outflow tangential traction is `wall_t = tau_ref(y) * eta_far(y)/eta_ref` with `eta_far` the far-field viscosity at the card's hot side-wall temperature; the design's literal isoviscous *stress* (`CASE_WALL_T=stress`) was measured to trap an outflow shear layer of `max|u| ~ 1.7e5` against the 10^3 contrast, and is not the default. And the open-box heat budget built from the pointwise wall gradient does not close for a card with fixed side walls: the side-wall exchange is a Dirichlet reaction, not a resolved one-sided derivative, and the library's consistent boundary flux exists for the top and bottom walls only (`docs/dev/VALIDATION.md`, section 4.1). Both facts are recorded with the measured numbers in `docs/dev/REGIONAL_PROGRESS.md`.
+The limitations are part of the case. There is no dipping slab interface and no free surface: the trench side is a vertical open wall, the slab sits outside the box, and the case models the incoming plate with the mantle channel beneath it. There is also no compositional field and no self-consistent slab pull, and `Ra = 0` makes the velocity prescribed at the walls, so the numbers are not directly comparable with published kinematic-subduction models.
 
 ## A programmatic run
 

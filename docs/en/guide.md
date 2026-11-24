@@ -2,54 +2,35 @@
 
 # Guide: the realistic 2-D mantle-convection case
 
-This page documents the case that `examples/case_realistic_2d.jl` builds: the physics, the numerical method, every knob, every output file, restarting, and the thread and memory behavior. Every parameter value quoted here is either a literal in that script or a default of `run_semquad_simulation` in `src/driver/run.jl`; section 5 lists them all.
+This page documents the case that `examples/case_realistic_2d.jl` builds: the physics, the numerical method, every knob, every output file, restarting, and the thread and memory behavior. Every parameter value quoted here is either a literal in that script or a default of `run_semquad_simulation` in `src/driver/run.jl`; section 6 lists them all.
 
 The problem is a 2.5 x 1 box of incompressible fluid with free-slip walls, temperature 0 at the top and 1 at the bottom, internal heating `H = 10`, a nominal Rayleigh number `Ra = 1e5`, composite diffusion–dislocation rheology, and two phase transitions with latent heat. Yielding and strain weakening are off.
+
+Section 2 is the reference for the per-wall boundary conditions; section 6 lists the names and defaults of the knobs that set them.
 
 <details>
 <summary><b>Contents</b></summary>
 
 - [1. The physical problem](#1-the-physical-problem)
-- [2. The discretization](#2-the-discretization)
-- [3. The adaptive policy](#3-the-adaptive-policy)
-- [4. Linear solvers and the `:auto` rule](#4-linear-solvers-and-the-auto-rule)
-- [5. Parameter reference](#5-parameter-reference)
-- [6. Output formats](#6-output-formats)
-- [7. Restarting and the configuration guard](#7-restarting-and-the-configuration-guard)
-- [8. Threads and memory](#8-threads-and-memory)
-- [9. Where to read next](#9-where-to-read-next)
+- [2. Boundary conditions](#2-boundary-conditions)
+- [3. The discretization](#3-the-discretization)
+- [4. The adaptive policy](#4-the-adaptive-policy)
+- [5. Linear solvers and the `:auto` rule](#5-linear-solvers-and-the-auto-rule)
+- [6. Parameter reference](#6-parameter-reference)
+- [7. Output formats](#7-output-formats)
+- [8. Restarting and the configuration guard](#8-restarting-and-the-configuration-guard)
+- [9. Threads and memory](#9-threads-and-memory)
+- [10. Where to read next](#10-where-to-read-next)
 
 </details>
 
 ## 1. The physical problem
 
-### 1.1 Domain and boundary conditions
+### 1.1 The domain and the default boundary
 
-The domain is $[0,2.5]\times[0,1]$ , built from 5 x 2 base cells that the quadtree subdivides into square leaves. $x$ is horizontal and $y$ is height, with $y=0$ at the bottom and $y=1$ at the top; depth is $1-y$ .
+The domain is $[0,2.5]\times[0,1]$ , built from 5 x 2 base cells that the quadtree subdivides into square leaves. $x$ is horizontal and $y$ is height, with $y=0$ at the bottom and $y=1$ at the top; depth is $1-y$ . Temperature is $T=0$ on the top wall and $T=1$ on the bottom wall; the side walls are insulating.
 
-All four walls are free slip: no normal flow, unrestricted tangential flow. The normal component is fixed,
-
-$$
-u_x = 0 \quad (x=0,\,2.5),
-\qquad
-u_y = 0 \quad (y=0,\,1),
-$$
-
-where $u\_x$ and $u\_y$ are the two velocity components. Temperature is $T=0$ at the top wall and $T=1$ at the bottom wall; the side walls are insulating.
-
-The condition can be set per wall. `bc = :free` (the default) applies free slip to all four; `bc = :rigid` applies no slip to all four, which fixes the tangential component as well and takes it from the wall-velocity closures $u\_{Dx}(x,y)$ , $u\_{Dy}(x,y)$ . `wall_bc` overrides one wall at a time, in the order `(xminus, xplus, yminus, yplus)`, with entries `:same` (follow `bc`), `:free`, `:rigid` or `:open`. The card exposes the tuple as `CASE_WALL_BC` (section 5.1). An `:open` wall has **no** Dirichlet component on either component: the natural traction condition applies there, the optional data are the per-wall tractions of the two paragraphs below, and it changes the pressure gauge (see below).
-
-The wall-velocity closures are functions of position, and the four walls sit at different $y$ (or $x$). A spatially varying wall velocity therefore needs no extra API: $u\_{Dx}=Uy$ with `bc = :rigid` drives a lid at $U$ over a resting floor and reproduces the Couette solution $u=(Uy,0)$ to $10^{-10}$ . The only assignment a single closure cannot express is one that disagrees at a corner, and continuity forbids a disagreement there anyway.
-
-The *normal* component is set per wall by `Params.wall_un` (the solve takes it as the `wall_un` keyword), in the same `(xminus, xplus, yminus, yplus)` order. An entry `(x,y) -> value` prescribes that wall's normal velocity as the value of the wall's normal component in the positive coordinate direction -- $u\_x$ on a vertical wall and $u\_y$ on a horizontal one, exactly the convention of the closures above and not the outward flux $u\cdot n$ -- and `nothing` (the default) falls back to the historical closure, which the driver sets to zero, so the default card is unchanged. The normal component is Dirichlet on a `:free` and on a `:rigid` wall; an `:open` wall has no Dirichlet component, so a value there is an error. While every wall keeps a Dirichlet normal component, the prescribed data must satisfy $\int\_{\partial\Omega}u\cdot n\,\mathrm dS=0$ ; an unbalanced tuple (for example a through-flow prescribed on one vertical wall only) is refused with the measured flux instead of solving a discrete problem whose continuity equations are inconsistent. With an `:open` wall the free normal velocity absorbs the imbalance by construction and the net-flux check is skipped. The same Couette solution driven by `wall_un` on the side walls and `wall_u` on the lid is exact to $2\times10^{-14}$ (section 5.3; gate G258). A prescribed tangential value (`wall_u`) is only meaningful on a `:rigid` wall; on a `:free` wall the tangential component is traction-free and on an `:open` wall there is no Dirichlet component at all, so the value would be silently ignored and is an error. At a corner the walls are applied in the order above and the later wall owns the shared component: a rigid top or bottom wall's tangential value overrides the side walls' normal value at its two corners, which is what makes the lid-driven cavity's corners belong to the lid.
-
-The tangential *traction* is set per wall by `Params.wall_t` (the solve takes it as the `wall_t` keyword), in the same `(xminus, xplus, yminus, yplus)` order. An entry `(x,y) -> value` prescribes the tangential component of the **total** Cauchy traction $t=\sigma\cdot n$ as a boundary load: integration by parts of the momentum equation puts $\int\_\Gamma t\cdot v\,\mathrm dS$ on the right-hand side with a plus sign, and the code adds it to the unreduced load vector, so the constraint matrix is what projects it onto the admissible test space -- it is data on the free side, never a Dirichlet value. The value is the **global component in the positive coordinate direction**: $t\_x$ on a horizontal wall and $t\_z$ on a vertical one, exactly the convention of `wall_un` above and not an outward-normal component. On an axis-aligned wall the tangential traction is pressure-free ($t\_x=\sigma\_{xy}$, $t\_z=\sigma\_{zy}$), so this is the exact $2\eta\,\varepsilon(u)\cdot n$ shear traction. Because it only exists where the tangential component is free, `wall_t` is accepted on a `:free` or `:open` wall and refused on a `:rigid` one (the tangential velocity is Dirichlet there and the load would be silently dropped by the constraint). `nothing` is zero traction, so the default card is unchanged; a traction-driven Couette flow $u=(t\_0y/\eta,0)$, $p=0$ is exact to $10^{-10}$ (gate G259).
-
-The normal *traction* is set per wall by `Params.wall_tn` (the solve takes it as the `wall_tn` keyword, the card as `CASE_WALL_TN`), in the same order and with the same load convention -- the normal component of the full Cauchy traction $t=\sigma\cdot n$, as the global component in the positive coordinate direction ($t\_x$ on a vertical wall, $t\_z$ on a horizontal one). On an axis-aligned wall it is the pressure-bearing component, $t\_n=-p+2\eta\,\varepsilon\_{nn}$ in the wall's normal direction, and it is the data term that fixes the pressure level. Because $t=\sigma\cdot n$ uses the **outward** normal, a pressure $p\_0$ imposed on an open boundary is `wall_tn = -p0` on the **top** wall and `wall_tn = +p0` on the **bottom** wall; the prescribed value is the *dynamic* pressure traction in the solver's nondimensional pressure unit, not a lithostatic one. It is accepted only on an `:open` wall (the only wall with a free normal velocity); on a `:free` or `:rigid` wall the normal velocity is Dirichlet and the load would be silently dropped, so that is an error. Two consequences of an open wall:
-- **The pressure gauge is derived.** The nodal pressure pin is exact only while the normal velocity is Dirichlet on the whole boundary (then the constant pressure is in the null space of the reduced gradient, and the dropped continuity equation is a linear combination of the others). With an `:open` wall the solver therefore pins one pressure dof **iff no wall is `:open`**; a pinned open configuration would replace a continuity equation by $p\_a=0$ -- a different problem. The resolved decision is reported as `LAST_SEMSTOKES_PRESSURE_GAUGE` (`:pin`/`:none`).
-- **The open configurations must be well posed.** Every `:open` wall must leave at least one x-wall and one y-wall with a Dirichlet normal component; otherwise a rigid translation (or, with all four walls open, the whole rigid motion) is left admissible and the discrete saddle is singular. All four walls `:open` is the pure traction problem -- it needs a velocity gauge and net force/torque-compatible data -- and is refused, as is any configuration whose 3x3 rigid-mode Gram matrix over the Dirichlet dofs is singular (the message names the admissible motion). `linear=:direct` (with its shift ladder), `linear=:mg` and `linear=:auto` are supported without the pin; `:schur_cg`/`:lagged` assume the closed-boundary gauge and are refused on an open configuration.
-
-The gate numbers for the open-wall surface: a rigid box with the top `:open` and `wall_tn = T` gives $u=0$, $p=-T$ (the outward-normal sign), while the same $T$ on the **bottom** wall gives $p=+T$; the body-force hydrostatic solution with an open top and zero normal traction is $u=0$, $p=1-y$ -- all exact to $10^{-10}$ (G261). A traction-free open lid gives $u=p=0$ with the unpinned saddle and the hydrostatic free-slip/open configuration gives $p=1-y$ (G262). The legacy closed-wall paths are bit-identical to the stage-2 tree and the three linear paths agree on an open case (G263). Section 1.10 combines the knobs of this section into a regional inflow/outflow channel.
+The default card is free slip on all four walls. `bc` is the global wall type and defaults to `:free`; `wall_bc` overrides it per wall, and the four data arrays `wall_u`, `wall_un`, `wall_t` and `wall_tn` add values on top of the wall types. Section 2 is the reference for the wall types, the four data arrays and their sign conventions, the traction convention, the pressure gauge, the corner rule and the refused configurations; section 6.1 lists the names and defaults of the knobs that set them.
 
 ### 1.2 The equations
 
@@ -111,7 +92,7 @@ $$
 \mathrm{Nu}_{top} - \mathrm{Nu}_{bot} = H;
 $$
 
-how far the run sits from that identity is the `closure` column, described in section 6.2.
+how far the run sits from that identity is the `closure` column, described in section 7.2.
 
 ### 1.4 Rheology
 
@@ -297,64 +278,99 @@ $$
 \mathrm{Ra} = \frac{\rho g \alpha \Delta T d^3}{\kappa\,\eta_{\mathrm{ref}}},
 $$
 
-and the flow solve uses `eta_law/eta_ref` wherever the material law's viscosity enters, through `eta_multiplier` and the Maxwell effective-viscosity closure of section 1.8. `eta_ref` is `Params.eta_ref` (default `1.0`), in the units the material law returns. The case exposes it as `CASE_ETA_REF` (section 5.1); the header prints it and the checkpoint metadata records it.
+and the flow solve uses `eta_law/eta_ref` wherever the material law's viscosity enters, through `eta_multiplier` and the Maxwell effective-viscosity closure of section 1.8. `eta_ref` is `Params.eta_ref` (default `1.0`), in the units the material law returns. The case exposes it as `CASE_ETA_REF` (section 6.1); the header prints it and the checkpoint metadata records it.
 
 The convention is consistent only when a rescaled law is paired with the same rescaling of `eta_ref`. Multiplying `comp_Ad` and `comp_As` by `1/c` multiplies every viscosity the law returns by `c`; with `eta_ref = c` the flow is unchanged, because the ratio `eta/eta_ref` is unchanged, while with `eta_ref = 1` the same `Ra` describes a different physical Rayleigh number. The bounds are absolute: `eta_min` and `eta_max` are in the law's units and are applied before the normalization, so a law rescaled by `c` needs its bounds rescaled by `c` as well. The default `1.0` leaves every existing run bit-identical.
 
-When `eta_ref != 1` the driver reports the convention, once at the first flow solve and once at the end of the run. The report gives `Ra`, `eta_ref`, the range and contrast of the normalized field `eta/eta_ref`, `eta_interior` (the arithmetic volume mean of `eta/eta_ref` over the interior band `0.25 <= z <= 0.75`, both wall layers excluded), `Ra_interior = Ra/eta_interior`, and, when the card supplies its scale set, `eta_0` in Pa s. `pic_mode = :newton` builds its viscosity from the raw law, so it refuses `eta_ref != 1` rather than solve a different problem silently.
+When `eta_ref != 1` the driver reports the convention, once at the first flow solve and once at the end of the run. The report gives `Ra`, `eta_ref`, the range and contrast of the normalized field `eta/eta_ref`, `eta_interior` (the arithmetic volume mean of `eta/eta_ref` over the interior band `0.25 <= z <= 0.75`, the vertical coordinate that the code names `z`, with both wall layers excluded), `Ra_interior = Ra/eta_interior`, and, when the card supplies its scale set, `eta_0` in Pa s. `pic_mode = :newton` builds its viscosity from the raw law, so it refuses `eta_ref != 1` rather than solve a different problem silently.
 
 The production card's default is `eta_ref = 1`, but its material law varies by orders of magnitude across the box, so the interior Rayleigh number is far above the nominal one. The report prints only for `eta_ref != 1`; the convention's numbers at the card's developed state are `eta_interior = 4.280635e-3`, `Ra_interior = 2.336102e7` and `eta_0 = 2.368635e23 Pa s`, the physical viscosity that `Ra` is defined with, which puts the physical interior viscosity at `1.013926e21 Pa s`. At the calibration's hot interior point (`T = 1.75`, `edot_ref`) the same convention gives `Ra = 7.84e7` and a viscosity of `3.02e20 Pa s`. The label `Ra = 1e5` therefore describes the calibration point, not the interior: quote both.
 
-### 1.10 A regional channel model
+## 2. Boundary conditions
 
-The per-wall knobs of section 1.1 compose into a regional model: fluid enters through one wall, crosses the domain and leaves through an open wall, while the other walls are no slip or free slip. The shipped demonstration is `examples/channel_flow_2d.jl`, a plane channel whose exact solution is plane Poiseuille; this subsection is the recipe, and the semantics of each knob stay in section 1.1.
+This section is the single reference for the boundary conditions: the four wall types, the four data arrays and their sign conventions, the traction convention, the derived pressure gauge, the corner rule, every refused configuration, and what the restart guard records. Section 6.1 lists the names and defaults of the knobs; this section does not repeat them.
 
-The channel card has this shape, in the wall order `(xminus, xplus, yminus, yplus)`:
+### 2.1 The four wall types
 
-| wall | `wall_bc` | data |
+The four walls are ordered `(xminus, xplus, yminus, yplus)`, which is the order of every boundary tuple in this code. `bc` is the global wall type and is `:free` or `:rigid`. `wall_bc` overrides it per wall with `:same`, `:free`, `:rigid` or `:open`; `:same` follows `bc` and is the default.
+
+| Wall type | Normal velocity | Tangential velocity |
 |---|---|---|
-| upstream x-wall | `:rigid` | `wall_un` = the normal velocity $u\_x(y)$ of the inflow profile; `wall_u` = the tangential velocity (zero for a normal inflow) |
-| downstream x-wall | `:open` | `wall_tn` = $-p\_{\mathrm{out}}$ (the dynamic pressure of the outflow) and `wall_t = \eta\,\mathrm du\_x/\mathrm dy` (the shear traction) |
-| top and bottom | `:rigid` or `:free` | nothing, or `wall_un` = 0 for a free-slip wall |
+| `:free` | Dirichlet, zero unless `wall_un` sets it | Free: zero tangential traction unless `wall_t` sets a load |
+| `:rigid` | Dirichlet, zero unless `wall_un` sets it | Dirichlet, zero unless `wall_u` sets it |
+| `:open` | Free: the natural traction applies, giving zero normal traction unless `wall_tn` sets a load | Free: zero tangential traction unless `wall_t` sets a load |
 
-The inflow wall must be `:rigid`: a `:free` wall has zero tangential traction and cannot support the shear $\eta\,\mathrm du\_x/\mathrm dy$ that a shear-carrying profile has at its entrance. Prescribing the same normal velocity on a `:free` wall gives a genuinely different flow, measured at 5.6% of the centreline velocity on the plane channel; the design's channel therefore always uses `:rigid` on the inflow, with `wall_u` carrying any tangential part. The velocity of a flow entering through a normal-velocity boundary is prescribed completely by `wall_un` and `wall_u`, and the interior sees it as the same Dirichlet data whichever of the two mechanisms writes the value (gate G264 compares the new `wall_un` route against the legacy `uDx` closure and finds the solutions bit-identical).
+### 2.2 The four data arrays
 
-Three compatibility conditions make the combination well posed:
+Four data arrays add values on top of the wall types. Each is a tuple in the wall order, each entry is either `nothing` or a function `(x, y) -> Float64`, and the default is `nothing` everywhere.
 
-- **Mass.** Continuity fixes the flux. The integral of the inflow data is the flux the outflow must carry, and the discrete continuity equations enforce the balance. The net-flux guard of section 1.1 cannot double as the check here: with an open wall an inlet whose integral does not match is not an error, its imbalance simply moves the outflow velocity. The open wall's free normal velocity is what absorbs it, and that is exactly the regional model's outflow.
-- **Pressure level.** The open wall removes the nodal pressure pin (section 1.1), so the pressure is not fixed by a pin but by the normal traction data: `wall_tn` **is** the dynamic pressure of the outflow, $p\_{\mathrm{out}}$, with the sign of the outward normal. It is a dynamic pressure, not a lithostatic one: the solver's `p` excludes the base state and the buoyancy subtracts it analytically, so a user who passes a hydrostatic value imposes that whole column as a traction.
-- **Well-posedness.** At least one x-wall and one y-wall keep a Dirichlet normal component, as section 1.1 requires; the channel satisfies this with the rigid inflow, the two channel walls and the open outflow.
+| Field | Prescribes | Accepted on | Value convention |
+|---|---|---|---|
+| `wall_u` | Tangential velocity | `:rigid` only | Component in the positive coordinate direction |
+| `wall_un` | Normal velocity | `:free` and `:rigid` | `u_x` on an x-wall, `u_y` on a y-wall, in the positive coordinate direction; not the outward flux $u\cdot n$ |
+| `wall_t` | Tangential component of the total Cauchy traction, as a boundary load | `:free` and `:open` | `t_x` on a horizontal wall, `t_y` on a vertical wall |
+| `wall_tn` | Normal component of the total Cauchy traction, as a boundary load | `:open` only | `t_x` on a vertical wall, `t_y` on a horizontal wall |
 
-The exact solution of the channel with height $H$, length $L$, pressure gradient $G$ and constant viscosity $\eta$ is plane Poiseuille:
+An unset `wall_u` or `wall_un` falls back to the legacy global wall-velocity closures; `run_semquad_simulation` passes zero closures, so on the driver path an unset entry is zero. An unset `wall_t` or `wall_tn` is zero traction.
 
-$$
-u_x=\frac{G\,y\,(H-y)}{2\eta},\qquad u_y=0,\qquad p=p\_{\mathrm{out}}+G\,(L-x),
-$$
+The card knobs are `CASE_WALL_BC`, `CASE_WALL_UN`, `CASE_WALL_T` and `CASE_WALL_TN`; it has no knob for `wall_u`, which is a `Params` field set in code. Section 6.1 lists the knobs' defaults and accepted values and defers to this section for the semantics. The regional inflow/outflow recipes that compose these knobs are on the [examples](examples.md) page, and the measured checks of the boundary surface are in [validation](validation.md).
 
-so the total traction on the outflow, whose outward normal is $+e\_x$, is
+### 2.3 The traction is the total Cauchy stress
 
-$$
-\sigma\cdot n=\left(-p,\ \eta\frac{\mathrm du\_x}{\mathrm dy}\right)
-=\left(-p\_{\mathrm{out}},\ G\left(\frac H2-y\right)\right).
-$$
+Write $t=\sigma\cdot n=-p\,n+2\eta\,\boldsymbol\varepsilon(u)\cdot n$ , with $n$ the outward normal. Integration by parts of the momentum equation puts $\int\_\Gamma t\cdot v\,\mathrm dS$ on the right-hand side with a plus sign, and the code adds the prescribed data to the unreduced load vector: the constraints then project it onto the admissible test space. It is data on the free side, never a Dirichlet value. On an axis-aligned wall the tangential component is the shear stress $\sigma\_{xy}$ and carries no pressure, so `wall_t` is the exact $2\eta\,\boldsymbol\varepsilon(u)\cdot n$ tangential traction. The normal component carries the pressure, $t\_n=-p+2\eta\,\varepsilon\_{nn}$ , so `wall_tn` is the data that fixes the pressure level on an open boundary.
 
-That is `wall_tn = -p_out` and `wall_t = G(H/2 - y)`; the tangential part is eta-independent at constant eta. The same profile is also the exact solution for a constant body force $f\_x=G$ with no pressure gradient, in which case the pressure is constant, $p=p\_0$, and the outflow normal traction is $-p\_0$. Both driving modes are gates (G264 (a) and (b)); the script uses the pressure-driven one because the driver's body force is the buoyancy and has no horizontal component.
+**`wall_tn` is the dynamic pressure traction.** The pressure this solver computes is the dynamic pressure: the buoyancy force acts on the temperature anomaly and the conductive base state is subtracted analytically (sections 1.2 and 1.3). A `wall_tn` value therefore acts on $p$ itself, not on a lithostatic or hydrostatic column. Because the traction uses the outward normal, a dynamic pressure $p\_0$ imposed on an open boundary is `wall_tn = -p0` on the top wall, `wall_tn = +p0` on the bottom wall, `wall_tn = +p0` on the xminus wall and `wall_tn = -p0` on the xplus wall.
 
-$Q\_2$ velocity and $Q\_1$ pressure contain this solution exactly, and the face quadrature of the traction is exact for its polynomial data, so a channel run measures the linear solve, not the discretisation: the demonstration on a 128-leaf tree reports a profile error of $2\times10^{-14}$ of the centreline velocity and the same pressure field to $5\times10^{-13}$. The three mechanisms are needed together: without the inflow normal velocity nothing drives the region, without the tangential traction the outflow is a different (free-slip) flow, and without `:open`/`wall_tn` the outflow is not at a prescribed pressure.
+### 2.4 The pressure gauge
 
-If the outflow tangential traction is omitted (`wall_t = nothing`), the open wall is a free-slip outlet. The Poiseuille profile is then **not** the solution, because its outflow shear $G(H/2-y)$ violates the zero-tangential-traction condition; the free-slip solution keeps the same inflow data and mass flux, and differs from Poiseuille by exactly the response to the withheld shear traction. That difference is bounded and localised: on the plane channel it is 18% of the centreline velocity, and its strain energy is 2.4% of the derived scale $L\,\lVert\eta u'\rVert^2/(2\eta^2)$. G264 (d) checks the exact linearity in the withheld-traction scale and the response identities, and the script's page in [examples](examples.md) lists the run.
+The nodal pressure pin -- one pressure degree of freedom fixed to zero, with its continuity equation dropped -- is exact only while the normal velocity is Dirichlet on the whole boundary. Then the constant pressure is in the null space of the reduced gradient, because $\int\_\Omega\mathrm{div}\,v=\int\_{\partial\Omega}v\cdot n=0$ for every admissible test function, and the dropped continuity equation is a linear combination of the others. With any `:open` wall a test function with a nonzero normal trace exists, the constant is not in the null space, and pinning one degree of freedom in place of one continuity equation would solve a different problem. The rule is therefore mechanical: the solver pins one pressure dof **iff no wall is `:open`**. The resolved decision is reported as `LAST_SEMSTOKES_PRESSURE_GAUGE`, which is `:pin` or `:none`; with an open wall the pressure level comes from the `wall_tn` data.
 
-The production use of the recipe is `examples/subduction_2d.jl`, a regional subduction-style case with five modes (`validate`, `rheology`, `phases`, `full`, `converge`); its command, its checks and its honest limitations are on the [examples](examples.md) page.
+### 2.5 The corner rule
 
-## 2. The discretization
+A corner node is shared by two walls, and a component cannot take two different Dirichlet values. The walls are written in the order `(xminus, xplus, yminus, yplus)`, normal before tangential within a wall, and a later write overwrites an earlier one. An `:open` wall writes nothing. The owners are:
 
-### 2.1 Mesh and spaces
+| Corner component | Owner |
+|---|---|
+| $u\_x$ | The x-wall's normal `wall_un` value, unless the y-wall there is `:rigid`, whose tangential `wall_u` value is written later and owns it |
+| $u\_y$ | The y-wall's normal `wall_un` value when the y-wall is closed (`:free` or `:rigid`); an x-wall's tangential `wall_u` write, if that wall is `:rigid`, comes earlier and is overwritten. An `:open` y-wall writes nothing, so the x-wall's value survives there |
+
+A rigid top or bottom wall therefore owns $u\_x$ at its two corners, which is what makes a lid-driven cavity's corners belong to the lid.
+
+### 2.6 The refused configurations
+
+**Well-posedness.** Every accepted configuration has a Dirichlet normal component on at least one x-wall and one y-wall. Otherwise a rigid translation is admissible and the discrete saddle is singular: both x-walls `:open` leaves the x-translation free, both y-walls `:open` leaves the y-translation free, and all four walls `:open` leaves the whole rigid motion free. `Params` applies this combinatorial test when the card is constructed. The solver tests the same condition on the actual Dirichlet dof set, as the rank test of the 3 x 3 Gram matrix of the three rigid modes (x-translation, y-translation, rotation about the origin); on failure it reports the measured eigenvalues and the admissible mode.
+
+The refused configurations are listed here with their reasons. `Params` raises the wall-type, data-placement, all-`:open` and rigid-translation refusals when the card is constructed, and the solver repeats the data-placement checks for a direct library call. The numeric rigid-mode test and the net-flux check run inside the flow solve; the linear-path and per-step Newton rows are refused by the solver and by the driver respectively.
+
+| Refused configuration | Reason |
+|---|---|
+| `bc = :open` | The global wall type is `:free` or `:rigid`; `:open` exists only as a per-wall entry of `wall_bc`. |
+| A `wall_bc` entry other than `:same`, `:free`, `:rigid` or `:open` | The four entries are validated when the card is constructed. |
+| All four walls `:open` | The pure traction problem: the velocity is determined only up to a rigid motion, the pressure is not fixed by the boundary, and the data would also have to satisfy zero net force and torque. |
+| Both x-walls `:open`, or both y-walls `:open` | The corresponding rigid translation is admissible. The solver's numeric test also refuses any other configuration whose rigid-mode Gram matrix is singular, naming the admissible motion. |
+| `wall_u` on a resolved `:free` wall | The tangential component is traction-free there; the value would be ignored. |
+| `wall_u` or `wall_un` on an `:open` wall | An open wall has no Dirichlet component on either component; the value would be ignored. Use `wall_tn` for a normal traction on an open wall. |
+| `wall_t` on a resolved `:rigid` wall | The tangential component is Dirichlet there; the assembled load would be dropped by the constraints. |
+| `wall_tn` on a resolved `:free` or `:rigid` wall | The normal component is Dirichlet there; the load would be dropped, and a normal traction needs the free normal velocity of an open wall. |
+| `linear = :schur_cg` or `linear = :lagged` with any `:open` wall | Those paths assume the closed-boundary nodal pin; the derived gauge makes the reduced saddle a different problem. `:direct`, `:mg` and `:auto` are supported. |
+| `pic_mode = :newton` with any non-default per-wall field | The per-step Newton path solves the single-`bc` problem and would silently close an `:open` wall. Use `pic_mode = :picard` for a per-wall configuration. |
+| Prescribed normal data whose net outward flux does not vanish, when no wall is `:open` | The discrete continuity equations are consistent only when $\int\_{\partial\Omega}u\cdot n\,\mathrm dS=0$ . The solver integrates the data it imposes and refuses the tuple when the flux exceeds $10^{-12}\max(u\_{\max}\,\mathrm{perimeter},1)$ , reporting the measured value; the absolute floor admits exact manufactured-solution data that evaluate to round-off at the wall. |
+
+When any wall is `:open` the free normal velocity absorbs a flux imbalance by construction, so the net-flux check is skipped.
+
+### 2.7 The restart markers
+
+A checkpoint stores `wall_bc` as its four values, and stores `wall_u`, `wall_un`, `wall_t` and `wall_tn` as one `none`/`custom` marker per wall. The restart guard refuses a run whose stored marker differs from the live one. A function has no canonical value to compare, so the guard records only whether a custom value is present: swapping one function for another is not detectable, and a restart that changes a wall function must start from scratch rather than from the checkpoint.
+
+## 3. The discretization
+
+### 3.1 Mesh and spaces
 
 The mesh is a quadtree. A leaf is `(level, ix, iy)`, and the tree stays 2:1 balanced: face neighbors differ by at most one level. Refinement splits a quartet of siblings; coarsening merges one. The case caps depth at `max_level = 7`, which puts the finest leaf at $1/256$ of the box height, and caps the leaf count at `max_leaves = 10000`. The initial tree is uniform level 3 with 640 leaves.
 
-Velocity and pressure form a Taylor–Hood pair: velocity in $Q\_p$ , pressure in $Q\_{p-1}$ , with `p = 2` on this case, so $Q\_2$ velocity and $Q\_1$ pressure. Nodes are the Gauss–Legendre–Lobatto points of the reference square, $p+1$ per direction for velocity and $p$ for pressure. Element matrices use Gauss–Legendre quadrature with `p+2` points per direction, the default `nq = p + 2` of `make_fedata`, which integrates the $Q\_p$ mass and stiffness matrices exactly.
+Velocity and pressure form a Taylor–Hood pair: velocity in $Q\_p$ , pressure in $Q\_{p-1}$ , with `p = 2` on this case, so $Q\_2$ velocity and $Q\_1$ pressure. Both are continuous nodal bases on the Gauss–Legendre–Lobatto (GLL) points of the reference square, $p+1$ nodes per direction for velocity and $p$ for pressure. The element integrals use Gauss–Legendre quadrature with `p+2` points per direction, the default `nq = p + 2` of `make_fedata`, which over-integrates the $Q\_p$ mass and stiffness matrices exactly. There is no mass lumping: the mass matrices are the full consistent ones, so GLL quadrature would gain nothing and is not used.
 
-### 2.2 Hanging nodes and constraints
+### 3.2 Hanging nodes and constraints
 
 A node on the face of a coarser leaf is a hanging node. Its value is whatever the coarse face's GLL interpolation gives, imposed through a sparse constraint matrix $C$ that is the identity on free rows. The system is assembled and solved as
 
@@ -362,9 +378,9 @@ $$
 C^{\mathsf T} A\,C,
 $$
 
-where $A$ is the unconstrained assembly. This keeps symmetry and is exact for linear constraints. Boundary values enter the same affine map, and one pressure degree of freedom is pinned to remove the constant null space.
+where $A$ is the unconstrained assembly. This keeps symmetry and is exact for linear constraints. Boundary values enter the same affine map, and one pressure degree of freedom is pinned to remove the constant null space when the boundary is closed (section 2.4).
 
-### 2.3 Time stepping
+### 3.3 Time stepping
 
 The flow is quasi-static, so each step solves Stokes once. The energy equation uses BDF2, with backward Euler on the first step. With the variable step ratio $w=\Delta t/\Delta t\_{\mathrm{prev}}$ the update reads
 
@@ -394,7 +410,7 @@ $$
 
 with `cfl = 0.5` and $h\_{\min}$ the smallest leaf height. It grows by at most 5% per step and shrinks by at most 5% per step unless the hard CFL cut fires, and it is clamped to $[\Delta t\_{\min},\Delta t\_{\max}]=[10^{-9},5\times10^{-5}]$ . The first step starts from $\Delta t\_0=10^{-6}$ and is immediately cut to the CFL value. The update reads the velocity and mesh of the step's first flow solve, so an AMR pass that zeroes the velocity cannot freeze `dt`.
 
-### 2.4 Entropy viscosity
+### 3.4 Entropy viscosity
 
 Oscillations are controlled by an elementwise entropy viscosity added to the energy operator, one value per leaf:
 
@@ -419,9 +435,9 @@ $$
 
 The viscosity is zero on the wall rows and is recomputed every step. For the first two steps, and whenever a variation vanishes, the code falls back to $\nu=\nu\_{\max}$ . It is stored in the checkpoint, because the previous step's energy operator cannot be rebuilt without it.
 
-## 3. The adaptive policy
+## 4. The adaptive policy
 
-### 3.1 Indicator
+### 4.1 Indicator
 
 The indicator is the jump in the temperature gradient across leaf faces, plus a one-sided term on the Dirichlet walls:
 
@@ -448,21 +464,21 @@ where $j\_\theta$ and $j\_v$ are the per-leaf indicators of the two fields. Neit
 
 **The measured comparison.** The measurement is one developed 2-D state at equal cost, 10 000 leaves and 43 steps at the same fixed `dt`, against a 40 000-leaf `:theta` solution. The relative error of `Nu_bot` is 1.10e-4 with `:theta` and 1.01e-5 with `:velocity`; of the volume-mean temperature, 1.75e-4 against 1.15e-4. `:theta` wins on the exact wall-flux residual `resid_A/Nu_top`, about 7e-4 percent against 5e-3 percent. The mechanism is where the leaves go: `:theta` puts 85% of its fine leaves in the wall strips, while `:velocity` puts 3.6% there and refines the interior instead. The choice therefore depends on the observable, not on a ranking. The measurement covers one state, one Rayleigh number, 43 steps (0.2% of the time axis) and 2-D, so keep the default unless you have a reason, and read the comparison as a property of that state rather than a guarantee.
 
-### 3.2 Marking, coarsening and the leaf cap
+### 4.2 Marking, coarsening and the leaf cap
 
 Marking is Dörfler's: `refine_frac = 0.2` is the share of the total indicator to resolve, so the cell count follows from the indicator field. The balanced cycle coarsens from below with the relative threshold `coarsen_frac * total` on a complete quartet, pays for refinement by merging the lowest-error eligible quartet, and caps the leaves dropped per cycle at `round(coarsen_frac * n)`. The case uses `coarsen_frac = 0.05`.
 
 Two hard limits apply after every cycle: the depth cap `max_level` and the leaf cap `max_leaves`. `amr_coarsen_gate` refuses a merge that the next cycle would have to undo, the 2:1 pre-check of the balanced policy. Fields move between meshes by nodal interpolation (`transfer_mode = :nodal`), and `amr_passes = 1` on this case.
 
-### 3.3 Hysteresis and the wall rule
+### 4.3 Hysteresis and the wall rule
 
 The hysteresis cooldown (`amr_hysteresis = 1`, `CASE_HYST`) keeps a quartet that was just merged from being split again for that many cycles; `0` disables it. The deadband multiplier of the balanced cycle is fixed at `0.5`, applied as `tau_h = min(tau_c, 0.5 tau_r)`.
 
 The wall rule forces every leaf within `wall_strip = 0.1` of the top or bottom wall, and the wall rows themselves, back to at least `wall_min_level = 5` after every cycle, then enforces the leaf cap. `CASE_WALLMIN=0` turns it off. The rule exists because the indicator alone leaves the top wall at level 3 or 4 while the interior reaches level 5 or 6, and the pointwise `Nu_top` then differs from the wall-refined value by 1.2% and the consistent boundary flux by 9.6%.
 
-## 4. Linear solvers and the `:auto` rule
+## 5. Linear solvers and the `:auto` rule
 
-### 4.1 The direct path
+### 5.1 The direct path
 
 The direct path forms the reduced saddle
 
@@ -474,11 +490,11 @@ $$
 
 after constraint and boundary elimination, factorizes it with UMFPACK, and checks the true reduced residual. A wall-refined free-slip tree makes the unshifted factorization unstable, so the path walks a shift ladder: relative diagonal shifts of $10^{-12}$ , then $10^{-10}$ , then $10^{-8}$ . If no rung meets the acceptance tolerance, a few GMRES refinement iterations against the unshifted operator, preconditioned by the best rung, polish the iterate. Two smaller shifts, $10^{-14}$ and $10^{-13}$ , are tried first when the unshifted factorization has lost the solution outright, and again as a last resort before the step fails. With `stokes_scaling = :equilibrated` the path first tries the symmetric equilibration $S\to DSD$ , which lifts the near-null pressure modes above the round-off floor and engages only on a solve that would otherwise enter the ladder. The direct path is the only bitwise reproducible one, so a bitwise reference pins it explicitly.
 
-### 4.2 The multigrid path
+### 5.2 The multigrid path
 
 The multigrid path is a block-triangular preconditioner for flexible GMRES: a geometric V-cycle for the velocity block, with h-coarsening of at least 1.5 per level, damped-Jacobi smoothing, and every level built from the leaf-local matrix-free apply; and a three-factor w-BFBT approximation of the pressure Schur complement. FGMRES restarts every 100 iterations and is capped at 500, stopping on the true reduced-saddle residual against `mg_tol`. The case passes `mg_tol = 1e-8` , five orders below its `stokes_tol = 1e-3` ; the library default is `1e-10` .
 
-### 4.3 The `:auto` rule
+### 5.3 The `:auto` rule
 
 `linear = :auto` resolves the path before assembly, from two properties of the current saddle:
 
@@ -486,7 +502,7 @@ $$
 N_{\mathrm{saddle}} = 2N_u + N_p,
 $$
 
-with $N\_u$ the velocity degrees of freedom and $N\_p$ the pressure ones. The rules are:
+with $N\_u$ the velocity unknowns and $N\_p$ the pressure ones, counted before the hanging-node constraints and the Dirichlet elimination. The rules are:
 
 | Condition | Choice |
 |---|---|
@@ -494,11 +510,11 @@ with $N\_u$ the velocity degrees of freedom and $N\_p$ the pressure ones. The ru
 | Contrast at most 100 and $N\_{\mathrm{saddle}} \ge 2\,000$ | Multigrid. |
 | Everything else | The direct path, which is also the bitwise path, so ties go there. |
 
-The contrast is sampled on a fixed 33 x 33 grid of the viscosity field the solve actually uses, 1 089 evaluations at a fixed cost. Once `:auto` picks multigrid it also forces `mg_operator = :matrixfree` and `mg_threads = min(8, Threads.nthreads())` . If that solve misses `stokes_tol` or throws, the same solve is redone on the direct path and counted in `LAST_AUTO_FALLBACK` ; the run continues and the count is printed as `auto_fallbacks` at the end. An explicit `linear = :mg` has no such net and fails loudly. At this case's states the saddle is 78 720 degrees of freedom at 8 188 leaves and 95 308 at 10 000, both above the 20 000 rule, so a new run resolves to multigrid. The library also keeps two historical paths, `:schur_cg` (CG on the Schur complement, with `schur_maxiter` and `schur_precond`) and `:lagged` (a reused direct factorization); this case uses neither.
+The contrast is sampled on a fixed 33 x 33 grid of the viscosity field the solve actually uses, 1 089 evaluations at a fixed cost. Once `:auto` picks multigrid it also forces `mg_operator = :matrixfree` and `mg_threads = min(8, Threads.nthreads())` . If that solve misses `stokes_tol` or throws, the same solve is redone on the direct path and counted in `LAST_AUTO_FALLBACK` ; the run continues and the count is printed as `auto_fallbacks` at the end. An explicit `linear = :mg` has no such net and fails loudly. At this case's states the selector's count is 78 720 at 8 188 leaves and 95 308 at 10 000, both above the 20 000 rule, so a new run resolves to multigrid. The library also keeps two historical paths, `:schur_cg` (CG on the Schur complement, with `schur_maxiter` and `schur_precond`) and `:lagged` (a reused direct factorization); this case uses neither, and both are refused when any wall is `:open` (section 2.6).
 
-## 5. Parameter reference
+## 6. Parameter reference
 
-### 5.1 Environment variables
+### 6.1 Environment variables
 
 Every knob is a `CASE_*` environment variable read when the script starts. The second column is the case's default; the third lists the accepted values.
 
@@ -516,13 +532,13 @@ Every knob is a `CASE_*` environment variable read when the script starts. The s
 | `CASE_COARSEN` | 0.05 | float | Coarsening share: relative threshold and per-cycle cell cap of the balanced policy. |
 | `CASE_WALLMIN` | 5 | integer | Minimum level inside the wall strip and on the wall rows. 0 turns the wall rule off. |
 | `CASE_WALLSTRIP` | 0.1 | float in (0, 0.5) | Width of the wall strip, as a fraction of the box height from each wall. |
-| `CASE_WALL_BC` | empty | `same`, `free`, `rigid` or `open`, four entries | Per-wall velocity condition, in the order (xminus, xplus, yminus, yplus); empty means all `same`, which follows `bc` (section 1.1). `open` leaves both components free and switches the pressure gauge to the derived one. |
-| `CASE_WALL_UN` | empty (all `nothing`) | four entries, each empty or a float | Per-wall normal velocity, in the order (xminus, xplus, yminus, yplus); an entry is the wall's normal component in the positive coordinate direction, an empty entry keeps the historical zero, and while no wall is `open` the four values must have zero net outward flux (section 1.1). |
-| `CASE_WALL_T` | empty (all `nothing`) | four entries, each empty or a float | Per-wall tangential traction, in the order (xminus, xplus, yminus, yplus); an entry is the total Cauchy traction's tangential global component (`t_x` on a horizontal wall, `t_z` on a vertical one), an empty entry is zero traction, and an entry is only accepted on a wall that resolves to `:free` or `:open` (section 1.1). |
-| `CASE_WALL_TN` | empty (all `nothing`) | four entries, each empty or a float | Per-wall normal traction, in the order (xminus, xplus, yminus, yplus); an entry is the total Cauchy traction's normal global component (`t_x` on a vertical wall, `t_z` on a horizontal one), an empty entry is zero traction, and an entry is only accepted on an `:open` wall. Because the traction uses the outward normal, a pressure `p0` is `-p0` on the top wall and `+p0` on the bottom wall (section 1.1). |
+| `CASE_WALL_BC` | empty (all `same`) | four entries, each `same`, `free`, `rigid` or `open` | Per-wall velocity condition, in the order (xminus, xplus, yminus, yplus). Empty overall means all `same`, which follows the card's `bc = :free` and is the free-slip card. `open` leaves both components free and switches the pressure gauge to the derived one (section 2.4). |
+| `CASE_WALL_UN` | empty (all `nothing`) | four entries, each empty or a float | Per-wall normal velocity: `u_x` on an x-wall, `u_y` on a y-wall, in the positive coordinate direction. An empty entry keeps the historical zero. While no wall is `open` the four face integrals must balance (section 2.6). |
+| `CASE_WALL_T` | empty (all `nothing`) | four entries, each empty or a float | Per-wall tangential traction: the total Cauchy traction's `t_x` on a horizontal wall and `t_y` on a vertical one. An empty entry is zero traction. Accepted only on a wall that resolves to `free` or `open` (section 2.6). |
+| `CASE_WALL_TN` | empty (all `nothing`) | four entries, each empty or a float | Per-wall normal traction: the total Cauchy traction's `t_y` on a horizontal wall and `t_x` on a vertical one. An empty entry is zero traction. Accepted only on an `open` wall. Because the traction uses the outward normal, a dynamic pressure `p0` is `-p0` on the top wall and `+p0` on the bottom wall (section 2.3). |
 | `CASE_SYMMETRY` | `none` | `none`, `x` | x-mirror closure of the AMR passes: `x` refines and merges mirror partners together, for symmetric benchmarks. |
-| `CASE_INDICATOR` | `theta` | `theta`, `velocity`, `both` | Field the AMR jump indicator is applied to, as in section 3.1. |
-| `CASE_LINEAR` | `auto` | `auto`, `direct`, `mg`, `schur_cg`, `lagged` | Linear solver, as in section 4. |
+| `CASE_INDICATOR` | `theta` | `theta`, `velocity`, `both` | Field the AMR jump indicator is applied to, as in section 4.1. |
+| `CASE_LINEAR` | `auto` | `auto`, `direct`, `mg`, `schur_cg`, `lagged` | Linear solver, as in section 5. `schur_cg` and `lagged` are refused with an `open` wall. |
 | `CASE_EV` | 0.11 | float | Entropy-viscosity coefficient. |
 | `CASE_LATENT` | `per_phase` | `per_phase`, `global` | Latent coefficients: one per transition, or the single historical `latent_L = 0.11` for both. Any other value is rejected when `Params` is constructed. |
 | `CASE_COMP_ED`, `CASE_COMP_ES` | 12.0, 17.0 | floats | Activation energies of the composite law's diffusion and dislocation branches, `E_d` and `E_s` (section 1.4). |
@@ -536,7 +552,7 @@ Every knob is a `CASE_*` environment variable read when the script starts. The s
 | `CASE_SHEAR_MODULUS` | empty (off) | float >= 0 | Maxwell viscoelasticity: the nondimensional elastic shear modulus $G$ . Empty or 0 is off and leaves the run bit-identical; a positive value changes the effective viscosity and the physical regime, as section 1.8 describes. |
 | `CASE_EXTDIAG` | 0 | 0, 1 (also `true`, `yes`, `on`) | Append the exact energy-identity residual `resid_A` to `history.csv`. It changes the column count, so it is accepted only in a new output directory. |
 
-`main()` rejects an unknown `CASE_AMR_GATE` (not 0 or 1), `CASE_SYMMETRY` (not `none` or `x`) or `CASE_STOKES_SCALING` (not `none` or `equilibrated`) before doing any work. It also validates `CASE_SHEAR_MODULUS` (finite and at least 0), `CASE_ETA_REF` (finite and positive), the four entries of `CASE_WALL_BC`, `CASE_WALL_UN`, `CASE_WALL_T` and `CASE_WALL_TN` (each empty or a finite float), and the well-posedness of an `:open` wall combination (refused at `Params` construction). The following are literals rather than knobs: `H = 10`, `p = 2`, `stokes_tol = 1e-3`, `mg_tol = 1e-8`, `amr_every = 5`, `refine_frac = 0.2`, `cfl = 0.5`, `dt_growth = 1.05`, `maxpic = 1`, `pic_tol = 1e-6`, `ev_cmax = 0.052`, `ev_alpha = 2`, `checkpoint_every = 200`, and the 256 x 256 frame grid.
+`main()` rejects an unknown `CASE_AMR_GATE` (not 0 or 1), `CASE_SYMMETRY` (not `none` or `x`) or `CASE_STOKES_SCALING` (not `none` or `equilibrated`) before doing any work. It also validates `CASE_SHEAR_MODULUS` (finite and at least 0), `CASE_ETA_REF` (finite and positive), the four entries of `CASE_WALL_BC` (each `same`, `free`, `rigid` or `open`) and the four entries of `CASE_WALL_UN`, `CASE_WALL_T` and `CASE_WALL_TN` (each empty or a finite float). The combination itself is validated when `Params` is constructed, so an ill-posed `open` configuration is refused there (section 2.6). The following are literals rather than knobs: `H = 10`, `p = 2`, `stokes_tol = 1e-3`, `mg_tol = 1e-8`, `amr_every = 5`, `refine_frac = 0.2`, `cfl = 0.5`, `dt_growth = 1.05`, `maxpic = 1`, `pic_tol = 1e-6`, `ev_cmax = 0.052`, `ev_alpha = 2`, `checkpoint_every = 200`, and the 256 x 256 frame grid.
 
 With no argument the script runs `short`. Otherwise the first argument selects one of seven modes:
 
@@ -550,9 +566,9 @@ With no argument the script runs `short`. Otherwise the first argument selects o
 | `resume <ckpt>` | 2000 | Continues any checkpoint with AMR to `resume.h5`. |
 | `symseed <ckpt>` | none | Writes a copy of the checkpoint with `symmetry` rewritten under `seed/`, and runs no steps. |
 
-The four restart modes read `$CASE_OUT/spinup.h5` when the checkpoint argument is omitted. The three seed modes copy a checkpoint and rewrite exactly the configuration strings the next stage changes, so the restart guard still checks everything else.
+The four modes that take a checkpoint argument read `$CASE_OUT/spinup.h5` when it is omitted. The three seed modes (`freeze`, `wallrefine`, `symseed`) copy a checkpoint and rewrite exactly the configuration strings the next stage changes, so the restart guard still checks everything else.
 
-### 5.2 Keywords of `run_semquad_simulation`
+### 6.2 Keywords of `run_semquad_simulation`
 
 The defaults are the library defaults; the case column is the value `case_realistic_2d.jl` passes.
 
@@ -567,7 +583,7 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `tmin`, `steady_tol`, `steady_window` | 0, `Inf`, 5 | 0, `Inf`, 5 | Steady-state stop: after `t > tmin`, stop once the relative theta change and the relative `Nu` change stay below `steady_tol` for `steady_window` steps. |
 | `tavg_start` | `Inf` | `Inf` | Start of the running time average returned as `avg`; `Inf` disables it. |
 | `amr_every` | 0 | 5 | Steps between AMR cycles; 0 freezes the mesh. |
-| `amr_indicator` | `:theta` | `CASE_INDICATOR` | Field of the AMR jump indicator: `:theta`, `:velocity` or `:both` (section 3.1). |
+| `amr_indicator` | `:theta` | `CASE_INDICATOR` | Field of the AMR jump indicator: `:theta`, `:velocity` or `:both` (section 4.1). |
 | `amr_passes` | 1 | 1 | Indicator, refine and transfer passes per cycle. |
 | `refine_frac`, `coarsen_frac` | 0.2, 0.0 | 0.2, `CASE_COARSEN` | Cumulative-error shares of the balanced cycle, marked by Dörfler from above and from below. |
 | `amr_hysteresis`, `amr_coarsen_gate` | 1, true | `CASE_HYST`, `CASE_AMR_GATE == 1` | Hysteresis cooldown and the 2:1 gate. |
@@ -579,13 +595,13 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `top_wall_level`, `top_wall_frac` | 0, 0.5 | off | Top-wall refinement rule. |
 | `zero_side_eta`, `side_strip` | false, 0.05 | false, 0.05 | Side-strip viscosity zeroing. |
 | `advection` | `:galerkin` | `:skew` | Advection form of the energy equation. |
-| `ev`, `ev_cmax`, `ev_alpha` | 0, 0.052, 2 | 0.11, 0.052, 2 | Entropy viscosity, as in section 2.4; `ev = 0` switches it off. |
-| `maxpic`, `pic_tol`, `pic_relax`, `pic_mode` | 1, 1e-6, 1.0, `:picard` | same | Nonlinear iteration inside a step. `pic_mode = :newton` is a research option: it requires `linear=:direct`, refuses the reference state, the compressible mass form and `nu_cbf`, and is slower than Picard with multigrid on the measured cases. |
+| `ev`, `ev_cmax`, `ev_alpha` | 0, 0.052, 2 | 0.11, 0.052, 2 | Entropy viscosity, as in section 3.4; `ev = 0` switches it off. |
+| `maxpic`, `pic_tol`, `pic_relax`, `pic_mode` | 1, 1e-6, 1.0, `:picard` | same | Nonlinear iteration inside a step. `pic_mode = :newton` is a research option: it requires `linear=:direct`, refuses the reference state, the compressible mass form, `nu_cbf`, `eta_multiplier`, `eta_ref != 1` and any non-default per-wall field, and is slower than Picard with multigrid on the measured cases. |
 | `pic_reject`, `pic_reject_clamp`, `pic_reject_res`, `pic_reject_max` | false, 0.25, 10, 4 | defaults | Reject a Picard trial when the clamp fraction or the residual grows, and redo it with a halved relaxation. |
 | `pic_adapt`, `pic_relax_min`, `pic_eta_relax`, `pic_u_relax` | false, 0.05, 1.0, 1.0 | defaults | Relaxation adaptation, strain-rate averaging and velocity under-relaxation of the Picard loop. |
 | `pic_div_window`, `pic_div_factor` | 0, 10 | defaults | Divergence detector of the Picard loop. |
 | `newton_maxit`, `newton_krylov`, `newton_restart`, `newton_ls`, `newton_geo_safety` | 15, 80, 30, 8, 0 | defaults | Newton controls, inert while `pic_mode = :picard`. |
-| `linear` | `:auto` | `CASE_LINEAR` | Linear solver, as in section 4. |
+| `linear` | `:auto` | `CASE_LINEAR` | Linear solver, as in section 5. |
 | `stokes_tol` | `Inf` | 1e-3 | Abort the step above this true residual; also the `:auto` fallback and the direct path's acceptance tolerance. |
 | `schur_maxiter`, `schur_precond` | 200, `:mass` | defaults | Iteration cap and preconditioner of `linear = :schur_cg`. |
 | `mg_tol`, `mg_threads` | 1e-10, 1 | 1e-8, 1 (`auto`: `min(8, nthreads)`) | Outer tolerance and thread count of the multigrid. |
@@ -604,9 +620,11 @@ The defaults are the library defaults; the case column is the value `case_realis
 | `checkpoint_meta`, `callback`, `verbose`, `profile_steps` | empty, `nothing`, false, false | case metadata, frame writer, true, false | Checkpoint metadata, step hook, per-step lines, per-step timing. |
 | `pic_diag`, `extdiag` | false, false | false, `CASE_EXTDIAG` | Nonlinear diagnostics, and the `resid_A` history column. |
 
-The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `ss`, `ux`, `uz`, `pv`, `avg`, `weak`, `chi`, `chi_prev`, `txx`, `tyy` and `txy`. The three stress components are `nothing` unless `shear_modulus > 0` (section 1.8). `history` holds one row per step actually run, with the columns of section 6.2, and `history_extra` names the columns appended after the fixed 18.
+The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `ss`, `ux`, `uz`, `pv`, `avg`, `weak`, `chi`, `chi_prev`, `txx`, `tyy` and `txy`. The three stress components are `nothing` unless `shear_modulus > 0` (section 1.8). `history` holds one row per step actually run, with the columns of section 7.2, and `history_extra` names the columns appended after the fixed 18.
 
-### 5.3 The `Params` card
+The per-wall data and the wall types are `Params` fields, not keywords of `run_semquad_simulation`; the driver forwards them to every flow solve. Section 6.3 lists the fields, and section 2 gives their semantics.
+
+### 6.3 The `Params` card
 
 `make_params()` in the case script sets these fields. Everything else in `Params` keeps its default, listed in `src/physics/params.jl`.
 
@@ -620,8 +638,8 @@ The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `s
 | `comp_n`, `comp_Tcut`, `comp_eps_min` | 3, 0 (off), 1e-12 | Stress exponent, temperature floor, strain-rate floor. |
 | `eta_T0`, `eta_min`, `eta_max` | 0.5, 1e-4, 1e4 | Surface offset and viscosity bounds. |
 | `eta_ref` | 1.0 | Rayleigh-number reference viscosity: `Ra` is defined with it and the flow solve uses `eta/eta_ref` (section 1.9). |
-| `bc`, `wall_bc`, `wall_un`, `wall_t`, `wall_tn` | `:free`, from `CASE_WALL_BC`, from `CASE_WALL_UN`, from `CASE_WALL_T`, from `CASE_WALL_TN` | Free-slip walls; `:rigid` is no-slip, `:open` leaves both components free, and `wall_bc` overrides one wall at a time (section 1.1). `wall_un` refines the Dirichlet *normal* value per wall; empty entries keep the historical zero, and while no wall is `open` the four values must have zero net flux. `wall_t` adds a per-wall *tangential* traction as a boundary-face load and `wall_tn` a per-wall *normal* traction on an `:open` wall; empty entries are zero traction, and a `wall_tn` entry also switches the pressure gauge to the derived (unpinned) one (section 1.1). |
-| `latent_L`, `latent_mode` | 0.11, `:per_phase` | Historical single coefficient, unused here, and the per-transition mode. |
+| `bc`, `wall_bc`, `wall_u`, `wall_un`, `wall_t`, `wall_tn` | `:free`, from `CASE_WALL_BC`, from `CASE_WALL_UN`, from `CASE_WALL_T`, from `CASE_WALL_TN` | Wall types and per-wall data. `bc` is `:free` or `:rigid`; `wall_bc` overrides one wall at a time with `:same`, `:free`, `:rigid` or `:open`. The four data tuples prescribe velocity or traction per wall; every entry defaults to `nothing`, which falls back to the historical values described in section 2.2. Section 2 gives the accepted walls, the sign conventions, the refusals and the restart markers. |
+| `latent_L`, `latent_mode` | 0.11, `:per_phase` | Historical single coefficient, unused while `latent_mode = :per_phase`, and the per-transition mode. |
 | `yield_c`, `yield_phi`, `yield_taumax` | `Inf`, 0, `Inf` | Yield surface off. |
 | `yield_c_grad`, `yield_mu_grad` | 0, 0 | Depth dependence of the yield surface off. |
 | `weak_f`, `weak_eps_ref` | 1, 0 | Strain weakening off. |
@@ -635,11 +653,11 @@ The function returns `theta`, `t`, `steps`, `history`, `history_extra`, `qt`, `s
 
 `Params` also validates the law. `:composite` refuses a Drucker–Prager yield surface, `:tosi` refuses `yield_*` because it carries its own plastic branch, and `:arrhenius` needs `eta_T0 > 0`.
 
-## 6. Output formats
+## 7. Output formats
 
 Everything is written under `CASE_OUT`. The program creates the directory; only a shell redirect into it needs the directory to exist first.
 
-### 6.1 `run.log`
+### 7.1 `run.log`
 
 The program does not create this file. It is the shell redirect of stdout and stderr, and it holds the four header lines, two lines per step (the step record and the Picard update, with `verbose=true`), two lines every 5 steps (the `AMR:` record and the `balanced:` counters), a progress line every 100 steps from the case callback, and at the end
 
@@ -650,7 +668,7 @@ The program does not create this file. It is the shell redirect of stdout and st
 
 stdout is block buffered, and the callback flushes it every 100 steps, so a redirected log lags by at most that much. Errors go to stderr, unbuffered.
 
-### 6.2 `history.csv`
+### 7.2 `history.csv`
 
 Written once, when the run returns, with one row per step actually run:
 
@@ -680,7 +698,7 @@ This case appends one more column because its latent terms are active.
 
 With `CASE_EXTDIAG=1` a `resid_A` column follows: the exact residual of the quoted pointwise Nusselt pair against the scheme's energy identity, per unit area, so it is zero for the time-step flux and $O(h)$ for the pointwise one. With `nu_cbf=true` the consistent-boundary-flux pair, `Nu_cbf_top` and `Nu_cbf_bot`, is appended. A run can carry both extras; on this case the appended columns are `closure_nolatent`, `Nu_cbf_top`, `Nu_cbf_bot` and `resid_A`, in that order.
 
-### 6.3 Frames
+### 7.3 Frames
 
 One frame per `CASE_FRAME` steps, offset one step past every AMR cycle. The AMR pass zeroes the velocity, so a frame written on an AMR step would carry a zero velocity and a meaningless Nusselt number. A final frame is always written.
 
@@ -704,7 +722,7 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 
 `nlev` is the number of distinct levels, `eta_clip_frac` the fraction of velocity nodes whose viscosity hit a bound, and `wall_s` the seconds since the frame writer was constructed.
 
-### 6.4 Checkpoints
+### 7.4 Checkpoints
 
 An HDF5 file, written every `checkpoint_every` steps and once at the end, always to the same path (`$CASE_OUT/spinup.h5`, `frozen.h5`, `resume.h5`, and so on). It holds the full state needed to continue the trajectory:
 
@@ -722,7 +740,7 @@ An HDF5 file, written every `checkpoint_every` steps and once at the end, always
 
 `velocity_stale` marks a final checkpoint whose last step was an AMR step: the stored velocity is a diagnostic re-solve, and a restart zeroes it. A checkpoint is about 2 MB at the production state.
 
-## 7. Restarting and the configuration guard
+## 8. Restarting and the configuration guard
 
 `restart_from` replaces the mesh, `p` and the initial state with the checkpoint contents before the first step, and `checkpoint_path` writes the continued run to its own file. `maxsteps` and `tstop` stay absolute. The quick start shows the command for this case (section "Stopping and resuming" there).
 
@@ -734,7 +752,7 @@ ArgumentError: restart configuration mismatch in /path/resume.h5:
   wall_min_level: checkpoint=0.0, current=5.0
 ```
 
-The compared keys are the ones that affect the trajectory. They cover the AMR policy: `amr_every`, `amr_passes`, `refine_frac`, `coarsen_frac`, `max_leaves`, `max_level`, `wall_min_level`, `wall_strip`, `symmetry`, `transfer_mode`, `amr_hysteresis`, `amr_coarsen_gate`, `amr_indicator`, `amr_policy`, the hotspot and top-wall keys, `zero_side_eta` and `side_strip`. They cover the energy step: `advection`, `ev`, `ev_cmax` and `ev_alpha`. They cover the nonlinear and time-step controls: `maxpic`, `pic_tol`, `pic_relax`, `pic_mode`, `pic_reject`, `cfl`, `dtmax`, `dtmin`, `mass_form` and `deviatoric`. They cover the physics: `H`, `H_half_life`, `rho_heating`, `rho_cp`, `Di`, `heating_adiabatic`, `heating_dissipation`, the active law's parameters (`comp_*`, `eta_T0`, `eta_min`, `eta_max` and `comp_rule` here; the `tosi_*` block for that law), the yield and weakening parameters, `latent_L`, `latent_mode`, `latent_scheme` and the phase list, the reference state and its `ref_*` values, the weak-zone and density hooks (`eta_multiplier` and `rho_multiplier`, stored as `none` or `custom`), the wall motion (`wall_bc`, and `wall_u`/`wall_un`/`wall_t`/`wall_tn` stored as one `none`/`custom` marker per wall: a function has no value to compare, so a restart that changes the value but not the presence of a wall function is not detected, and should be restarted from scratch), `side_thermal`, `Twall_left`, `Twall_right`, `shear_modulus`, `eta_ref`, `stokes_scaling`, and `physics_revision`.
+The compared keys are the ones that affect the trajectory. They cover the AMR policy: `amr_every`, `amr_passes`, `refine_frac`, `coarsen_frac`, `max_leaves`, `max_level`, `wall_min_level`, `wall_strip`, `symmetry`, `transfer_mode`, `amr_hysteresis`, `amr_coarsen_gate`, `amr_indicator`, `amr_policy`, the hotspot and top-wall keys, `zero_side_eta` and `side_strip`. They cover the energy step: `advection`, `ev`, `ev_cmax` and `ev_alpha`. They cover the nonlinear and time-step controls: `maxpic`, `pic_tol`, `pic_relax`, `pic_mode`, `pic_reject`, `cfl`, `dtmax`, `dtmin`, `mass_form` and `deviatoric`. They cover the physics: `H`, `H_half_life`, `rho_heating`, `rho_cp`, `Di`, `heating_adiabatic`, `heating_dissipation`, the active law's parameters (`comp_*`, `eta_T0`, `eta_min`, `eta_max` and `comp_rule` here; the `tosi_*` block for that law), the yield and weakening parameters, `latent_L`, `latent_mode`, `latent_scheme` and the phase list, the reference state and its `ref_*` values, the weak-zone and density hooks (`eta_multiplier` and `rho_multiplier`, stored as `none` or `custom`), the wall motion (`bc`, `wall_bc`, and `wall_u`/`wall_un`/`wall_t`/`wall_tn` stored as one `none`/`custom` marker per wall, as section 2.7 describes), `side_thermal`, `Twall_left`, `Twall_right`, `shear_modulus`, `eta_ref`, `stokes_scaling`, and `physics_revision`.
 
 `physics_revision` is a property of the physics code, not of a parameter value. The driver refuses a checkpoint written under another revision, and resumes a file that has no revision marker with a warning that states whether the file carries a Maxwell stress history. The comparison iterates over the checkpoint's keys, so a key added after a checkpoint was written is not compared. `stokes_scaling` has a defined default: a file without it reads as `none`, and switching the option on for such a chain is refused.
 
@@ -742,16 +760,18 @@ Some settings are state rather than configuration, so they are not compared: `p`
 
 When a resume is refused, repeat the stored values, or use a seed mode. A seed mode copies the checkpoint and rewrites exactly the conflicting strings: `freeze` sets `amr_every = 0`, `wallrefine` sets `wall_min_level`, `wall_strip`, `max_leaves`, `ev` and `symmetry` and refines the wall, and `symseed` sets `symmetry`. The source file is never modified.
 
-## 8. Threads and memory
+## 9. Threads and memory
 
 Start Julia with `--threads=N`. The only part of this case that uses the Julia thread pool is the matrix-free V-cycle that `linear = :auto` selects, and it is capped at eight threads, `mg_threads = min(8, Threads.nthreads())`, so more than eight adds nothing on that path. With one thread the auto path warns once and runs serial. An explicit `linear = :mg` keeps `mg_threads = 1` unless the caller sets it, and the direct factorization is serial in every case.
 
 At eight threads the warm production Stokes solve takes 1.36 s, against 3.37 s for the direct solve. The full solve gains 1.30 to 1.42x over a single thread, and the V-cycle gains 1.77 to 2.05x.
 
+A warm step at the 10 000-leaf cap costs about 3.6 s: 3.1 s in the Stokes solve, 0.31 s in the energy assembly and solve, 0.14 s in the work and dissipation terms, and 0.04 s in diagnostics. The rest of the per-step time is the AMR pass, the frame diagnostics and checkpoint I/O.
+
 At the 10 000-leaf cap, the production state peaks at about 1.3 GB resident on the multigrid path with eight threads, and about 2.4 GB with the direct factorization, so the multigrid needs about half the memory of the direct solve at this size. Both figures are process peaks, so they include the Julia runtime and the loaded state. Plan on 2 GB of free memory for a default run and 3 GB for the direct path.
 
-Disk is dominated by frames. Section 6.3 lists the files each frame writes; their size follows the tree, and the frame count follows `CASE_FRAME`. A checkpoint is about 2 MB (section 6.4).
+Disk is dominated by frames. Section 7.3 lists the files each frame writes; their size follows the tree, and the frame count follows `CASE_FRAME`. A checkpoint is about 2 MB (section 7.4).
 
-## 9. Where to read next
+## 10. Where to read next
 
 **Next:** [Validation](validation.md) — the benchmark record behind these defaults, and the scope of what has been checked.

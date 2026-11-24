@@ -6,7 +6,7 @@ This page gives the short answer. The solver has been checked at three levels. A
 
 ## Steady benchmarks
 
-The steady benchmarks are the Blankenbach et al. (1989) family on the quadtree solver. Every row is a run driven to a steady state at one refinement level, so the table shows how the answer converges rather than quoting a single point. `Nu` is the top wall flux from the one-sided GLL gradient and `Vrms` the volume RMS velocity; [guide section 1.3](guide.md#13-base-state-heating-and-nusselt-numbers) defines the Nusselt numbers and guide section 6.2 the velocity columns.
+The steady benchmarks are the Blankenbach et al. (1989) family on the quadtree solver. Every row is a run driven to a steady state at one refinement level, so the table shows how the answer converges rather than quoting a single point. `Nu` is the top wall flux from the one-sided GLL gradient and `Vrms` the volume RMS velocity; [guide section 1.3](guide.md#13-base-state-heating-and-nusselt-numbers) defines the Nusselt numbers and guide section 7.2 the velocity columns.
 
 | Case | `Ra` | Viscosity | Level | Leaves | `Nu` | Reference | Δ | `Vrms` | Δ |
 |---|---:|---|---:|---:|---:|---:|---:|---:|---:|
@@ -24,11 +24,11 @@ The steady benchmarks are the Blankenbach et al. (1989) family on the quadtree s
 | 2b | $10^4$ | temperature and depth | 3 + walls 4 | 1 120 | 7.212885 | 6.9299 | +4.08% | 170.633 | −0.65% |
 | 2b | $10^4$ | temperature and depth | 4 + walls 5 | 4 000 | 6.992620 | 6.9299 | **+0.90%** | 171.634 | −0.07% |
 
-Read the 1a rows for the method. The error drops by a factor of 3.9 between level 3 and level 4, and by 3.5 between level 4 and level 5, against the factor of 4 a second-order element predicts. 1b shows the same behavior, with ratios of 3.3 and 3.9. `Vrms` sits within 0.02% of the reference on every level. That contrast is why both columns are here: the velocity field is a large-scale quantity, while `Nu` is a one-sided gradient inside a boundary layer thinner than the wall element.
+Read the 1a rows for the method. The error drops by a factor of 3.9 between level 3 and level 4, and by 3.5 between level 4 and level 5, against the factor of 4 a second-order element predicts. 1b shows the same behavior, with ratios of 3.3 and 3.9. In 1a and 1b, `Vrms` sits within 0.02% of the reference on every level. That contrast is why both columns are here: the velocity field is a large-scale quantity, while `Nu` is a one-sided gradient inside a boundary layer thinner than the wall element.
 
 Case 1c converges more slowly, 7.81% to 4.85% to 1.56%, a ratio of 1.6 and then 3.1. Its Rayleigh number is $10^6$ , a hundred times 1a's, so the wall boundary layer is thinner at the same leaf count and the wall element carries a larger share of the error at every level.
 
-Cases 2a and 2b use the wall rule of [guide section 3.3](guide.md#33-hysteresis-and-the-wall-rule): every leaf within a strip of a wall, and the wall rows themselves, are held at a minimum level. 2b shows what that buys, moving from +4.60% at 640 leaves to +0.90% at 4 000, where the two wall fluxes agree to 0.39%. The 4.60% offset at level 3 is the wall boundary layer being under-resolved, not an implementation error, and agreement between the top and bottom fluxes is the steady-state acceptance test. Uniform refinement does not substitute for the wall rule: a uniform level-4 run on 2b (80 x 32) stopped before convergence at +5.31%. 2a lands at +0.58% on `Nu_top` and −0.15% on `Vrms` with the same rule at 1 600 leaves.
+Cases 2a and 2b use the wall rule of [guide section 4.3](guide.md#43-hysteresis-and-the-wall-rule): every leaf within a strip of a wall, and the wall rows themselves, are held at a minimum level. 2b shows what that buys, moving from +4.60% at 640 leaves to +0.90% at 4 000, where the two wall fluxes agree to 0.39%. The 4.60% offset at level 3 is the wall boundary layer being under-resolved, not an implementation error, and agreement between the top and bottom fluxes is the steady-state acceptance test. Uniform refinement does not substitute for the wall rule: a uniform level-4 run on 2b (80 x 32) stopped before convergence at +5.31%. 2a lands at +0.58% on `Nu_top` and −0.15% on `Vrms` with the same rule at 1 600 leaves.
 
 ### The 2b flux families
 
@@ -44,21 +44,34 @@ Cases 2a and 2b use the wall rule of [guide section 3.3](guide.md#33-hysteresis-
 
 On the wall-refined state the three families span 0.22%. That agreement is the reason the convergence table quotes the plain wall gradient: the choice of definition does not move the answer at this resolution.
 
+## Boundary conditions
+
+The per-wall surface of [guide section 2](guide.md#2-boundary-conditions) is verified against exact solutions whose boundary data are the inputs. Uniform viscosity and polynomial data make Q2 velocity and Q1 pressure exact, and the face quadrature exact for the polynomial traction, so every number below is the linear solve's round-off and not a discretization error.
+
+| Check | What was compared | Measured |
+|---|---|---|
+| Traction-driven Couette | uniform viscosity `eta0 = 3`, tangential traction `tau0 = 2` on one wall, the other three no slip; exact `u = (tau0 y/eta0, 0)`, `p = 0` | velocity error 7.6e-15, pressure 2.6e-12 |
+| Normal traction on an open wall | a rigid box with the top `:open` and `wall_tn = T`; exact `u = 0`, `p = -T` | `max|u| = 3.6e-16`, `max|p + T|/T = 8.7e-15` |
+| Channel Poiseuille | an inflow normal velocity, no-slip channel walls and an open outflow carrying the exact total traction, in both driving modes | velocity 9.9e-15, pressure 2.3e-13, net boundary flux 1e-16 |
+| Regional `validate` | the Couette–Poiseuille channel of the regional case, 13 gated analytic checks | 13 of 13 pass (velocity 1.4e-14, pressure 1.3e-12, net flux 9.0e-16) |
+
+Each row discriminates something a wrong implementation would get wrong. The traction-driven Couette fixes the sign and the total-Cauchy-traction convention of `wall_t`, and its pressure check rules out a spurious pressure load. The normal-traction row gives the *data* as the exact pressure (`-T`, not the pinned zero), so a pinned gauge or a hidden outward-normal sign table fails it. The channel row needs all three mechanisms together: without the inflow normal velocity nothing drives the region, without the tangential traction the outflow is a different flow, and without the open wall with `wall_tn` the outflow is not at a prescribed pressure. The regional `validate` mode re-runs the same construction through the production driver and the wall-refined tree. The derived gauge is checked in the same tests: `LAST_SEMSTOKES_PRESSURE_GAUGE` is `:none` whenever a wall is open and `:pin` otherwise.
+
+Every boundary addition defaults to `nothing`, and the closed free-slip card is unchanged: the pre-existing regression pins of the default path reproduce byte-identical state dumps.
+
 ## Cross-code comparisons
 
 | Case | Quantity | Ours | Other code | Difference |
 |---|---|---:|---:|---:|
-| blob, `Ra = 1e8`, frame 25 | `Tmax` | 1.2644 | 1.2531 (ASPECT) | +0.9% |
+| blob, `Ra = 1e8`, frame 25 | `Tmax` | 1.2643 | 1.2531 (ASPECT) | +0.9% |
 | realistic, ASPECT state imported | `Nu_top` | 5.990543 | 5.990543 (ASPECT) | 0.000% |
 | realistic, ASPECT state imported | `Nu_bot` | -3.074986 | -3.075076 (ASPECT) | +0.003% |
 
-The same-state rows are the sharp test. Both codes start from the same imported temperature field and evaluate the same wall functional, so a difference there is a discretization difference and nothing else. The blob row is a 25-frame transient, so its `Tmax` also carries the accumulated trajectory.
+The same-state rows are the sharp test. Both codes start from the same imported temperature field, ASPECT's state at `t_nd = 9.586e-4`, and evaluate the same wall functional, so a difference there is a discretization difference and nothing else. The blob row is a 25-frame transient, so its `Tmax` also carries the accumulated trajectory.
 
 The comparison runs ASPECT 2.5.0-pre on the same 2.5 x 1 case, with the same composite rheology, the same initial condition, and no tuned parameter. The top flux, which is the box's total heat loss, agrees to **0.005 to 0.9 percent** over `t_nd = 1e-3 .. 5e-3`, with a cross-correlation of at least 0.994 at every lag.
 
-The bottom flux carries the two solutions' different bottom-boundary-layer history, so it is quoted with its window: **-6.11%** (consistent-boundary-flux family) or **-8.44%** (gradient family) over `t_nd = 1e-6 .. 1e-3`, crossing zero at `1.42e-3`, and **+6.05% / +5.83%** over the later window.
-
-The same-state test separates the operator from the history. ASPECT's state at `t_nd = 9.586e-4` was imported into the QuaST tree, and both codes advanced from it: `Nu_bot` agrees to **0.003%** and `Nu_top` to **0.000%**. On a shared field the two operators agree to the last digits the comparison can resolve.
+The bottom flux carries the two solutions' different bottom-boundary-layer history, so it is quoted with its window: **-6.11%** (consistent-boundary-flux family) or **-8.44%** (gradient family) over `t_nd = 1e-6 .. 1e-3`, crossing zero at `1.42e-3`, and **+6.05% / +5.83%** over the later window. On a shared field the two operators agree to the last digits the comparison can resolve.
 
 ## The Tosi family
 
@@ -76,7 +89,7 @@ Tosi et al. (2015) extends the Blankenbach cases with a viscoplastic rheology. C
 
 Both cases land inside the spread the eleven codes reported for themselves, which is the resolution the benchmark can offer. Case 5a carries particular weight: a limit cycle is hard to reach by accident, and its period, amplitude and mean temperature all come out in the right place at once.
 
-## The two Nusselt conventions
+## The three Nusselt conventions
 
 Three discrete families measure the wall flux. Write $\theta$ for the temperature anomaly, $H$ for the internal heating, $h$ for the wall element height, and $\langle\cdot\rangle$ for the horizontal average.
 
@@ -114,19 +127,33 @@ The card's nominal `Ra` describes the calibration point, not the interior; [guid
 
 ## The automated suite
 
-`test/runtests.jl` includes the test files for analytic identities, constitutive cards, manufactured-solution convergence, the benchmark drivers, the blob regression, checkpoint round trips, the AMR rules, and the solver paths. Run the whole suite with
+`test/runtests.jl` includes 184 gate files covering analytic identities, constitutive cards, manufactured-solution convergence, the benchmark drivers, the blob regression, checkpoint round trips, the AMR rules, the boundary-condition surface, the regional case, and the solver paths. Run the whole suite with
 
 ```bash
 julia --project=. --threads=8 test/runtests.jl
 ```
 
-It takes about 25 to 30 minutes on eight threads. Each test pins its reference state at a stated relative tolerance; the 2b snapshot test uses `1e-6` and its symmetry identity `1e-10`, so a change that moves a number surfaces before a benchmark has to be re-run.
+The last full run recorded 133 716 assertions: 133 714 passed, 0 failed, and 2 broken. The two broken entries wait for checkpoints the repository does not ship. The suite takes about 26 minutes on eight threads. Each test pins its reference state at a stated relative tolerance; the benchmark snapshot pins its 20-step trajectory at `1e-6` relative and the symmetric case asserts `Nu_top = Nu_bot` to `1e-10`, so a change that moves a number surfaces before a benchmark has to be re-run.
 
 ## Scope
 
-The validation covers a two-dimensional Cartesian box with free-slip or rigid walls and the Boussinesq mass form used by the benchmark and cross-code runs. It covers the shipped physics where that physics is exercised: composite isostress rheology, phase transitions with per-transition latent heat, internal heating, depth-dependent yielding, and strain weakening. The TALA/ALA reference state has its own self-consistency check.
+The validation covers a two-dimensional Cartesian box with free-slip, rigid or open walls and the Boussinesq mass form used by the benchmark and cross-code runs. The anelastic form with a TALA/ALA reference state has its own self-consistency check. It covers the shipped physics where that physics is exercised: composite isostress rheology, phase transitions with per-transition latent heat, internal heating, depth-dependent yielding, and strain weakening.
 
-For studies in this geometry and this physics, the numbers above are the accuracy to expect. Three dimensions, a spherical shell, toroidal motion, plate boundaries, magnetic fields and a free surface lie outside what this code implements, and nothing in the record is measured in 3-D. Full elasticity is not a separate rheology either: the one elastic behavior this release carries is the Maxwell viscoelastic model ([guide section 1.8](guide.md#18-viscoelasticity)). The benchmark and cross-code numbers above are measured at the default `eta_ref = 1` and `shear_modulus = 0`; the viscoelastic and reference-viscosity sections above are the checks that cover the other settings.
+What the solver cannot do is this list:
+
+- Three dimensions.
+- Any geometry other than a Cartesian box: no spherical shell, no annulus, no dipping interface, no non-axis-aligned wall.
+- A free surface or topography.
+- Compositional fields or tracers, and therefore no chemical buoyancy.
+- Melt transport.
+- Pressure- and temperature-dependent material properties from a table.
+- Full compressibility: Boussinesq or anelastic only.
+- Finite-strain elasticity: Maxwell only.
+- Distributed-memory parallelism: shared-memory threads only.
+- Time-dependent boundary data.
+- VTK or other visualization formats: the frames are raw binary plus CSV.
+
+For studies in this geometry and this physics, the numbers above are the accuracy to expect. The benchmark and cross-code numbers are measured at the default `eta_ref = 1` and `shear_modulus = 0`; the viscoelastic and reference-viscosity sections above are the checks that cover the other settings.
 
 Before quoting a number in a new regime, run a resolution check on the quantity you intend to quote. Convergence is necessary, and it does not by itself validate an answer.
 

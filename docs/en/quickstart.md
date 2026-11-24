@@ -25,7 +25,7 @@ Set aside five to ten minutes and under 2 GB of disk. Julia itself is about 1 GB
 CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 ```
 
-The first run takes about two minutes, almost all of it compilation. Run it again and it finishes in seconds. `smoke` advances ten steps from the initial condition stored in the case, adapts the mesh at steps 5 and 10, and writes a frame at steps 1, 6 and 10. Expect four header lines, then one line per step, then AMR records at each mesh cycle, then two closing lines:
+The first run takes about two minutes, almost all of it compilation. Run it again and it finishes in seconds. `smoke` advances ten steps from the initial condition stored in the case, adapts the mesh at steps 5 and 10, and writes a frame at steps 1, 6 and 10. Expect four header lines, then a step record and a Picard line per step, then AMR records at each mesh cycle, then two closing lines:
 
 ```text
 [case] mode=smoke Ra=1.0e+05 H=10.0 p=2 max_level=7 max_leaves=10000 amr_every=5 steps=10 ...
@@ -69,7 +69,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=2000 \
 
 Put `mkdir` first. The shell opens `run.log` before the program gets a chance to create `CASE_OUT`; the program does call `mkpath(CASE_OUT)`, but that comes too late. `spinup` writes a checkpoint every 200 steps and one at the end, both to `$CASE_OUT/spinup.h5`, plus a frame every 5 steps and a final frame.
 
-Plan on 1.5 to 2.5 hours on eight threads. A from-scratch step costs about 2.8 s on the multigrid path that `CASE_LINEAR=auto` selects at this size, and about 4.4 s with `CASE_LINEAR=direct`. Frames dominate the disk use; each frame writes the files listed in section 6.3 of the [guide](guide.md), and two thousand steps at the default stride write 401 of them.
+Plan on 1.5 to 2.5 hours on eight threads. A from-scratch step costs about 2.8 s on the multigrid path that `CASE_LINEAR=auto` selects at this size, and about 4.4 s with `CASE_LINEAR=direct`. Frames dominate the disk use; each frame writes the files listed in section 7.3 of the [guide](guide.md), and two thousand steps at the default stride write 401 of them.
 
 ### Watching the run
 
@@ -87,7 +87,7 @@ The callback flushes stdout, so a redirected log lags by at most 100 steps.
 
 **A rising `auto_fallbacks` count is not a failure.** Each fallback redoes one Stokes solve on the direct path, and the run keeps going.
 
-`frames/frame_meta.csv` gives you a second live view. It is flushed after every frame, so it advances every 5 steps, one row per frame; section 6.3 of the [guide](guide.md) names the columns and defines `wall_s`. `history.csv` is different: it is written once, after the run returns, so it does not exist while the run is in progress. Its columns are in the [guide](guide.md), together with the meaning of `closure`. Read `closure` as an enthalpy rate, not as a flux error.
+`frames/frame_meta.csv` gives you a second live view. It is flushed after every frame, so it advances every 5 steps, one row per frame; section 7.3 of the [guide](guide.md) names the columns and defines `wall_s`. `history.csv` is different: it is written once, after the run returns, so it does not exist while the run is in progress. Its columns are in the [guide](guide.md), together with the meaning of `closure`. Read `closure` as an enthalpy rate, not as a flux error.
 
 ## Stopping and resuming
 
@@ -103,7 +103,7 @@ Three things to know:
 
 - `CASE_STEPS` is an absolute step number, not an increment. If it does not exceed the checkpoint's step, the driver runs nothing, prints `[case] DONE mode=resume steps=... (no steps were run: maxsteps=... <= checkpoint step); nothing written`, and exits.
 - `resume` writes to `$CASE_OUT/resume.h5`, so the next resume either takes that path explicitly or starts again from the older `spinup.h5`. With no argument it reads `$CASE_OUT/spinup.h5`.
-- A resume inherits the settings stored in the checkpoint. A plain run needs no extra variables. A run that changed a restart key must repeat the same value, or the configuration guard refuses it; section 7 of the [guide](guide.md) lists the keys that are compared.
+- A resume inherits the settings stored in the checkpoint. A plain run needs no extra variables. A run that changed a restart key must repeat the same value, or the configuration guard refuses it; section 8 of the [guide](guide.md) lists the keys that are compared.
 
 **Always set `CASE_OUT`, and give it an absolute path.** Without it, the run writes into a directory inside the repository that may still hold files from an earlier spin-up. Writing there overwrites `history.csv`, overwrites frames with the same step numbers, and appends rows to `frame_meta.csv`. Use one directory per run, and a scratch path for every smoke test and test run.
 
@@ -112,10 +112,10 @@ Three things to know:
 | Knob | What to do |
 |---|---|
 | `CASE_OUT` | Set it on every call, make it absolute, and use one directory per run. Everything the run produces lives under it. |
-| `CASE_STEPS` | The run stops at this absolute step number, so on a resume it is the step to stop at, not the number of steps to add. The mode defaults are in section 5.1 of the [guide](guide.md). |
-| `CASE_LINEAR` | Leave it at `auto` unless you have a reason. `direct` is the bitwise reproducible path and is slower; `mg` forces the matrix-free multigrid and is serial unless the caller sets `mg_threads`. Sections 4.1 and 4.3 of the [guide](guide.md) give the paths and the rule. |
+| `CASE_STEPS` | The run stops at this absolute step number, so on a resume it is the step to stop at, not the number of steps to add. The mode defaults are in section 6.1 of the [guide](guide.md). |
+| `CASE_LINEAR` | Leave it at `auto` unless you have a reason. `direct` is the bitwise reproducible path and is slower; `mg` forces the matrix-free multigrid and is serial unless the caller sets `mg_threads`. Sections 5.1 and 5.3 of the [guide](guide.md) give the paths and the rule. |
 
-The [guide](guide.md) lists the other `CASE_*` variables and every keyword of `run_semquad_simulation`, including the reference viscosity `CASE_ETA_REF` that defines `Ra` (section 1.9 there).
+The [guide](guide.md) lists the other `CASE_*` variables and every keyword of `run_semquad_simulation`, including the reference viscosity `CASE_ETA_REF` that defines `Ra` (section 1.9 there). The card also reads four per-wall boundary knobs, `CASE_WALL_BC`, `CASE_WALL_UN`, `CASE_WALL_T` and `CASE_WALL_TN`. Every one is empty by default, which is the free-slip closed box this page runs; [guide section 2](guide.md#2-boundary-conditions) is their reference.
 
 ## When something goes wrong
 
@@ -123,11 +123,11 @@ The [guide](guide.md) lists the other `CASE_*` variables and every keyword of `r
 
 Julia throws `ERROR: OutOfMemoryError()` with a stack trace, or the process simply disappears and `run.log` stops in the middle of a step. Under WSL the OOM killer ends it with exit code 137 and no message at all.
 
-At the 10 000-leaf cap the multigrid path needs about half the memory of the direct factorization; section 8 of the [guide](guide.md) gives the measured peaks and the memory plan. Stay on `CASE_LINEAR=auto`, or switch to `CASE_LINEAR=mg`. You can also lower the cap with `CASE_MAXLEAVES=5000` or `CASE_MAXLEV=6`. Check `free -g` before launching. WSL gives the virtual machine its own memory limit, raised in `.wslconfig` on the Windows side. Both mesh keys are restart configuration keys, so a smaller cap means a new run rather than a resume.
+At the 10 000-leaf cap the multigrid path needs about half the memory of the direct factorization; section 9 of the [guide](guide.md) gives the measured peaks and the memory plan. Stay on `CASE_LINEAR=auto`, or switch to `CASE_LINEAR=mg`. You can also lower the cap with `CASE_MAXLEAVES=5000` or `CASE_MAXLEV=6`. Check `free -g` before launching. WSL gives the virtual machine its own memory limit, raised in `.wslconfig` on the Windows side. Both mesh keys are restart configuration keys, so a smaller cap means a new run rather than a resume.
 
 ### A restart refused by the configuration guard
 
-The driver compares the settings stored in the checkpoint against the settings of the live run, key by key, and refuses to continue on any difference. The message names the file and every key that disagrees, with the stored value next to the live one; section 7 of the [guide](guide.md) shows its shape.
+The driver compares the settings stored in the checkpoint against the settings of the live run, key by key, and refuses to continue on any difference. The message names the file and every key that disagrees, with the stored value next to the live one; section 8 of the [guide](guide.md) shows its shape.
 
 Each value is the canonical string of that setting: floats print as `5.0`, symbols as `x` or `none`. Repeat every setting the checkpoint was written with, or read them back:
 
@@ -136,7 +136,7 @@ julia --project=. -e 'using HDF5; h5open(ARGS[1]) do f; println(HDF5.attrs(f)["c
   "$HOME/quast/run1/spinup.h5"
 ```
 
-If you really do mean to change one key, use a seed mode. Each one copies the checkpoint and rewrites exactly the conflicting strings; section 7 of the [guide](guide.md) lists what `freeze`, `wallrefine` and `symseed` rewrite. The source checkpoint is never touched.
+If you really do mean to change one key, use a seed mode. Each one copies the checkpoint and rewrites exactly the conflicting strings; section 8 of the [guide](guide.md) lists what `freeze`, `wallrefine` and `symseed` rewrite. The source checkpoint is never touched.
 
 ### A Stokes residual that misses the tolerance
 
@@ -155,4 +155,4 @@ ERROR: Stokes residual <r> exceeds stokes_tol=0.001 at step <n>; the solve auto-
 
 The run aborted, so the checkpoint is up to 200 steps old. Restart from it with the corrected knobs. If you get the zero-step message, `CASE_STEPS` is too small.
 
-**Next:** [Examples](examples.md) — four complete runs with measured times and numbers to check.
+**Next:** [Examples](examples.md) — six runs with their commands and the numbers to check.

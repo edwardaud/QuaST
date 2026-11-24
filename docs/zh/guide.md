@@ -2,7 +2,7 @@
 
 # 用户指南：二维地幔对流真实算例
 
-本页是参考页：讲 `examples/case_realistic_2d.jl` 求解的物理问题、数值方法、全部可调项、输出文件格式、重启规则，以及线程与内存表现。要按步骤操作，见[快速开始](quickstart.md)；要跑现成的算例，见[算例](examples.md)。
+本页是参考页：讲 `examples/case_realistic_2d.jl` 求解的物理问题、边界条件、数值方法、自适应策略、线性求解器、全部参数、输出格式、重启规则，以及线程与内存表现。要按步骤操作，见[快速开始](quickstart.md)；要跑现成的算例，见[算例](examples.md)。
 
 算例本身： $2.5 \times 1$ 的不可压流体盒，四壁自由滑移，顶部温度 0、底部温度 1，内部加热 `H = 10`，名义 Rayleigh 数 `Ra = 1e5`；扩散与位错两种蠕变同时生效，含两个相变并带潜热。屈服和应变弱化都关掉了。本页出现的每个取值，要么是脚本里的字面量，要么是 `src/driver/run.jl` 中 `run_semquad_simulation` 的默认值，要么是仓库内的实测记录。
 
@@ -10,24 +10,25 @@
 <summary><b>目录</b></summary>
 
 - [1. 物理问题](#1-物理问题)
-- [2. 离散](#2-离散)
-- [3. 自适应策略](#3-自适应策略)
-- [4. 线性求解器与 `:auto` 规则](#4-线性求解器与-auto-规则)
-- [5. 参数参考](#5-参数参考)
-- [6. 输出格式](#6-输出格式)
-- [7. 重启与配置守卫](#7-重启与配置守卫)
-- [8. 线程与内存](#8-线程与内存)
-- [9. 下一步读什么](#9-下一步读什么)
+- [2. 边界条件参考](#2-边界条件参考)
+- [3. 离散](#3-离散)
+- [4. 自适应策略](#4-自适应策略)
+- [5. 线性求解器与 `:auto` 规则](#5-线性求解器与-auto-规则)
+- [6. 参数参考](#6-参数参考)
+- [7. 输出格式](#7-输出格式)
+- [8. 重启与配置守卫](#8-重启与配置守卫)
+- [9. 线程与内存](#9-线程与内存)
+- [10. 下一步读什么](#10-下一步读什么)
 
 </details>
 
 ## 1. 物理问题
 
-### 1.1 区域与边界条件
+### 1.1 区域与默认边界
 
 计算域是 $[0,2.5]\times[0,1]$ ，由 5 × 2 个基础单元在四叉树上不断细分得到，每个叶都是正方形。 $x$ 是水平方向， $y$ 是竖直方向， $y=0$ 在底、 $y=1$ 在顶，深度即 $1-y$ 。
 
-四壁自由滑移：法向不能流动，切向不受约束。实现上就是限制法向分量：
+默认四壁自由滑移：法向不能流动，切向不受约束。实现上就是限制法向分量：
 
 $$
 u_x = 0 \quad (x=0,\,2.5),
@@ -37,19 +38,7 @@ $$
 
 其中 $u\_x$ 、 $u\_y$ 是速度的两个分量。温度在顶壁取 $T=0$ 、在底壁取 $T=1$ ，侧壁绝热。
 
-边界条件可以逐壁设置。 `bc = :free`（默认）表示四壁自由滑移； `bc = :rigid` 表示四壁无滑移，此时切向分量也被固定，取值来自壁面速度闭合 $u\_{Dx}(x,y)$ 与 $u\_{Dy}(x,y)$ 。 `wall_bc` 单独覆盖某一面壁，顺序为 `(xminus, xplus, yminus, yplus)`，取值 `:same`（跟随 `bc`）、`:free`、`:rigid` 或 `:open`。参数卡用 `CASE_WALL_BC=rigid,rigid,free,free` 这种四元组形式给出。 `:open` 壁的两个分量都没有 Dirichlet 条件：那里适用自然（牵引）条件，可选数据是下面两段里的逐壁牵引，并且它会改变压力基准（见下文）。
-
-壁面速度闭合本身就是位置的函数，而四面壁处在不同的 $y$ （或 $x$ ）上，所以空间变化的壁面速度不需要额外接口：取 $u\_{Dx}=Uy$ 并设 `bc = :rigid`，就是顶盖以 $U$ 拖动、底部静止，解析解 $u=(Uy,0)$ 可复现到 $10^{-10}$ 。单一闭合唯一无法表达的是角点上两壁速度不一致，而那里连续条件本来就不允许不一致。
-
-法向分量由 `Params.wall_un` 逐壁设置（求解函数对应的关键字也是 `wall_un`），顺序同样是 `(xminus, xplus, yminus, yplus)`。表项 `(x,y) -> value` 表示该壁法向速度取沿正坐标方向的分量值：竖直壁上就是 $u\_x$ ，水平壁上就是 $u\_y$ ，与被替换的全局闭合约定相同，而不是外法向通量 $u\cdot n$ ； `nothing`（默认）表示沿用历史闭合，驱动把它设为零，所以默认参数卡逐位不变。法向分量在 `:free` 与 `:rigid` 壁上都是 Dirichlet 条件； `:open` 壁上没有 Dirichlet 分量，所以在那里给 `wall_un` 会直接报错。只要没有 `:open` 壁，给定的数据必须满足零净通量 $\int\_{\partial\Omega}u\cdot n\,\mathrm dS=0$ ；不平衡的取值（例如只在某个竖直壁上给入流）会被拒绝并报告实测通量，而不是去解一个连续性方程不相容的离散问题。有 `:open` 壁时自由法向速度会自动吸收不平衡量，这项检查被跳过。用 `wall_un` 给侧壁法向、用 `wall_u` 给顶盖切向的同一 Couette 解可精确到 $2\times10^{-14}$ （见 5.3 节，G258）。 `wall_u` 是切向速度，只在 `:rigid` 壁上有意义； `:free` 壁的切向分量为自由（零切向牵引）， `:open` 壁则根本没有 Dirichlet 分量，此时给值曾被静默忽略，现在直接报错。角点上的分量归属由上述写入顺序决定：后写的壁拥有该自由度，所以刚性顶壁或底壁的切向值会覆盖侧壁在其两个角点上的法向值。
-
-切向*牵引*由 `Params.wall_t` 逐壁设置（求解函数对应的关键字也是 `wall_t`），顺序同样是 `(xminus, xplus, yminus, yplus)`。表项 `(x,y) -> value` 表示该壁切向的**总 Cauchy 牵引** $t=\sigma\cdot n$ ，它作为边界载荷进入弱形式：对动量方程分部积分后 $\int\_\Gamma t\cdot v\,\mathrm dS$ 以正号落在右端，代码把它加到未约化的载荷向量上，再由约束矩阵投影到容许检验空间 —— 它是自由侧的数据，不是 Dirichlet 值。取值是**沿正坐标方向的全局分量**：水平壁上为 $t\_x$ ，竖直壁上为 $t\_z$ ，与上面的 `wall_un` 约定相同，而不是外法向分量。在轴对齐壁上切向牵引不含压力（ $t\_x=\sigma\_{xy}$ 、 $t\_z=\sigma\_{zy}$ ），所以它就是精确的 $2\eta\,\varepsilon(u)\cdot n$ 剪切牵引。由于它只在切向自由的壁上才有意义， `wall_t` 只接受 `:free` 或 `:open` 壁；在 `:rigid` 壁上切向速度是 Dirichlet 条件，载荷会被约束静默丢弃，因此直接报错。 `nothing` 表示零牵引，所以默认参数卡不变；顶壁给定常值牵引的 Couette 解 $u=(t\_0y/\eta,0)$ 、 $p=0$ 可精确到 $10^{-10}$ （G259）。
-
-法向*牵引*由 `Params.wall_tn` 逐壁设置（求解函数对应的关键字也是 `wall_tn`，参数卡为 `CASE_WALL_TN`），顺序与载荷约定都相同 —— 取**总 Cauchy 牵引** $t=\sigma\cdot n$ 的法向分量，即沿正坐标方向的全局分量（竖直壁上为 $t\_x$ ，水平壁上为 $t\_z$ ）。在轴对齐壁上它就是携带压力的分量，沿该壁外法向为 $t\_n=-p+2\eta\,\varepsilon\_{nn}$ ，也是确定压力水平的数据项。由于 $t=\sigma\cdot n$ 使用**外法向**，开边界上给定压力 $p\_0$ 意味着顶壁 `wall_tn = -p0` 、底壁 `wall_tn = +p0` ；给定值是求解器无量纲压力单位下的*动态*压力牵引，不是岩石静压。它只接受 `:open` 壁（唯一法向速度自由的壁）；在 `:free` 或 `:rigid` 壁上法向速度是 Dirichlet 条件，载荷会被静默丢弃，因此报错。开壁带来两个后果：
-- **压力基准是推导出来的。** 节点压力钉值只在整条边界的法向速度都是 Dirichlet 条件时才精确（此时常数压力位于约化梯度的零空间内，被丢掉的那一行连续性方程是其余行的线性组合）。有 `:open` 壁时求解器**仅当没有 `:open` 壁时才钉住**一个压力自由度；对开壁配置强行钉值等于把一条连续性方程换成 $p\_a=0$ —— 那是另一个问题。解析结果记录在 `LAST_SEMSTOKES_PRESSURE_GAUGE` （`:pin`/`:none`）中。
-- **开壁配置必须适定。** 每面 `:open` 壁都必须使得至少一面 x 壁和至少一面 y 壁保留 Dirichlet 法向分量；否则会留下一个刚性平移（四面全开时甚至是整个刚体运动），离散鞍点奇异。四面全 `:open` 就是纯牵引问题 —— 它需要速度规范以及净力/净力矩相容的数据 —— 直接拒绝；任何在 Dirichlet 自由度上 3x3 刚体模态 Gram 矩阵奇异的配置也拒绝（报错信息会指出可容许的运动）。 `linear=:direct`（含其位移阶梯）、`linear=:mg` 与 `linear=:auto` 都支持不钉值的求解； `:schur_cg`/`:lagged` 依赖闭边界规范，在开壁配置上被拒绝。
-
-开壁接口对应的门禁数字：刚性方盒、顶壁 `:open` 且 `wall_tn = T` 时 $u=0$ 、 $p=-T$ （外法向符号），把同样的 $T$ 给在**底**壁则 $p=+T$ ；有体积力、开顶且法向牵引为零的静水压解为 $u=0$ 、 $p=1-y$ —— 都精确到 $10^{-10}$ （G261）。无载荷开顶盖给出 $u=p=0$ 且鞍点不钉值即可求解，自由滑移/开壁组合的静水压配置给出 $p=1-y$ （G262）。闭壁旧路径与 stage-2 树逐位一致，三条线性路径在开壁算例上一致（G263）。1.10 节把本节的这些开关组合成一个区域入流/出流通道。
+四壁条件可以逐壁覆盖： `bc` 给默认壁型， `wall_bc` 逐壁覆盖， `wall_u` 、 `wall_un` 、 `wall_t` 、 `wall_tn` 给逐壁数据。四种壁型、四组数据的约定、压力基准、角点归属与每一种被拒绝的配置都由第 2 节拥有；本页其余各节只按需引用它。
 
 ### 1.2 控制方程
 
@@ -111,7 +100,7 @@ $$
 \mathrm{Nu}_{top} - \mathrm{Nu}_{bot} = H;
 $$
 
-实际偏离这个恒等式的量就是 `closure`，含义见 6.2 节。
+实际偏离这个恒等式的量就是 `closure`，含义见 7.2 节。
 
 ### 1.4 流变
 
@@ -148,6 +137,8 @@ $$
 $k$ 是两种机制的无量纲黏度比， $x$ 是等应力解中位错分支所占份额， $\eta$ 是合成黏度。 $k>0$ 时方程有唯一根； $k\to0$ 退化为纯位错， $k\to\infty$ 退化为纯扩散。参数卡把 $\eta$ 截断在 $[10^{-4},10^4]$ ，这既是求解器的保护，也直接决定条件数。实测黏度对比约为 $10^7$ 。
 
 常数取 $A\_d=1.6240183119\times10^5$ 、 $A\_s=2.6796419238\times10^{-1}$ 、 $E\_d=12$ 、 $E\_s=17$ 、 $n=3$ 、 $\eta\_{T0}=0.5$ 。它们由 $y=0.5$ 处的两个条件定出： $\eta(T=0.5,\dot\varepsilon\_{\mathrm{ref}})=1$ 定整体尺度， $\eta(T=0.1)/\eta(T=0.9)=10^4$ 在 $\dot\varepsilon\_{\mathrm{ref}}$ 下定两种机制的比例。参考应变率 $\dot\varepsilon\_{\mathrm{ref}}=1.65\times10^3$ 来自同一算例的常黏度前驱。
+
+`eta_law` 的其余取值： `:expT` 用 `deta_T`； `:expTz` 用 `eta_b` 与 `eta_c`； `:arrhenius` 用 `eta_E` 与 `eta_T0`； `:tosi` 用 `TosiLaw`，它自带塑性分支； `:composite` 用 `comp_*`。 `run_semquad_simulation` 只接受这五种，`:const` 只存在于 `Params`；常黏度用 `deta_T = 1` 的 `:expT` 表示。参数卡没覆盖的定律可以传 `eta_custom=(x, z) -> ...`，它在 Stokes 组装时接管温度定律。
 
 ### 1.5 两个相变
 
@@ -295,56 +286,117 @@ $$
 
 生产参数卡的默认值是 `eta_ref = 1` ，但它的材料定律在盒内跨越多个数量级，所以内部 Rayleigh 数远高于名义值。报告只在 `eta_ref != 1` 时打印；用同一套约定算出的该卡成熟状态数值是 `eta_interior = 4.280635e-3` 、 `Ra_interior = 2.336102e7` 和 `eta_0 = 2.368635e23 Pa s` （ `Ra` 定义所对应的物理黏度），由此得到物理内部黏度 `1.013926e21 Pa s` 。在标定所用的热内部点（ `T = 1.75` ， `edot_ref` ）上，同一套约定给出 `Ra = 7.84e7` 与 `3.02e20 Pa s` 的黏度。所以 `Ra = 1e5` 这个标签描述的是标定点，而不是内部：引用时要和 `Ra_interior` 一起给出。
 
-### 1.10 区域通道模型
+## 2. 边界条件参考
 
-1.1 节的逐壁开关可以组合成一个区域模型：流体从一面壁进入，穿过计算域，再从 `:open` 壁流出，其余壁面取无滑移或自由滑移。随仓库提供的演示脚本是 `examples/channel_flow_2d.jl` ，它算的是平面 Poiseuille 通道；本小节给的是组合配方，各开关本身的语义仍以 1.1 节为准。
+本节是边界条件的唯一参考：壁型、四组数据、牵引的符号约定、派生压力基准、角点归属、每一种被拒绝的配置，以及重启守卫记录了什么。参数名与默认值见 6.1 节，本节不再重复它们；把几种壁型组合成区域入流/出流问题的配方见[算例](examples.md)的区域通道一节。
 
-通道参数卡按 `(xminus, xplus, yminus, yplus)` 的顺序长这样：
+### 2.1 四种壁型
 
-| 壁面 | `wall_bc` | 数据 |
+`bc` 是默认壁型，取 `:free` 或 `:rigid`，默认 `:free`。 `wall_bc` 按顺序 `(xminus, xplus, yminus, yplus)` 逐壁覆盖，每一面取 `:same`（跟随 `bc`）、`:free`、`:rigid` 或 `:open`。库接口对应 `Params.wall_bc`，参数卡对应 `CASE_WALL_BC`。
+
+| 壁型 | 法向分量 | 切向分量 |
 |---|---|---|
-| 上游 x 壁 | `:rigid` | `wall_un` = 入流剖面的法向速度 $u\_x(y)$ ；`wall_u` = 切向速度（纯法向入流时为零） |
-| 下游 x 壁 | `:open` | `wall_tn` = $-p\_{\mathrm{out}}$ （出流的动压力）以及 `wall_t = \eta\,\mathrm du\_x/\mathrm dy` （剪切牵引） |
-| 顶壁与底壁 | `:rigid` 或 `:free` | 不设数据；自由滑移时也可显式给 `wall_un = 0` |
+| `:free` | Dirichlet，默认零 | 自由，自然条件为零切向牵引 |
+| `:rigid` | Dirichlet，默认零 | Dirichlet，默认零，可由 `wall_u` 给定 |
+| `:open` | 自由 | 自由 |
+| `:same` | 跟随 `bc` | 跟随 `bc` |
 
-入流壁必须是 `:rigid`： `:free` 壁的切向牵引为零，撑不住带剪切剖面在入口处的 $\eta\,\mathrm du\_x/\mathrm dy$ 。把同样的法向速度给在 `:free` 壁上得到的是另一个流动，在平面通道上实测为中心速度的 5.6%；所以设计里的通道入流一律用 `:rigid`，切向部分交给 `wall_u` 。法向速度入流的壁面速度由 `wall_un` 与 `wall_u` 完全确定，内部看到的只是同一组 Dirichlet 数据，与两者中哪一个写入无关（G264 把新的 `wall_un` 路径和老的整体 `uDx` 闭合相比，解逐位相同）。
+`:free` 是自由滑移， `:rigid` 是无滑移， `:open` 两个分量都没有 Dirichlet 条件：适用自然（零）牵引，数据由 `wall_t` 与 `wall_tn` 给出。逐壁条件只作用于计算域的外边界，内部叶面不受影响。
 
-三个相容条件让这个组合适定：
+### 2.2 四组数据
 
-- **质量。** 连续性固定了通量。入流数据的积分就是出流必须带走的总量，离散连续性方程会保证这个平衡。1.1 节的净通量检查在这里不能替代核对：有开壁时，入口积分与出流不匹配并不算错误，不平衡量只会改变出流速度——开壁的自由法向速度把它吸收掉，这正是区域模型的出流。
-- **压力水平。** 开壁取消了节点压力钉值（见 1.1 节），压力不再由钉值确定，而由法向牵引数据确定： `wall_tn` **就是**出流的动压力 $p\_{\mathrm{out}}$ ，符号随外法向。它是动压力而不是岩石静压：求解器的 `p` 不含基态，浮力里已经解析地减掉了基态，所以给一个静水压就等于把整根水柱当成牵引加载。
-- **适定。** 至少一面 x 壁和一面 y 壁保留 Dirichlet 法向分量（1.1 节的要求）；通道用刚性入流、两个通道壁和开出的出流满足它。
+四组数据都按 `(xminus, xplus, yminus, yplus)` 逐壁给出。库接口接受位置的函数 `(x, y) -> Float64`，参数卡只接受每面壁一个常量（空项表示 `nothing`）。取值为 `nothing` 时：速度数据沿用全局闭合 `uDx`/`uDz`（驱动把这两个闭合设为零），牵引数据表示零牵引。
 
-高度 $H$ 、长度 $L$ 、压力梯度 $G$ 、常黏度 $\eta$ 的通道，精确解是平面 Poiseuille：
+| 数据 | 物理含义 | 允许的壁 | 约定 |
+|---|---|---|---|
+| `wall_u` | 切向速度 | 仅 `:rigid` | 全局分量，沿正坐标方向：竖直壁上为 $u\_y$ ，水平壁上为 $u\_x$ 。 |
+| `wall_un` | 法向速度 | `:free`、`:rigid` | 全局分量，沿正坐标方向：竖直壁上为 $u\_x$ ，水平壁上为 $u\_y$ ；不是外法向通量 $u\cdot n$ 。 |
+| `wall_t` | 总 Cauchy 牵引的切向分量 | `:free`、`:open` | 全局分量，沿正坐标方向：竖直壁上为 $t\_z$ ，水平壁上为 $t\_x$ 。 |
+| `wall_tn` | 总 Cauchy 牵引的法向分量 | 仅 `:open` | 全局分量，沿正坐标方向：竖直壁上为 $t\_x$ ，水平壁上为 $t\_z$ 。 |
+
+参数卡暴露四组数据中的三组： `CASE_WALL_UN`、`CASE_WALL_T`、`CASE_WALL_TN`； `wall_u` 只能从库接口给出，参数卡没有对应的环境变量。四组数据都用求解器的无量纲单位：速度与 `wall_un` 同一个速度单位，牵引与压力、应力同一个单位。
+
+### 2.3 牵引是总 Cauchy 应力
+
+对动量方程分部积分，边界项以正号落在右端：
 
 $$
-u_x=\frac{G\,y\,(H-y)}{2\eta},\qquad u_y=0,\qquad p=p\_{\mathrm{out}}+G\,(L-x),
+\int_\Omega 2\eta\,\boldsymbol\varepsilon(\mathbf u):\boldsymbol\varepsilon(\mathbf v)\,\mathrm dV \;- \int_\Omega p\,\nabla\cdot\mathbf v\,\mathrm dV
+= \int_\Omega \mathbf f\cdot\mathbf v\,\mathrm dV + \int_{\partial\Omega} \mathbf t\cdot\mathbf v\,\mathrm dS,
+\qquad
+\mathbf t = \boldsymbol\sigma\cdot\mathbf n = -p\,\mathbf n + 2\eta\,\boldsymbol\varepsilon(\mathbf u)\cdot\mathbf n,
 $$
 
-而出流处外法向为 $+e\_x$ 的总牵引是
+其中 $\boldsymbol\sigma$ 是总 Cauchy 应力， $\mathbf n$ 是外法向。 `wall_t` 与 `wall_tn` 就是上式中的 $\mathbf t$ 的两个分量，作为边界载荷加到**未约化**的载荷向量上，再由约束矩阵投影到容许检验空间。它们是自由侧的数据项，不是 Dirichlet 值。
+
+在轴对齐壁上，牵引的切向分量不含压力： $x$ 壁上 $t\_z=\sigma\_{zy}$ ， $y$ 壁上 $t\_x=\sigma\_{xy}$ ，所以 `wall_t` 就是 $2\eta\,\boldsymbol\varepsilon(\mathbf u)\cdot\mathbf n$ 的切向分量，且在常黏度下与 $\eta$ 无关。法向分量携带压力：
 
 $$
-\sigma\cdot n=\left(-p,\ \eta\frac{\mathrm du\_x}{\mathrm dy}\right)
-=\left(-p\_{\mathrm{out}},\ G\left(\frac H2-y\right)\right).
+t_n = -p + 2\eta\,\varepsilon_{nn},
 $$
 
-也就是 `wall_tn = -p_out` 、 `wall_t = G(H/2 - y)` ；常黏度下切向部分与 $\eta$ 无关。同一个剖面也是常数体力 $f\_x=G$ 、无压力梯度时的精确解，只是此时压力为常数 $p=p\_0$ ，出流法向牵引为 $-p\_0$ 。两种驱动方式各有门禁（G264 (a) 与 (b)）；演示脚本用压力驱动那一种，因为驱动里的体力就是浮力，没有水平分量。
+所以 `wall_tn` 是确定压力水平的数据项。因为 $\mathbf t$ 使用外法向，给定压力 $p\_0$ 时：
 
-$Q\_2$ 速度与 $Q\_1$ 压力精确包含这个解，牵引的面求积对它的多项式数据也是精确的，所以跑一次通道量到的是线性求解的误差而不是离散误差：在 128 叶的树上，演示脚本报告剖面误差为中心速度的 $2\times10^{-14}$ ，压力场一致到 $5\times10^{-13}$ 。三个机制要一起用：没有入流法向速度区域就没有驱动，没有切向牵引出流就是另一个（自由滑移的）流动，没有 `:open`/`wall_tn` 出流就没有指定的压力。
+| 壁 | 外法向 $\mathbf n$ | `wall_tn` |
+|---|---|---|
+| 顶壁 $y=1$ | $+\mathbf e\_y$ | $-p\_0$ |
+| 底壁 $y=0$ | $-\mathbf e\_y$ | $+p\_0$ |
+| `xminus` $x=0$ | $-\mathbf e\_x$ | $+p\_0$ |
+| `xplus` $x=L\_x$ | $+\mathbf e\_x$ | $-p\_0$ |
 
-若省略出流切向牵引（ `wall_t = nothing` ），开壁就是自由滑移出口。此时 Poiseuille 剖面**不是**精确解：它的出流剪切 $G(H/2-y)$ 违反零切向牵引条件。自由滑移解保持同样的入流数据与质量通量，与 Poiseuille 的差恰好是被扣掉的那份剪切牵引的响应；这个差有界且局域：平面通道上它是中心速度的 18%，其应变能是推导尺度 $L\,\lVert\eta u'\rVert^2/(2\eta^2)$ 的 2.4%。G264 (d) 检查了在被扣牵引尺度上的精确线性以及响应恒等式，运行方式见[算例](examples.md)页。
+等价的写法是 `wall_tn` 取 $-p\_0$ 乘以外法向在该坐标方向上的分量。严格地说 `wall_tn` 固定的是总法向牵引；压力恰为 $p\_0$ 还需要 $2\eta\,\varepsilon\_{nn}=0$ 。 `wall_tn` 给的是求解器无量纲压力单位下的**动态**压力牵引，不是岩石静压：求解器的 $p$ 不含基态，浮力里已经把基态解析地减掉，给一个静水压等于把整根水柱当成牵引加载。
 
-这个配方的生产用法是 `examples/subduction_2d.jl`：一个区域俯冲型算例，有五个模式（ `validate` 、 `rheology` 、 `phases` 、 `full` 、 `converge` ）；命令、检查与诚实的局限见[算例](examples.md)页。
+### 2.4 压力基准
 
-## 2. 离散
+节点压力钉值只在**没有** `:open` 壁时施加。四壁都保留 Dirichlet 法向分量时，常数压力位于约化梯度的零空间内，被丢掉的那一行连续性方程是其余行的线性组合，钉一个压力自由度因此是精确的。
 
-### 2.1 网格与空间
+有 `:open` 壁时，常数压力不在这个零空间里：存在法向迹非零的边界检验函数。此时钉一个压力自由度等于把一条连续性方程换成 $p\_a=0$ ，那是另一个问题。所以求解器不钉值，压力水平由 `wall_tn` 数据决定；求解器把决定记录在 `LAST_SEMSTOKES_PRESSURE_GAUGE` 中（`:pin` 或 `:none`）。不钉值的求解在 `linear=:direct`（含平移阶梯）、`:mg` 与 `:auto` 上验证过；`:schur_cg` 与 `:lagged` 依赖闭边界的规范，在开壁配置上被拒绝（见 2.6）。
+
+### 2.5 角点归属
+
+四个方向按 `(xminus, xplus, yminus, yplus)` 的顺序写入，后写的壁覆盖先写的壁，所以角点分量有确定的归属：
+
+| 角点分量 | 归属 |
+|---|---|
+| $u\_x$ | `x` 壁不是 `:open` 时取它的法向值；若该角点的 `y` 壁是 `:rigid` ，`y` 壁的切向 `wall_u` 值后写并覆盖它。 |
+| $u\_y$ | 该角点的 `y` 壁不是 `:open` 时，归 `y` 壁的法向值；`y` 壁是 `:open` 时不写，`x` 壁（若为 `:rigid`）的切向值保留。 |
+
+`:open` 壁不写任何分量。后果之一是：刚性顶壁或底壁占有其两个角点的 $u\_x$ ，侧壁的入流数据在角点被它覆盖。
+
+### 2.6 被拒绝的配置
+
+下列配置在构造 `Params` 时即被拒绝；直接调用 `solve_semquad_stokes_var` 时求解器重复同样的检查，因此库调用也绕不过去。
+
+| 配置 | 拒绝原因 |
+|---|---|
+| 全局 `bc = :open` | 默认壁型只接受 `:free` 或 `:rigid`； `:open` 只能逐壁给出。 |
+| 四面全 `:open` | 纯牵引问题：速度只确定到刚体运动，数据还必须满足净力与净力矩相容；离散鞍点奇异，压力不被边界确定。 |
+| 两面 `x` 壁全 `:open` | 留下 $x$ 平移。求解器用 Dirichlet 自由度上 3 × 3 刚体模态 Gram 矩阵的秩测试确认，报错信息给出实测特征值与可容许运动。 |
+| 两面 `y` 壁全 `:open` | 留下 $y$ 平移，判据同上。 |
+| `wall_u` 给在解析为 `:free` 或 `:open` 的壁 | 该壁切向分量自由（ `:free` ）或根本没有 Dirichlet 分量（ `:open` ），值会被静默忽略。 |
+| `wall_un` 给在 `:open` 壁 | 法向速度在那里是未知量，值会被静默忽略。 |
+| `wall_t` 给在 `:rigid` 壁 | 切向分量是 Dirichlet 条件，载荷会被约束矩阵丢掉。 |
+| `wall_tn` 给在 `:free` 或 `:rigid` 壁 | 法向分量是 Dirichlet 条件，载荷会被丢掉。 |
+| 无 `:open` 壁时，指定的法向速度净外通量不为零 | 四壁法向都是 Dirichlet 时，离散连续性方程只在 $\int\_{\partial\Omega}\mathbf u\cdot\mathbf n\,\mathrm dS=0$ 时相容。阈值是 $10^{-12}\max(u\_{\max}\cdot P,1)$ ，其中 $u\_{\max}$ 是给定的法向值的最大绝对值， $P$ 是边界周长。绝对下限是必需的：制造解测试把精确场作为壁面数据，其数学净通量为零，但浮点求值不为零（例如壁上的 $\sin(\pi)=1.2\times10^{-16}$ ）。 |
+| 有 `:open` 壁时使用 `:schur_cg` 或 `:lagged` | 这两条路径假设闭边界的压力规范；开壁配置没有节点钉值。 |
+| `pic_mode = :newton` 且任一逐壁字段非默认 | 每步 Newton 路径只用 `bc` 解 Stokes，逐壁数据会被忽略，开壁会被当成闭壁。 |
+| 未知的壁型字符串 | 只接受 `:same`、`:free`、`:rigid`、`:open`。 |
+
+有 `:open` 壁时净通量检查被跳过：开壁的自由法向速度按构造吸收不平衡量。
+
+### 2.7 重启标记
+
+边界条件属于 `run_config` ： `wall_bc` 以逗号连接的字符串记录； `wall_u`、`wall_un`、`wall_t`、`wall_tn` 每面壁记一个 `none`/`custom` 标记。守卫拒绝标记改变的续算。函数没有可比较的取值，所以把一个函数换成另一个函数不会被检出：这类改动应从头重算。旧检查点缺少某个键时跳过该键的比较，规则见第 8 节。
+
+## 3. 离散
+
+### 3.1 网格与空间
 
 网格是四叉树。每个叶用 $(\ell,i\_x,i\_y)$ 标记，树始终保持 2:1 平衡，即相邻叶最多相差一级。加密把一个四兄弟拆成四个，粗化把四个合回一个。参数卡把深度限制在 `max_level = 7` ，所以最细的叶高是盒高的 $1/(2\cdot2^{7})=1/256$ 。初始树由 5 × 2 个基础单元各均匀细分三次得到，即均匀的 level 3、共 640 个叶。
 
-采用 Taylor-Hood 单元：速度取 $Q\_p$ ，压力取 $Q\_{p-1}$ ，本卡取 $p=2$ ，即 $Q\_2$ 速度、 $Q\_1$ 压力。节点是参考正方形上的 Gauss-Legendre-Lobatto 点，速度每方向 $p+1$ 个，压力每方向 $p$ 个。单元矩阵用 Gauss-Legendre 求积，每方向取 `p+2` 个点，这正是 `make_fedata` 的默认 `nq = p + 2` ；它把 $Q\_p$ 的质量矩阵与刚度矩阵都精确积分。
+空间离散是 Taylor–Hood 元：速度取 $Q\_p$ ，压力取 $Q\_{p-1}$ ，本卡取 $p=2$ ，即 $Q\_2$ 速度、 $Q\_1$ 压力。节点是参考正方形上的 Gauss–Legendre–Lobatto 点，每个单元上的基函数是这些节点上的 Lagrange 基：速度每方向 $p+1$ 个节点，压力每方向 $p$ 个。单元矩阵用 Gauss–Legendre 求积，每方向取 `p+2` 个点，即 `make_fedata` 的默认 `nq = p + 2` 。这是过积分：它精确积分 $Q\_p$ 的质量矩阵与刚度矩阵。代码不做质量集中，质量矩阵按完整求积组装成一致矩阵而不是对角阵，所以这里没有用 GLL 求积换对角质量矩阵的余地。
 
-### 2.2 悬挂节点与约束
+### 3.2 悬挂节点与约束
 
 粗叶面上存在细节点，即悬挂节点。它的取值由粗面 GLL 插值给出的迹决定，写成稀疏约束矩阵 $C$ ，自由行上是单位阵。系统按
 
@@ -352,9 +404,9 @@ $$
 C^{\mathsf T} A\,C
 $$
 
-组装并求解，其中 $A$ 是未加约束的组装矩阵， $C$ 是约束矩阵， $C\^{\mathsf T}$ 是其转置。这样对称性得以保留，对线性约束而言是精确的。边界值走同一个仿射映射，另外固定一个压力自由度，消掉常数零空间。
+组装并求解，其中 $A$ 是未加约束的组装矩阵， $C$ 是约束矩阵， $C\^{\mathsf T}$ 是其转置。这样对称性得以保留，对线性约束而言是精确的。边界值走同一个仿射映射；压力基准按 2.4 节的规则处理：没有 `:open` 壁时钉住一个压力自由度，有 `:open` 壁时不钉值。
 
-### 2.3 时间积分
+### 3.3 时间积分
 
 流场是准静态的，每步解一次 Stokes。能量方程用 BDF2，第一步退化为后向 Euler。记变步长比为
 
@@ -390,7 +442,7 @@ $$
 
 更新，其中 $\mathrm{CFL}=0.5$ ， $h\_{\min}$ 是最小叶高， $|\mathbf u|\_{\max}$ 是最大速度模。每步最多放大 5%、最多缩小 5%，除非触发硬 CFL 截断；步长被限制在 $[\Delta t\_{\min},\Delta t\_{\max}]=[10^{-9},5\times10^{-5}]$ 内，第一步从 $\Delta t\_0=10^{-6}$ 出发并立即切到 CFL 允许值。
 
-### 2.4 熵黏性
+### 3.4 熵黏性
 
 振荡通过逐单元熵黏性压制，黏性项加到能量算子上，每个叶一个值：
 
@@ -414,9 +466,9 @@ $$
 
 参数卡取 `ev_alpha = 2` ，所以用 $h\_e^2$ 形式。壁面行上的黏性为零。每个时间步都重算；最初两步以及任何变差为零时，代码直接取 $\nu=\nu\_{\max}$ 。熵黏性场写入检查点，因为没有它就无法重建上一步的能量算子。
 
-## 3. 自适应策略
+## 4. 自适应策略
 
-### 3.1 指示子
+### 4.1 指示子
 
 加密指示子默认取温度异常梯度在内部面上的跳变：
 
@@ -436,7 +488,7 @@ $$
 
 下面的比较在一个成熟的二维状态上以相同成本测得：10 000 叶、43 步、同样的固定 `dt`，参照解是 40 000 叶的 `:theta` 解。 `Nu_bot` 的相对误差， `:theta` 为 1.10e-4， `:velocity` 为 1.01e-5；体积平均温度分别 1.75e-4 与 1.15e-4。精确壁面通量残差 `resid_A/Nu_top` 则是 `:theta` 更小，约 7e-4% 对 5e-3%。机制在于细叶落在哪里： `:theta` 把 85% 的细叶放在壁面条带， `:velocity` 只放 3.6%，转而加密内部。因此选择取决于观测量，而不是给两种指示子排名。这个比较只覆盖一个状态、一个 Rayleigh 数、43 步（时间轴的 0.2%）和二维，所以没有理由时保持默认，并把上面的数字看作该状态的属性，而不是其他流动的保证。
 
-### 3.2 标记、粗化与叶数上限
+### 4.2 标记、粗化与叶数上限
 
 标记采用 Dörfler 策略： `refine_frac = 0.2` 指需要分辨的指示子总量占比，因此加密多少单元由指示子场自己决定。
 
@@ -451,7 +503,7 @@ $$
 
 叶数上限是 `max_leaves = 10000` 。本卡取 `amr_passes = 1` ，也就是每个 AMR 周期只跑一轮指示子、加密与场传递。
 
-### 3.3 迟滞与壁面规则
+### 4.3 迟滞与壁面规则
 
 平衡循环还有三条固定规则：
 
@@ -463,9 +515,9 @@ $$
 
 壁面规则存在的原因：单靠指示子时，顶壁停留在 level 3 或 4，而内部已经到 level 5 或 6；这时逐点 `Nu_top` 与壁面加密后的值相差 1.2%，一致边界通量相差 9.6%。
 
-## 4. 线性求解器与 `:auto` 规则
+## 5. 线性求解器与 `:auto` 规则
 
-### 4.1 直接路径
+### 5.1 直接路径
 
 直接路径求解的是消去约束与边界值之后的约化鞍点
 
@@ -486,11 +538,11 @@ $$
 
 其中 $K\_{\mathrm{red}}$ 是约化速度矩阵， $B$ 是梯度， $B\_s$ 是散度， $p$ 是压力。分解用 UMFPACK，并对真正的约化残差做检查。壁面加密后的自由滑移四叉树会让无平移分解失稳，因此这条路径采用平移阶梯：相对对角平移依次取 $10^{-12}$ 、 $10^{-10}$ 、 $10^{-8}$ ；若没有一级满足接受容差，就以最好的那级为预条件，对无平移算子做若干步 GMRES 迭代精化。另有两级更小的平移 $10^{-14}$ 与 $10^{-13}$ ：当无平移分解已经完全丢掉解时先试这两级，阶梯与精化都失败、该步即将中止前再作为最后手段试一次。 `stokes_scaling = :equilibrated` 会先尝试对称平衡 $S\to DSD$ ，其中 $S$ 是鞍点矩阵、 $D$ 是对角缩放矩阵，作用是把接近零的压力模态抬到舍入误差之上；它只在本来会进入阶梯的那些求解上生效。直接路径是唯一逐位可复现的路径。
 
-### 4.2 多重网格路径
+### 5.2 多重网格路径
 
 多重网格路径用 flexible GMRES 配块三角预条件：速度块用几何 V 循环，每级至少按 1.5 倍 h 粗化，采用阻尼 Jacobi 光滑，各层算子由叶局部无矩阵 apply 构建；压力 Schur 补用三因子 w-BFBT 近似。FGMRES 每 100 次重启，总上限 500 次，按真正的约化鞍点残差对 `mg_tol` 判断收敛。参数卡传 `mg_tol = 1e-8` ，比它的 `stokes_tol = 1e-3` 低五个数量级；库默认值是 `1e-10` 。
 
-### 4.3 `:auto` 规则
+### 5.3 `:auto` 规则
 
 `linear = :auto` 在组装之前根据当前鞍点的两个属性决定路径。鞍点自由度按
 
@@ -508,18 +560,18 @@ $$
 
 黏度对比在固定的 33 × 33 网格上采样，样本取自本次求解实际使用的黏度场。 `:auto` 一旦选中多重网格，还会强制 `mg_operator = :matrixfree` 和 `mg_threads = min(8, Threads.nthreads())` 。如果这次求解没过 `stokes_tol` 或抛出异常，同一次求解会改走直接路径并记入 `LAST_AUTO_FALLBACK` ，运行继续，计数最后打在 `auto_fallbacks` 里。显式指定 `linear = :mg` 没有这层保护，失败就是失败。本卡在 8 188 叶时鞍点为 78 720 个自由度，在 10 000 叶时为 95 308 个，都超过 20 000，所以新运行都会解析到多重网格。
 
-## 5. 参数参考
+## 6. 参数参考
 
-### 5.1 参数卡的环境变量
+### 6.1 参数卡的环境变量
 
-下表的可调项通过脚本启动时读取的 `CASE_*` 环境变量设置；第二列是参数卡给出的默认值。
+下表的可调项通过脚本启动时读取的 `CASE_*` 环境变量设置；第二列是参数卡给出的默认值。逐壁边界条件的四个变量只列名字与默认值：取值、数据约定与拒绝规则由第 2 节拥有。
 
 | 变量 | 默认值 | 允许值 | 作用 |
 |---|---|---|---|
 | `CASE_OUT` | `out_julia/case_realistic` | 任意路径 | 输出根目录，运行产生的全部文件都在它下面。 |
 | `CASE_STEPS` | 0 | 整数 | 步数上限，与绝对步号比较。取 0 表示用模式默认值：smoke 10，short 150，spinup 10000，freeze 20000，resume 与 wallrefine 2000。 |
 | `CASE_FRAME` | 0 | 整数 | 帧间隔，单位是步。取 0 表示用参数卡的 5。 |
-| `CASE_LX` | 2.5 | 浮点 | 盒宽。必须保持 `CASE_LX/CASE_CX == 1/CASE_CY`，否则叶就不再是正方形。 |
+| `CASE_LX` | 2.5 | 浮点 | 盒宽。必须保持 `CASE_LX/CASE_CX == 1/CASE_CY` ；`Quadtree` 构造时校验，不一致直接报错。 |
 | `CASE_CX`、`CASE_CY` | 5、2 | 整数 | x 与 y 方向的基础单元数。 |
 | `CASE_MAXLEV` | 7 | 整数 | 四叉树最大层级，最细叶高为盒高的 $1/(2\cdot2^{\ell})$ 。 |
 | `CASE_MAXLEAVES` | 10000 | 整数 | 叶数硬上限，每个 AMR 周期之后执行。 |
@@ -528,13 +580,13 @@ $$
 | `CASE_COARSEN` | 0.05 | 浮点 | 粗化配额：平衡循环的相对阈值与每周期单元数上限。 |
 | `CASE_WALLMIN` | 5 | 整数 | 壁面条带内以及壁面行的最小层级，取 0 关闭壁面规则。 |
 | `CASE_WALLSTRIP` | 0.1 | $(0,0.5)$ 内的浮点 | 壁面条带宽度，从每个壁面向内占盒高的比例。 |
-| `CASE_WALL_BC` | 空（全部 `:same`） | `same`、`free`、`rigid`、`open` 的四元组 | 逐壁速度条件，顺序为 `(xminus, xplus, yminus, yplus)`，见 1.1 节。`open` 两个分量都自由，并切换到推导出的压力基准。 |
-| `CASE_WALL_UN` | 空（全部 `nothing`） | 四元组，每项为空或一个浮点数 | 逐壁法向速度，顺序为 `(xminus, xplus, yminus, yplus)`；每项是该壁沿正坐标方向的法向分量，留空表示沿用历史的零值；只要没有 `open` 壁，四个值必须满足零净外通量（见 1.1 节）。 |
-| `CASE_WALL_T` | 空（全部 `nothing`） | 四元组，每项为空或一个浮点数 | 逐壁切向牵引，顺序为 `(xminus, xplus, yminus, yplus)`；每项是总 Cauchy 牵引的切向全局分量（水平壁上为 `t_x`，竖直壁上为 `t_z`），留空表示零牵引，且只能给在解析为 `:free` 或 `:open` 的壁上（见 1.1 节）。 |
-| `CASE_WALL_TN` | 空（全部 `nothing`） | 四元组，每项为空或一个浮点数 | 逐壁法向牵引，顺序为 `(xminus, xplus, yminus, yplus)`；每项是总 Cauchy 牵引的法向全局分量（竖直壁上为 `t_x`，水平壁上为 `t_z`），留空表示零牵引，且只能给在 `:open` 壁上。由于牵引使用外法向，给定压力 `p0` 在顶壁是 `-p0`、在底壁是 `+p0`（见 1.1 节）。 |
+| `CASE_WALL_BC` | 空（全部 `same`） | 见 2.1 节 | 逐壁速度条件。 |
+| `CASE_WALL_UN` | 空（全部 `nothing`） | 见 2.2 节 | 逐壁法向速度，常量四元组。 |
+| `CASE_WALL_T` | 空（全部 `nothing`） | 见 2.2 节 | 逐壁切向牵引，常量四元组。 |
+| `CASE_WALL_TN` | 空（全部 `nothing`） | 见 2.2 节 | 逐壁法向牵引，常量四元组。 |
 | `CASE_SYMMETRY` | `none` | `none`、`x` | AMR 各轮的 x 镜像闭合：取 `x` 时镜像伙伴一起加密、一起合并，用于对称基准。 |
-| `CASE_INDICATOR` | `theta` | `theta`、`velocity`、`both` | 加密指示子作用的场，见 3.1 节。 |
-| `CASE_LINEAR` | `auto` | `auto`、`direct`、`mg`、`schur_cg`、`lagged` | 线性求解器，见 4 节。 |
+| `CASE_INDICATOR` | `theta` | `theta`、`velocity`、`both` | 加密指示子作用的场，见 4.1 节。 |
+| `CASE_LINEAR` | `auto` | `auto`、`direct`、`mg`、`schur_cg`、`lagged` | 线性求解器，见第 5 节。 |
 | `CASE_EV` | 0.11 | 浮点 | 熵黏性系数。 |
 | `CASE_LATENT` | `per_phase` | `per_phase`、`global` | 潜热系数：逐个相变计算，或两个相变共用历史值 `latent_L = 0.11` 。传入其他字符串会在构造 `Params` 时被拒绝。 |
 | `CASE_COMP_ED`、`CASE_COMP_ES` | 12.0、17.0 | 浮点 | 复合定律扩散分支与位错分支的活化能 `E_d`、`E_s`（见 1.4 节）。 |
@@ -548,7 +600,7 @@ $$
 | `CASE_SHEAR_MODULUS` | 空（关闭） | 大于等于 0 的浮点 | Maxwell 黏弹性：无量纲弹性剪切模量 $G$ 。留空或取 0 表示关闭，运行结果逐位不变；取正值会改变有效黏度与物理区域，见 1.8 节。 |
 | `CASE_EXTDIAG` | 0 | 0、1 | 把精确能量恒等式残差 `resid_A` 追加到 `history.csv` 。它会改变列数，所以只接受全新的输出目录。 |
 
-`main()` 在做任何事之前就会拒绝无法识别的 `CASE_AMR_GATE`、`CASE_SYMMETRY` 或 `CASE_STOKES_SCALING` ，并校验 `CASE_WALL_BC`、`CASE_WALL_UN`、`CASE_WALL_T` 与 `CASE_WALL_TN` 各自的四元组，以及 `:open` 壁组合的适定性（不合法组合在构造 `Params` 时即被拒绝）。下面这些是参数卡传给驱动的取值：
+`main()` 在做任何事之前就会拒绝无法识别的 `CASE_AMR_GATE`、`CASE_SYMMETRY` 或 `CASE_STOKES_SCALING` ，并校验 `CASE_WALL_BC`、`CASE_WALL_UN`、`CASE_WALL_T` 与 `CASE_WALL_TN` 各自的四元组以及每个数值是否有限；逐壁组合是否适定在构造 `Params` 时检查（见 2.6 节）。下面这些是参数卡传给驱动的取值：
 
 | 取值 | 参数卡里的值 |
 |---|---|
@@ -583,11 +635,11 @@ $$
 | `resume <ckpt>` | 带 AMR 续算。 |
 | `symseed <ckpt>` | 换一个 `CASE_SYMMETRY` 后续算。 |
 
-种子模式只复制检查点并改写下一阶段要变的那条配置字符串，其余各项照旧参与重启守卫的比较，规则见第 7 节。
+种子模式只复制检查点并改写下一阶段要变的那条配置字符串，其余各项照旧参与重启守卫的比较，规则见第 8 节。
 
-### 5.2 run_semquad_simulation 的关键字
+### 6.2 run_semquad_simulation 的关键字
 
-「默认值」一列是库的默认，「参数卡」一列是 `case_realistic_2d.jl` 传入的值。
+「默认值」一列是库的默认，「参数卡」一列是 `case_realistic_2d.jl` 传入的值。逐壁边界数据不是这里的关键字：它们属于 `Params` 的字段，见第 2 节。
 
 | 关键字 | 默认值 | 参数卡 | 作用 |
 |---|---|---|---|
@@ -597,7 +649,7 @@ $$
 | `dt0`、`dtmax`、`dtmin`、`dt_growth` | 1e-4、`Inf`、1e-14、1.05 | 1e-6、5e-5、1e-9、1.05 | 步长及其上下界。 |
 | `cfl` | 0 | 0.5 | 步长更新所用 CFL 数；取 0 表示把 `dt` 冻结在 `dt0` 。 |
 | `amr_every` | 0 | 5 | 两次 AMR 之间的步数；取 0 冻结网格。 |
-| `amr_indicator` | `:theta` | `CASE_INDICATOR` | 加密指示子作用的场：`:theta`、`:velocity` 或 `:both`（见 3.1 节）。 |
+| `amr_indicator` | `:theta` | `CASE_INDICATOR` | 加密指示子作用的场：`:theta`、`:velocity` 或 `:both`（见 4.1 节）。 |
 | `amr_passes` | 1 | 1 | 每个 AMR 周期里指示子、加密与场传递的轮数。 |
 | `amr_hysteresis`、`amr_coarsen_gate` | 1、true | `CASE_HYST`、`CASE_AMR_GATE == 1` | 平衡循环的迟滞长度与 2:1 校验。 |
 | `refine_frac`、`coarsen_frac` | 0.2、0.0 | 0.2、`CASE_COARSEN` | 平衡循环的误差份额，分别从上方和下方做 Dörfler 标记。 |
@@ -608,13 +660,13 @@ $$
 | `top_wall_level`、`top_wall_frac` | 0、0.5 | 关闭 | 顶壁加密规则。 |
 | `zero_side_eta`、`side_strip` | false、0.05 | false、0.05 | 侧墙条带的黏度清零。 |
 | `advection` | `:galerkin` | `:skew` | 能量方程的对流离散形式。 |
-| `ev`、`ev_cmax`、`ev_alpha` | 0、0.052、2 | 0.11、0.052、2 | 熵黏性，见 2.4 节；`ev = 0` 关闭。 |
+| `ev`、`ev_cmax`、`ev_alpha` | 0、0.052、2 | 0.11、0.052、2 | 熵黏性，见 3.4 节；`ev = 0` 关闭。 |
 | `maxpic`、`pic_tol`、`pic_relax`、`pic_mode` | 1、1e-6、1.0、`:picard` | 相同 | 步内非线性迭代；用 Newton 时要求 `linear=:direct` 。 |
 | `pic_reject`、`pic_reject_clamp`、`pic_reject_res`、`pic_reject_max` | false、0.25、10、4 | 默认值 | 当贴限比例或残差变大时拒绝一次 Picard 试步，并用减半的松弛重做。 |
 | `pic_adapt`、`pic_relax_min`、`pic_eta_relax`、`pic_u_relax` | false、0.05、1.0、1.0 | 默认值 | Picard 循环的松弛自适应、应变率平均与速度欠松弛。 |
 | `pic_div_window`、`pic_div_factor` | 0、10 | 默认值 | Picard 循环的散度检测器。 |
 | `newton_maxit`、`newton_krylov`、`newton_restart`、`newton_ls`、`newton_geo_safety` | 15、80、30、8、0 | 默认值 | Newton 控制项，`pic_mode = :picard` 时都不起作用。 |
-| `linear` | `:auto` | `CASE_LINEAR` | 线性求解器，见 4 节。 |
+| `linear` | `:auto` | `CASE_LINEAR` | 线性求解器，见第 5 节。 |
 | `stokes_tol` | `Inf` | 1e-3 | 真正残差超过它就中止该步；同时也是 `:auto` 回退和直接路径的接受容差。 |
 | `schur_maxiter`、`schur_precond` | 200、`:mass` | 默认值 | `linear = :schur_cg` 的迭代上限与预条件。 |
 | `mg_tol`、`mg_threads` | 1e-10、1 | 1e-8、1（`auto`：`min(8, nthreads)`） | 多重网格的外层容差与线程数。 |
@@ -627,7 +679,7 @@ $$
 | `mass_form` | `:anelastic` | `:boussinesq` | 质量守恒形式。 |
 | `phases`、`latent_scheme` | `[]`、`:implicit` | 两个相变、`:implicit` | 相变与潜热耦合；`maxpic = 1` 时两种格式结果相同。 |
 | `weak_chi0` | 0 | 0 | 初始应变弱化场；只有参数卡设置了弱化参数时才起作用。 |
-| `nu_cbf` | false | false | 把一致边界通量的 Nusselt 对追加到 history 里（见 6.2 节）。 |
+| `nu_cbf` | false | false | 把一致边界通量的 Nusselt 对追加到 history 里（见 7.2 节）。 |
 | `restart_from` | `""` | 取决于模式 | 从哪个检查点重启。 |
 | `checkpoint_path`、`checkpoint_every` | `""`、0 | `$CASE_OUT/spinup.h5`、200 | 检查点的写入位置与间隔。 |
 | `checkpoint_meta`、`callback`、`verbose`、`profile_steps` | 空、`nothing`、false、false | 参数卡的元数据、帧写入器、true、false | 检查点元数据、步钩子、逐步输出、逐步计时。 |
@@ -635,11 +687,11 @@ $$
 | `initial_refine`、`theta_ic` | 0、`nothing` | 0、`nothing` | 第一步之前在初值上做的 AMR 轮数；`theta_ic` 在每次加密后的树上重新采样解析初值。 |
 | `tavg_start`、`steady_tol`、`cfl_tol`、`tmin`、`steady_window` | `Inf`、`Inf`、`Inf`、0、5 | `Inf`、`Inf`、`Inf`、0、5 | `tavg_start` 是时间平均窗口； `steady_tol`、`steady_window` 与 `tmin` 是稳态停止判据，在 `t > tmin` 之后，相对温度与相对 `Nu` 的变化在 `steady_window` 步内都低于 `steady_tol` 即停止； `cfl_tol` 是壁面 CFL 中止保护。 |
 
-函数返回 `theta`、`t`、`steps`、`history`、`history_extra`、`qt`、`ss`、`ux`、`uz`、`pv`、`avg`、`weak`、`chi`、`chi_prev` ，以及 Maxwell 应力历史的 `txx`、`tyy`、`txy`（`shear_modulus = 0` 时为 `nothing`）。 `history` 每实际跑一步记一行，列的含义见 6.2 节； `history_extra` 存放固定 18 列之后追加的列。
+函数返回 `theta`、`t`、`steps`、`history`、`history_extra`、`qt`、`ss`、`ux`、`uz`、`pv`、`avg`、`weak`、`chi`、`chi_prev` ，以及 Maxwell 应力历史的 `txx`、`tyy`、`txy`（`shear_modulus = 0` 时为 `nothing`）。 `history` 每实际跑一步记一行，列的含义见 7.2 节； `history_extra` 存放固定 18 列之后追加的列。
 
-### 5.3 参数卡
+### 6.3 参数卡
 
-`case_realistic_2d.jl` 里的 `make_params()` 设置下列字段； `Params` 的其余字段保持 `src/physics/params.jl` 中列出的默认值。表中既有显式关闭的开关，也有为交代取值而列出的关键字段；物理背景见 1.1 至 1.9 节。
+`case_realistic_2d.jl` 里的 `make_params()` 设置下列字段； `Params` 的其余字段保持 `src/physics/params.jl` 中列出的默认值。表中既有显式关闭的开关，也有为交代取值而列出的关键字段；物理背景见 1.1 至 1.9 节，逐壁字段的语义见第 2 节。
 
 | 字段 | 取值 | 含义 |
 |---|---|---|
@@ -650,23 +702,22 @@ $$
 | `weak_f` | 1 | 残余弱化因子取 1，即不弱化。 |
 | `weak_eps_ref` | 0 | 关闭应变弱化。 |
 | `rho_heating`、`rho_cp` | `false` | 关闭密度加权加热。 |
-| `side_thermal`、`Twall_left`、`Twall_right` | `:insulating` | 侧壁绝热（法向通量为零）。取 `:fixed` 时两侧壁分别固定为给定物理温度，约定与顶/底壁相同：`Twall - Tbar`。 |
+| `side_thermal`、`Twall_left`、`Twall_right` | `:insulating`；两个温度字段保持默认 0 | 侧壁绝热（法向通量为零）。取 `:fixed` 时两侧壁分别固定为给定物理温度，约定与顶/底壁相同：`Twall - Tbar`。 |
 | `Twall_top`、`Twall_bot` | 0、1 | 顶壁与底壁温度；参数卡不显式设置，保持 `Params` 的默认值。 |
 | `H_half_life` | `Inf` | 放射性生热保持恒定。取有限值时按 `H·2^(-t/H_half_life)` 衰减，时间单位与代码一致；只能用 Picard 时间推进。 |
 | `Di` | 0 | 关闭耗散加热与绝热加热。 |
 | `heating_adiabatic`、`heating_dissipation` | `false`、`false` | 绝热加热与耗散加热的开关；`Di = 0` 时两项都不产生源项。 |
 | `refstate` | `nothing` | 不使用参考态。 |
 | `deviatoric` | `false` | 不做偏量投影。 |
-| `mass_form` | `:boussinesq` | Boussinesq 质量守恒形式。 |
-| `bc`、`wall_bc`、`wall_un`、`wall_t`、`wall_tn` | `:free`、来自 `CASE_WALL_BC`、来自 `CASE_WALL_UN`、来自 `CASE_WALL_T`、来自 `CASE_WALL_TN` | 四壁自由滑移；`:rigid` 是无滑移，`:open` 两个分量都自由，`wall_bc` 逐壁覆盖（见 1.1 节）。`wall_un` 逐壁细化法向 Dirichlet 值，空项保持历史零值，且在没有 `open` 壁时四个值必须零净通量。`wall_t` 逐壁加切向牵引作为边界载荷，`wall_tn` 在 `:open` 壁上加逐壁法向牵引；空项为零牵引，且 `wall_tn` 会把压力基准切换为推导出的（不钉值）形式（见 1.1 节）。 |
+| `bc`、`wall_bc`、`wall_un`、`wall_t`、`wall_tn` | `:free`；逐壁字段来自 `CASE_WALL_*` | 四壁自由滑移；逐壁覆盖与四组数据的语义见第 2 节，变量名与默认值见 6.1 节。 |
 
 `Params` 还会校验黏度定律。 `:composite` 拒绝 Drucker–Prager 屈服面； `:tosi` 自带塑性分支，因此拒绝 `yield_*` ； `:arrhenius` 要求 `eta_T0 > 0` 。
 
-## 6. 输出格式
+## 7. 输出格式
 
 所有文件都写在 `CASE_OUT` 下。目录由程序创建；只有要用 shell 重定向把日志写进该目录时，才需要它事先存在。
 
-### 6.1 run.log
+### 7.1 run.log
 
 这个文件不是程序创建的，而是 stdout 与 stderr 的 shell 重定向。内容包括四行头部、每步一行（`verbose=true` 时）、每 5 步一行 AMR（带加密、粗化、合并计数以及平衡循环的计数器）、每 100 步一行参数卡回调的进度，以及最后两行：
 
@@ -677,7 +728,7 @@ $$
 
 stdout 是块缓冲的，回调每 100 步 flush 一次，因此重定向出来的日志最多滞后 100 步。错误走 stderr，不缓冲。
 
-### 6.2 history.csv
+### 7.2 history.csv
 
 在运行返回时一次写出，每实际跑一步一行：
 
@@ -707,7 +758,7 @@ t,dt,Nu_top,Nu_bot,Vrms,meanT,N,leaves,div_max,hmin,umax,cfl,closure,usrms_surf,
 
 设 `CASE_EXTDIAG=1` 会追加一列 `resid_A` ：所引用的逐点 Nusselt 数与格式能量恒等式之间的精确残差，按单位面积计，因此对时间步通量为零，对逐点通量为 $O(h)$ 。设 `nu_cbf=true` 会追加一致边界通量的一对 Nusselt 数 `Nu_cbf_top` 与 `Nu_cbf_bot` 。两项可以同时打开；在本卡上把这两项都打开时，追加的列依次是 `closure_nolatent`、`Nu_cbf_top`、`Nu_cbf_bot`、`resid_A` 。
 
-### 6.3 帧文件
+### 7.3 帧文件
 
 每 `CASE_FRAME` 步存一帧，并错开每个 AMR 周期的第一步：AMR 那一轮会把速度清零，如果在 AMR 步上写帧，得到的是零速度和没有意义的 Nusselt 数。最后一帧总会补上。
 
@@ -732,7 +783,7 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 
 `nlev` 是不同层级的个数，`eta_clip_frac` 是黏度贴住上下限的速度节点比例，`wall_s` 是写帧器构造至今的秒数。
 
-### 6.4 检查点
+### 7.4 检查点
 
 单个 HDF5 文件，每 `checkpoint_every` 步写一次，结束时再写一次，始终写到同一路径（`$CASE_OUT/spinup.h5`、`frozen.h5`、`resume.h5` 等）。它保存把轨迹接下去所需的全部状态：
 
@@ -750,7 +801,7 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 
 `velocity_stale` 标记最后一步是 AMR 步的收尾检查点：里面存的速度只是诊断性重解，重启时会被清零。
 
-## 7. 重启与配置守卫
+## 8. 重启与配置守卫
 
 `restart_from` 会在第一步之前用检查点内容替换网格、`p` 和初始状态；`checkpoint_path` 让续算写到自己的文件。`maxsteps` 与 `tstop` 始终按绝对量解释。守卫把检查点里存的 `config` 与本次调用的设置逐键比较，只要有一项不同就拒绝启动，并在错误信息里逐行列出 `键: checkpoint=..., current=...` 。完整报错样例与处理步骤见[快速开始](quickstart.md)的「出问题怎么办」。
 
@@ -759,12 +810,12 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 | 类别 | 键 |
 |---|---|
 | AMR | 节奏、各轮设置、份额、叶数上限、层级上限、壁面规则、热点与顶壁规则、对称、传递模式、迟滞与校验。 |
-| 壁面运动 | `wall_bc`；`wall_u`、`wall_un`、`wall_t` 与 `wall_tn` 按每面壁记成 `none`/`custom` 标记：函数没有可比较的取值，若“是否有自定义值”不变而函数本身被替换，守卫无法检出，应从头重算。 |
+| 壁面运动与边界数据 | `wall_bc`；`wall_u`、`wall_un`、`wall_t` 与 `wall_tn` 按每面壁记成 `none`/`custom` 标记：函数没有可比较的取值，若「是否有自定义值」不变而函数本身被替换，守卫无法检出，应从头重算（见 2.7 节）。 |
 | 离散 | 对流形式、熵黏性系数。 |
 | 非线性与时间步 | `maxpic`、`pic_tol`、`pic_relax`、`pic_mode`、`pic_reject`、`cfl`、`dtmax`、`dtmin`。 |
 | 质量与投影 | `mass_form`、`deviatoric`。 |
 | 加热 | 加热开关与 `H`。 |
-| 流变 | 当前定律的参数；本卡是 `comp_*` 与 `eta_*` ，Tosi 定律则是 `tosi_*` 块。 |
+| 流变 | `:composite` 记 `comp_*`、`comp_rule`、`eta_T0`、`eta_min`、`eta_max`；`:tosi` 记 `tosi_*` 块。`:expT`、`:expTz`、`:arrhenius` 的定律参数不写入 `config`，续算前要自己确认一致。 |
 | 屈服与弱化 | 屈服、弱化参数。 |
 | 潜热 | `latent_L`、`latent_mode`、`latent_scheme` 与相变列表。 |
 | 参考态 | 参考态相关设置。 |
@@ -778,7 +829,7 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 
 续算被拒时，把存下的值原样重设一遍，或者改用种子模式。种子模式复制检查点，只改写冲突的那一个字符串：`freeze` 把 `amr_every` 设为 0，`wallrefine` 设置 `wall_min_level` 与 `wall_strip` 并加密壁面，`symseed` 设置 `symmetry` 。源文件始终不被修改。
 
-## 8. 线程与内存
+## 9. 线程与内存
 
 用 `--threads=N` 启动 Julia。本卡唯一用到 Julia 线程池的地方是 `linear = :auto` 选中的无矩阵 V 循环，它被限制在八个线程（`mg_threads = min(8, Threads.nthreads())`），所以开超过八个对 `auto` 路径没有收益。单线程时 `auto` 会警告一次并串行运行。显式指定 `linear = :mg` 时 `mg_threads` 保持为 1，除非调用者自己设置；直接分解在任何情况下都是串行的。
 
@@ -786,8 +837,13 @@ frame,step,t,dt,N,leaves,nlev,Tmin,Tmax,Tmean,Nu_top,Nu_bot,Vrms,umax,eta_min,et
 
 生产状态下的实测内存：在 10 000 叶上限下，八线程多重网格路径峰值常驻约 1.3 GB，直接分解约 2.4 GB。两者都是进程峰值，包含 Julia 运行时和已加载的状态。默认运行应预留 2 GB 空闲内存，直接路径预留 3 GB。
 
-磁盘几乎全被帧吃掉。6.3 节列出每帧写的文件，大小随树变化；一个检查点约 2 MB。
+磁盘几乎全被帧吃掉。7.3 节列出每帧写的文件，大小随树变化；一个检查点约 2 MB。
 
-## 9. 下一步读什么
+## 10. 下一步读什么
 
-这些默认值背后的基准记录与已核对的适用范围见[验证](validation.md)；上手之后想改某一处，见[常见问题](faq.md)。可运行的算例与各自应打印的数字见[算例](examples.md)。
+想核对本页这些默认值，见[验证](validation.md)；上手之后想改某一处，见[常见问题](faq.md)。
+
+下一步：可运行的算例、每个的命令与用来核对的数见[算例](examples.md)。
+
+
+

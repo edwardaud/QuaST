@@ -38,7 +38,7 @@ CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 [case] final: Nu_top=... Nu_bot=... Vrms=... meanT=... closure=... leaves=... N=...
 ```
 
-数字会随步数变化，行的格式不变。两个 Nusselt 数从传导值出发，十步之内都停在附近；定义与传导值见[用户指南](guide.md) 1.3 节，用作核对的数值见[算例](examples.md#真实算例)。
+数字会随步数变化，行的格式不变。两个 Nusselt 数从传导值出发，十步之内都停在附近；定义与传导值见[用户指南](guide.md) 1.3 节，用作核对的数值见[算例](examples.md)的真实算例一节。
 
 `smoke` 不写检查点，所以输出目录里只有这些：
 
@@ -48,7 +48,7 @@ CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 /tmp/quast_smoke/frames/frame_meta.csv        3 行加一个表头
 ```
 
-每个帧步在 `frames/` 下写 `frame_NNNNN_T.bin`（512 KB）、`frame_NNNNN_mesh.csv`，以及节点场文件 `frame_NNNNN_eta.bin`、`frame_NNNNN_speed.bin`、`frame_NNNNN_nodes.bin`；各类文件的格式见[用户指南](guide.md) 6.3 节。 `wc -l /tmp/quast_smoke/history.csv` 得到 11，`ls /tmp/quast_smoke/frames/*_T.bin | wc -l` 得到 3。本卡写出 19 列，`history.csv` 的列含义见指南 6.2 节。
+每个帧步在 `frames/` 下写 `frame_NNNNN_T.bin`（512 KB）、`frame_NNNNN_mesh.csv`，以及节点场文件 `frame_NNNNN_eta.bin`、`frame_NNNNN_speed.bin`、`frame_NNNNN_nodes.bin`；各类文件的格式见[用户指南](guide.md) 7.3 节。 `wc -l /tmp/quast_smoke/history.csv` 得到 11，`ls /tmp/quast_smoke/frames/*_T.bin | wc -l` 得到 3。本卡写出 19 列，`history.csv` 的列含义见指南 7.2 节。
 
 ## 第一次正式运行
 
@@ -79,7 +79,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=2000 \
 
 **`auto_fallbacks` 上升不是故障。** 每次回退只是把一次 Stokes 求解换成直接法，运行照常继续。
 
-`frames/frame_meta.csv` 是第二个实时窗口，每存完一帧就 flush，所以每 5 步前进一次，列含义见[用户指南](guide.md) 6.3 节。 `history.csv` 只在运行结束后写一次，运行期间不存在；列含义与 `closure` 的读法见指南 6.2 节。
+`frames/frame_meta.csv` 是第二个实时窗口，每存完一帧就 flush，所以每 5 步前进一次，列含义见[用户指南](guide.md) 7.3 节。 `history.csv` 只在运行结束后写一次，运行期间不存在；列含义与 `closure` 的读法见指南 7.2 节。
 
 ## 停下与续算
 
@@ -95,7 +95,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=4000 \
 
 - `CASE_STEPS` 是绝对步号，不是增量。续算时若 `CASE_STEPS` 不大于检查点里的步号，程序一步也不跑，打印 `[case] DONE mode=resume steps=... (no steps were run: maxsteps=... <= checkpoint step); nothing written` 后退出。
 - `resume` 把结果写到 `$CASE_OUT/resume.h5` 。所以下一次续算要么显式指定这个路径，要么又回到旧的 `spinup.h5` 。不带参数时它读 `$CASE_OUT/spinup.h5` 。
-- 续算要求当前设置与检查点一致。常规续算不必再设任何变量，因为脚本默认值与检查点相同；影响轨迹的键（AMR、壁面规则、对称、物理参数等）如果之前改过，这次必须设成同样的值，否则被配置守卫拒绝； `CASE_LINEAR` 、步长初值、检查点节奏这类求解器设置不在比较之列，可以更换。比较范围见[用户指南](guide.md)第 7 节，报错的处理办法见本页「出问题怎么办」。
+- 续算要求当前设置与检查点一致。常规续算不必再设任何变量，因为脚本默认值与检查点相同；影响轨迹的键（AMR、壁面规则、对称、物理参数等）如果之前改过，这次必须设成同样的值，否则被配置守卫拒绝； `CASE_LINEAR` 、步长初值、检查点节奏这类求解器设置不在比较之列，可以更换。比较范围见[用户指南](guide.md)第 8 节，报错的处理办法见本页「出问题怎么办」。
 
 **`CASE_OUT` 一定要设，而且用绝对路径。** 默认值是仓库内的 `out_julia/case_realistic` ，可能残留着更早一次预积分的文件：写进去会覆盖 `history.csv` 、覆盖步号相同的帧、向 `frame_meta.csv` 追加行。建议每次运行用一个独立目录，冒烟和测试用临时路径。
 
@@ -104,10 +104,12 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=4000 \
 | 旋钮 | 默认值 | 作用 |
 |---|---|---|
 | `CASE_OUT` | `out_julia/case_realistic` | 输出根目录。每次调用都给，且用绝对路径；运行产生的所有文件都在它下面。 |
-| `CASE_STEPS` | 0（按模式取默认，各模式的步数见指南 5.1 节） | 步数上限，与绝对步号比较，所以续算时它就是停下的那一步。 |
-| `CASE_LINEAR` | `auto` | 线性求解器。默认的 `auto` 按鞍点规模与黏度对比自动选择多重网格或直接分解，规则见指南 4.3 节。 `direct` 强制走直接路径，也就是逐位可复现的那条，墙钟和内存都约翻倍。 `mg` 强制走无矩阵多重网格，且只能串行，因为参数卡没有传 `mg_threads` ；只有 `auto` 会用到多线程 V 循环。 |
+| `CASE_STEPS` | 0（按模式取默认，各模式的步数见指南 6.1 节） | 步数上限，与绝对步号比较，所以续算时它就是停下的那一步。 |
+| `CASE_LINEAR` | `auto` | 线性求解器。默认的 `auto` 按鞍点规模与黏度对比自动选择多重网格或直接分解，规则见指南 5.3 节。 `direct` 强制走直接路径，也就是逐位可复现的那条，墙钟和内存都约翻倍。 `mg` 强制走无矩阵多重网格，且只能串行，因为参数卡没有传 `mg_threads` ；只有 `auto` 会用到多线程 V 循环。 |
 
-其余 `CASE_*` 变量与 `run_semquad_simulation` 的关键字见[用户指南](guide.md)第 5 节。定义 `Ra` 的参考黏度是 `CASE_ETA_REF`（默认 `1.0`），约定见指南 1.9 节。
+参数卡还接受逐壁边界条件： `CASE_WALL_BC`、`CASE_WALL_UN`、`CASE_WALL_T`、`CASE_WALL_TN` 。默认全空，即四壁自由滑移、零数据，所以首次运行的预期不变；取值与数据约定见[用户指南](guide.md)第 2 节，本页不展开。
+
+其余 `CASE_*` 变量与 `run_semquad_simulation` 的关键字见[用户指南](guide.md)第 6 节。定义 `Ra` 的参考黏度是 `CASE_ETA_REF`（默认 `1.0`），约定见指南 1.9 节。
 
 ## 出问题怎么办
 
@@ -115,7 +117,7 @@ CASE_OUT="$HOME/quast/run1" CASE_STEPS=4000 \
 
 现象是 Julia 抛 `ERROR: OutOfMemoryError()` 并附栈回溯，或者进程直接消失、`run.log` 断在半截。WSL 下的 OOM killer 会用退出码 137 结束进程，不留下任何消息。
 
-默认参数卡在 10 000 叶的上限下，峰值常驻内存见[用户指南](guide.md)第 8 节。优先保留 `CASE_LINEAR=auto` ，或改用 `CASE_LINEAR=mg` ，后者在这个规模上只占直接分解一半左右的内存；也可以把上限调低，例如 `CASE_MAXLEAVES=5000` 或 `CASE_MAXLEV=6` ；启动前先看一眼 `free -g` 。WSL 虚拟机的内存上限在 Windows 侧的 `.wslconfig` 里调。网格相关的键属于重启配置，所以缩小预算只能新开一次运行，不能续算。
+默认参数卡在 10 000 叶的上限下，峰值常驻内存见[用户指南](guide.md)第 9 节。优先保留 `CASE_LINEAR=auto` ，或改用 `CASE_LINEAR=mg` ，后者在这个规模上只占直接分解一半左右的内存；也可以把上限调低，例如 `CASE_MAXLEAVES=5000` 或 `CASE_MAXLEV=6` ；启动前先看一眼 `free -g` 。WSL 虚拟机的内存上限在 Windows 侧的 `.wslconfig` 里调。网格相关的键属于重启配置，所以缩小预算只能新开一次运行，不能续算。
 
 ### 重启被配置守卫拒绝
 
@@ -134,7 +136,7 @@ julia --project=. -e 'using HDF5; h5open(ARGS[1]) do f; println(HDF5.attrs(f)["c
   "$HOME/quast/run1/spinup.h5"
 ```
 
-确实要改某一项，就用种子模式：它们复制检查点，只改写那一个字符串，规则见[用户指南](guide.md)第 5 节。 `freeze` 冻结网格（把 `amr_every` 设为 0），`wallrefine` 换一套壁面参数，`symseed` 换一个新的 `CASE_SYMMETRY` 。源检查点不会被改动。
+确实要改某一项，就用种子模式：它们复制检查点，只改写那一个字符串，规则见[用户指南](guide.md)第 6 节。 `freeze` 冻结网格（把 `amr_every` 设为 0），`wallrefine` 换一套壁面参数，`symseed` 换一个新的 `CASE_SYMMETRY` 。源检查点不会被改动。
 
 ### Stokes 残差没达标
 
