@@ -35,14 +35,16 @@ function _checkpoint_leaf_candidates(leaves::Vector{NTuple{3,Int}})
 end
 
 """
-    _rebuild_tree(leaves, maxlev; nx0, ny0, Lx)
+    _rebuild_tree(leaves, maxlev; nx0, ny0, Lx, seam=:none)
 
 Rebuild a tree with the given base cells and return it only when its leaf set is
-exactly `leaves`; otherwise return `nothing`.
+exactly `leaves`; otherwise return `nothing`.  `seam` is the stored tree topology
+(stage 0.5c1): a ring checkpoint rebuilds a `seam = :periodic` tree, so the
+cross-seam neighbour pairs and the node identity are restored with the leaves.
 """
 function _rebuild_tree(leaves::Vector{NTuple{3,Int}}, maxlev::Int;
-                       nx0::Int, ny0::Int, Lx::Float64)
-    qt = Quadtree(maxlev; Lx=Lx, cells_x=nx0, cells_y=ny0)
+                       nx0::Int, ny0::Int, Lx::Float64, seam::Symbol=:none)
+    qt = Quadtree(maxlev; Lx=Lx, cells_x=nx0, cells_y=ny0, seam=seam)
     for (l, ix, iy) in leaves
         node = (0, ix >> l, iy >> l)
         for lev in 1:l

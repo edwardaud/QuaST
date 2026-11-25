@@ -247,6 +247,17 @@ order.
 
 The scale `2^(maxlevel-l)` puts a node at level `l` on the common finest grid
 `maxlevel`, so leaves at different levels compare directly.
+
+**Stage 0.5c1 (the periodic seam).**  On a `seam = :periodic` tree the logical
+`T` direction is a circle, so the node at `T = 1` *is* the node at `T = 0`.  The
+`T = 1` numerator is exactly the denominator `2*ny0*2^maxlevel` (the last column's
+`+1` node is `(2*(nside-1) + 2)*scale = 2*nside*scale`), so canonicalising
+`Tnum == den_y` to `0` identifies the two sides **bit for bit** and needs no
+tolerance: the wrapped node then also takes the `T = 0` physical coordinate
+(`logical_map(geom, ..., 0)`), which is the coordinate of the seam curve the map
+closes.  The `Snum` of the two images is the same exact expression as for any
+shared interior node, so the seam nodes merge by the same rule.  A non-periodic
+tree takes the historical body bit for bit.
 """
 @inline function _logical_node_key(qt::Quadtree, lf::NTuple{3,Int},
                                    i::Int, j::Int, rule)
@@ -254,6 +265,9 @@ The scale `2^(maxlevel-l)` puts a node at level `l` on the common finest grid
     scale = Float64(1 << (qt.maxlevel - l))
     Snum = (2.0 * lf[2] + (rule.nodes[i] + 1.0)) * scale
     Tnum = (2.0 * lf[3] + (rule.nodes[j] + 1.0)) * scale
+    if qt.seam === :periodic && Tnum == _logical_den_y(qt)
+        Tnum = 0.0
+    end
     return (Snum, Tnum)
 end
 
@@ -1894,6 +1908,62 @@ face_pairs(qt::Quadtree, ::CartesianBox) = face_pairs(qt)
 face_pairs(qt::Quadtree, ::AbstractGeometry) = face_pairs_logical(qt)
 
 # ---------------------------------------------------------------------------
+# 9b. The tree/geometry seam agreement (stage 0.5c1)
+# ---------------------------------------------------------------------------
+
+"""
+    _geom_periodic(g::AbstractGeometry) -> Bool
+
+Whether the geometry closes the logical `T` direction into a ring.  Only the
+polar annulus can (`seam = :periodic`, and then `Phi = 2*pi` by construction);
+every box-like geometry is bounded, and so is the annulus *wedge* (`seam =
+:wall`, `Phi < 2*pi`, or even the cut ring `Phi = 2*pi` whose two seam images
+coincide but are not glued).  The generic answer is `false`; the `PolarAnnulus`
+method is in section 10 with the type.
+"""
+@inline _geom_periodic(::AbstractGeometry) = false
+
+"""
+    check_seam_compat(qt::Quadtree, g::AbstractGeometry)
+
+Refuse a tree/geometry pair whose seam topologies disagree.  The periodic seam
+is a **tree** feature (`Quadtree(...; seam = :periodic)`) while the map that
+closes it is a **geometry** feature (`PolarAnnulus(...; seam = :periodic)`); one
+without the other is not a ring and would silently run a half-glued topology:
+
+  * a periodic tree with a bounded geometry would identify `T = 0`/`T = 1` nodes
+    of a domain whose two sides are *not* the same curve (a wedge, a box);
+  * a bounded tree with a periodic geometry would run the ring map with a cut:
+    the seam faces are walls (free-slip would pin `u.n = 0` on a radial cut of
+    what should be the same point), which is the silent non-periodic failure the
+    stage-0.5a record warned about.
+
+Called by [`make_semquad`](@ref) (so every space construction, including the MG
+coarse levels, is checked) and by the driver before setup.
+"""
+function check_seam_compat(qt::Quadtree, g::AbstractGeometry)
+    tree_periodic = qt.seam === :periodic
+    geom_periodic = _geom_periodic(g)
+    tree_periodic == geom_periodic && return nothing
+    if tree_periodic
+        throw(ArgumentError("the tree has seam = :periodic but the geometry " *
+                            "($(geometry_name(g))) does not close: a periodic " *
+                            "seam identifies the T = 0 and T = 1 logical sides, " *
+                            "which is only a physical identification under a map " *
+                            "that closes (PolarAnnulus with Phi = 2*pi and " *
+                            "seam = :periodic).  Build the tree with " *
+                            "Quadtree(...; seam = :none) for a wedge/box, or " *
+                            "the geometry with seam = :periodic for a ring."))
+    end
+    throw(ArgumentError("the geometry ($(geometry_name(g))) closes its angular " *
+                        "direction (seam = :periodic) but the tree has " *
+                        "seam = :none: the seam faces would be treated as walls " *
+                        "(a bounded tree does not identify T = 0 with T = 1), so " *
+                        "the solve would silently be non-periodic.  Build the " *
+                        "tree with Quadtree(...; seam = :periodic)."))
+end
+
+# ---------------------------------------------------------------------------
 # 10. Stage 0.5a: the 2-D polar annulus (`PolarAnnulus`)
 # ---------------------------------------------------------------------------
 #
@@ -2005,20 +2075,32 @@ constant magnitude, inward: ANNULUS_REFS §5.1).  The logical boundaries are
 
 and the Nusselt pair is the two circles (`nu_wall_sides = (:xminus, :xplus)`).
 
-**The seam.**  `seam = :wall` is the wedge: the two radial sides are ordinary
-logical walls (free-slip radial cuts; the boundary registry tags them
-`(:seam_lo, :seam_hi)`).  `seam = :periodic` (the closed 360-degree ring) is
-**refused in stage 0.5a**: the annulus *map* is periodic in `T`, but the
-quadtree topology is not -- `T = 0` and `T = 1` do not share nodes
-(`_logical_node_key` keys them separately), the neighbour table has no
-cross-seam pair, and the transfer/MG/AMR layers have no periodic arm.  Accepting
-the ring here would silently run the wedge topology with a periodic-looking
-registry, which is exactly the topology feature `GEOM_DESIGN` §6.7 says the
-mapping layer must not own.  The constructor therefore throws an actionable
-`ArgumentError` for `:periodic`; the ring is a later stage.  A `:wall` wedge at
-`Φ = 2*pi` is still constructible as a *cut ring* (all four sides are walls and
-the two seam images coincide), which is useful for metric tests but is not the
-periodic benchmark.
+**The seam (stage 0.5c1: wedge or ring).**  `seam = :wall` is the wedge (or
+the cut ring): the two radial sides are ordinary logical walls (free-slip radial
+cuts; the boundary registry tags them `(:seam_lo, :seam_hi)`).  `seam =
+:periodic` is the closed 360-degree ring: the `T = 0` and `T = 1` images are the
+same physical curve, the two seam sides are **not** walls, and the registry
+reports them as `kind = :periodic` with `tag = :seam_lo`/`:seam_hi`.  The seam is
+a **quadtree topology** feature and lives on the tree
+(`Quadtree(...; seam = :periodic)`: cross-seam neighbour pairs, the node
+identity across the seam, the 2:1 balance across it, periodic transfer/MG/AMR);
+the geometry contributes only the map that closes and the registry entry.  The
+two halves must agree -- a ring geometry on a bounded tree, or a periodic tree on
+a wedge, is refused by [`check_seam_compat`](@ref) -- and the ring constructor
+requires the opening angle to close **exactly**:
+
+* `seam = :periodic` requires `Φ == 2*pi` (the `Float64` value).  Any other angle
+  leaves a gap between the two seam images, so identifying them would be a
+  topology that the map does not realise; the constructor refuses with the
+  measured angle and tells the caller to pass `2*pi` (or to use the wedge).
+  There is deliberately no tolerance-and-snap: the geometry identity and the
+  stamp carry `Φ` verbatim, so snapping would change a parameter the checkpoint
+  records.  A caller whose `Φ` is one ulp off `2*pi` gets the refusal and the
+  exact value to write;
+* `Φ == 2*pi` with `seam = :wall` stays constructible as a *cut ring* (all four
+  sides are walls and the two seam images coincide to round-off, but they are
+  not glued: `perimeter` counts both radial sides and the seam faces are walls).
+  This is useful for metric tests and is not the periodic benchmark.
 
 Validation: `R0 > 0`, `R1 > R0`, `0 < Φ <= 2*pi`, all finite and the map
 orientation-preserving (`(R1 - R0) * Φ` finite and positive).
@@ -2049,15 +2131,16 @@ struct PolarAnnulus <: AbstractGeometry
                                 "orientation-preserving, det J = Phi*(R1-R0)*r > 0 " *
                                 "for r > 0 (got (R1-R0)*Phi = $(d * Φ))"))
         if seam === :periodic
-            throw(ArgumentError("PolarAnnulus: seam = :periodic (the closed 360-degree " *
-                                "ring) is not available in stage 0.5a.  The annulus map " *
-                                "is periodic in T, but the periodic seam is a quadtree " *
-                                "topology feature that is not implemented: T = 0 and " *
-                                "T = 1 do not share nodes, the neighbour table has no " *
-                                "cross-seam pair, and transfer/MG/AMR have no periodic " *
-                                "arm (docs/dev/GEOM_DESIGN.md 6.7).  Build a wedge with " *
-                                "seam = :wall (e.g. PolarAnnulus(1.0, 2.0, pi/2; " *
-                                "seam = :wall)) instead; the ring is a later stage."))
+            Φ == 2.0 * pi ||
+                throw(ArgumentError("PolarAnnulus: seam = :periodic is the closed " *
+                                    "360-degree ring and requires the opening angle " *
+                                    "to close exactly (Phi == 2*pi); got Phi = $Φ, " *
+                                    "which leaves a gap of $(2.0 * pi - Φ) rad " *
+                                    "between the two seam images, so identifying " *
+                                    "them would not be the map.  Pass Phi = 2*pi " *
+                                    "for the ring, or seam = :wall for a wedge (a " *
+                                    "cut ring at Phi = 2*pi with seam = :wall is " *
+                                    "the bounded topology)."))
         elseif seam !== :wall
             throw(ArgumentError("PolarAnnulus: seam must be :wall or :periodic " *
                                 "(got :$seam)"))
@@ -2065,6 +2148,15 @@ struct PolarAnnulus <: AbstractGeometry
         return new(R0, R1, Φ, seam)
     end
 end
+
+"""
+    _geom_periodic(g::PolarAnnulus) -> Bool
+
+The `PolarAnnulus` method of [`_geom_periodic`](@ref): `true` only for the ring
+(`seam = :periodic`, which the constructor restricts to `Phi = 2*pi`).  The
+wedge and the cut ring (`Phi = 2*pi`, `seam = :wall`) are bounded.
+"""
+@inline _geom_periodic(g::PolarAnnulus) = g.seam === :periodic
 
 PolarAnnulus(R0::Real, R1::Real, Φ::Real; seam::Symbol=:wall) =
     PolarAnnulus(Float64(R0), Float64(R1), Float64(Φ), seam)
@@ -2209,16 +2301,23 @@ end
 """
     boundaries(g::PolarAnnulus) -> NTuple{4,LogicalBoundary}
 
-The wedge's registry: the two circles are `:inner`/`:outer` walls and the two
-radial sides are the `:seam_lo`/`:seam_hi` walls.  Every side is a `:wall` in
-stage 0.5a because `seam = :periodic` is refused (see the type docstring); a
-future ring stage changes only the kind of the seam sides, driven by `g.seam`.
+The registry: the two circles are `:inner`/`:outer` walls and the two radial
+sides are `:seam_lo`/`:seam_hi`.  The seam sides are `:wall` for the wedge (and
+the cut ring) and **`:periodic` for the ring** (stage 0.5c1), where they are not
+domain boundary at all: the wall loops never see them because the periodic tree
+reports no face without a neighbour on the seam sides
+([`_semquad_boundary_face_mask`](@ref) is built from
+[`has_no_face_neighbor`](@ref)), and a consumer that reads the registry instead
+of the per-face mask must skip a `:periodic` side rather than apply a wall
+condition to it.  The tag names stay `:seam_lo`/`:seam_hi` for both topologies,
+so the wedge metadata is unchanged.
 """
 function boundaries(g::PolarAnnulus)
+    sk = g.seam === :periodic ? :periodic : :wall
     return (LogicalBoundary(:xminus, :wall, :inner),
             LogicalBoundary(:xplus, :wall, :outer),
-            LogicalBoundary(:yminus, :wall, :seam_lo),
-            LogicalBoundary(:yplus, :wall, :seam_hi))
+            LogicalBoundary(:yminus, sk, :seam_lo),
+            LogicalBoundary(:yplus, sk, :seam_hi))
 end
 
 """

@@ -706,10 +706,17 @@ end
         end
         @test allunique([base_id; [geometry_identity(v) for v in variants]])
         @test allunique([base_st; [geometry_stamp(v) for v in variants]])
-        # the seam is part of the identity: a ring record cannot alias a wedge
-        # record (the :periodic object itself is refused, see the next block)
+        # the seam is part of the identity: a ring record cannot alias the
+        # *cut ring* record of the same shape (stage 0.5c1: the ring is the
+        # same Phi = 2pi map with seam = :periodic; the two are different
+        # topologies and must never share an identity or a cache stamp)
         @test geometry_identity(gq) !=
               "PolarAnnulus(R0=0.55,R1=1.55,Phi=1.5707963267948966,seam=:periodic)"
+        gc = PolarAnnulus(1.0, 2.0, 2.0pi; seam=:wall)
+        gr = PolarAnnulus(1.0, 2.0, 2.0pi; seam=:periodic)
+        @test geometry_identity(gc) != geometry_identity(gr)
+        @test geometry_stamp(gc) != geometry_stamp(gr)
+        @test occursin("seam=:periodic", geometry_identity(gr))
         # the annulus never collides with the box in the cut-5 cache key
         @test geometry_stamp(gq) != geometry_stamp(CartesianBox(1.0))
         # constructor validation
@@ -725,6 +732,12 @@ end
         @test_throws ArgumentError PolarAnnulus(1.0, 2.0, NaN)
         @test_throws ArgumentError PolarAnnulus(1.0, 2.0, Inf)
         @test_throws ArgumentError PolarAnnulus(1.0, 2.0, pi; seam=:ring)
+        # stage 0.5c1: the ring is accepted only when the angle closes exactly
+        @test_throws ArgumentError PolarAnnulus(1.0, 2.0, 0.5pi; seam=:periodic)
+        @test_throws ArgumentError PolarAnnulus(1.0, 2.0, 2.0pi - 1.0e-12;
+                                                seam=:periodic)
+        @test_throws ArgumentError PolarAnnulus(1.0, 2.0, 2.0pi + 1.0e-9;
+                                                seam=:periodic)
         # the boundaries of the allowed ranges are accepted; Real arguments convert
         @test geometry_name(PolarAnnulus(1.0, 2.0, 2.0pi)) === :PolarAnnulus
         @test geometry_name(PolarAnnulus(1.0, 2.0, 1.0e-6)) === :PolarAnnulus
@@ -741,7 +754,7 @@ end
     end
 
     # ======================================================================
-    # (h) the seam decision
+    # (h) the seam decision: wedge / cut ring / ring (stage 0.5c1)
     # ======================================================================
     @testset "seam mode decision" begin
         gq = PolarAnnulus(1.0, 2.0, 0.5pi)
@@ -753,24 +766,10 @@ end
         qt = g273_uniform_tree()[2]
         sq = make_semquad(qt, p; geom=gq)
         @test abs(boundary_measure(gq, sq, :yminus) - (gq.R1 - gq.R0)) <= 1e-13
-        # :periodic is refused with an actionable message (what is missing and
-        # what to do instead), because the seam is a quadtree topology feature
-        perr = try
-            PolarAnnulus(1.0, 2.0, 2.0pi; seam=:periodic)
-            nothing
-        catch e
-            e
-        end
-        @test perr isa ArgumentError
-        pmsg = sprint(showerror, perr)
-        @test occursin(":periodic", pmsg)
-        @test occursin("topology", pmsg)
-        @test occursin("seam = :wall", pmsg)
-        @test occursin("ring", pmsg)
-        # a full-turn *cut ring* is a wedge (Phi = 2pi, seam = :wall): the map is
-        # 2pi-periodic to round-off, but the geometry does NOT treat the seam as
-        # glued -- the registry has four walls and the perimeter counts the two
-        # radial sides on top of the circles
+        @test !MS273._geom_periodic(gq)
+        # a full-turn *cut ring* (Phi = 2pi, seam = :wall) is still a wedge: the
+        # map is 2pi-periodic to round-off, but the geometry does NOT treat the
+        # seam as glued -- four walls and the two radial sides counted
         gr = PolarAnnulus(1.0, 2.0, 2.0pi)
         @test gr.seam === :wall
         x0, y0 = logical_map(gr, 0.4, 0.0)
@@ -782,8 +781,48 @@ end
         @test abs(per - (ring + 2.0 * (gr.R1 - gr.R0))) <= 1e-12 * per
         @test per - ring > 0.5 * (gr.R1 - gr.R0)   # the seam is counted, not glued
         @test all(b -> b.kind === :wall, boundaries(gr))
+        @test !MS273._geom_periodic(gr)
+        # the ring: the seam sides are :periodic, the circles stay walls
+        gring = PolarAnnulus(1.0, 2.0, 2.0pi; seam=:periodic)
+        @test MS273._geom_periodic(gring)
+        bring = boundaries(gring)
+        @test bring[1].kind === :wall && bring[1].tag === :inner
+        @test bring[2].kind === :wall && bring[2].tag === :outer
+        @test bring[3].kind === :periodic && bring[3].tag === :seam_lo
+        @test bring[4].kind === :periodic && bring[4].tag === :seam_hi
+        # a ring needs a periodic tree and a periodic tree a closing geometry;
+        # both refusals are actionable (stage 0.5c1, check_seam_compat)
+        qtr = g273_refine(Quadtree(2; cells_x=1, cells_y=4, seam=:periodic), 2)
+        @test qtr.seam === :periodic
+        @test MS273.check_seam_compat(qtr, gring) === nothing
+        @test_throws ArgumentError MS273.check_seam_compat(qt, gring)
+        @test_throws ArgumentError MS273.check_seam_compat(qtr, gq)
+        @test_throws ArgumentError MS273.check_seam_compat(qtr, gr)
+        @test_throws ArgumentError make_semquad(qt, p; geom=gring)
+        # the periodic tree is not a CartesianBox tree: the physical face-pair
+        # list of the bounded topology refuses rather than dropping the seam
+        @test_throws ArgumentError face_pairs(qtr)
+        # a periodic tree needs at least two base cells in the closed direction
+        @test_throws ArgumentError Quadtree(2; cells_x=1, cells_y=1,
+                                            seam=:periodic)
+        # the non-closing ring is refused with the measured gap and the exact
+        # value to write (no tolerance-and-snap: the angle is in the identity);
+        # one ulp below 2pi is already a gap the constructor refuses
+        perr = try
+            PolarAnnulus(1.0, 2.0, prevfloat(2.0pi); seam=:periodic)
+            nothing
+        catch e
+            e
+        end
+        @test perr isa ArgumentError
+        pmsg = sprint(showerror, perr)
+        @test occursin(":periodic", pmsg)
+        @test occursin("2*pi", pmsg)
+        @test occursin("gap", pmsg)
+        @test occursin("seam = :wall", pmsg)
         # the circles are still the Nusselt walls whatever the seam decision
         @test nu_wall_sides(gr) == (:xminus, :xplus)
         @test nu_wall_sides(gq) == (:xminus, :xplus)
+        @test nu_wall_sides(gring) == (:xminus, :xplus)
     end
 end

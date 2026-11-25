@@ -406,8 +406,8 @@ function _semquad_velocity_boundary(ss::SemStokes, geom::CartesianBox,
         cons2[c] = (ms, ws)
         cons2[nu + c] = (nu .+ ms, ws)
     end
-    u0, Cu, _ = _affine_constraint(Nu2, cons2, fixed)
-    return fixed, cons2, u0, Cu, _SEMQUAD_NO_WALLS
+    u0, Cu, free = _affine_constraint(Nu2, cons2, fixed)
+    return fixed, cons2, u0, Cu, free, _SEMQUAD_NO_WALLS
 end
 
 function _semquad_velocity_boundary(ss::SemStokes, geom::AbstractGeometry,
@@ -463,8 +463,8 @@ function _semquad_velocity_boundary(ss::SemStokes, geom::AbstractGeometry,
     # folded into the affine representation by the wall pass) and build
     # u = u0 + Cu u_free with the affine offsets of the wall rows.
     cons2, offsets = _semquad_merge_wall_constraints(cons_hang, wd)
-    u0, Cu, _ = _affine_constraint(Nu2, cons2, fixed, offsets)
-    return fixed, cons2, u0, Cu, wd
+    u0, Cu, free = _affine_constraint(Nu2, cons2, fixed, offsets)
+    return fixed, cons2, u0, Cu, free, wd
 end
 
 function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
@@ -1008,7 +1008,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # typed method boundary keeps the box path's codegen and allocation at the
     # cut-2 values (the A/B measured +208 B per assembly when the branches were
     # in the core body).
-    fixed, cons2, u0, Cu, wd = _semquad_velocity_boundary(
+    fixed, cons2, u0, Cu, free, wd = _semquad_velocity_boundary(
         ss, geom, su, qt, bmask, resolved_wall_bc, wall_u, wall_un, uDx, uDz,
         fd, n, nu, Nu2)
     # BC stage 3: is there an `:open` wall?  It decides the pressure gauge (pin
@@ -1159,7 +1159,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     if assemble_only !== false
         return (K=K, B=Bref, Bc=Bc, Bm=Bm, Cu=Cu, Cp=Cp, u0=u0, p0=p0, fv=fv,
                 fr=fr, gr=gr, Kred=Kred, Bs=Bs, Bt=Bt, Kgeo=Kgeo, Kp=Kp,
-                Kp_red=Kp_red)
+                Kp_red=Kp_red, free=free)
     end
     nit = 0
     # Every solve resets the direct-path shift record, so it describes this
@@ -1235,7 +1235,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                              smoothing=mg_smoothing, pre=mg_pre,
                              post=mg_post, omega=mg_omega,
                              mg_threads=mg_threads, mg_diag=mg_diag,
-                             fine_Cu=Cu,
+                             fine_Cu=Cu, fine_free=free,
                              # On the matrix-free path the solve already built
                              # the finest level's leaf-local operator and its
                              # eta field; reuse both instead of resampling the

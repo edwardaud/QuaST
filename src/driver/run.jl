@@ -335,34 +335,43 @@ driver owns it for the whole run, restores it from a checkpoint on a resume and
 writes it back through `save_semquad_state`, so a caller can inspect the state the
 last AMR cycle left without reading a module global.
 
-**Geometry (stage 0.5b1).**  `geom` selects the geometry: `geom=:annulus` with
-`annulus_R0`/`annulus_R1`/`annulus_Phi` builds the 2-D polar annulus
-(`PolarAnnulus(R0, R1, Phi)`, `seam = :wall`; the closed ring needs the periodic
-seam of stage 0.5b2 and is refused by the geometry constructor), and any
-`AbstractGeometry` is accepted unchanged (the stage-0 validation geometries, or
-a caller-built `PolarAnnulus`).  The default `CartesianBox(qt)` keeps every
-historical card bitwise identical.  An annulus run uses the radial log/H
-conduction base state (`docs/dev/ANNULUS_REFS.md` §5.4/§6.5), the
-two-component radial buoyancy `+Ra rho alpha theta e_r`, and the per-wall
-Nusselt normalisation of ANNULUS_REFS §6.2.  Its contract: `R1 - R0 = 1` (the
-gap is the physics length unit and the closures' height is `r - R0`), every
-logical wall rigid (`bc=:rigid`; free-slip curved walls need the general
-normal-velocity constraint rows of stage 0.5b2, `:open` walls are not wired),
-`side_thermal=:insulating` (a wedge has no Cartesian side walls — its radial
-cuts are insulating symmetry cuts) and no `nu_cbf`/`extdiag` (those diagnostic
-families are box-only until the curved-wall residual rows exist).
+**Geometry (stage 0.5b1, ring at 0.5c1).**  `geom` selects the geometry:
+`geom=:annulus` with `annulus_R0`/`annulus_R1`/`annulus_Phi`/`annulus_seam`
+builds the 2-D polar annulus (`PolarAnnulus(R0, R1, Phi; seam=annulus_seam)`;
+`seam = :wall` is the wedge/cut ring and needs the default bounded tree;
+`seam = :periodic` is the closed ring, requires `annulus_Phi = 2*pi` and a tree
+built with `Quadtree(...; seam = :periodic)`), and any `AbstractGeometry` is
+accepted unchanged (the stage-0 validation geometries, or a caller-built
+`PolarAnnulus`).  The default `CartesianBox(qt)` keeps every historical card
+bitwise identical.  An annulus run uses the radial log/H conduction base state
+(`docs/dev/ANNULUS_REFS.md` §5.4/§6.5), the two-component radial buoyancy
+`+Ra rho alpha theta e_r`, and the per-wall Nusselt normalisation of
+ANNULUS_REFS §6.2.  Its contract: `R1 - R0 = 1` (the gap is the physics length
+unit and the closures' height is `r - R0`), `side_thermal=:insulating` (there
+are no Cartesian side walls; the wedge's radial cuts are insulating symmetry
+cuts and the ring's seam is not a boundary at all) and no
+`nu_cbf`/`extdiag` (those diagnostic families are box-only until the
+curved-wall residual rows exist).  The tree/geometry seam agreement is checked
+before setup ([`check_seam_compat`](@ref)): a ring geometry on a bounded tree (or
+the reverse) is refused instead of silently running a half-glued topology.
 """
 function run_semquad_simulation(qt::Quadtree, pr::Params,
                                 theta0::Vector{Float64};
                                 # Stage 0.5b1: the geometry card knob.  `:annulus`
                                 # builds `PolarAnnulus(annulus_R0, annulus_R1,
-                                # annulus_Phi)`; any `AbstractGeometry` is
-                                # accepted unchanged.  The box default keeps
-                                # every historical card bitwise identical.
+                                # annulus_Phi; seam=annulus_seam)`; any
+                                # `AbstractGeometry` is accepted unchanged.  The box
+                                # default keeps every historical card bitwise
+                                # identical.
                                 geom::Union{Symbol,AbstractGeometry}=CartesianBox(qt),
                                 annulus_R0::Real=1.22,
                                 annulus_R1::Real=2.22,
                                 annulus_Phi::Real=0.5 * pi,
+                                # Stage 0.5c1: the seam topology of the annulus
+                                # card.  `:wall` is the wedge (or the cut ring at
+                                # Phi = 2*pi); `:periodic` is the closed ring and
+                                # needs annulus_Phi = 2*pi and a periodic tree.
+                                annulus_seam::Symbol=:wall,
                                 kwargs...)
     # The knob is resolved before the implementation body, which is dispatched
     # on the concrete geometry type: a concrete `G` keeps every geometry
@@ -370,23 +379,27 @@ function run_semquad_simulation(qt::Quadtree, pr::Params,
     # keep the concrete types and zero allocation of the historical path, and
     # the mapped closures are specialised), which is the stage-0 recipe the
     # design uses for the mapped kernels.
-    g = _resolve_run_geometry(geom, annulus_R0, annulus_R1, annulus_Phi)
+    g = _resolve_run_geometry(geom, annulus_R0, annulus_R1, annulus_Phi,
+                              annulus_seam)
     return _run_semquad_simulation(qt, pr, theta0, g; kwargs...)
 end
 
 # Resolve the `geom` card knob: an `AbstractGeometry` passes through; the
-# `:annulus` symbol builds the 2-D polar annulus from the three shape keywords.
-function _resolve_run_geometry(geom::AbstractGeometry, ::Real, ::Real, ::Real)
+# `:annulus` symbol builds the 2-D polar annulus from the shape keywords and the
+# seam topology.
+function _resolve_run_geometry(geom::AbstractGeometry, ::Real, ::Real, ::Real,
+                               ::Symbol)
     return geom
 end
-function _resolve_run_geometry(geom::Symbol, R0::Real, R1::Real, Phi::Real)
+function _resolve_run_geometry(geom::Symbol, R0::Real, R1::Real, Phi::Real,
+                               seam::Symbol)
     geom === :annulus ||
         throw(ArgumentError("geom must be :annulus or an AbstractGeometry " *
                             "(got :$geom).  Use geom=:annulus with " *
-                            "annulus_R0/annulus_R1/annulus_Phi for the 2-D " *
-                            "polar annulus, or pass a geometry object " *
+                            "annulus_R0/annulus_R1/annulus_Phi/annulus_seam for " *
+                            "the 2-D polar annulus, or pass a geometry object " *
                             "(geom=CartesianBox(qt), geom=PolarAnnulus(...), ...)."))
-    return PolarAnnulus(R0, R1, Phi)
+    return PolarAnnulus(R0, R1, Phi; seam=seam)
 end
 
 # The implementation body (everything from here to the end of the function was
@@ -518,6 +531,11 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                             ":expTz, :arrhenius, :tosi or :composite"))
     steady_window >= 1 ||
         throw(ArgumentError("steady_window must be >= 1"))
+    # Stage 0.5c1: the periodic seam is a tree feature and the closing map a
+    # geometry feature.  A mismatch would silently run a half-glued topology
+    # (wall rows on the seam, or T = 0/T = 1 identified on a wedge), so it is
+    # refused before any setup work.
+    check_seam_compat(qt, geom)
     # G257: the optional dimensional scale set of the eta_ref report.  It is
     # only multiplied into physical viscosities (Pa s), but a malformed one
     # would silently print a NaN/Inf, so validate it up front.
@@ -792,13 +810,16 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         # * A wedge has no Cartesian side walls: the two radial cuts are
         #   symmetry cuts with the natural (insulating) condition.  `:fixed`
         #   would impose a Cartesian Twall_left/right on a radial cut, which is
-        #   not a physical boundary condition of the annulus.
+        #   not a physical boundary condition of the annulus.  The ring has no
+        #   angular boundary at all, so the same restriction applies (the seam
+        #   sides are not walls and the temperature is periodic there).
         pr.side_thermal === :insulating ||
             throw(ArgumentError("the annulus does not support " *
                                 "side_thermal=:fixed: the wedge's radial sides " *
                                 "are symmetry cuts with the natural insulating " *
                                 "condition, not Cartesian side walls with a " *
-                                "prescribed temperature.  Keep " *
+                                "prescribed temperature (the ring's seam is not " *
+                                "a boundary at all).  Keep " *
                                 "side_thermal=:insulating."))
         # * Stage 0.5b2: every wall kind is wired on the curved annulus walls.
         #   `:free` is the general `n.u = g` line row (free slip: zero normal
@@ -806,10 +827,12 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         #   wall-frame Dirichlet data `u = un*n + ut*tau` (`wall_u`/`wall_un` are
         #   `u.tau`/`u.n` on a mapped geometry), and `:open` is the natural
         #   traction condition with the derived (unpinned) pressure gauge and the
-        #   `wall_t`/`wall_tn` data in the `(n,tau)` frame.  The periodic ring is
-        #   still out of scope: `seam = :periodic` is refused by the
-        #   `PolarAnnulus` constructor, so every `geom = :annulus` card builds a
-        #   walled wedge (the published full-ring benchmark is stage 0.5c).
+        #   `wall_t`/`wall_tn` data in the `(n,tau)` frame.  Stage 0.5c1 adds the
+        #   ring: `geom.seam = :periodic` with a `seam = :periodic` tree has only
+        #   the two circles as walls (the seam sides are not in the boundary
+        #   mask, so `bc`/`wall_bc`/`wall_u`/`wall_un` entries 3-4 are inert), and
+        #   the free-slip ring is the configuration where the solid-body rotation
+        #   gauge and the pressure pin coexist.
         # * `nu_cbf` and `extdiag` sum the residual on the box's logical y wall
         #   rows and normalise by `total_area`; on the annulus the thermal walls
         #   are the circles (`nu_wall_sides = (:xminus, :xplus)`), so those

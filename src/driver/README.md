@@ -82,9 +82,14 @@ perturbation, angular mode 4) sets the paper's/ASPECT's documented **total**
 temperature, converted by the driver to the perturbation `theta = T_ic - Tbar(r)`
 through the annulus base state and re-sampled by the existing `theta_ic` hook
 after every AMR cycle; it needs `geom=:annulus` and cannot be combined with a
-user `theta_ic` or with `restart_from`.  The full periodic ring remains the
-0.5c prerequisite: `seam=:periodic` is refused by the `PolarAnnulus`
-constructor, so every `geom=:annulus` card is a walled wedge.  G274 is the
+user `theta_ic` or with `restart_from`.  **Stage 0.5c1** adds the closed ring: `annulus_seam = :periodic` (with
+`annulus_Phi = 2*pi` and a tree built with `Quadtree(...; seam = :periodic)`)
+makes the seam a periodic seam -- `seam=:wall` stays the wedge and the cut
+ring -- and the driver checks the tree/geometry seam agreement before setup
+(`check_seam_compat`: a ring geometry on a bounded tree, or a periodic tree on
+a wedge, is refused instead of running a half-glued topology).  The ring has
+only the two circles as walls, so `bc`/`wall_bc` entries 3-4 are inert, and the
+free-slip ring engages the rotation gauge and the pressure pin together.  G274 is the
 stage-0.5b1 gate (conduction fixed point, H-inclusive flux identity, hydrostatic
 balance, the end-to-end rigid run with checkpoint/resume and the remaining
 refusals, depth-dependent closure wiring); G275 is the stage-0.5b2 gate

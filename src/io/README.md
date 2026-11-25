@@ -13,4 +13,4 @@ needed for a bit-identical resume is here; visualisation frames and
 | `checkpoint.jl` | HDF5 checkpoint/restart of the full quadtree SEM state. |
 | `checkpoint_cooldown.jl` | The optional `:balanced` AMR cooldown datasets. |
 | `checkpoint_config.jl` | The `key=value` configuration codec of a checkpoint. |
-| `checkpoint_tree.jl` | Rebuilding the quadtree a checkpoint describes. |
+| `checkpoint_tree.jl` | Rebuilding the quadtree a checkpoint describes, including its `seam` topology. |

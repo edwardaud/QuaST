@@ -6,6 +6,7 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
                               coarsen_factor::Float64=1.0,
                               coarse_direct_max::Int=0,
                               fine_Cu::Union{Nothing,SparseMatrixCSC{Float64,Int}}=nothing,
+                              fine_free::Union{Nothing,Vector{Int}}=nothing,
                               fine_ss::Union{Nothing,SemStokes}=nothing,
                               geom_assembly::Symbol=:minimal)
     coarse_direct_max >= 0 ||
@@ -15,10 +16,12 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
     # Cut 5: the geometry identity enters the hierarchy cache key.  A box and a
     # mapped geometry on the same tree must never share a hierarchy: the levels
     # store geometry-carrying spaces and their operators are built from the
-    # mapped assembly (GEOM_DESIGN §2.5, risk 5).
+    # mapped assembly (GEOM_DESIGN §2.5, risk 5).  Stage 0.5c1 adds the tree's
+    # `seam`: a ring hierarchy and a bounded hierarchy on the same leaf set are
+    # different topologies (cross-seam constraints/prolongation).
     gstamp = geometry_stamp(ss.su.geom)
     key = (p, qt.nx0, qt.ny0, qt.Lx, bc, deviatoric, wall_bc,
-           length(qt.leaves), hash(qt.leaves), gstamp,
+           length(qt.leaves), hash(qt.leaves), gstamp, qt.seam,
            coarsen_layers, coarsen_factor, coarse_direct_max, geom_assembly)
     if haskey(SEMQUAD_MG_CACHE, key)
         cached = SEMQUAD_MG_CACHE[key]::SemQuadMGGeom
@@ -50,7 +53,8 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
         lv = nothing
         if cacheable && reuse
             lkey = SemQuadMGLevelKey(idx, nleaf, stamps[idx], p, q.nx0, q.ny0,
-                                     q.Lx, bc, deviatoric, wall_bc, gstamp)
+                                     q.Lx, bc, deviatoric, wall_bc, gstamp,
+                                     q.seam)
             got = get(SEMQUAD_MG_CACHE, lkey, nothing)
             if got isa SemQuadMGLevel
                 lv = got
@@ -62,25 +66,32 @@ function _semquad_mg_geometry(ss::SemStokes, qt::Quadtree, p::Int,
             fine = idx == nlev && fine_Cu !== nothing
             s = fine && fine_ss !== nothing ? fine_ss :
                 make_semstokes(q, p; geom=ss.su.geom)
-            Cu = if fine
+            # The free-row list is taken from the assembly that produced Cu when
+            # the caller supplies it (stage 0.5c1: a ring free-slip row can have
+            # the same sparse signature as a free row, so recovering the list
+            # from Cu alone is not reliable -- see _semquad_mg_level_Cu).  The
+            # _mg_free_rows fallback keeps standalone callers working.
+            Cu, free = if fine
                 size(fine_Cu, 1) == 2 * s.su.N ||
                     throw(ArgumentError("fine_Cu has $(size(fine_Cu, 1)) rows, " *
                                         "expected $(2 * s.su.N); it does not belong " *
                                         "to the finest MG tree"))
-                fine_Cu
+                (fine_Cu, fine_free === nothing ?
+                          _mg_free_rows(fine_Cu, 2 * s.su.N) : fine_free)
             else
                 _semquad_mg_level_Cu(q, s, bc, deviatoric, geom_assembly;
                                      wall_bc=wall_bc)
             end
             lv = SemQuadMGLevel(idx, nleaf, stamps[idx], q, s, Cu,
-                                size(Cu, 2), _mg_free_rows(Cu, 2 * s.su.N),
+                                size(Cu, 2), free,
                                 nothing, (0, UInt64(0), 0, UInt64(0)))
             if cacheable
                 stats.misses += 1
                 push!(stats.last_rebuilt, idx)
                 reuse && _semquad_mg_level_cache_put!(
                     SemQuadMGLevelKey(idx, nleaf, stamps[idx], p, q.nx0, q.ny0,
-                                      q.Lx, bc, deviatoric, wall_bc, gstamp), lv)
+                                      q.Lx, bc, deviatoric, wall_bc, gstamp,
+                                      q.seam), lv)
             end
         end
         levels[idx] = lv
@@ -243,6 +254,7 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                          mg_threads::Int=1,
                          mg_diag::Symbol=:constrained,
                          fine_Cu::Union{Nothing,SparseMatrixCSC{Float64,Int}}=nothing,
+                         fine_free::Union{Nothing,Vector{Int}}=nothing,
                          geom_assembly::Symbol=:minimal,
                          fine_mfop::Union{Nothing,AnySemQuadKOp}=nothing,
                          fine_mfeta::Union{Nothing,AbstractVector{Float64}}=nothing,
@@ -281,8 +293,8 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                                coarsen_layers=coarsen_layers,
                                coarsen_factor=coarsen_factor,
                                coarse_direct_max=coarse_direct_max,
-                               fine_Cu=fine_Cu, fine_ss=ss,
-                               geom_assembly=geom_assembly)
+                               fine_Cu=fine_Cu, fine_free=fine_free,
+                               fine_ss=ss, geom_assembly=geom_assembly)
     L = geo.L
     mfops = AnySemQuadKOp[]
     mfetas = SemQuadEtaLane[]

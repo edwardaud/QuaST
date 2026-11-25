@@ -154,3 +154,20 @@ fail loudly.  No arithmetic result of a solve reads them back.  The rule is that
 anything in that family is write-once per call and read only by the caller after
 the call; a new value that has to influence the next solve belongs in an argument,
 not in this family.
+
+Stage 0.5c1 (the periodic ring) adds the ring to the boundary layer and one
+latent fix to the multigrid free-row bookkeeping.  The curved-wall rows, the
+rigid-mode analysis, the rotation gauge, the net-flux check and the
+torque-solvability check are unchanged: on a ring the only walls are the two
+circles (the periodic seam sides are not in the boundary mask, so `bc`,
+`wall_bc`, `wall_u` and `wall_un` entries 3-4 are inert), the free-slip ring is
+the configuration where the rotation gauge and the pressure pin coexist, and
+the torque-free-load check still guarantees the projected velocity solves the
+momentum equation.  `_mg_free_rows` assumed a free row is the only kind of
+row with a single unit sparse coefficient; a ring free-slip row at a circle
+node with `n_p = -n_q` reduces to `u_p = u_q`, which has that signature, so
+the free-row list is now threaded from `_affine_constraint` through
+`_semquad_velocity_boundary` and the `assemble_only` record into
+`make_semquad_mg` (`fine_free`), with `_mg_free_rows` kept as the fallback for
+standalone callers.  G276 (a)/(c)/(d) pin the ring Couette gate, the ring MG
+and the gauge composition.

@@ -57,6 +57,9 @@ which is exactly the historical insertion order.
 function make_semquad(qt::Quadtree, p::Int;
                       geom::AbstractGeometry=CartesianBox(qt))
     p >= 1 || throw(ArgumentError("p must be >= 1"))
+    # Stage 0.5c1: the periodic seam is a tree feature and the closing map a
+    # geometry feature; one without the other is a silently half-glued topology.
+    check_seam_compat(qt, geom)
     rule = gll_rule_cached(p)
     n = p + 1
     D = zeros(Float64, n, n)

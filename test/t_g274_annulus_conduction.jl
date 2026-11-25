@@ -565,10 +565,19 @@ end
         @test e isa ArgumentError && occursin("symmetry", sprint(showerror, e))
         e = g274_refusal(pr; pic_mode=:newton)
         @test e isa ArgumentError && occursin("pic_mode", sprint(showerror, e))
-        # (viii) the closed ring is refused by the geometry constructor itself
-        # (G273 pins the message); the wedge is the constructible topology here.
-        @test_throws ArgumentError PolarAnnulus(G274_R0, G274_R1, 2.0 * pi;
-                                                seam=:periodic)
+        # (viii) the ring is a legal geometry since stage 0.5c1, but only with a
+        # *periodic* tree: the seam agreement is what the constructor/driver
+        # refuse (the ring's own gates are G276).  The wedge is the bounded
+        # topology.
+        gref = PolarAnnulus(G274_R0, G274_R1, 2.0 * pi; seam=:periodic)
+        @test MS274._geom_periodic(gref)
+        e = try
+            make_semstokes(Quadtree(1; cells_x=1, cells_y=4), 2; geom=gref)
+            nothing
+        catch e
+            e
+        end
+        @test e isa ArgumentError && occursin("periodic", sprint(showerror, e))
     end
 
     # ======================================================================

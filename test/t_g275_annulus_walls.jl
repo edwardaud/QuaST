@@ -43,9 +43,9 @@
 #            torques `+-2 B Phi` (the published full-ring torque `4 pi B` at
 #            `Phi = 2 pi`) and the torque-balance residual `T_in + T_out`
 #            converge.  The full ring (where Couette is also exact with free-slip
-#            circles and no cuts) is stage 0.5c; the assertion that the
-#            *published* free-slip ring benchmark is reachable is deferred with
-#            it.  A free-slip-cut control demonstrates that the wedges differ
+#            circles and no cuts) is stage 0.5c1 and is gated by G276; this gate
+#            keeps the wedge-analytic all-Dirichlet restriction and the
+#            free-slip-cut control, which demonstrates that the wedges differ
 #            O(1) from the Couette restriction, i.e. the all-Dirichlet choice is
 #            load-bearing;
 #       (b2) the `:open` (traction) walls on the curved circles: the exact
@@ -86,8 +86,8 @@
 #       pattern and the base-state subtraction; an end-to-end free-slip annulus
 #       run (direct and `:mg`/`:auto`) is finite, writes history, keeps its
 #       checked identities and refuses to combine the knob with a user IC.  The
-#       periodic ring remains the 0.5c prerequisite (refused by the constructor;
-#       the published Davies benchmark is the ring).
+#       periodic ring is stage 0.5c1 and is gated by G276 (the published Davies
+#       benchmark is the ring and belongs to 0.5c2).
 #
 # WHY THE ASSERTIONS ARE NOT TAUTOLOGICAL (what each block catches):
 #   * (a1) reads the *affine constraint matrix* the solve imposes: a row written
@@ -1121,7 +1121,10 @@ end
         direct2 = g275_run(nsteps=2, linear=:direct)
         @test au.theta == direct2.theta
         @test abs(mg.history[end][5] - direct2.history[end][5]) <= 1.0e-6
-        # IC knob refusals and the ring prerequisite
+        # the IC knob refusals and the ring prerequisite: stage 0.5c1 makes the
+        # ring a legal geometry (with a periodic tree), so the old blanket
+        # refusal is now the *seam agreement* refusal; the ring's own gates are
+        # G276.
         err = try
             qt = g275_tree(2)
             ss = make_semstokes(qt, 2; geom=CartesianBox(qt))
@@ -1143,8 +1146,14 @@ end
         end
         @test err isa ArgumentError
         @test occursin("theta_ic", sprint(showerror, err))
+        # a ring geometry is now constructible; what is still refused is an
+        # angle that does not close and a ring geometry on a bounded tree
+        gring = PolarAnnulus(G275_R0, G275_R1, 2.0 * pi; seam=:periodic)
+        @test MS275._geom_periodic(gring)
+        @test_throws ArgumentError PolarAnnulus(G275_R0, G275_R1, G275_PHI;
+                                                seam=:periodic)
         ringerr = try
-            PolarAnnulus(G275_R0, G275_R1, 2.0 * pi; seam=:periodic)
+            make_semstokes(g275_tree(2), 2; geom=gring)
             nothing
         catch e
             e

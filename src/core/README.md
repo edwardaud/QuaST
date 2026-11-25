@@ -18,11 +18,11 @@ those live in `physics/`, `stokes/` and `amr/`.
 | `gll.jl` | GLL nodes and weights, the barycentric Lagrange basis, Gauss–Legendre quadrature. |
 | `parallel.jl` | Threading helpers shared by the leaf-blocked assembly loops. |
 | `poisson.jl` | SIPG/Nitsche Poisson operator: a verification-only assembler and its constrained solve. |
-| `quadtree.jl` | The 2:1-balanced quadtree: refine, coarsen, neighbours, balance and wall grading (the cut-6 height-based wall grading of `wall_graded_tree`). |
+| `quadtree.jl` | The 2:1-balanced quadtree: refine, coarsen, neighbours, balance and wall grading (the cut-6 height-based wall grading of `wall_graded_tree`); the stage-0.5c1 `seam` topology (`:none`/`:periodic`), the wrapped cross-seam pairs and the periodic top-level pair list. |
 | `quadtree_balance.jl` | The x-mirror symmetry and the 2:1 balancing policy. |
-| `quadtree_table.jl` | The flat face table the quadtree queries are answered from. |
-| `semquad.jl` | The continuous Q_p space on the quadtree, its mass matrix and constraints. |
-| `transfer.jl` | Solution transfer between quadtree SEM meshes: nodal restriction and L2 projection; the mapped method evaluates the old field at the new node's logical position and uses the mapped mass. |
+| `quadtree_table.jl` | The flat face table the quadtree queries are answered from; on a periodic tree the two seam columns are cross-face neighbours. |
+| `semquad.jl` | The continuous Q_p space on the quadtree, its mass matrix and constraints; node identity across a periodic seam and the tree/geometry seam agreement. |
+| `transfer.jl` | Solution transfer between quadtree SEM meshes: nodal restriction and L2 projection; the mapped method evaluates the old field at the new node's logical position and uses the mapped mass; a ring transfer keeps the seam trace exact. |
 
 `quadtree.jl`, `quadtree_table.jl` and `quadtree_balance.jl` are three views of
 one object: the refinement primitives maintain the flat face table, the table
@@ -44,8 +44,8 @@ the map `r = R0 + (R1-R0)*S`, `phi = Phi*T`, its analytic inverse, the leaf
 Jacobian `det J = Phi*r*(R1-R0)/(4*nx*ny)` and the map Hessian, the radial
 height/gravity (`h = r - R0`, `grad h = e_r`, `lap h = 1/r`, `g = -e_r`), the
 circle/seam boundary registry (`:inner`/`:outer` as `:wall`, the seam sides as
-`:seam_lo`/`:seam_hi`; a periodic seam is refused because the topology does not
-exist yet) and `nu_wall_sides = (:xminus, :xplus)`.  It consumes the generic
+`:seam_lo`/`:seam_hi`, `:periodic` for the ring) and `nu_wall_sides =
+(:xminus, :xplus)`.  It consumes the generic
 mapped leaf/face/metric/measure/cache bodies unchanged -- that is the stage-0
 layer's acceptance test -- and G273 pins the map, Jacobian, inverse,
 second-derivative surface, normals and the plane-annulus measures against
@@ -132,3 +132,35 @@ and physical-gradient primitives both use; `leaf_normal_size` (box: the
 historical `leaf_hx`/`leaf_hy`; mapped: `2/|grad xi|` at the face midpoint)
 completes the §2.3 measure API.
 
+**Stage 0.5c1: the periodic ring.**  The annulus's logical `T = 0` and `T = 1`
+sides are one physical curve, and that is a quadtree *topology* feature, not a
+mapping one.  `Quadtree(...; seam = :periodic)` closes the logical `y`
+direction: the flat face table wraps the last column's `:yplus` face to the
+first column and the first column's `:yminus` face to the last (a substitution
+of the column index with an in-range one, so the hot path stays index
+arithmetic), the ancestor walk then finds a cross-seam coarse/fine neighbour
+with the same code as an interior face, `balance!` therefore sees the seam and
+enforces the 2:1 condition across it, and `_logical_node_key` canonicalises the
+`T = 1` numerator (`2*ny0*2^maxlevel`) to `T = 0`, so the two seam images are
+one node with one physical coordinate.  The top-level pair list
+(`face_pairs(qt, geom)` / `face_pairs_logical`) makes its two `y` direction
+tests circular and its cache key carries the `seam`; the bounded-box
+`face_pairs(qt)` refuses a periodic tree rather than silently dropping the
+seam.  `PolarAnnulus(...; seam = :periodic)` is accepted only for `Phi == 2*pi`
+(exactly: a gap is not a ring, and the angle is part of the geometry
+identity/stamp) and its registry marks the two seam sides `:periodic`;
+`check_seam_compat` (called by `make_semquad`, so every space -- including the
+MG levels -- is checked, and by the driver before setup) refuses a ring
+geometry on a bounded tree and a periodic tree on a bounded geometry.  The
+hanging-node constraints (the cross-seam pair is a normal coarse/fine pair, so
+the seam trace is the coarse polynomial exactly), the transfer (the matrix of
+a mapped transfer is unchanged; the seam nodes are already one dof), the MG
+hierarchy (`_mg_copy_tree` keeps the flag, the prolongation evaluates the
+coarse field at the fine node's logical position, and the hierarchy/level-cache
+keys carry the seam), the balanced/AMR cycle (the indicator wraps the coarse
+abscissa of a cross-seam pair into the coarse leaf) and the checkpoint (the
+HDF5 attribute `seam`; absent in old files = bounded) all consume the wrapped
+pairs unchanged.  G276 pins the node identity, the table-vs-scan oracle
+agreement, the balance mirror, the space-level C0 seam, the periodic transfer,
+the Couette ring gate, the ring MG, the rotation-gauge/pressure-pin composition
+and an end-to-end driver run.

@@ -399,8 +399,16 @@ function semquad_ev_nu(g::AbstractGeometry, sq::SemQuad, pr::Params,
         nu = min(nu_max, nu_e)
     end
     # the wall-row switch is the logical side test (leaf index, not a physical
-    # coordinate), so it is the same statement as on the box path
-    if lf[3] == 0 || lf[3] == sq.ny0 * (1 << lf[1]) - 1
+    # coordinate), so it is the same statement as on the box path.  Stage 0.5c1:
+    # on a **ring** the logical y rows are the periodic seam, not a wall, so the
+    # switch is the geometry's physical Dirichlet-wall test instead (the
+    # circles).  The wedge keeps the historical logical-y statement (its
+    # mapped-EV wall rows are a stage-0.5b1 latent defect recorded for 0.5c2,
+    # measured at `ev = 0` by every existing gate), so the wedge path is
+    # bit-identical.
+    if _geom_periodic(g)
+        _amr_wall_leaf(g, sq, lf) && (nu = 0.0)
+    elseif lf[3] == 0 || lf[3] == sq.ny0 * (1 << lf[1]) - 1
         nu = 0.0
     end
     return nu

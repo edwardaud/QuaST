@@ -226,14 +226,17 @@ function _mg_smoothing_profile(smoothing::Symbol, geo::SemQuadMGGeom,
 end
 
 """
-    _semquad_uniform_level(Lx, nx0, ny0, l)
+    _semquad_uniform_level(Lx, nx0, ny0, l; seam=:none)
 
 The uniform level-`l` tree with the same base cells and box width.  Kept for
 tests and for building reference hierarchies; `Quadtree(l; ...)` only creates
-the level-0 base leaves (`maxlevel` is a cap).
+the level-0 base leaves (`maxlevel` is a cap).  `seam` forwards the tree topology
+(stage 0.5c1): a ring hierarchy must be built with `seam = :periodic` at every
+level.
 """
-function _semquad_uniform_level(Lx::Float64, nx0::Int, ny0::Int, l::Int)
-    qt = Quadtree(l; Lx=Lx, cells_x=nx0, cells_y=ny0)
+function _semquad_uniform_level(Lx::Float64, nx0::Int, ny0::Int, l::Int;
+                                seam::Symbol=:none)
+    qt = Quadtree(l; Lx=Lx, cells_x=nx0, cells_y=ny0, seam=seam)
     for _ in 1:l, lf in collect(qt.leaves)
         refine!(qt, lf)
     end
@@ -245,10 +248,14 @@ end
     _mg_copy_tree(qt)
 
 An independent copy of `qt` (the leaves set is copied, so merging does not touch
-the input tree).
+the input tree).  The copy carries the tree's `seam` topology (stage 0.5c1): a
+coarse level of a ring hierarchy must stay a ring, or its hanging-node
+constraints carry no cross-seam rows and the prolongation/restriction between
+the levels would be non-periodic.
 """
 function _mg_copy_tree(qt::Quadtree)
-    qc = Quadtree(qt.maxlevel; Lx=qt.Lx, cells_x=qt.nx0, cells_y=qt.ny0)
+    qc = Quadtree(qt.maxlevel; Lx=qt.Lx, cells_x=qt.nx0, cells_y=qt.ny0,
+                  seam=qt.seam)
     empty!(qc.leaves)          # the constructor seeds the level-0 base leaves
     for lf in qt.leaves
         push!(qc.leaves, lf)

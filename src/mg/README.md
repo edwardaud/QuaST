@@ -49,3 +49,20 @@ pressure-cache / stale-LU fingerprint).  The keys are extended, never re-laid
 out: the *level* cache still stores topology only (`docs/dev/MG.md` policy), and
 an entry is a pure function of its key, so a geometry change is a new key and a
 stale hit is impossible.
+
+Stage 0.5c1 (the periodic ring) adds the tree's `seam` topology to the MG
+layer.  The level trees are coarsenings of the caller's tree and must stay
+rings: `_mg_copy_tree` copies the flag, so every level's hanging-node
+constraints carry the cross-seam rows and the prolongation/restriction never
+mixes a ring level with a bounded one.  The per-tree hierarchy key and
+`SemQuadMGLevelKey` carry `qt.seam`, and the prolongation is still the same
+logical-position interpolation (a fine node on the seam is located at
+`T = 1` in the last coarse row and at `T = 0` in the first; both evaluate the
+same coarse polynomial because the coarse space is periodic).  The finest
+level's free-row list is now taken from the assembly that produced `Cu`
+instead of being recovered from `Cu` alone: on a ring a free-slip row at a
+circle node where `n_p = -n_q` (the 3pi/4 and 7pi/4 nodes) reduces to
+`u_p = u_q`, a constrained row with the same sparse signature as a free row,
+so `_mg_free_rows` would over-count the free dofs.  G276 (c) pins the ring
+hierarchy, the prolongation against an independent physical-point evaluation,
+the periodic prolongated trace and the 0 B warm mapped apply on a ring tree.

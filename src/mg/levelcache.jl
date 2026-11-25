@@ -41,7 +41,7 @@ const SEMQUAD_MG_LEVEL_CACHE = Ref(true)
 
 """
     SemQuadMGLevelKey(idx, nleaf, stamp, p, nx0, ny0, Lx, bc, deviatoric, wall_bc,
-                      geom)
+                      geom, seam)
 
 Cache key of one coarse MG level: the level index (coarse first) plus the
 fingerprint of the level's **own** leaf set (`_semquad_mg_leaf_hash`) and the
@@ -55,6 +55,10 @@ the geometry, and the mapped assembly of a level is a function of it, so a box
 and an annulus with the same coarse leaf set must never share a cached level
 (GEOM_DESIGN §2.5).  The stamp is `geometry_stamp(g)`, the same identity every
 cut-5 cache key uses.
+
+Stage 0.5c1 adds the level tree's `seam` topology: the cached level stores
+`Cu` and the prolongation, which carry the cross-seam rows and weights, so a
+ring level and a bounded level with the same leaves must never share an entry.
 """
 struct SemQuadMGLevelKey
     idx::Int
@@ -68,21 +72,23 @@ struct SemQuadMGLevelKey
     deviatoric::Bool
     wall_bc::NTuple{4,Symbol}
     geom::UInt64
+    seam::Symbol
 end
 
 Base.:(==)(a::SemQuadMGLevelKey, b::SemQuadMGLevelKey) =
     a.idx == b.idx && a.nleaf == b.nleaf && a.stamp == b.stamp &&
     a.p == b.p && a.nx0 == b.nx0 && a.ny0 == b.ny0 && a.Lx == b.Lx &&
     a.bc === b.bc && a.deviatoric == b.deviatoric && a.wall_bc == b.wall_bc &&
-    a.geom == b.geom
+    a.geom == b.geom && a.seam === b.seam
 Base.hash(k::SemQuadMGLevelKey, h::UInt) =
-    hash(k.geom, hash(k.stamp, hash(k.idx, hash(k.nleaf, hash(k.p, hash(k.bc,
-              hash(k.wall_bc, hash(k.Lx, h))))))))
+    hash(k.seam, hash(k.geom, hash(k.stamp,
+              hash(k.idx, hash(k.nleaf, hash(k.p, hash(k.bc,
+              hash(k.wall_bc, hash(k.Lx, h)))))))))
 
 function Base.show(io::IO, k::SemQuadMGLevelKey)
     print(io, "SemQuadMGLevelKey(level=", k.idx, ", leaves=", k.nleaf,
           ", stamp=", string(k.stamp; base=16),
-          ", geom=", string(k.geom; base=16), ")")
+          ", geom=", string(k.geom; base=16), ", seam=:", k.seam, ")")
 end
 
 """
@@ -220,8 +226,16 @@ function _semquad_mg_drop_tree_entries!()
     return nothing
 end
 
-"""`Cu` of one coarse level, via the reduced (`:mg`) or the historical
-K-forming (`:full`) assembly (see `make_semquad_mg`'s `geom_assembly`)."""
+"""`(Cu, free)` of one coarse level, via the reduced (`:mg`) or the historical
+K-forming (`:full`) assembly (see `make_semquad_mg`'s `geom_assembly`).
+
+`free` is the affine-constraint free-row list the assembly itself used.  The
+prolongation needs it (`P = Pfull[free_rows, :] * C_coarse`), and stage 0.5c1
+made it explicit rather than recovered from `Cu`: on a **ring** a free-slip row
+at a circle node where `n_p = -n_q` (the 3π/4 and 7π/4 nodes) reduces to
+`u_p = u_q`, i.e. a constrained row with a single unit coefficient — the same
+sparse signature as a free row — so `_mg_free_rows` would over-count the free
+dofs (G276 (c) pins the explicit list and the misfire it prevents)."""
 function _semquad_mg_level_Cu(q::Quadtree, s::SemStokes, bc::Symbol,
                               deviatoric::Bool, geom_assembly::Symbol;
                               wall_bc::NTuple{4,Symbol}=(:same, :same, :same, :same))
@@ -246,6 +260,6 @@ function _semquad_mg_level_Cu(q::Quadtree, s::SemStokes, bc::Symbol,
                                        wall_bc=wall_bc,
                                        assemble_only=true)
     end
-    return SparseMatrixCSC{Float64,Int}(sparse(asm.Cu))
+    return SparseMatrixCSC{Float64,Int}(sparse(asm.Cu)), copy(asm.free)
 end
 

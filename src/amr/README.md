@@ -43,3 +43,17 @@ the estimator's units matter.  The cycle, wall refinement and
 `wall_graded_tree` take an optional `geom` (default the box) and their box call
 sites are the historical ones, so the box path is bitwise and allocates exactly
 what it did before the cut (G272 (e), the dump, the A/B).
+
+Stage 0.5c1 (the periodic ring) matters to the adaptive layer in two places.
+The **gradient-jump indicator** iterates the logical pair list, which on a ring
+contains the cross-seam pairs; a cross-seam pair has the fine face one logical
+period away from the coarse leaf, so the coarse side's abscissa is wrapped into
+the coarse leaf before the reference-space evaluation (a bounded tree never
+takes that branch).  The **balanced cycle** needs no policy change: the wrap is
+a property of the flat face table, so `balance!`, the coarsening gate, the
+budget pass and `max_face_level_jump` all see the seam and enforce 2:1 across
+it; a refinement applied to one side is mirrored by the balance exactly as an
+interior refinement would be.  G276 (b3) pins that a one-sided refinement is
+detected as a 2-level cross-seam jump and repaired by the balance, and G276 (e)
+pins that an AMR ring run keeps the tree periodic, balanced and the
+transferred temperature periodic.

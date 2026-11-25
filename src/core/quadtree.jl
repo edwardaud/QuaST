@@ -138,26 +138,58 @@ struct Quadtree
     ny0::Int                    # base cells in y at level 0
     leaves::Set{NTuple{3,Int}}
     faces::QuadFaceCache
+    # Stage 0.5c1: the periodic seam of the logical `y` direction.  The tree owns
+    # the *topology*; the geometry only supplies a map that closes (`PolarAnnulus`
+    # with `Phi = 2*pi`, docs/dev/GEOM_DESIGN.md 6.7).
+    #
+    #   * `:none` (default) -- the historical box topology: `y` is a bounded
+    #     interval and the four logical sides are the domain boundary.
+    #   * `:periodic` -- the `y` direction is closed.  The last angular column
+    #     `iy = ny0*2^l - 1` and the first column `iy = 0` are face neighbours
+    #     across the seam (`_push_face_ids!` wraps the row index), `balance!`
+    #     therefore enforces the 2:1 condition *across* the seam, and the SEM
+    #     nodes at `T = 0`/`T = 1` are one node (`_logical_node_key`
+    #     canonicalises the `T = 1` numerator to 0).  The `y` direction needs at
+    #     least two base cells: a single cell would be its own cross-seam
+    #     neighbour.
+    #
+    # The flag is part of the tree because the face table, the balance and the
+    # node identity are topology; it is *not* read by any box-path body (every
+    # box tree has `seam === :none`), so the box arithmetic is untouched.
+    seam::Symbol
     function Quadtree(maxlevel::Int, Lx::Float64, nx0::Int, ny0::Int,
-                      leaves::Set{NTuple{3,Int}})
-        return new(maxlevel, Lx, nx0, ny0, leaves, QuadFaceCache())
+                      leaves::Set{NTuple{3,Int}}, seam::Symbol=:none)
+        seam === :periodic && ny0 < 2 &&
+            throw(ArgumentError("a periodic seam needs at least two base cells " *
+                                "in the closed direction (a single base cell " *
+                                "would be its own cross-seam neighbour), got " *
+                                "cells_y = $ny0"))
+        return new(maxlevel, Lx, nx0, ny0, leaves, QuadFaceCache(), seam)
     end
 end
 
 """
-    Quadtree(maxlevel; Lx=nothing, cells_x=1, cells_y=1)
+    Quadtree(maxlevel; Lx=nothing, cells_x=1, cells_y=1, seam=:none)
 
 `cells_x × cells_y` base cells over `[0,Lx]×[0,1]`, `Lx` defaulting to
 `cells_x/cells_y`.  With `cells_x/cells_y = Lx` the leaves are **square**
 (side `1/(cells_y*2^l)`); `cells_x=5, cells_y=2` is ASPECT's 2b geometry.  The
 defaults `(1,1)` are the historical unit square, and `cells_x=cells_y=1, Lx≠1`
 keeps the older coordinate stretching (anisotropic leaves).
+
+`seam` (stage 0.5c1) selects the logical-`y` topology: `:none` is the historical
+box (and every box tree); `:periodic` closes the `y` direction (the ring of the
+2-D annulus, `PolarAnnulus` with `Phi = 2*pi`) -- see the [`Quadtree`](@ref)
+field comment.  It needs `cells_y >= 2`.
 """
 function Quadtree(maxlevel::Int; Lx::Union{Nothing,Float64}=nothing,
-                  cells_x::Int=1, cells_y::Int=1)
+                  cells_x::Int=1, cells_y::Int=1, seam::Symbol=:none)
     maxlevel >= 0 || throw(ArgumentError("maxlevel must be >= 0"))
     cells_x >= 1 || throw(ArgumentError("cells_x must be >= 1"))
     cells_y >= 1 || throw(ArgumentError("cells_y must be >= 1"))
+    seam in (:none, :periodic) ||
+        throw(ArgumentError("a Quadtree seam must be :none or :periodic " *
+                            "(got :$seam)"))
     Lxb = Lx === nothing ? cells_x / cells_y : Float64(Lx)
     Lxb > 0.0 || throw(ArgumentError("Lx must be > 0"))
     if (cells_x != 1 || cells_y != 1) &&
@@ -166,7 +198,7 @@ function Quadtree(maxlevel::Int; Lx::Union{Nothing,Float64}=nothing,
                             "$(cells_x)/$(cells_y)"))
     end
     base = Set([(0, ix, iy) for iy in 0:(cells_y - 1) for ix in 0:(cells_x - 1)])
-    Quadtree(maxlevel, Lxb, cells_x, cells_y, base)
+    Quadtree(maxlevel, Lxb, cells_x, cells_y, base, seam)
 end
 
 # Bump the tree version of the derived caches (`face_pairs`; the flat table is
@@ -282,24 +314,38 @@ The historical `neighbors` implementation, verbatim (float-coordinate descent
 from the base cells).  Reference oracle for the flat table; **not** on any hot
 path.  `neighbors` falls back to it for a key that is not a leaf of the tree, so
 the two agree for every input.
+
+Stage 0.5c1: on a `seam = :periodic` tree the face coordinate of a `y` side is
+wrapped (`1 -> 0` for `:yplus`, `0 -> 1` for `:yminus`), which is exactly the
+cross-seam neighbour set the flat table computes by index arithmetic; the two are
+compared leaf by leaf in G276 (b).  The wrap is a coordinate substitution, so the
+oracle stays independent of the table logic.
 """
 function _neighbors_scan(qt::Quadtree, leaf::NTuple{3,Int}, dir::Symbol)
     dir in FACE_DIRS || throw(ArgumentError("unknown direction $dir"))
     l, ix, iy = leaf
     h = leaf_h(qt, l)
     x0 = ix * h; y0 = iy * h
+    # Periodic seam: a face on the closing coordinate is the *other* side of the
+    # sector, so the scan coordinate wraps by one logical period.
+    xp = x0 + h
+    yp = y0 + h
+    if qt.seam === :periodic
+        yp >= 1.0 && (yp = 0.0)
+    end
+    ym = (qt.seam === :periodic && y0 <= 0.0) ? 1.0 : y0
     out = NTuple{3,Int}[]
     # With several base cells (cells_x x cells_y) the face search has to start
     # from every base cell, not from a single root.
     for by in 0:(qt.ny0 - 1), bx in 0:(qt.nx0 - 1)
         if dir === :xplus
-            _collect_face!(out, qt, 0, bx, by, true, x0 + h, y0, y0 + h)
+            _collect_face!(out, qt, 0, bx, by, true, xp, y0, y0 + h)
         elseif dir === :xminus
             _collect_face!(out, qt, 0, bx, by, true, x0, y0, y0 + h)
         elseif dir === :yplus
-            _collect_face!(out, qt, 0, bx, by, false, y0 + h, x0, x0 + h)
+            _collect_face!(out, qt, 0, bx, by, false, yp, x0, x0 + h)
         else
-            _collect_face!(out, qt, 0, bx, by, false, y0, x0, x0 + h)
+            _collect_face!(out, qt, 0, bx, by, false, ym, x0, x0 + h)
         end
     end
     filter!(o -> o != leaf, out)
@@ -487,8 +533,23 @@ sub-faces, one per fine neighbor.
 The list is cached per tree version (see `QuadFaceCache`): the indicator,
 constraints and assembly all consume it for the same mesh, and it is a pure
 function of the leaf set.  Callers must not mutate the returned vector.
+
+This body is the **bounded-box** topology: its pair direction is decided from
+physical face intervals, so a cross-seam pair of a `seam = :periodic` tree would
+be silently dropped (the two sides are one period apart).  A periodic tree must
+therefore go through [`face_pairs`](@ref)`(qt, geom)` /
+[`face_pairs_logical`](@ref) (the mapped path); the accessor refuses instead of
+serving an incomplete list.
 """
 function face_pairs(qt::Quadtree)
+    qt.seam === :periodic &&
+        throw(ArgumentError("face_pairs(qt) is the bounded-box pair list and " *
+                            "cannot describe a periodic seam: the cross-seam " *
+                            "pair of a seam = :periodic tree is one logical " *
+                            "period apart, so the physical-interval test would " *
+                            "drop it.  Use face_pairs(qt, geom) (the mapped " *
+                            "list, face_pairs_logical) on a periodic tree; a " *
+                            "periodic tree only pairs with a periodic geometry."))
     cached = qt.faces.pairs
     cached === nothing || return cached
     out = FacePair[]
@@ -559,7 +620,16 @@ Cut 5 caches the list per `(leaf-set fingerprint, layout)` in
 [`LOGICAL_FACE_PAIR_CACHE`](@ref); the mapped constraints and every mapped
 assembly reuse it, so the warm mapped path does not rebuild it (the cut-2 record
 measured that rebuild at ~1.5 MB per call at 1024 leaves).  The key carries no
-geometry because the list is topology, not metric.
+geometry because the list is topology, not metric.  **Stage 0.5c1** adds the
+tree's `seam` flag to the key: a periodic tree has extra cross-seam pairs on the
+same leaf set, so a periodic and a bounded tree must never share an entry.
+
+On a `seam = :periodic` tree the two `y` direction tests are **circular**: the
+angular index arithmetic is modulo the fine level's column count, so the coarse
+last column and the fine first column (and the reverse) are neighbours.  The
+`x` tests stay exact as before.  A wrapped pair keeps the same meaning of
+`offset`/`len` (the fine leaf's own logical start and extent), which for the
+wrapped side is the `T = 0` side of the sector.
 """
 @inline function _flip_dir(dir::Symbol)
     dir === :xplus && return :xminus
@@ -572,23 +642,22 @@ end
     LOGICAL_FACE_PAIR_CACHE
 
 Per-tree cache of [`face_pairs_logical`](@ref) (cut 5): the logical pair list is
-a pure function of the leaf set and the base cells — it must not see the geometry
-(GEOM_DESIGN §2.1 rule 4) — so it is keyed by the leaf-set fingerprint and the
-layout, and a geometry change never invalidates it (there is nothing geometric
-to invalidate).  This is the "logical face-pair connection" the cut-2 record
-assigned to cut 5: before it every mapped `semquad_constraints` rebuilt the list
-(~1.5 MB at 1024 leaves), every mapped assembly call.  Same read-only contract as
-the box `face_pairs` cache: callers must not mutate the returned vector.
+a pure function of the leaf set, the base cells and (stage 0.5c1) the tree's
+`seam` topology — it must not see the geometry
+(GEOM_DESIGN §2.1 rule 4) — so it is keyed by the leaf-set fingerprint, the
+layout and the seam, and a geometry change never invalidates it (there is
+nothing geometric to invalidate).  Same read-only contract as the box
+`face_pairs` cache: callers must not mutate the returned vector.
 
-Invalidation rule: a new key is a new leaf set/layout; entries are never mutated;
-`empty!(LOGICAL_FACE_PAIR_CACHE)` is the only clearing operation.
+Invalidation rule: a new key is a new leaf set/layout/seam; entries are never
+mutated; `empty!(LOGICAL_FACE_PAIR_CACHE)` is the only clearing operation.
 """
 const LOGICAL_FACE_PAIR_CACHE = Dict{Any,Vector{FacePair}}()
 
-"""Cache key of one logical face-pair list: leaf set + layout (topology only)."""
+"""Cache key of one logical face-pair list: leaf set + layout + seam topology."""
 function _logical_face_pair_key(qt::Quadtree)
     return (_leafset_hash(qt.leaves), length(qt.leaves), qt.nx0, qt.ny0,
-            qt.Lx)
+            qt.Lx, qt.seam)
 end
 
 function face_pairs_logical(qt::Quadtree)
@@ -601,6 +670,7 @@ function face_pairs_logical(qt::Quadtree)
 end
 
 function _build_face_pairs_logical(qt::Quadtree)
+    periodic = qt.seam === :periodic
     out = FacePair[]
     seen = Set{NTuple{7,Int}}()
     for leaf in sort(collect(qt.leaves)), d in 1:4
@@ -621,6 +691,7 @@ function _build_face_pairs_logical(qt::Quadtree)
             # The direction must agree with the leaf *intervals*: compare the
             # coarse interval (scaled to the fine leaf's index units) with the
             # fine one.  Same level is the sh == 0 case.  No floating point.
+            # On a periodic tree the y tests are circular (see the docstring).
             la = a[1]
             lb = b[1]
             sh = lb - la
@@ -631,6 +702,17 @@ function _build_face_pairs_logical(qt::Quadtree)
             elseif ddir === :xminus
                 ((b[2] + 1) == (a[2] << sh)) || continue
                 b[3] >= (a[3] << sh) && b[3] + 1 <= ((a[3] + 1) << sh) || continue
+            elseif periodic
+                nside_r = qt.ny0 * (1 << lb)
+                # cross-face test: circular in the closed y direction
+                if ddir === :yplus
+                    (b[3] == mod((a[3] + 1) << sh, nside_r)) || continue
+                else
+                    (mod(b[3] + 1 - mod(a[3] << sh, nside_r), nside_r) == 0) ||
+                        continue
+                end
+                # along-face extent: x is bounded, so the historical test holds
+                b[2] >= (a[2] << sh) && b[2] + 1 <= ((a[2] + 1) << sh) || continue
             elseif ddir === :yplus
                 (b[3] == (a[3] + 1) << sh) || continue
                 b[2] >= (a[2] << sh) && b[2] + 1 <= ((a[2] + 1) << sh) || continue

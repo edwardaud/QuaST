@@ -153,6 +153,11 @@ function save_semquad_state(path::AbstractString, qt::Quadtree,
         # A stretched single-root box (cells_x=cells_y=1, Lx != 1) has the same
         # nx0/ny0 as the unit square, so the width must be stored explicitly.
         HDF5.attrs(f)["Lx"] = Float64(qt.Lx)
+        # Stage 0.5c1: the tree topology (`:none` or `:periodic`).  A ring
+        # checkpoint must rebuild a periodic tree, or the resumed mesh would be
+        # the cut ring (T = 0 and T = 1 separate nodes, seam faces as walls).
+        # Absent in old files = the bounded topology (`:none`).
+        HDF5.attrs(f)["seam"] = String(qt.seam)
         for (k, v) in meta
             HDF5.attrs(f)[string(k)] = v
         end
@@ -212,15 +217,23 @@ function load_semquad_state(path::AbstractString)
         has_nx0 = haskey(HDF5.attrs(f), "nx0")
         has_ny0 = haskey(HDF5.attrs(f), "ny0")
         Lx_attr = haskey(HDF5.attrs(f), "Lx") ? Float64(HDF5.attrs(f)["Lx"]) : nothing
+        # Stage 0.5c1: the stored tree topology.  Old files predate the key and
+        # were all bounded, so an absent attribute is `:none`.
+        seam = haskey(HDF5.attrs(f), "seam") ?
+               Symbol(HDF5.attrs(f)["seam"]) : :none
+        seam in (:none, :periodic) ||
+            throw(ArgumentError("checkpoint $path stores seam = :$seam; only " *
+                                ":none and :periodic exist"))
         if has_nx0 && has_ny0
             nx0 = Int(HDF5.attrs(f)["nx0"])
             ny0 = Int(HDF5.attrs(f)["ny0"])
             Lx = Lx_attr === nothing ?
                  (nx0 == 1 && ny0 == 1 ? 1.0 : nx0 / ny0) : Lx_attr
-            qt = _rebuild_tree(leaves, maxlev; nx0=nx0, ny0=ny0, Lx=Lx)
+            qt = _rebuild_tree(leaves, maxlev; nx0=nx0, ny0=ny0, Lx=Lx, seam=seam)
             qt === nothing &&
                 throw(ArgumentError("checkpoint leaf list is not a partition " *
-                                    "for the stored base $(nx0)x$(ny0)"))
+                                    "for the stored base $(nx0)x$(ny0) and " *
+                                    "seam = :$seam"))
         else
             # Old format: infer the base cells from the wall leaves.  Try every
             # candidate; a valid pair must rebuild the exact leaf set.
@@ -228,7 +241,8 @@ function load_semquad_state(path::AbstractString)
             found = Tuple{Quadtree,Int,Int}[]
             for nx0 in cx, ny0 in cy
                 Lx = Lx_attr === nothing ? nx0 / ny0 : Lx_attr
-                qt = _rebuild_tree(leaves, maxlev; nx0=nx0, ny0=ny0, Lx=Lx)
+                qt = _rebuild_tree(leaves, maxlev; nx0=nx0, ny0=ny0, Lx=Lx,
+                                   seam=seam)
                 qt === nothing || push!(found, (qt, nx0, ny0))
             end
             isempty(found) &&

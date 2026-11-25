@@ -61,6 +61,26 @@ In a complete quadtree a cell exists iff none of its ancestors is a leaf, so "no
 ancestor is a leaf" is exactly "the equal-level cell is an internal node".  The
 leaf's own children are never in the list: they do not exist (a leaf has none),
 and the equal-level cell is on the other side of the face.
+
+**Stage 0.5c1, the periodic seam.**  On a `seam = :periodic` tree the `y`
+direction is closed: the `:yplus` face of the last column and the `:yminus` face
+of the first column are the same physical face.  The adjacent column across that
+face is the *first* column (`:yplus` of the last column) or the *last* column
+(`:yminus` of the first column) — never a column outside the layout — so the
+wrap is a substitution of `jy` with an in-range index, not a modulo in the
+hot path:
+
+  * `:yplus` wraps `jy = nside -> 0`: the equal-level cell is the first column,
+    whose ancestor at level `k` is the first column (`0 >> m == 0`);
+  * `:yminus` wraps `jy = -1 -> nside - 1`: the equal-level cell is the last
+    column, whose ancestor at level `k` is the last column
+    (`(nside-1) >> m == nside(k) - 1`, exact because `nside` is a power of two
+    multiple of the coarse count).
+
+The subtree descent then reuses the bounded arithmetic (the wrapped column's
+in-range index is already the near column of the cut), and a cross-seam pair of
+*different* levels is found by the same ancestor walk.  The `x` direction is
+never periodic.  A non-periodic tree takes the historical body bit for bit.
 """
 function _push_face_ids!(out::Vector{Int32}, tab::QuadFaceTable, qt::Quadtree,
                          leaf::NTuple{3,Int}, d::Int)
@@ -74,10 +94,16 @@ function _push_face_ids!(out::Vector{Int32}, tab::QuadFaceTable, qt::Quadtree,
         ix > 0 || return out
     elseif d == 3                   # :yplus
         jx = ix; jy = iy + 1
-        jy < qt.ny0 * (1 << l) || return out
+        if jy >= qt.ny0 * (1 << l)
+            qt.seam === :periodic || return out
+            jy = 0                  # cross-seam: the first column of the sector
+        end
     else                            # :yminus
         jx = ix; jy = iy - 1
-        iy > 0 || return out
+        if iy == 0
+            qt.seam === :periodic || return out
+            jy = qt.ny0 * (1 << l) - 1     # cross-seam: the last column
+        end
     end
     for k in 0:l
         id = get(tab.ids, (k, jx >> (l - k), jy >> (l - k)), Int32(0))

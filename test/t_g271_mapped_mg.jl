@@ -265,14 +265,15 @@ end
         stampA = geometry_stamp(gA)
         stampB = geometry_stamp(gB)
         @test stampA != stampB
+        # stage 0.5c1 adds the tree topology (seam) as the last key field
         lkA = SemQuadMGLevelKey(1, length(qt.leaves),
                                 _semquad_mg_leaf_hash(qt.leaves), p, qt.nx0,
                                 qt.ny0, qt.Lx, :rigid, false,
-                                (:same, :same, :same, :same), stampA)
+                                (:same, :same, :same, :same), stampA, qt.seam)
         lkB = SemQuadMGLevelKey(1, length(qt.leaves),
                                 _semquad_mg_leaf_hash(qt.leaves), p, qt.nx0,
                                 qt.ny0, qt.Lx, :rigid, false,
-                                (:same, :same, :same, :same), stampB)
+                                (:same, :same, :same, :same), stampB, qt.seam)
         @test lkA != lkB
         @test hash(lkA, zero(UInt)) != hash(lkB, zero(UInt))
         # `_saddle_key`: the pressure-cache/stale-LU key gains the geometry

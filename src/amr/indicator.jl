@@ -380,9 +380,19 @@ function _semquad_gradient_jump(g::AbstractGeometry, sq::SemQuad,
             dR = _mapped_normal_derivative(g, sq, u, R, xiR, etaR,
                                            fm.nx[q], fm.ny[q])
             # Coarse side: evaluate at the same logical face point, located on
-            # the coarse leaf by logical arithmetic only.
+            # the coarse leaf by logical arithmetic only.  Stage 0.5c1: on a
+            # ring a cross-seam pair has the fine face one logical period away
+            # from the coarse leaf, so the abscissa is wrapped into the coarse
+            # leaf (the pair's two faces are the same physical curve).  A
+            # bounded tree never takes the branch: its abscissa is already in
+            # [-1, 1].
             S, T = global_logical(sq, R, xiR, etaR)
             xiL, etaL = leaf_ref(sq, L, S, T)
+            if qt.seam === :periodic && (dir === :yplus || dir === :yminus)
+                nL = leaf_nside_y(sq, L[1])
+                etaL < -1.0 && (etaL += 2.0 * nL)
+                etaL > 1.0 && (etaL -= 2.0 * nL)
+            end
             dL = _mapped_normal_derivative(g, sq, u, L, xiL, etaL,
                                            fm.nx[q], fm.ny[q])
             J += fm.jac[q] * sq.w[q] * (dL - dR)^2
