@@ -85,7 +85,12 @@ end
     etas = [
         ("const", (x, y) -> 1.0),
         ("16384x", (x, y) -> exp(-log(16384.0) * (1.0 - y))),
-        ("bilinear", (x, y) -> 1.0 + 3.0 * (1.0 - x) + 5.0 * y * y),
+        # The 5x2 tree has Lx = 2.5; the historical coefficients (1 + 3(1-x))
+        # went negative at x > 4/3 there, and the raw solve API now refuses a
+        # non-positive viscosity (AUDIT_VV F6).  The kernel cross-path test only
+        # needs a smooth spatially varying eta, so the coefficient is tempered
+        # to stay positive on the whole box.
+        ("bilinear", (x, y) -> 1.0 + 0.3 * (1.0 - x) + 5.0 * y * y),
     ]
     worst_scalar = 0.0
     worst_blocked = 0.0

@@ -397,7 +397,14 @@ end
 function semquad_eta_field(op::AbstractSemQuadKOp, eta::Function)
     vals = Vector{Float64}(undef, length(op.xq))
     @inbounds for i in eachindex(vals)
-        vals[i] = eta(op.xq[i], op.yq[i])
+        x = op.xq[i]
+        y = op.yq[i]
+        e = eta(x, y)
+        # F5/F6 guard (cold throw path): the matrix-free/MG paths sample the raw
+        # closure here, so a non-finite or non-positive viscosity must be
+        # refused at the sample rather than become part of the operator.
+        _require_eta!(e, x, y)
+        vals[i] = e
     end
     return vals
 end

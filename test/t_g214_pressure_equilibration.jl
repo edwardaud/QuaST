@@ -169,7 +169,12 @@ using Test, QuaST, LinearAlgebra, SparseArrays
     if isempty(state) || !isfile(state)
         @info "G214: realistic-state check skipped (set G214_STATE to the " *
               "G step-7641 checkpoint to enable it)"
-        @test_skip 1 + 1 == 2
+        # Explicit documented skip (remediation batch P0 part 1): the fixture is
+        # a data-dependent realistic state above the batch's <2 MB fixture bar,
+        # so it stays environment-gated; the row is a named reason rather than
+        # the old literal `1 + 1 == 2` tautology.
+        @test_skip "G214_STATE is not set: the G step-7641 realistic state is " *
+                   "data-dependent and not committed (AUDIT_GATES §1.1)"
     else
         RA_G = 1.0e5
         COMP_AD = 1.6240183119e5

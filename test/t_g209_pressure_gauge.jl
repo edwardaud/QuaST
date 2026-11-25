@@ -278,7 +278,14 @@ end
     if isempty(state) || !isfile(state)
         @info "G209: realistic-state check skipped (set G209_STATE to the " *
               "step-6600 checkpoint to enable it)"
-        @test_skip 1 + 1 == 2
+        # Explicit documented skip (remediation batch P0 part 1).  The fixture
+        # is the step-6600 realistic state (8-27 MB, data-dependent, produced by
+        # a long run), i.e. above the "<2 MB committed fixture" bar this batch
+        # used as its criterion, so it stays environment-gated; the assertion is
+        # now a named reason instead of the old literal `1 + 1 == 2` tautology.
+        # The row counts as the suite's one documented `broken` entry on G209.
+        @test_skip "G209_STATE is not set: the step-6600 realistic state is " *
+                   "data-dependent and not committed (AUDIT_GATES §1.1)"
     else
         prj = probe_realistic(state)
         @test prj.unshifted_res > 1.0e7       # measured 4.69e7 (lost)

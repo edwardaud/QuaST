@@ -396,6 +396,28 @@ function _restart_guard(qt::Quadtree, p::Int, theta0::Vector{Float64},
                     "$(restart_from):\n  geometry: checkpoint=CartesianBox " *
                     "(key absent), current=$cur"))
         end
+        # The other direction (AUDIT_BUGS R5): the checkpoint records a geometry
+        # but the live config does not.  The generic value loop above only
+        # rejects keys *both* sides know (`haskey(run_config, k) || continue`),
+        # and the branch just above only covers a checkpoint *without* the key,
+        # so a checkpointed mapped state used to resume silently as a box when a
+        # direct `_restart_guard` caller built a config without the key.  The
+        # driver's `_run_config` always sets it, hence latent, but the guard's
+        # contract is "a resumed run cannot silently continue with a different
+        # setup": geometry is exactly that kind of setup, so compare (refuse)
+        # rather than skip.
+        if haskey(restart.config, "geometry") && !haskey(run_config, "geometry")
+            throw(ArgumentError("restart configuration mismatch in " *
+                "$(restart_from):\n  geometry: " *
+                "checkpoint=$(restart.config["geometry"]), current=(not " *
+                "recorded: the live run_config has no geometry key).  The " *
+                "checkpoint was written on a recorded geometry but this run " *
+                "does not state which geometry it continues, so the resume " *
+                "cannot be shown to be the same physical problem.  Rebuild the " *
+                "live config with its geometry (the driver's `_run_config` " *
+                "sets `geometry` from the run geometry), or resume in a run " *
+                "configured for $(restart.config["geometry"])."))
+        end
         qt = restart.qt
         p = restart.p
         theta0 = restart.theta

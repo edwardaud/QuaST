@@ -10,16 +10,16 @@ from `physics/`, and the hierarchy and Krylov machinery are in `mg/`.
 | File | What it is |
 |---|---|
 | `apply.jl` | The consolidated per-level fork/join used by the matrix-free applies and V-cycle sweeps. |
-| `assembly.jl` | Reference Q_p/Q_q element matrices and the sparse pressure mass/stiffness. |
-| `assembly_var.jl` | Leaf-parallel variable-viscosity assembly with deterministic block merge. |
+| `assembly.jl` | Reference Q_p/Q_q element matrices and the sparse pressure mass/stiffness. `make_semstokes` requires `p >= 2` and builds the `Q_{p-1}` pressure space through the internal semquad builder (AUDIT_VV F7). |
+| `assembly_var.jl` | Leaf-parallel variable-viscosity assembly with deterministic block merge. Every sampled viscosity is checked for finite/positive and every body-force sample for finite at the quadrature point (the named guards of `core/guards.jl`, cold path; AUDIT_VV F5/F6). |
 | `diag.jl` | The matrix-free diagonal and the affine-constraint helpers. |
 | `direct.jl` | The sparse direct saddle: stale-factor cache, iterative refinement and shift ladder. |
 | `kop.jl` | The matrix-free velocity stiffness `K*v` and its precomputed eta field. |
 | `operators.jl` | The quadrature divergence `B` and the compressibility block `Pcm`. |
 | `selector.jl` | `linear=:auto`: choose direct or MG from saddle size and viscosity contrast. |
-| `solve_const.jl` | Constant-viscosity Stokes solve and point evaluation. |
+| `solve_const.jl` | Constant-viscosity Stokes solve and point evaluation; non-finite body-force and reduced-RHS inputs are named refusals (AUDIT_VV F5). |
 | `solve_var.jl` | Variable-viscosity Stokes solve: direct, Schur-CG, MG, lagged and auto. |
-| `solve_var_core.jl` | The core variable-viscosity Stokes solve (every linear path). |
+| `solve_var_core.jl` | The core variable-viscosity Stokes solve (every linear path); the assembled load `fv` and reduced RHS `fr` are scanned for non-finite entries (allocation-free, AUDIT_VV F5). |
 | `solve_var_fallback.jl` | The `linear = :auto` safety net that redoes an unacceptable MG solve. |
 | `state.jl` | `SemStokes`: Q_p velocity, Q_{p-1} pressure, constraints and residual records. |
 | `wall_constraints.jl` | Stage 0.5b2: the general curved-wall rows (`n.u = g` on `:free` walls, wall-frame Dirichlet data on `:rigid` walls, the corner rule, the rigid-mode analysis and the rotation gauge). |

@@ -22,8 +22,8 @@ only composes them.
 | `picard.jl` | Lagged viscosity, strain-rate averaging and adaptive Picard relaxation. |
 | `picard_control.jl` | The field blend, the divergence test and the adaptive relaxation. |
 | `strain_rate.jl` | The nodal strain-rate and spin fields of the SEM velocity: historical box bodies plus cut-6 mapped bodies (physical gradient by the chain rule) for the strain-rate-dependent laws, yielding, weakening and the Maxwell advance. |
-| `restart_guard.jl` | The `run_config` builder and the restart guard of `run_semquad_simulation`. |
-| `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. |
+| `restart_guard.jl` | The `run_config` builder and the restart guard of `run_semquad_simulation`. The guard compares a checkpoint's stored `geometry` against the live config and **refuses** a resume whose config lacks the key (AUDIT_BUGS R5; the mapped checkpoint no longer resumes silently as a box). |
+| `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. Entry validations added in remediation batch P0 part 1: `dt0 > 0`, `dtmax >= dt0`, `tstop > 0` (except the build-only `tstop = 0, maxsteps = 0` sentinel), `dtmin > 0`, `maxsteps >= 0` (AUDIT_VV F8), and a named non-finite-theta refusal at the driver entry and at every per-step entry (AUDIT_VV F5). |
 | `run_diagnostics.jl` | The driver-owned snapshot of the solver and AMR diagnostic out-parameters. |
 | `step_newton.jl` | Globalization of the per-time-step nonlinear solve. |
 

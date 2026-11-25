@@ -43,7 +43,9 @@ using Test, QuaST
     # field must change eta when the plastic branch is actually active
     pr = Params(Ra=1.0e6, H=0.0, eta_law=:arrhenius, eta_E=3.0, eta_T0=0.5,
                 eta_min=1.0e-9, yield_c=1.0e-3)
-    sp = make_semquad(qt, 1)                     # p-1 = 1 pressure space
+    # The pressure space Q_1 is built by the internal builder: the public
+    # `make_semquad` requires the velocity/temperature degree p >= 2 (F7 guard).
+    sp = QuaST._make_semquad_space(qt, 1)        # p-1 = 1 pressure space
     theta = [0.1 * sinpi(x) * sinpi(z) for (x, z) in sq.coords]
     pv = zeros(sp.N)
     e_base, e_big = 10.0, 100.0

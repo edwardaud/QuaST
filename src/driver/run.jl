@@ -963,6 +963,40 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 "steady and Newton paths hold H constant"))
     end
 
+    # P0 part 1 (AUDIT_VV F8): validate the time window and the step controls
+    # before any setup work.  Before this guard `dt0 < 0` integrated backwards
+    # (t = -0.002 after two steps, finite output, no error) and `dtmax < dt0`
+    # silently clamped the first step.  `tstop = 0` is the documented build-only
+    # sentinel and is accepted **only** with `maxsteps = 0` (G274 (v) relies on
+    # it: a card-validity probe that must not integrate); any run that actually
+    # integrates needs `tstop > 0`.
+    # `tstop = Inf` is a supported sentinel: with `cfl > 0` (adaptive dt) or an
+    # explicit `maxsteps` the step count is the only stop criterion and the
+    # historical cards use `tstop = Inf` for it (G213/G221/G256/G257/G265/G280).
+    # `tstop = NaN` is refused (any comparison would silently never stop).
+    !isnan(tstop) && tstop >= 0.0 ||
+        throw(ArgumentError("tstop must be a non-NaN value >= 0 (got " *
+            "tstop=$tstop): a negative stop time would integrate the run " *
+            "backwards."))
+    (tstop > 0.0 || tstop == Inf || maxsteps == 0) ||
+        throw(ArgumentError("tstop must be > 0 (or Inf: stop on maxsteps) " *
+            "when the run integrates (got tstop=$tstop, maxsteps=$maxsteps): " *
+            "the time loop would never advance.  Pass tstop > 0 or Inf, or " *
+            "maxsteps = 0 for a build-only run."))
+    isfinite(dt0) && dt0 > 0.0 ||
+        throw(ArgumentError("dt0 must be finite and > 0 (got dt0=$dt0): a " *
+            "negative or zero first step integrates backwards or stalls the " *
+            "time loop."))
+    dtmax >= dt0 ||
+        throw(ArgumentError("dtmax must be >= dt0 (got dt0=$dt0, " *
+            "dtmax=$dtmax): the first step would exceed the documented maximum " *
+            "step and the step-control clamp would silently shrink it."))
+    isfinite(dtmin) && dtmin > 0.0 ||
+        throw(ArgumentError("dtmin must be finite and > 0 (got dtmin=$dtmin): " *
+            "a zero/negative floor defeats the CFL step control."))
+    maxsteps >= 0 ||
+        throw(ArgumentError("maxsteps must be >= 0 (got maxsteps=$maxsteps)"))
+
     # Every setting that changes the trajectory is recorded in one dictionary:
     # the checkpoint stores it and the restart guard compares it.  The builder
     # and the guard live in `restart_guard.jl`; the keywords they read are
@@ -1035,6 +1069,12 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         theta0 = [Float64(icfun(x, y)) for (x, y) in sq.coords]
         theta_ic = icfun
     end
+    # F5 guard (driver entry): the initial/resumed temperature field must be
+    # finite.  Before this guard a NaN in theta reached the Stokes solve through
+    # the buoyancy load and failed 5.8 s later with a bare SingularException
+    # (AUDIT_VV F5, robustness.log line 31).
+    _require_finite!(theta0, "theta0 (the initial temperature perturbation)",
+                     "the driver entry, after restart/annulus_ic resolution")
     # theta0 is the perturbation T-Tbar, so its wall value is Twall - Tbar(wall).
     # For the Boussinesq base (Twall_top=0, Twall_bot=1, Tbar(1)=0, Tbar(0)=1)
     # this is zero, and a nonzero theta0 at a wall is a mistake (it creates a
@@ -1720,6 +1760,12 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     diag = RunDiagnostics()
 
     while step < maxsteps && t < tstop
+        # F5 guard (per-step entry): a temperature field that went non-finite
+        # in the previous step must fail here, naming the step, instead of
+        # poisoning the next Stokes solve (which would throw a bare
+        # SingularException with no state information).  Step/t are passed as
+        # numbers: the check allocates nothing on the success path.
+        _require_step_theta!(theta, step, t)
         tp_step = profile_steps ? time_ns() : 0
         tprof = profile_steps ? zeros(Float64, 6) : nothing
         theta_old = copy(theta)

@@ -67,8 +67,16 @@ function solve_semquad_stokes(ss::SemStokes, qt::Quadtree,
             y = y0 + 0.5 * (su.xi[j] + 1.0) * hy
             w = 0.25 * hx * hy * su.w[i] * su.w[j]
             g = uids[(j - 1) * n + i]
-            fv[g] += w * fx(x, y)
-            fv[nu + g] += w * fz(x, y)
+            fxv = fx(x, y)
+            fzv = fz(x, y)
+            # F5 guard: name a non-finite body force at the sample point (cold
+            # throw path; the constant-viscosity path is verification-only, but
+            # a silent NaN here is the same defect).  Coordinates are numbers,
+            # not an interpolated string, so the success path does not allocate.
+            _require_load!(fxv, "the Stokes body force fx(x, y)", x, y)
+            _require_load!(fzv, "the Stokes body force fz(x, y)", x, y)
+            fv[g] += w * fxv
+            fv[nu + g] += w * fzv
         end
     end
     K = sparse(IK, JK, VK, Nu2, Nu2)
@@ -129,6 +137,10 @@ function solve_semquad_stokes(ss::SemStokes, qt::Quadtree,
     CpB = Cp' * B * Cu
     Kred = Cu' * K * Cu
     fr = Cu' * (fv - K * u0 + B' * p0)
+    # F5 guard: the reduced RHS is what the solve sees; it also carries the
+    # Dirichlet data uDx/uDz.
+    _require_finite!(fr, "the reduced Stokes right-hand side fr",
+                     "the boundary data (uDx/uDz) of this solve")
     gr = Cp' * (B * u0)
     nf = size(Cu, 2); nfp = size(Cp, 2)
     Bs = -CpB

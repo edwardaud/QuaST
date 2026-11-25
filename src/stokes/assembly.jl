@@ -6,11 +6,25 @@ Velocity Q_p and pressure Q_{p-1} spaces on the same tree and geometry.  The
 box default keeps every historical call site bitwise unchanged; a mapped
 geometry (validation geometry or, later, the annulus) is passed explicitly and
 stored on both `SemQuad`s (GEOM_DESIGN §2.5).
+
+`p` is the **velocity** degree and must be `>= 2` (Taylor-Hood `Q_p`/`Q_{p-1}`;
+`Q_1`/`Q_0` is not stable).  Before the batch-P0 F7 guard, `p = 1` reached the
+internal pressure-space builder at `p - 1 = 0` and failed there with the
+self-contradictory message "p must be >= 1"; the guard below refuses it first
+with the requirement that actually applies.
 """
 function make_semstokes(qt::Quadtree, p::Int;
                         geom::AbstractGeometry=CartesianBox(qt))
+    p >= 2 ||
+        throw(ArgumentError("make_semstokes requires p >= 2 (got p=$p): the " *
+            "velocity space is Q_p and the pressure space is Q_{p-1} " *
+            "(Taylor-Hood), so p = 1 would build the unstable Q_1/Q_0 pair.  " *
+            "Use p = 2 (Q_2/Q_1) or higher."))
+    # The pressure space is Q_{p-1}; at the production p = 2 that is Q_1, which
+    # only the internal builder constructs (the public `make_semquad` requires
+    # the p >= 2 velocity/temperature degree, AUDIT_VV F7).
     return SemStokes(p, p - 1, make_semquad(qt, p; geom=geom),
-                     make_semquad(qt, p - 1; geom=geom))
+                     _make_semquad_space(qt, p - 1; geom=geom))
 end
 
 """Reference element matrices for Q_p velocity / Q_q pressure (constant eta)."""

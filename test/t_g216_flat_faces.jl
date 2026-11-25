@@ -309,10 +309,20 @@ end
             @test all(haskey(tab.ids, l) for l in qt.leaves)
             if tab.cur != 0 && rand(rng2) < 0.2
                 l = lvs[rand(rng2, 1:length(lvs))]
-                id = get(tab.ids, l, Int32(0))
-                id == Int32(0) && continue
-                MS._table_ready!(qt, id)
-                @test true
+                # The leaf may have been coarsened away by the mutation: query
+                # the *current* table id, as the production callers do.
+                id = get(qt.faces.tab.ids, l, Int32(0))
+                if id == Int32(0)
+                    @test !haskey(qt.faces.tab.ids, l)   # it really is gone
+                else
+                    # real assertion: after `_table_ready!` the queried row is
+                    # current in the live table (a stale row would recompute to
+                    # a wrong neighbour list; the parallel scan below checks the
+                    # full table for that).
+                    tab2 = MS._table_ready!(qt, id)
+                    @test tab2 === qt.faces.tab
+                    @test tab2.gen[id] == tab2.cur
+                end
             end
         end
         g216_compare_all(qt)

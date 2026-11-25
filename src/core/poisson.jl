@@ -26,7 +26,12 @@ function assemble_semquad_poisson(sq::SemQuad, qt::Quadtree, f::Function, uD::Fu
         for j in 1:n, i in 1:n
             x = x0 + 0.5 * (sq.xi[i] + 1.0) * hx
             y = y0 + 0.5 * (sq.xi[j] + 1.0) * hy
-            b[ids[(j - 1) * n + i]] += 0.25 * hx * hy * sq.w[i] * sq.w[j] * f(x, y)
+            fv = f(x, y)
+            # F5 guard: a non-finite load must be named here, not silently
+            # turned into a NaN solution field.  (No interpolated string: the
+            # success path must not allocate.)
+            _require_load!(fv, "the Poisson load f(x, y)", x, y)
+            b[ids[(j - 1) * n + i]] += 0.25 * hx * hy * sq.w[i] * sq.w[j] * fv
         end
     end
     # Nitsche boundaries (same formulas as the DG prototype).  The penalty uses
@@ -78,6 +83,10 @@ function assemble_semquad_poisson(sq::SemQuad, qt::Quadtree, f::Function, uD::Fu
             end
         end
     end
+    # F5 guard: also cover the Nitsche boundary data uD(x, y), whose values enter
+    # the load through the boundary terms above.
+    _require_finite!(b, "the assembled Poisson load vector b",
+                     "the load / boundary-data closures of this solve")
     return sparse(I, J, V, N, N), b
 end
 

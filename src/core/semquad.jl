@@ -53,10 +53,36 @@ or a face node with the same reference index), so the deduplication is exact
 rather than tolerance-based; the physical coordinate is stored once, from the
 first occurrence in `sort(leaves)` order (a coarser leaf, when levels differ),
 which is exactly the historical insertion order.
+
+`p` is the degree of the **velocity/temperature** space and must be `>= 2`:
+the scheme is Taylor-Hood `Q_p` velocity with `Q_{p-1}` pressure, and `Q_1`
+velocity with `Q_0` pressure (`p = 1`) is not stable.  The `Q_{p-1}` pressure
+space (which is `Q_1` for the production `p = 2`) is built internally by
+[`make_semstokes`](@ref) through `_make_semquad_space`; that internal builder
+is the only way to obtain a standalone `Q_1` space (AUDIT_VV F7: before this
+guard `make_semquad(qt, 1)` was accepted and `make_semstokes(qt, 1)` failed
+with the self-contradictory message "p must be >= 1").
 """
 function make_semquad(qt::Quadtree, p::Int;
                       geom::AbstractGeometry=CartesianBox(qt))
-    p >= 1 || throw(ArgumentError("p must be >= 1"))
+    p >= 2 ||
+        throw(ArgumentError("make_semquad builds the velocity/temperature " *
+            "Q_p space and requires p >= 2 (got p=$p): the scheme is " *
+            "Taylor-Hood Q_p velocity with Q_{p-1} pressure, and Q_1/Q_0 is " *
+            "not a stable pair.  The Q_{p-1} pressure space is built " *
+            "internally by make_semstokes (a standalone Q_1 scalar space is " *
+            "`QuaST._make_semquad_space`)."))
+    return _make_semquad_space(qt, p; geom=geom)
+end
+
+# Internal space builder: the historical `make_semquad` body.  `p >= 1` is the
+# only degree restriction here (the GLL rule needs its two endpoint nodes); the
+# velocity/temperature `p >= 2` rule is enforced by the public `make_semquad`
+# above, and `make_semstokes` deliberately calls this builder at `p - 1 = 1`
+# for the Taylor-Hood pressure space.
+function _make_semquad_space(qt::Quadtree, p::Int;
+                             geom::AbstractGeometry=CartesianBox(qt))
+    p >= 1 || throw(ArgumentError("p must be >= 1 (got p=$p)"))
     # Stage 0.5c1: the periodic seam is a tree feature and the closing map a
     # geometry feature; one without the other is a silently half-glued topology.
     check_seam_compat(qt, geom)

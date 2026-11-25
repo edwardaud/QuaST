@@ -16,12 +16,13 @@ those live in `physics/`, `stokes/` and `amr/`.
 | `fe.jl` | Reference-element data: GLL nodes for the basis, Gauss–Legendre points for quadrature. |
 | `geometry.jl` | Geometry/mapping layer: `CartesianBox` (production), `AffineBox`/`CurvedBox` (validation), `PolarAnnulus` (stage 0.5a, the 2-D polar annulus), point map and inverse, Jacobian/metric and face normals, the map-curvature second derivatives, logical boundary registry, height/depth/gravity, physical measures and normal leaf size, checkpoint identity. |
 | `gll.jl` | GLL nodes and weights, the barycentric Lagrange basis, Gauss–Legendre quadrature. |
+| `guards.jl` | Named, allocation-free input guards (remediation batch P0 part 1): the non-finite-field scan of the assembly/driver entry points (`_require_finite!`, `_require_step_theta!`), the non-finite load sample (`_require_load!`) and the positive-viscosity rule (`_require_eta!`, AUDIT_VV F5/F6). The success path is one comparison per element and adds 0 B to the box hot path; the throw path names the field, the value and (where known) the coordinate. |
 | `parallel.jl` | Threading helpers shared by the leaf-blocked assembly loops. |
 | `poisson.jl` | SIPG/Nitsche Poisson operator: a verification-only assembler and its constrained solve. |
 | `quadtree.jl` | The 2:1-balanced quadtree: refine, coarsen, neighbours, balance and wall grading (the cut-6 height-based wall grading of `wall_graded_tree`); the stage-0.5c1 `seam` topology (`:none`/`:periodic`), the wrapped cross-seam pairs and the periodic top-level pair list. |
 | `quadtree_balance.jl` | The x-mirror symmetry and the 2:1 balancing policy. |
 | `quadtree_table.jl` | The flat face table the quadtree queries are answered from; on a periodic tree the two seam columns are cross-face neighbours. |
-| `semquad.jl` | The continuous Q_p space on the quadtree, its mass matrix and constraints; node identity across a periodic seam and the tree/geometry seam agreement. |
+| `semquad.jl` | The continuous Q_p space on the quadtree, its mass matrix and constraints; node identity across a periodic seam and the tree/geometry seam agreement. The public `make_semquad` requires the velocity/temperature degree `p >= 2` (AUDIT_VV F7); the `Q_{p-1}` pressure space is built by the internal `_make_semquad_space` that `make_semstokes` calls. |
 | `transfer.jl` | Solution transfer between quadtree SEM meshes: nodal restriction and L2 projection; the mapped method evaluates the old field at the new node's logical position and uses the mapped mass; a ring transfer keeps the seam trace exact. |
 
 `quadtree.jl`, `quadtree_table.jl` and `quadtree_balance.jl` are three views of

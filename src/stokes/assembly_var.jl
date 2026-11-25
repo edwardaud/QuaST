@@ -184,6 +184,10 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
             etaq = 0.0
             if !mf_path
                 etaq = eta_fun(x, y)
+                # F5/F6 guard: a NaN/Inf or non-positive viscosity is refused
+                # here (cold throw path, one branch per quadrature point) instead
+                # of silently producing NaN stiffness entries or a wrong field.
+                _require_eta!(etaq, x, y)
             end
             for j in 1:n, i in 1:n
                 k = (j - 1) * n + i
@@ -198,6 +202,12 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
             # Identical values.
             fxv = fx(x, y)
             fzv = fz(x, y)
+            # F5 guard: the assembled body-force load must be finite; name the
+            # closure and the point instead of letting NaN reach `fv`.  The
+            # coordinates are passed as numbers: an interpolated message string
+            # would allocate per quadrature point (measured +3 MB per solve).
+            _require_load!(fxv, "the Stokes body force fx(x, y)", x, y)
+            _require_load!(fzv, "the Stokes body force fz(x, y)", x, y)
             for k in 1:nv
                 floc[k] += w * fxv * phi[k]
                 floc[nv + k] += w * fzv * phi[k]
@@ -454,6 +464,10 @@ function _semquad_assemble_block_mapped!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
             etaq = 0.0
             if !mf_path
                 etaq = eta_fun(x, y)
+                # F5/F6 guard: a NaN/Inf or non-positive viscosity is refused
+                # here (cold throw path, one branch per quadrature point) instead
+                # of silently producing NaN stiffness entries or a wrong field.
+                _require_eta!(etaq, x, y)
             end
             for j in 1:n, i in 1:n
                 k = (j - 1) * n + i
@@ -462,6 +476,12 @@ function _semquad_assemble_block_mapped!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
             end
             fxv = fx(x, y)
             fzv = fz(x, y)
+            # F5 guard: the assembled body-force load must be finite; name the
+            # closure and the point instead of letting NaN reach `fv`.  The
+            # coordinates are passed as numbers: an interpolated message string
+            # would allocate per quadrature point (measured +3 MB per solve).
+            _require_load!(fxv, "the Stokes body force fx(x, y)", x, y)
+            _require_load!(fzv, "the Stokes body force fz(x, y)", x, y)
             for k in 1:nv
                 floc[k] += w * fxv * phi[k]
                 floc[nv + k] += w * fzv * phi[k]

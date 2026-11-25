@@ -40,6 +40,10 @@ include("physics/phase.jl")
 # utilities, constraints, the Nitsche Poisson demo, point evaluation, transfer).
 # Every slice is a contiguous, unedited part of the original file.
 include("core/gll.jl")
+# Remediation batch P0 part 1: the named finite/positive input guards used by
+# the assembly entry points and the driver (AUDIT_VV F5/F6).  No dependency on
+# another file, so it is included as early as possible.
+include("core/guards.jl")
 include("core/fe.jl")
 include("core/quadtree.jl")
 include("core/quadtree_table.jl")

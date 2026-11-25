@@ -224,10 +224,17 @@ end
             "Kp" => _h202(sys.Kp), "Kred" => _h202(sys.Kred),
             "fv" => _h202(sys.fv))
     if SNAPSHOT
+        # Snapshot-regeneration mode: the pins are printed for the operator to
+        # record.  The assertion below is *not* a placeholder: it checks the
+        # shape every pin must have before it can be recorded (6 named pins,
+        # each a hex SHA-256 or a slash-joined set of them).  A broken hash
+        # helper (empty string, "NaN", an exception turned into text) is red.
         for (k, v) in pins
             println("G202 pin ", k, " = ", v)
         end
-        @test true
+        @test length(pins) == 6
+        @test all(p -> occursin(r"^[0-9a-f]{64}(/[0-9a-f]{64})*$", last(p)), pins)
+        @test all(p -> !isempty(first(p)), pins)
     else
         @test pins[1].second == "a7ab253441e8cd8696c518e513aa29c5384875e42642c668f070e167c038f9a8/967b8aa7c54b2da3377079faf1d18b62e167910216bafcb2d620b1a4ee3e4d9f/c1fb569e7c221d1f85f451708a97859631cf46e25da75e8d6ecdc983c19cb967"
         @test pins[2].second == "5aeb295244d0ea45b9e9cad6bddf7303bfbe86ef2de40d98ccaaf48910c8d4bd/7f9861051ec0a7dc110ad418bcc955abcc7bb8b7d571635b07d136be6930d5ee/bbc380b5d5afed4877a65b6a8cde8d2f3c429886a8957f53aecfcc916a661b23"

@@ -202,4 +202,13 @@ using QuaST
     include("t_g278_indicator_oracle.jl")
     include("t_g279_mapped_fixes.jl")
     include("t_g280_realistic_amr_trajectory.jl")
+    # remediation batch P0 part 1 (2026-11-25): code guards and test holes
+    include("t_g281_restart_guard_geometry.jl")
+    include("t_g282_assembly_input_guards.jl")
+    include("t_g283_viscosity_positive.jl")
+    include("t_g284_space_order_guard.jl")
+    include("t_g285_time_step_validation.jl")
+    include("t_g286_ev_known_answer.jl")
+    include("t_g287_hanging_rigid_wall.jl")
+    include("t_g288_constraint_tolerance.jl")
 end

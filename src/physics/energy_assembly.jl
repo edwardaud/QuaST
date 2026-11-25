@@ -816,6 +816,23 @@ function assemble_semquad_energy(sq::SemQuad, qt::Quadtree, pr::Params,
             throw(ArgumentError("theta_lat has $(length(theta_lat)) entries, " *
                                 "mesh has $(sq.N) dofs"))
     end
+    # F5 guard: the temperature fields this assembly reads must be finite.  A
+    # NaN in theta otherwise enters the assembled mass/stiffness/source through
+    # `_semquad_eval_at_leaf!` and surfaces later as a NaN state or a bare
+    # SingularException in the Stokes solve (AUDIT_VV F5).  The scans are
+    # allocation-free; the throw path is cold.
+    theta === nothing ||
+        _require_finite!(theta, "the temperature field theta",
+                         "the assemble_semquad_energy theta argument")
+    theta_prev === nothing ||
+        _require_finite!(theta_prev, "the previous temperature field theta_prev",
+                         "the assemble_semquad_energy theta_prev argument")
+    theta_lat === nothing ||
+        _require_finite!(theta_lat, "the latent-evaluation temperature theta_lat",
+                         "the assemble_semquad_energy theta_lat argument")
+    ev_field === nothing ||
+        _require_finite!(ev_field, "the entropy-viscosity field ev_field",
+                         "the assemble_semquad_energy ev_field argument")
     N = sq.N
     p = sq.p
     fd = make_fedata(p, p - 1)

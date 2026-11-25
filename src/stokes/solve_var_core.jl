@@ -965,6 +965,12 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # `B`, the matrix-free path and the multigrid hierarchy never see it).
     _semquad_boundary_traction!(fv, geom, su, bmask, fd, wall_t, wall_tn,
                                 resolved_wall_bc)
+    # F5 guard: the assembled (unreduced) RHS must be finite.  The leaf guards
+    # catch a non-finite fx/fz/eta at the point where they are sampled; this
+    # scan also covers the traction load (wall_t/wall_tn closures) and is
+    # allocation-free (0 B measured on the box hot path A/B).
+    _require_finite!(fv, "the assembled Stokes load vector fv",
+                     "the body-force / traction load closures of this solve")
 
     if mf_path
         K = nothing
@@ -1086,6 +1092,10 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     else
         fr = Cu' * (fv - K * u0 + Bm' * p0)
     end
+    # F5 guard: the reduced RHS is what the linear solve sees; `u0`/`p0` carry
+    # the Dirichlet/wall data, so a non-finite boundary closure shows up here.
+    _require_finite!(fr, "the reduced Stokes right-hand side fr",
+                     "the boundary data (uDx/uDz/wall_u/wall_un) of this solve")
     # Stage 0.5b2: a rotation-gauge configuration pins one free velocity dof to
     # remove the solid-body rotation from the linear system, but the pinned
     # saddle is still unsolvable for a load with a net torque: no wall of a

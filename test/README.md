@@ -2,15 +2,28 @@
 
 One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
-test script that starts with `using`; most wrap one `@testset`. The 194 files
-hold the suite's 136 980 assertions (136 978 passed, 2
-broken, 0 failed) — the count of the stage-0.5b2 tree, recorded with its
-evidence in `docs/dev/GEOM_PROGRESS.md`. (Cut 1 recorded 134 086 / 134 084 / 0 / 2
-on 185 files; cut 2 adds G267 and G268; cut 3 adds G269, +151 assertions; cut 4
-adds G270, +302 assertions; cut 5 adds G271, +136 assertions; cut 6 adds G272,
-+245 assertions; stage 0.5a adds G273, +1 565 assertions; stage 0.5b1 adds G274, +158 assertions; stage 0.5b2 adds G275, +160 assertions.) The top-level README
-still quotes the pre-cut-1 total
-(133 716); the top-level markdown was outside the cut write scopes.
+test script that starts with `using`; most wrap one `@testset`.
+
+Recorded full-suite totals: **142 227 total / 142 225 passed / 0 failed / 2 broken**, 30 m 54 s
+(2026-11-26, 8 threads / 16 cores, final tree of remediation batch P0 part 1;
+log `out_julia/agent/p0/suite.log`).  The tree has 207 gate files and `runtests.jl` includes each of them exactly
+once; `scripts/check_counts.jl`
+(run by hand, not part of the suite) checks those counts against this record and
+the other documented surfaces (`CONTRIBUTING.md`; the top-level `README.md` is
+checked as a warning-only surface because it is owned by the documentation
+batch).  The two `broken` entries are the explicit, documented `@test_skip`
+environment gates in G209 and G214 -- the realistic-state checkpoints they wait
+for are data-dependent states of 8-27 MB produced by long runs and are not
+committed (the decision and the alternatives are recorded in
+`docs/dev/BUG_FIX_LOG.md` §14.11); they are no longer literal tautologies.  The
+batch-P0 part-1 campaign record (code guards, order-gate thresholds, test holes,
+before/after evidence) is `docs/dev/BUG_FIX_LOG.md` §14.
+
+History: the earlier cuts' recorded totals were 134 086 / 134 084 / 0 / 2 on 185
+files (cut 1), then 136 980 / 136 978 / 0 / 2 on 194 files (stage 0.5b2), with
+G267/G268 (+2 files), G269 (+151 assertions), G270 (+302), G271 (+136), G272
+(+245), G273 (+1 565), G274 (+158) and G275 (+160) added along the way, then
+137 619 / 137 617 / 0 / 2 on 199 files at `f373126` (the campaign baseline).
 
 G266 is the geometry/mapping-layer gate of stage 0 cut 1: it rebuilds the box
 coordinates, node ids, leaf/face metrics, nodal transfer, AMR indicator and the
@@ -73,6 +86,42 @@ with `:schur_cg`/`:lagged` still refused with their box-assumption message.
 G272 is the cut-6 mapped transfer/indicator/AMR gate: a logical P2 is transferred exactly (max error 0.0) by the nodal transfer on an `AffineBox` and a `CurvedBox` (refinement and coarsening) and by the mapped L2 transfer (3-4e-15), the mapped nodal transfer on the box map is bit-identical to the historical box body, a deliberately wrong ``box-formula'' evaluation point on `CurvedBox` is caught with a measured 4.4e-1 error (correct: 0.0), and a smooth coarsening shows L2 beating nodal by four orders of magnitude on the G80 wall-graded trees.  The mapped indicator equals an independent analytic-map oracle (closed-form map, Jacobian, face normals and normal sizes written in the gate) to 3.7e-16, is invariant under a rigid rotation of geometry+field (7e-15), is non-negative, reproduces a corrected box oracle bitwise on the box map -- and differs from the **historical** box body by 9.96e-1, because the pre-cut box body computes the fine-side horizontal-face derivative in the x index (a pre-existing defect, kept for the nine-hash bitwise invariant and recorded as the cut's main finding); the linear-field probe measures the spurious interior term (6.25e-4) and the mapped body's zero.  The physical-vs-logical decision is measured on a `CurvedBox` whose layer-direction physical cell size varies by the annulus's `(R0+1)/R0 = 2.818`: the per-leaf `eta_phys/eta_log` equals the analytic map factor (7.9e-11 ... 8.4e-16 at levels 4-6), the compressed/tall span converges 2.592 -> 2.716 -> 2.770 towards 2.818, and on a similarity (box) map the two estimators coincide exactly -- the physical choice is justified by a number, not an opinion.  End to end, a mapped driver run with `initial_refine = 2` and `amr_every = 2` completes four steps, evolves 16 -> 28 leaves, writes 4x18 history rows, keeps every state finite, and checkpoints/resumes bit-identically to the uninterrupted run (the geometry record is in the checkpoint config); the Tosi / yielding law paths and the velocity indicator run mapped; the still-refused mapped paths (`symmetry=:x`, the Cartesian-y AMR policies, Newton, the Maxwell elastic load, `:schur_cg`) name their missing piece.  The box half (158 assertions) pins the indicator, nodal transfer, wall-strip/protect predicates, the box-default cycle/wall refinement/`wall_graded_tree` and the box-map transfer against the historical bodies carried in the gate.  G265 is the gate of
 G273 is the stage-0.5a polar-annulus geometry gate: it constructs `PolarAnnulus` for five fixtures (the published-unit-gap quarter wedge, the published 1.22/2.22 half wedge whose Float64 gap is `1+2^-52`, a three-quarter wedge, a full-turn cut ring, and a thick annulus with gap 2) on three trees and pins the map and its analytic inverse geometrically (radius, angle, collinearity, node counts), `det J` against the closed form and against a fourth-order finite difference of the public map, `J^T J^{-T} = I` and the `(xi_x, eta_x, xi_y, eta_y)` convention, the map Hessian against closed form and finite differences, the plane-annulus measures (`total_measure` and a quadrature-only `sum(detJ*w)` equal `Phi/2 (R1^2-R0^2)` to 4e-16, wall lengths `Phi R0` / `Phi R1` / `R1-R0`, perimeter `Phi(R0+R1)+2(R1-R0)`, leaf min/vertical/normal sizes), the registry and the face metric at arbitrary face parameters (inner `-e_r`, outer `+e_r`, radial sides `-/+e_phi`, tangents `+e_phi`/`+e_r`, analytic face Jacobians, unit length and orthogonality), `height = r-R0`, `|grad h| = 1`, `lap h = 1/r` (also against a finite difference), `gravity = -e_r` with unit magnitude, `nu_wall_sides = (:xminus, :xplus)`, the constructor refusals and the seam decision (`:periodic` is refused with an actionable topology message; a `Phi = 2*pi`, `seam = :wall` cut ring is constructible and its perimeter counts the seam).  The second-derivative block is the annulus analogue of G269 (d): the exact physical Laplacians of `S, T, S^2, T^2, S*T` come out at 2.0e-12 while the deliberately dropped map-curvature term fails by 15.07, and the FD Laplacian of a smooth nodal field through `semquad_eval` agrees to 2.9e-10 (dropped-C 2.4e-1) on 256 interior quadrature points.  The canonical identity pins the exact checkpoint string including the seam, each parameter moves the identity and the cut-5 cache stamp, and the annulus stamp cannot alias the box's.  1 565 assertions in 5.6 s; the box path is untouched (nine state-dump hashes unchanged).
 
+**Remediation batch P0 part 1 (2026-11-25): strengthened old gates and the
+closed test holes.**  G24, G28, G36 and G37 were re-measured with a *quadrature
+norm* on four levels (G24 keeps its three mixed-tree levels) and now assert the
+observed convergence order of every consecutive pair with G269-style margins:
+G24 Poisson L2 >= 2.7 and H1 >= 1.8 (measured 3.075/3.040 and 2.19/2.08); G28
+and G37 velocity L2 >= 2.7, velocity H1 >= 1.8, pressure L2 >= 1.7 (measured
+3.197/3.061/3.022, 2.139/2.026/2.015, 2.419/2.220/2.079 for G28; 3.070/2.979/
+2.998, 2.154/2.017/2.010, 2.133/2.065/2.050 for G37); G36 BDF2 >= 1.7 on every
+dt rung (measured 2.060/2.158/2.310) with a **first-order backward-Euler
+control** asserted <= 1.4 (measured 0.986/0.995/1.002), and its old single ratio
+threshold of 1.5 is gone.  Nothing was loosened: the old thresholds (2.0 / 2.0 /
+1.0 / 1.5) pass implementations the new ones reject; the old and new thresholds
+and the measured tables are recorded in `docs/dev/BUG_FIX_LOG.md` §14.7.
+G281 (23 assertions) is the restart-guard geometry comparison (R5: a direct
+caller's config without the `geometry` key must not resume an annulus
+checkpoint), with the reachable driver restart still bitwise.  G282 (43) is the
+named non-finite-input battery (F5: Poisson/Stokes body forces, viscosity, theta
+at assembly, driver entry and per-step entry), with valid controls unchanged.
+G283 (18) is the positive-viscosity rule for the raw solve API (F6), with the
+known-answer homogeneity rescaling as the "valid field unchanged" control.
+G284 (39) is the `p >= 2` space-constructor rule and the internal Q_1 pressure
+builder (F7), bitwise against the pre-fix body for p = 2, 3, 4.  G285 (22) is
+the time-window/step-card validation (F8).  G286 (4 257) is a known-answer test
+of the entropy-viscosity operator on a uniform-gradient steady state: analytic
+globals, per-leaf `Rmax`/`nu`, the assembly `ev_out` field, and the exact
+`K(nu=1) == 2 K(nu=0)` scaling; the audit's m03 mutation makes it red.  G287
+(25) pins the curved-wall `:rigid` hanging-node pass white-box, after measuring
+that the audit's proposed physical fixture is structurally unreachable on a
+balanced quadtree (0 such nodes over clustered ring/wedge trees -- recorded);
+m16b makes it red.  G288 (68) discriminates the 1e-10 constraint tolerance with
+a near-coincident-but-distinct node fixture (both face orientations, box and
+mapped bodies); m17/m17b make it red.  The four tautology/skip sites were
+cleaned: G202 and G216 got real assertions, and the two G209/G214 skips became
+explicit documented skips with a reason (the broken count stays 2, by the
+recorded decision).  See `docs/dev/BUG_FIX_LOG.md` §14 for the mutation logs,
+the box nine-hash/allocation evidence and every mistake found on the way.
 `examples/subduction_2d.jl` (the
 regional subduction-style case). It pins only the checks the design classifies
 as exact identities or as the mass-flux conservation identity, with their
@@ -95,5 +144,6 @@ and the whole suite:
     julia --project=. --threads=8 test/runtests.jl
 
 A kernel gate such as `t_g0.jl` takes about 2 s warm; the heavy
-checkpoint/regression gates run to minutes. The full suite is about 22 min on
-eight threads (CI allows 90 at four).
+checkpoint/regression gates run to minutes. The full suite is 30 m 54 s on eight
+threads (CI allows 90 at four); the campaign baseline at `f373126` measured
+30 m 49 s.
