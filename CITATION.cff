@@ -18,10 +18,10 @@ authors:
   # no family-names are invented. Replace with given-names/family-names and add an
   # orcid when the owner publishes them.
   - alias: edwardaud
-version: 0.1.0
+version: 0.2.0
 # release date of the version recorded in CHANGELOG.md; move it to the tag date if
 # the annotated tag v0.1.0 is cut on a later day.
-date-released: "2026-11-13"
+date-released: "2026-11-26"
 url: "https://github.com/edwardaud/QuaST"
 repository-code: "https://github.com/edwardaud/QuaST"
 license: MIT

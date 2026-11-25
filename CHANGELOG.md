@@ -6,6 +6,10 @@ public release: earlier development happened in a private repository.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.0] - 2026-11-26
+
 ### Added
 
 - `examples/benchmark_cases.jl`: one entry point per published case (Blankenbach 1a, 1b,

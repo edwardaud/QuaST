@@ -1,6 +1,6 @@
 name = "QuaST"
 uuid = "4a934f96-4962-41bf-a203-184953d15cc7"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["edwardaud"]
 
 [deps]

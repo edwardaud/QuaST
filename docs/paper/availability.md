@@ -8,7 +8,7 @@ heading and the level of detail change.
 
 ## Status: the DOI is a placeholder
 
-**No archived release exists yet and no DOI has been minted.** The Zenodo DOI is
+**The release tag `v0.2.0` exists, but no archived deposit and no DOI has been minted.** The Zenodo DOI is
 written as `<ZENODO-DOI>` below and it must be replaced with a real, resolvable
 DOI before a manuscript is submitted. The same replacement is needed in
 `CITATION.cff` (the `identifiers` block is present but commented out) and in the
@@ -18,13 +18,13 @@ of this page.
 
 | Placeholder | Replace with | Where |
 |---|---|---|
-| `<ZENODO-DOI>` | version DOI of the `v0.1.0` release, e.g. `10.5281/zenodo.12345678` | every statement below; `CITATION.cff` |
+| `<ZENODO-DOI>` | version DOI of the `v0.2.0` release, e.g. `10.5281/zenodo.12345678` | every statement below; `CITATION.cff` |
 | `<CONCEPT-DOI>` | Zenodo concept DOI, the one that resolves to the newest release | the "all versions" sentence |
-| `<RELEASE-COMMIT>` | the commit the annotated tag `v0.1.0` points at | statements that quote a commit |
+| `<RELEASE-COMMIT>` | the commit the annotated tag `v0.2.0` points at | statements that quote a commit |
 
 Repository state at the time of writing: <https://github.com/edwardaud/QuaST>,
-commit `f37312698bac800e444d46674b48608858058436` (2026-11-25), package version
-`0.1.0`, Julia `1.12.7` (the `julia_version` line of the committed
+the commit tagged `v0.2.0` (2026-11-26); `git rev-list -n1 v0.2.0`, package version
+`0.2.0`, Julia `1.12.7` (the `julia_version` line of the committed
 `Manifest.toml`), 8 threads, 25 GB of shared memory.
 
 ## Shared facts behind the statements
