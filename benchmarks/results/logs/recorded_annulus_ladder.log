@@ -1,0 +1,65 @@
+# Archived benchmark run log -- QuaST P2 evidence batch
+# tag: annulus_ladder
+# annulus ladder record (2026-11-25) behind docs/en/validation.md lines 55-60;
+# command: ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_PIC_RELAX=0.5, julia --project=. examples/annulus_benchmark.jl <rung>
+# rungs: 16x192 (113 s), 32x384 (193 s), 64x768 (424 s), 128x1536 (1391 s)
+# environment: Julia 1.12.7 WSL2, 8 threads, 25 GB RAM (recorded in docs/dev/GEOM_PROGRESS.md)
+# trimmed: no change except header
+=== RUNG L4 16x192 start 14:22:41 ===
+# annulus benchmark nx=16 ny=192 level=4 cells_y=12 leaves=3072 dofs=28608 (u=25344 p=3264 T=12672)
+# card: Ra=1e5 isoviscous H=0 free-slip ring R0=1.22 R1=2.22 phi=2pi; advection=galerkin ev=0.0 ic=firedrake
+# criterion: t > 0.0, change_t/|dNu_T|/|dV_RMS| < 1.0e-6 for 3 consecutive steps (steady_vrms=true); tstop=1.0e12 maxsteps=120 ckpt=new
+# mode: steady relaxation dt=1000.0 (CFL off; each step is a steady energy solve) maxpic=25 pic_relax=0.5
+  step      1 t=1.000000e+03 dt=1.000e+03 Nu_T=10.316741 Nu_B=10.268887 dNu=4.79e-02 Vrms=193.12895 meanT=0.382443 rss=1819MB
+  step      2 t=2.000000e+03 dt=1.000e+03 Nu_T=10.316611 Nu_B=10.268875 dNu=4.77e-02 Vrms=193.12615 meanT=0.382438 rss=1577MB
+  step      3 t=3.000000e+03 dt=1.000e+03 Nu_T=10.316640 Nu_B=10.268869 dNu=4.78e-02 Vrms=193.12699 meanT=0.382440 rss=1593MB
+  step      4 t=4.000000e+03 dt=1.000e+03 Nu_T=10.316643 Nu_B=10.268871 dNu=4.78e-02 Vrms=193.12703 meanT=0.382440 rss=1569MB
+  step      5 t=5.000000e+03 dt=1.000e+03 Nu_T=10.316645 Nu_B=10.268872 dNu=4.78e-02 Vrms=193.12705 meanT=0.382440 rss=1555MB
+  step      6 t=6.000000e+03 dt=1.000e+03 Nu_T=10.316646 Nu_B=10.268873 dNu=4.78e-02 Vrms=193.12706 meanT=0.382440 rss=1582MB
+ANNULUS_RESULT L4 nx=16 ny=192 level=4 leaves=3072 u_dofs=25344 p_dofs=3264 T_dofs=12672 saddle_dofs=28608 steps=6 t=6.000000e+03 dt=1.000e+03 wall=113.0 s_per_step=20.2861 s_step_warm=0.7304 stokes=17.5144 stokes_warm=0.5357 NuT=10.316646 NuB=10.268873 dNu=4.777e-02 Vrms=193.12706 meanT=0.382440 Umax=395.573 div_vol=-1.508e-13 div_rel=3.53e-17 Ibase=-7.419e-05 rss=1587 peak=1899 steady=1 window=3 nut_drift=2.94e-06 vr_drift=2.46e-05 adv=galerkin ev=0 ic=firedrake gauge=rotation pgauge=pin
+ANNULUS_DEV NuT_vs_aspect=8.0503% NuT_vs_firedrake=8.1296% NuB_vs_aspect=7.1460% Vrms_vs_aspect=-0.1262% Vrms_vs_firedrake=-0.0688% meanT_vs_aspect=0.1152% dNu_rel=0.4641%
+=== RUNG L4 done exit=0 14:25:58 ===
+=== RUNG L5 32x384 start 14:25:58 ===
+# annulus benchmark nx=32 ny=384 level=5 cells_y=12 leaves=12288 dofs=112512 (u=99840 p=12672 T=49920)
+# card: Ra=1e5 isoviscous H=0 free-slip ring R0=1.22 R1=2.22 phi=2pi; advection=galerkin ev=0.0 ic=firedrake
+# criterion: t > 0.0, change_t/|dNu_T|/|dV_RMS| < 1.0e-6 for 3 consecutive steps (steady_vrms=true); tstop=1.0e12 maxsteps=120 ckpt=new
+# mode: steady relaxation dt=1000.0 (CFL off; each step is a steady energy solve) maxpic=25 pic_relax=0.5
+  step      1 t=1.000000e+03 dt=1.000e+03 Nu_T=9.900031 Nu_B=9.943874 dNu=-4.38e-02 Vrms=193.26032 meanT=0.382468 rss=2076MB
+  step      2 t=2.000000e+03 dt=1.000e+03 Nu_T=9.899909 Nu_B=9.943854 dNu=-4.39e-02 Vrms=193.25752 meanT=0.382463 rss=2177MB
+  step      3 t=3.000000e+03 dt=1.000e+03 Nu_T=9.899935 Nu_B=9.943849 dNu=-4.39e-02 Vrms=193.25836 meanT=0.382464 rss=2094MB
+  step      4 t=4.000000e+03 dt=1.000e+03 Nu_T=9.899938 Nu_B=9.943851 dNu=-4.39e-02 Vrms=193.25839 meanT=0.382464 rss=2094MB
+  step      5 t=5.000000e+03 dt=1.000e+03 Nu_T=9.899940 Nu_B=9.943853 dNu=-4.39e-02 Vrms=193.25841 meanT=0.382464 rss=2096MB
+  step      6 t=6.000000e+03 dt=1.000e+03 Nu_T=9.899941 Nu_B=9.943853 dNu=-4.39e-02 Vrms=193.25842 meanT=0.382464 rss=2096MB
+ANNULUS_RESULT L5 nx=32 ny=384 level=5 leaves=12288 u_dofs=99840 p_dofs=12672 T_dofs=49920 saddle_dofs=112512 steps=6 t=6.000000e+03 dt=1.000e+03 wall=192.8 s_per_step=35.6726 s_step_warm=2.4728 stokes=30.3404 stokes_warm=1.8576 NuT=9.899941 NuB=9.943853 dNu=-4.391e-02 Vrms=193.25842 meanT=0.382464 Umax=395.814 div_vol=-5.274e-15 div_rel=1.23e-18 Ibase=-1.444e-06 rss=2098 peak=2348 steady=1 window=3 nut_drift=2.77e-06 vr_drift=2.47e-05 adv=galerkin ev=0 ic=firedrake gauge=rotation pgauge=pin
+ANNULUS_DEV NuT_vs_aspect=3.6860% NuT_vs_firedrake=3.7621% NuB_vs_aspect=3.7547% Vrms_vs_aspect=-0.0582% Vrms_vs_firedrake=-0.0008% meanT_vs_aspect=0.1215% dNu_rel=-0.4426%
+=== RUNG L5 done exit=0 14:30:35 ===
+=== LADDER DONE 14:30:35 ===
+=== RUNG L6 64x768 start 14:32:05 ===
+# annulus benchmark nx=64 ny=768 level=6 cells_y=12 leaves=49152 dofs=446208 (u=396288 p=49920 T=198144)
+# card: Ra=1e5 isoviscous H=0 free-slip ring R0=1.22 R1=2.22 phi=2pi; advection=galerkin ev=0.0 ic=firedrake
+# criterion: t > 0.0, change_t/|dNu_T|/|dV_RMS| < 1.0e-6 for 3 consecutive steps (steady_vrms=true); tstop=1.0e12 maxsteps=120 ckpt=new
+# mode: steady relaxation dt=1000.0 (CFL off; each step is a steady energy solve) maxpic=25 pic_relax=0.5
+  step      1 t=1.000000e+03 dt=1.000e+03 Nu_T=9.646197 Nu_B=9.665301 dNu=-1.91e-02 Vrms=193.26195 meanT=0.382469 rss=4226MB
+  step      2 t=2.000000e+03 dt=1.000e+03 Nu_T=9.646078 Nu_B=9.665286 dNu=-1.92e-02 Vrms=193.25915 meanT=0.382464 rss=4266MB
+  step      3 t=3.000000e+03 dt=1.000e+03 Nu_T=9.646104 Nu_B=9.665281 dNu=-1.92e-02 Vrms=193.25999 meanT=0.382465 rss=4295MB
+  step      4 t=4.000000e+03 dt=1.000e+03 Nu_T=9.646107 Nu_B=9.665283 dNu=-1.92e-02 Vrms=193.26003 meanT=0.382465 rss=4647MB
+  step      5 t=5.000000e+03 dt=1.000e+03 Nu_T=9.646109 Nu_B=9.665284 dNu=-1.92e-02 Vrms=193.26005 meanT=0.382466 rss=4169MB
+  step      6 t=6.000000e+03 dt=1.000e+03 Nu_T=9.646110 Nu_B=9.665285 dNu=-1.92e-02 Vrms=193.26005 meanT=0.382466 rss=4193MB
+ANNULUS_RESULT L6 nx=64 ny=768 level=6 leaves=49152 u_dofs=396288 p_dofs=49920 T_dofs=198144 saddle_dofs=446208 steps=6 t=6.000000e+03 dt=1.000e+03 wall=424.1 s_per_step=80.8329 s_step_warm=9.4104 stokes=64.6468 stokes_warm=7.1519 NuT=9.646110 NuB=9.665285 dNu=-1.917e-02 Vrms=193.26005 meanT=0.382466 Umax=395.815 div_vol=3.478e-14 div_rel=8.13e-18 Ibase=-1.175e-08 rss=4194 peak=4823 steady=1 window=3 nut_drift=2.64e-06 vr_drift=2.47e-05 adv=galerkin ev=0 ic=firedrake gauge=rotation pgauge=pin
+ANNULUS_DEV NuT_vs_aspect=1.0275% NuT_vs_firedrake=1.1017% NuB_vs_aspect=0.8481% Vrms_vs_aspect=-0.0574% Vrms_vs_firedrake=0.0000% meanT_vs_aspect=0.1219% dNu_rel=-0.1986%
+=== RUNG L6 done exit=0 14:40:34 ===
+=== RUNG L7 128x1536 start 14:40:34 ===
+# annulus benchmark nx=128 ny=1536 level=7 cells_y=12 leaves=196608 dofs=1777152 (u=1579008 p=198144 T=789504)
+# card: Ra=1e5 isoviscous H=0 free-slip ring R0=1.22 R1=2.22 phi=2pi; advection=galerkin ev=0.0 ic=firedrake
+# criterion: t > 0.0, change_t/|dNu_T|/|dV_RMS| < 1.0e-6 for 3 consecutive steps (steady_vrms=true); tstop=1.0e12 maxsteps=120 ckpt=new
+# mode: steady relaxation dt=1000.0 (CFL off; each step is a steady energy solve) maxpic=25 pic_relax=0.5
+  step      1 t=1.000000e+03 dt=1.000e+03 Nu_T=9.567516 Nu_B=9.573042 dNu=-5.53e-03 Vrms=193.26181 meanT=0.382469 rss=11929MB
+  step      2 t=2.000000e+03 dt=1.000e+03 Nu_T=9.567398 Nu_B=9.573028 dNu=-5.63e-03 Vrms=193.25902 meanT=0.382464 rss=12299MB
+  step      3 t=3.000000e+03 dt=1.000e+03 Nu_T=9.567424 Nu_B=9.573023 dNu=-5.60e-03 Vrms=193.25985 meanT=0.382465 rss=12154MB
+  step      4 t=4.000000e+03 dt=1.000e+03 Nu_T=9.567427 Nu_B=9.573025 dNu=-5.60e-03 Vrms=193.25989 meanT=0.382465 rss=12128MB
+  step      5 t=5.000000e+03 dt=1.000e+03 Nu_T=9.567428 Nu_B=9.573026 dNu=-5.60e-03 Vrms=193.25991 meanT=0.382465 rss=12250MB
+  step      6 t=6.000000e+03 dt=1.000e+03 Nu_T=9.567429 Nu_B=9.573026 dNu=-5.60e-03 Vrms=193.25992 meanT=0.382465 rss=12173MB
+ANNULUS_RESULT L7 nx=128 ny=1536 level=7 leaves=196608 u_dofs=1579008 p_dofs=198144 T_dofs=789504 saddle_dofs=1777152 steps=6 t=6.000000e+03 dt=1.000e+03 wall=1391.2 s_per_step=268.7260 s_step_warm=40.3214 stokes=199.1745 stokes_warm=29.7541 NuT=9.567429 NuB=9.573026 dNu=-5.597e-03 Vrms=193.25992 meanT=0.382465 Umax=395.814 div_vol=9.094e-14 div_rel=2.13e-17 Ibase=1.718e-08 rss=12174 peak=13700 steady=1 window=3 nut_drift=2.60e-06 vr_drift=2.47e-05 adv=galerkin ev=0 ic=firedrake gauge=rotation pgauge=pin
+ANNULUS_DEV NuT_vs_aspect=0.2035% NuT_vs_firedrake=0.2770% NuB_vs_aspect=-0.1145% Vrms_vs_aspect=-0.0574% Vrms_vs_firedrake=-0.0000% meanT_vs_aspect=0.1218% dNu_rel=-0.0585%
+=== RUNG L7 done exit=0 15:05:13 ===
+=== LADDER DONE 15:05:13 ===

@@ -78,6 +78,21 @@ Examples: `blankenbach1a_nu-L5_steady.md`,
 The index is rebuilt when records are added: one row per record, newest first.
 It is empty until the P2 batch fills it.
 
+The machine-readable roll-up of the same numbers is `summary.md` (tables,
+observed orders, Richardson values, GCI, verdicts) and `summary.csv` (one row per
+case / level / quantity: `case,level,leaves,quantity,value,reference,delta_pct,
+observed_order,gci_pct,richardson,safety_factor,status,source,note`).  The
+compact archived logs these records cite are in `logs/`; `logs/MANIFEST.txt`
+lists every one with its byte size and SHA-256.
+
 | Date | Record | Quantity | Status |
 |---|---|---|---|
-| — | — | — | — |
+| 2026-11-26 | `gates_suite-total_p2.md` | full-suite totals on the final tree | verified |
+| 2026-11-26 | `dump_state-hashes_p2.md` | nine box state hashes (bitwise invariant) | verified |
+| 2026-11-26 | `annulus_steady-dt_L4_relaxation.md` | relaxation dt / damping fixed point and steady-state residual (F9) | verified |
+| 2026-11-26 | `annulus_nu-t_128x1536_rung4.md` | annulus Nu_T/Nu_B, observed order, Richardson, GCI | recorded |
+| 2026-11-26 | `blankenbach2a_nu-L3-walls4_steady.md` | Blankenbach 2a published rung + uniform-tree resolution study | verified |
+| 2026-11-26 | `blankenbach1c_nu-L2toL4_steady.md` | Blankenbach 1c Nu, L2-L4 (no observed order) | verified |
+| 2026-11-26 | `blankenbach1b_nu-L2toL4_steady.md` | Blankenbach 1b Nu, L2-L4 re-run + recorded-ladder GCI | verified |
+| 2026-11-26 | `blankenbach1a_nu-L3toL5_steady.md` | Blankenbach 1a Nu, L3-L5, p = 1.955, GCI 0.089 % | verified |
+| 2026-11-26 | `tosi1_nu-top-L3_steady.md` | Tosi Case 1 Nu_top/V_rms at the fixed default Ra map | verified |

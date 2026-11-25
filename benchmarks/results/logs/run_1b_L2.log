@@ -1,0 +1,86 @@
+# Archived benchmark run log -- QuaST P2 evidence batch
+# tag: 1b_L2
+# command: CASE_CFL=20 CASE_STEADY=Inf  julia --project=. --threads=2 examples/benchmark_cases.jl 1b 2 0.08
+# start/end: 2026-11-26 03:45:43 CST -> 2026-11-26 03:48:43 CST  wall 180 s
+# environment: Julia 1.12.7, 2 threads, Ubuntu 24.04.5 LTS (WSL2), 13th Gen Intel Core i5-13490F (16 vCPU), 25 GB RAM, Manifest.toml sha256 ff64fc791ddb601a3119bbb0ff5a3bba7300a86b12b1f90fece23c7de2a247cc
+# trimmed: per-Picard-iteration lines removed, step lines kept (downsampled if over budget)
+  step    1 t=1.000e-04 dt=1.00e-04 Nu=11.23790/11.24831 Vrms=1.9348e+02 N=1089 leaves=256 closure=-1.041e-02
+  step    2 t=2.050e-04 dt=1.05e-04 Nu=11.25273/11.26298 Vrms=1.9354e+02 N=1089 leaves=256 closure=-1.026e-02
+  step    3 t=3.152e-04 dt=1.10e-04 Nu=11.26836/11.27848 Vrms=1.9359e+02 N=1089 leaves=256 closure=-1.012e-02
+  step    4 t=4.310e-04 dt=1.16e-04 Nu=11.28584/11.29585 Vrms=1.9366e+02 N=1089 leaves=256 closure=-1.001e-02
+  step    5 t=5.526e-04 dt=1.22e-04 Nu=11.30504/11.31497 Vrms=1.9373e+02 N=1089 leaves=256 closure=-9.924e-03
+  step    6 t=6.802e-04 dt=1.28e-04 Nu=11.32515/11.33500 Vrms=1.9381e+02 N=1089 leaves=256 closure=-9.850e-03
+  step    7 t=8.142e-04 dt=1.34e-04 Nu=11.34517/11.35497 Vrms=1.9390e+02 N=1089 leaves=256 closure=-9.793e-03
+  step    8 t=9.549e-04 dt=1.41e-04 Nu=11.36434/11.37409 Vrms=1.9401e+02 N=1089 leaves=256 closure=-9.752e-03
+  step    9 t=1.103e-03 dt=1.48e-04 Nu=11.38215/11.39187 Vrms=1.9413e+02 N=1089 leaves=256 closure=-9.726e-03
+  step   10 t=1.258e-03 dt=1.55e-04 Nu=11.39837/11.40808 Vrms=1.9426e+02 N=1089 leaves=256 closure=-9.715e-03
+  step   11 t=1.421e-03 dt=1.63e-04 Nu=11.41292/11.42263 Vrms=1.9440e+02 N=1089 leaves=256 closure=-9.718e-03
+  step   12 t=1.592e-03 dt=1.71e-04 Nu=11.42580/11.43553 Vrms=1.9454e+02 N=1089 leaves=256 closure=-9.736e-03
+  step   13 t=1.771e-03 dt=1.80e-04 Nu=11.43706/11.44683 Vrms=1.9469e+02 N=1089 leaves=256 closure=-9.768e-03
+  step   14 t=1.960e-03 dt=1.89e-04 Nu=11.44677/11.45658 Vrms=1.9482e+02 N=1089 leaves=256 closure=-9.812e-03
+  step   15 t=2.158e-03 dt=1.98e-04 Nu=11.45503/11.46489 Vrms=1.9495e+02 N=1089 leaves=256 closure=-9.863e-03
+  step   16 t=2.366e-03 dt=2.08e-04 Nu=11.46198/11.47190 Vrms=1.9504e+02 N=1089 leaves=256 closure=-9.918e-03
+  step   17 t=2.584e-03 dt=2.18e-04 Nu=11.46785/11.47782 Vrms=1.9511e+02 N=1089 leaves=256 closure=-9.970e-03
+  step   18 t=2.813e-03 dt=2.29e-04 Nu=11.47289/11.48290 Vrms=1.9513e+02 N=1089 leaves=256 closure=-1.001e-02
+  step   19 t=3.054e-03 dt=2.41e-04 Nu=11.47738/11.48741 Vrms=1.9509e+02 N=1089 leaves=256 closure=-1.003e-02
+  step   20 t=3.307e-03 dt=2.53e-04 Nu=11.48152/11.49155 Vrms=1.9499e+02 N=1089 leaves=256 closure=-1.003e-02
+  step   21 t=3.572e-03 dt=2.65e-04 Nu=11.48530/11.49531 Vrms=1.9482e+02 N=1089 leaves=256 closure=-1.001e-02
+  step   22 t=3.851e-03 dt=2.79e-04 Nu=11.48849/11.49846 Vrms=1.9458e+02 N=1089 leaves=256 closure=-9.964e-03
+  step   23 t=4.143e-03 dt=2.93e-04 Nu=11.49058/11.50047 Vrms=1.9426e+02 N=1089 leaves=256 closure=-9.898e-03
+  step   24 t=4.450e-03 dt=3.07e-04 Nu=11.49089/11.50070 Vrms=1.9388e+02 N=1089 leaves=256 closure=-9.813e-03
+  step   25 t=4.773e-03 dt=3.23e-04 Nu=11.48880/11.49851 Vrms=1.9346e+02 N=1089 leaves=256 closure=-9.712e-03
+  step   26 t=5.111e-03 dt=3.39e-04 Nu=11.48389/11.49348 Vrms=1.9302e+02 N=1089 leaves=256 closure=-9.596e-03
+  step   27 t=5.467e-03 dt=3.56e-04 Nu=11.47605/11.48552 Vrms=1.9259e+02 N=1089 leaves=256 closure=-9.467e-03
+  step   28 t=5.840e-03 dt=3.73e-04 Nu=11.46552/11.47485 Vrms=1.9223e+02 N=1089 leaves=256 closure=-9.332e-03
+  step   29 t=6.232e-03 dt=3.92e-04 Nu=11.45279/11.46198 Vrms=1.9196e+02 N=1089 leaves=256 closure=-9.197e-03
+  step   30 t=6.644e-03 dt=4.12e-04 Nu=11.43859/11.44766 Vrms=1.9180e+02 N=1089 leaves=256 closure=-9.071e-03
+  step   31 t=7.076e-03 dt=4.32e-04 Nu=11.42387/11.43283 Vrms=1.9175e+02 N=1089 leaves=256 closure=-8.959e-03
+  step   32 t=7.530e-03 dt=4.54e-04 Nu=11.40987/11.41873 Vrms=1.9178e+02 N=1089 leaves=256 closure=-8.866e-03
+  step   33 t=8.006e-03 dt=4.76e-04 Nu=11.39802/11.40681 Vrms=1.9188e+02 N=1089 leaves=256 closure=-8.791e-03
+  step   34 t=8.507e-03 dt=5.00e-04 Nu=11.38982/11.39855 Vrms=1.9201e+02 N=1089 leaves=256 closure=-8.734e-03
+  step   35 t=9.032e-03 dt=5.25e-04 Nu=11.38642/11.39511 Vrms=1.9217e+02 N=1089 leaves=256 closure=-8.690e-03
+  step   36 t=9.584e-03 dt=5.52e-04 Nu=11.38826/11.39691 Vrms=1.9237e+02 N=1089 leaves=256 closure=-8.648e-03
+  step   37 t=1.016e-02 dt=5.79e-04 Nu=11.39487/11.40346 Vrms=1.9263e+02 N=1089 leaves=256 closure=-8.588e-03
+  step   38 t=1.077e-02 dt=6.08e-04 Nu=11.40514/11.41362 Vrms=1.9297e+02 N=1089 leaves=256 closure=-8.484e-03
+  step   39 t=1.141e-02 dt=6.39e-04 Nu=11.41774/11.42606 Vrms=1.9337e+02 N=1089 leaves=256 closure=-8.320e-03
+  step   40 t=1.208e-02 dt=6.70e-04 Nu=11.43150/11.43961 Vrms=1.9377e+02 N=1089 leaves=256 closure=-8.105e-03
+  step   41 t=1.278e-02 dt=7.04e-04 Nu=11.44530/11.45318 Vrms=1.9406e+02 N=1089 leaves=256 closure=-7.876e-03
+  step   42 t=1.352e-02 dt=7.39e-04 Nu=11.45763/11.46531 Vrms=1.9416e+02 N=1089 leaves=256 closure=-7.686e-03
+  step   43 t=1.430e-02 dt=7.76e-04 Nu=11.46630/11.47388 Vrms=1.9403e+02 N=1089 leaves=256 closure=-7.577e-03
+  step   44 t=1.511e-02 dt=8.15e-04 Nu=11.46892/11.47647 Vrms=1.9371e+02 N=1089 leaves=256 closure=-7.546e-03
+  step   45 t=1.597e-02 dt=8.56e-04 Nu=11.46405/11.47159 Vrms=1.9331e+02 N=1089 leaves=256 closure=-7.541e-03
+  step   46 t=1.687e-02 dt=8.99e-04 Nu=11.45243/11.45992 Vrms=1.9292e+02 N=1089 leaves=256 closure=-7.486e-03
+  step   47 t=1.781e-02 dt=9.43e-04 Nu=11.43720/11.44453 Vrms=1.9263e+02 N=1089 leaves=256 closure=-7.326e-03
+  step   48 t=1.880e-02 dt=9.91e-04 Nu=11.42278/11.42984 Vrms=1.9246e+02 N=1089 leaves=256 closure=-7.065e-03
+  step   49 t=1.984e-02 dt=1.04e-03 Nu=11.41314/11.41991 Vrms=1.9244e+02 N=1089 leaves=256 closure=-6.773e-03
+  step   50 t=2.093e-02 dt=1.09e-03 Nu=11.41054/11.41708 Vrms=1.9258e+02 N=1089 leaves=256 closure=-6.539e-03
+  step   51 t=2.208e-02 dt=1.15e-03 Nu=11.41527/11.42168 Vrms=1.9286e+02 N=1089 leaves=256 closure=-6.410e-03
+  step   52 t=2.329e-02 dt=1.20e-03 Nu=11.42583/11.43218 Vrms=1.9321e+02 N=1089 leaves=256 closure=-6.349e-03
+  step   53 t=2.455e-02 dt=1.26e-03 Nu=11.43893/11.44520 Vrms=1.9351e+02 N=1089 leaves=256 closure=-6.263e-03
+  step   54 t=2.588e-02 dt=1.33e-03 Nu=11.44983/11.45591 Vrms=1.9362e+02 N=1089 leaves=256 closure=-6.082e-03
+  step   55 t=2.727e-02 dt=1.39e-03 Nu=11.45383/11.45965 Vrms=1.9348e+02 N=1089 leaves=256 closure=-5.823e-03
+  step   56 t=2.873e-02 dt=1.46e-03 Nu=11.44904/11.45461 Vrms=1.9318e+02 N=1089 leaves=256 closure=-5.573e-03
+  step   57 t=3.027e-02 dt=1.54e-03 Nu=11.43809/11.44349 Vrms=1.9288e+02 N=1089 leaves=256 closure=-5.396e-03
+  step   58 t=3.189e-02 dt=1.61e-03 Nu=11.42714/11.43241 Vrms=1.9272e+02 N=1089 leaves=256 closure=-5.270e-03
+  step   59 t=3.358e-02 dt=1.69e-03 Nu=11.42227/11.42739 Vrms=1.9277e+02 N=1089 leaves=256 closure=-5.115e-03
+  step   60 t=3.536e-02 dt=1.78e-03 Nu=11.42584/11.43074 Vrms=1.9299e+02 N=1089 leaves=256 closure=-4.893e-03
+  step   61 t=3.723e-02 dt=1.87e-03 Nu=11.43502/11.43966 Vrms=1.9324e+02 N=1089 leaves=256 closure=-4.648e-03
+  step   62 t=3.919e-02 dt=1.96e-03 Nu=11.44346/11.44790 Vrms=1.9336e+02 N=1089 leaves=256 closure=-4.443e-03
+  step   63 t=4.125e-02 dt=2.06e-03 Nu=11.44554/11.44982 Vrms=1.9328e+02 N=1089 leaves=256 closure=-4.282e-03
+  step   64 t=4.341e-02 dt=2.16e-03 Nu=11.44050/11.44461 Vrms=1.9307e+02 N=1089 leaves=256 closure=-4.109e-03
+  step   65 t=4.568e-02 dt=2.27e-03 Nu=11.43312/11.43701 Vrms=1.9291e+02 N=1089 leaves=256 closure=-3.896e-03
+  step   66 t=4.806e-02 dt=2.38e-03 Nu=11.42975/11.43342 Vrms=1.9292e+02 N=1089 leaves=256 closure=-3.673e-03
+  step   67 t=5.057e-02 dt=2.50e-03 Nu=11.43275/11.43623 Vrms=1.9307e+02 N=1089 leaves=256 closure=-3.474e-03
+  step   68 t=5.320e-02 dt=2.63e-03 Nu=11.43850/11.44179 Vrms=1.9320e+02 N=1089 leaves=256 closure=-3.293e-03
+  step   69 t=5.596e-02 dt=2.76e-03 Nu=11.44124/11.44435 Vrms=1.9320e+02 N=1089 leaves=256 closure=-3.105e-03
+  step   70 t=5.885e-02 dt=2.90e-03 Nu=11.43900/11.44191 Vrms=1.9309e+02 N=1089 leaves=256 closure=-2.908e-03
+  step   71 t=6.190e-02 dt=3.04e-03 Nu=11.43522/11.43793 Vrms=1.9301e+02 N=1089 leaves=256 closure=-2.714e-03
+  step   72 t=6.509e-02 dt=3.19e-03 Nu=11.43431/11.43684 Vrms=1.9303e+02 N=1089 leaves=256 closure=-2.532e-03
+  step   73 t=6.844e-02 dt=3.35e-03 Nu=11.43664/11.43900 Vrms=1.9311e+02 N=1089 leaves=256 closure=-2.353e-03
+  step   74 t=7.190e-02 dt=3.45e-03 Nu=11.43880/11.44098 Vrms=1.9314e+02 N=1089 leaves=256 closure=-2.180e-03
+  step   75 t=7.535e-02 dt=3.45e-03 Nu=11.43848/11.44050 Vrms=1.9310e+02 N=1089 leaves=256 closure=-2.020e-03
+  step   76 t=7.880e-02 dt=3.45e-03 Nu=11.43697/11.43884 Vrms=1.9306e+02 N=1089 leaves=256 closure=-1.872e-03
+  step   77 t=8.225e-02 dt=3.45e-03 Nu=11.43645/11.43819 Vrms=1.9306e+02 N=1089 leaves=256 closure=-1.734e-03
+
+[1b] steps=77 t=8.2250e-02 wall=83 s  Nu_top=11.436454 Nu_bot=11.438187 Vrms=193.064486  leaves=256
+[1b] reference Nu=10.534095 (8.57%)  Vrms=193.214540 (-0.08%)

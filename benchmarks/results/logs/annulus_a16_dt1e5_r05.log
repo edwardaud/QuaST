@@ -1,0 +1,11 @@
+# Archived benchmark run log -- QuaST P2 evidence batch
+# tag: a16_dt1e5_r05
+# command: env ANN_NX=... ANN_DT0=... ANN_PIC_RELAX=... ANN_STEPS=... julia --project=. --threads=8 out_julia/agent/p2/p2_annulus_probe.jl
+# environment: Julia 1.12.7, 2 threads, Ubuntu 24.04.5 LTS (WSL2), 13th Gen Intel Core i5-13490F (16 vCPU), 25 GB RAM, Manifest.toml sha256 ff64fc791ddb601a3119bbb0ff5a3bba7300a86b12b1f90fece23c7de2a247cc
+# trimmed: model Info lines kept; ANNPROBE result lines kept
+ANNPROBE tag=a16_dt1e5_r05 nx=16 ny=192 leaves=3072 saddle_dofs=28608 dt=1.000e+05 maxpic=25 pic_relax=0.50 steps=12 t=1.200000e+06 wall=191.5 s_step_warm=0.7419
+ANNPROBE_SCALARS tag=a16_dt1e5_r05 NuT=10.316647011744 NuB=10.268873463078 dNu=4.777355e-02 Vrms=193.12706082 meanT=0.3824399156 Umax=395.573403
+ANNPROBE_RESID tag=a16_dt1e5_r05 div_vol=-1.205e-13 div_rel=2.818e-17 linres_last=7.198e-11 linres_max=7.198e-11
+ANNPROBE_FIXPT tag=a16_dt1e5_r05 dU_last=1.856e-09 dU_prev=1.868e-09 rho_u=9.935e-01 residU_bound=2.828e-07 dTheta_last=1.820e-09 dTheta_prev=1.871e-09 rho_th=9.725e-01 residTheta_bound=6.430e-08
+ANNPROBE_CRIT tag=a16_dt1e5_r05 dNu_last=4.009e-09 dNu_prev=7.921e-09 dVrms_last=6.921e-09 dVrms_prev=1.159e-08
+ANNPROBE_SERIES tag=a16_dt1e5_r05 steps=(1,1.000000e+05,10.316655,10.268880,193.127077)(2,2.000000e+05,10.316651,10.268877,193.127078)(3,3.000000e+05,10.316649,10.268875,193.127062)(4,4.000000e+05,10.316648,10.268874,193.127062)(5,5.000000e+05,10.316648,10.268874,193.127061)(6,6.000000e+05,10.316647,10.268874,193.127061)(7,7.000000e+05,10.316647,10.268874,193.127061)(8,8.000000e+05,10.316647,10.268874,193.127061)(9,9.000000e+05,10.316647,10.268873,193.127061)(10,1.000000e+06,10.316647,10.268873,193.127061)(11,1.100000e+06,10.316647,10.268873,193.127061)(12,1.200000e+06,10.316647,10.268873,193.127061)

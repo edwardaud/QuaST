@@ -108,17 +108,27 @@ function make_case(name::String)
     elseif name == "tosi1"
         # ASPECT Tosi_Case1.prm: surface Ra = 100, eta_T = 1e5, no plastic branch,
         # eta_z = 1, eta in [1e-6, 10], initial guess 0.1, refinement 5 (32 x 32).
-        # ASPECT makes its law nondimensional with eta0 = 0.1 (its "Initial
-        # viscosity"), so the same choice is available here through CASE_ETA0.
-        # ASPECT's Ra = 100 is defined with eta0 = 0.1, while this solver takes Ra
-        # with a reference viscosity of one.  The two describe the same problem
-        # only when Ra / (eta_abs / eta0) matches, i.e. Ra_ours = 10 / eta0:
-        # (eta0 = 1, Ra = 10) and (eta0 = 0.1, Ra = 100) are the consistent pairs.
+        # The Tosi law is already nondimensional; `eta0` here is only the
+        # normalisation it is divided by before the flow solve sees it.  Because
+        # the solver takes `Ra` against `eta_ref` while the law enters as
+        # `eta_law / eta_ref` with `eta_law = eta_paper / eta0`, multiplying the
+        # Stokes equation through by `eta0 * eta_ref` gives the paper's law with
+        # the Rayleigh number
+        #
+        #     Ra_eff = Ra * eta0 * eta_ref,
+        #
+        # so the benchmark's Ra = 100 fixes the product, not Ra alone: the pairs
+        # (eta0 = 1, Ra = 100), (eta0 = 0.1, Ra = 1000) and (eta0 = 0.5, Ra = 200)
+        # are the same physical problem (pressure is rescaled; no diagnostic uses
+        # it).  The default keeps the shipped eta0 = 0.1 and therefore needs
+        # Ra = 100 / eta0 = 1000.  The older default Ra = 10 / eta0 encoded
+        # Ra_eff = 10, whose steady state is Nu_top = 1.99, not Table 2's 3.4216.
         eta0 = parse(Float64, get(ENV, "CASE_ETA0", "0.1"))
-        # Ra and eta0 trade off: Ra / (eta/eta0) is what the equations see, so
-        # only a change that keeps eta0 fixed and moves Ra changes the physics.
-        # CASE_RA is that knob; the default is the ASPECT pairing.
-        ra = parse(Float64, get(ENV, "CASE_RA", string(10.0 / eta0)))
+        # Only Ra_eff moves the physics: CASE_RA is the knob, the default is the
+        # derived pairing above, and eta_ref is 1 (the `Params` default on this
+        # card).  `TosiLaw`'s own default eta0 = 1 is the paper's normalisation
+        # and would pair with CASE_ETA0=1 CASE_RA=100.
+        ra = parse(Float64, get(ENV, "CASE_RA", string(100.0 / eta0)))
         law = TosiLaw(etaT=1.0e5, etaZ=1.0, eta_star=0.0, sigma_y=0.0,
                       eta_init=1.0e-1, eta0=eta0,
                       eta_min=1.0e-6, eta_max=10.0, z_is_depth=true)
@@ -128,8 +138,11 @@ function make_case(name::String)
     elseif name == "tosi5a"
         # ASPECT Tosi_Case5.prm: eta_z = 10, yield stress 4, eta* = 1e-3,
         # refinement 6 (64 x 64).  This case is a limit cycle, not a steady state.
+        # Same normalisation as tosi1 above: the benchmark's Ra = 100 is the
+        # product Ra_eff = Ra * eta0 * eta_ref, so the default pairs eta0 = 0.1
+        # with Ra = 100 / eta0 = 1000 (the same equations as eta0 = 1, Ra = 100).
         eta0 = parse(Float64, get(ENV, "CASE_ETA0", "0.1"))
-        ra = parse(Float64, get(ENV, "CASE_RA", string(10.0 / eta0)))
+        ra = parse(Float64, get(ENV, "CASE_RA", string(100.0 / eta0)))
         law = TosiLaw(etaT=1.0e5, etaZ=10.0, eta_star=1.0e-3, sigma_y=4.0,
                       eta_init=1.0e-1, eta0=eta0,
                       eta_min=1.0e-6, eta_max=10.0, z_is_depth=true)

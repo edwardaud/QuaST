@@ -1,0 +1,1047 @@
+# Archived full-suite log -- QuaST P2 evidence batch
+# tag: gates_suite
+# command: julia --project=. --threads=8 test/runtests.jl   (run on the final tree)
+# start/end/wall: 2026-11-26 04:08:26 -> 2026-11-26 04:41:56  wall 2010 s
+# environment: Julia 1.12.7, 8 threads, Ubuntu 24.04.5 LTS (WSL2), 13th Gen Intel Core i5-13490F (16 vCPU), 25 GB RAM, Manifest.toml sha256 ff64fc791ddb601a3119bbb0ff5a3bba7300a86b12b1f90fece23c7de2a247cc
+# trimmed: head 40 + tail 1000 lines of a 109376-byte log
+[case] STOKES-FAIL step=0 res=2.395983e+00 (vel=5.006e-14 div=2.396e+00) stokes_tol=1.0e-06 shift=0e+00 refine=0 leaves=376 N=1777 saddle=4067 eta=[2.102e-04,1.000e+00] eta_clip=0.000%
+┌ Warning: checkpoint /tmp/jl_JS5mRsp8XC.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries no Maxwell stress history, so there is no stored stress state for the revision change to affect.  Resuming under revision 2.
+└ @ QuaST src/driver/restart_guard.jl:330
+┌ Info: G175 full
+│   level = 3
+│   label = "const"
+└   rel = 3.9380476362221177e-16
+┌ Info: G175 reduced
+│   level = 3
+│   label = "const"
+└   relr = 3.871195395311971e-16
+┌ Info: G175 full
+│   level = 3
+│   label = "100x"
+└   rel = 3.68440256272334e-16
+┌ Info: G175 reduced
+│   level = 3
+│   label = "100x"
+└   relr = 3.387794567582339e-16
+┌ Info: G175 full
+│   level = 3
+│   label = "16kx"
+└   rel = 3.4319379640494024e-16
+┌ Info: G175 reduced
+│   level = 3
+│   label = "16kx"
+└   relr = 3.4160753425279016e-16
+┌ Info: G175 full
+│   level = 3
+│   label = "xy"
+└   rel = 3.7510072295768446e-16
+┌ Info: G175 reduced
+│   level = 3
+│   label = "xy"
+└   relr = 3.8841434808960873e-16
+┌ Info: G175 full
+│   level = 4
+│   label = "const"
+└   rel = 3.8702617453939575e-16
+┌ Info: G175 reduced
+# ... (middle omitted) ...
+│   contrast = 1.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "uniform L4 at p=2 (256 leaves)"
+│   dofs = 2467
+│   contrast = 1.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "uniform L4 (256 leaves, p=4)"
+│   dofs = 10851
+│   contrast = 1.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "uniform L5 (1 024 leaves, p=4)"
+│   dofs = 42691
+│   contrast = 1.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "uniform L6 (4 096 leaves, p=4)"
+│   dofs = 169347
+│   contrast = 1.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "mid-contrast L3 (stratified 50x)"
+│   dofs = 2803
+│   contrast = 50.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "mid-contrast L4 (stratified 50x)"
+│   dofs = 10851
+│   contrast = 50.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "blob traj frame 1 (214 leaves)"
+│   dofs = 9351
+│   contrast = 3024.0
+└   choice = :direct
+┌ Info: G191 table
+│   case = "blob traj frame 14 (628 leaves)"
+│   dofs = 28135
+│   contrast = 5087.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "blob f19 (1 024 leaves)"
+│   dofs = 45475
+│   contrast = 5087.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "blob f19x4 (2 344 leaves)"
+│   dofs = 99559
+│   contrast = 5087.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "blob f19x16 (4 096 leaves)"
+│   dofs = 174915
+│   contrast = 5087.0
+└   choice = :mg
+┌ Info: G191 table
+│   case = "production F (8 188 leaves, p=2)"
+│   dofs = 78720
+│   contrast = 5.69e6
+└   choice = :mg
+┌ Info: G191 table
+│   case = "production P1 (10 000 leaves, p=2)"
+│   dofs = 95308
+│   contrast = 3.29e6
+└   choice = :mg
+┌ Info: G191 contrast sampler
+│   grid = 2446.6604601814643
+│   full_quadrature = 2915.429925219901
+│   t_s = 1.4967e-5
+└   points = 1089
+┌ Info: G191 auto MG
+│   dofs = 10851
+│   contrast = 1.0
+│   threads = 8
+│   sample_ms = 0.007617
+│   rel_u = 0.0
+│   bitwise = true
+└   iterations = 26
+┌ Info: G203 guard cost
+│   tg = 0.000382302
+│   to = 0.000365993
+└   ratio = 1.0445609615484448
+┌ Warning: MG-FGMRES true relres=0.2526065280040169 exceeds 1e-5 at level 5
+└ @ QuaST src/stokes/solve_var_core.jl:1282
+┌ Warning: linear=:auto resolved to :mg but that solve was not acceptable; redoing it with linear=:direct (true residual 1.636e-03 > auto_fallback_tol 1.0e-09 (saddle_dofs=9539, contrast=1)).  Explicit linear=:mg is not affected; LAST_AUTO_FALLBACK[] counts these solves.
+└ @ QuaST src/stokes/solve_var_fallback.jl:15
+┌ Info: G205 fallback
+│   dofs = 9539
+│   residual = 1.0121778451275827e-15
+└   reason = "true residual 1.636e-03 > auto_fallback_tol 1.0e-09 (saddle_dofs=9539, contrast=1)"
+┌ Warning: MG-FGMRES true relres=0.2526065280040169 exceeds 1e-5 at level 5
+└ @ QuaST src/stokes/solve_var_core.jl:1282
+┌ Warning: MG-FGMRES true relres=0.2526065280040169 exceeds 1e-5 at level 5
+└ @ QuaST src/stokes/solve_var_core.jl:1282
+┌ Warning: MG-FGMRES true relres=0.2526065280040169 exceeds 1e-5 at level 5
+└ @ QuaST src/stokes/solve_var_core.jl:1282
+┌ Warning: MG-FGMRES true relres=0.2526065280040169 exceeds 1e-5 at level 5
+└ @ QuaST src/stokes/solve_var_core.jl:1282
+[ Info: G209: realistic-state check skipped (set G209_STATE to the step-6600 checkpoint to enable it)
+[ Info: G214: realistic-state check skipped (set G214_STATE to the G step-7641 checkpoint to enable it)
+┌ Info: G218 diagonal
+│   p = 2
+│   levels = 3
+│   nf = 214
+└   rel = 1.3141113520903665e-17
+┌ Info: G218 diagonal
+│   p = 3
+│   levels = 3
+│   nf = 490
+└   rel = 1.8812291354173983e-17
+┌ Info: G218 V-cycle
+│   amp = 0.04237515513664381
+└   amp_lumped = 0.04221674918812837
+┌ Info: G218 :cg saddle
+│   res = 2.1339728161198163e-12
+│   cg_iters = 19
+└   du = 3.268744196971049e-11
+┌ Info: G221 trajectory
+│   hits = 10
+│   misses = 3
+│   forced_misses = 13
+│   build_s = 0.032329492
+│   forced_build_s = 0.099111434
+└   bytes = 561182
+┌ Info: G223
+│   leaves = 64
+│   levels = 4
+│   dofs = 4-element Vector{Int64}: …
+└   threads = 8
+┌ Info: G223 V-cycle
+│   nw = 2
+│   thr = 0
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 78
+┌ Info: G223 V-cycle
+│   nw = 2
+│   thr = 20480
+│   percall_forks = 0
+│   region_forks = 0
+└   phases = 0
+┌ Info: G223 V-cycle
+│   nw = 2
+│   thr = 9223372036854775807
+│   percall_forks = 0
+│   region_forks = 0
+└   phases = 0
+┌ Info: G223 V-cycle
+│   nw = 8
+│   thr = 0
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 78
+┌ Info: G223 V-cycle
+│   nw = 8
+│   thr = 20480
+│   percall_forks = 0
+│   region_forks = 0
+└   phases = 0
+┌ Info: G223 V-cycle
+│   nw = 8
+│   thr = 9223372036854775807
+│   percall_forks = 0
+│   region_forks = 0
+└   phases = 0
+┌ Info: G224
+│   leaves = 64
+│   levels = 4
+│   dofs = 4-element Vector{Int64}: …
+└   threads = 8
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 126
+│   transfer = false
+│   cu = false
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 15
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 126
+│   transfer = true
+│   cu = false
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 16
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 126
+│   transfer = false
+│   cu = true
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 25
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 126
+│   transfer = true
+│   cu = true
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 26
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 0
+│   transfer = false
+│   cu = false
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 48
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 0
+│   transfer = true
+│   cu = false
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 48
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 0
+│   transfer = false
+│   cu = true
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 78
+┌ Info: G224 V-cycle
+│   nw = 2
+│   thr = 0
+│   transfer = true
+│   cu = true
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 78
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 126
+│   transfer = false
+│   cu = false
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 15
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 126
+│   transfer = true
+│   cu = false
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 16
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 126
+│   transfer = false
+│   cu = true
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 25
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 126
+│   transfer = true
+│   cu = true
+│   percall_forks = 15
+│   region_forks = 2
+└   phases = 26
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 0
+│   transfer = false
+│   cu = false
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 48
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 0
+│   transfer = true
+│   cu = false
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 48
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 0
+│   transfer = false
+│   cu = true
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 78
+┌ Info: G224 V-cycle
+│   nw = 8
+│   thr = 0
+│   transfer = true
+│   cu = true
+│   percall_forks = 48
+│   region_forks = 6
+└   phases = 78
+┌ Info: G222
+│   leaves = 64
+│   levels = 4
+│   dofs =
+│    4-element Vector{Int64}:
+│     6
+└     ⋮
+┌ Info: G225
+│   leaves = 67
+│   levels = 4
+│   dofs = 4-element Vector{Int64}: …
+└   threads = 8
+┌ Info: G225 solve
+│   nit = 18
+└   relres = 3.28829928905305e-7
+┌ Info: G226 diagonal
+│   p = 2
+│   nfp = 214
+│   rel = 7.414056883618613e-17
+│   rel_lump = 0.0003355746117741442
+└   contrast = 629.6730028540308
+┌ Info: G226 diagonal
+│   p = 3
+│   nfp = 490
+│   rel = 7.099117124301795e-17
+│   rel_lump = 0.0004835691000406746
+└   contrast = 1167.938691055249
+┌ Info: G226 solve
+│   weight = :leaf
+│   it = 12
+│   res = 4.4266134435380464e-8
+│   du = 3.6256518758575876e-7
+└   dpg = 1.352127533208492e-7
+┌ Info: G226 solve
+│   weight = :exact
+│   it = 12
+│   res = 4.436624054872376e-8
+│   du = 3.598302000027398e-7
+└   dpg = 1.3651002921862338e-7
+┌ Info: G228 card constants
+│   stokes_tol = 0.001
+└   mg_tol = 1.0e-8
+┌ Info: G228 auto uniform L4
+│   it_tight = 26
+│   it_card = 23
+│   res = 3.1144623761157694e-11
+│   du = 1.8275304791326817e-8
+└   dpg = 4.1171369201257783e-7
+┌ Info: G228 hanging-node contrast 1e4
+│   it_tight = 20
+│   it_card = 17
+│   res = 3.6970716360925053e-10
+│   du = 1.136802648524855e-9
+└   dpg = 3.494039704269207e-9
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-06, dt=1.000000e-06): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.990010e-04, 9.990010e-04], contrast 1.000000e+00; G*dt/eta in [1.000000e-03, 1.000000e-03] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 2, t=2.000000e-06, dt=1.000000e-06): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.990010e-04, 9.990010e-04], contrast 1.000000e+00; G*dt/eta in [1.000000e-03, 1.000000e-03] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 2 stress step(s), max 2|W|dt = 6.783194e-02, max 2*tau_M*|W| = 6.783194e+01, max per-step rotation 2|W|*min(dt, tau_M) = 6.783194e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e+03, dt=1.000000e+03): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.999990e-01, 9.999990e-01], contrast 1.000000e+00; G*dt/eta in [1.000000e+06, 1.000000e+06] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 1, t=1.000000e+03, dt=1.000000e+03): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.999990e-01, 9.999990e-01], contrast 1.000000e+00; G*dt/eta in [1.000000e+06, 1.000000e+06] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 1 stress step(s), max 2|W|dt = 6.776424e+04, max 2*tau_M*|W| = 6.776424e-02, max per-step rotation 2|W|*min(dt, tau_M) = 6.776424e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 4, t=4.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 4 stress step(s), max 2|W|dt = 7.931808e-02, max 2*tau_M*|W| = 7.931808e-01, max per-step rotation 2|W|*min(dt, tau_M) = 7.931808e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 3, t=3.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 9.290709e-02, max 2*tau_M*|W| = 9.290709e-01, max per-step rotation 2|W|*min(dt, tau_M) = 9.290709e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 3, t=3.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 9.580047e-02, max 2*tau_M*|W| = 9.580047e-01, max per-step rotation 2|W|*min(dt, tau_M) = 9.580047e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 3, t=3.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 7.931808e-02, max 2*tau_M*|W| = 7.931808e-01, max per-step rotation 2|W|*min(dt, tau_M) = 7.931808e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 4, t=4.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 6, t=6.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 1.343933e-02, max 2*tau_M*|W| = 1.343933e-01, max per-step rotation 2|W|*min(dt, tau_M) = 1.343933e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+G24 mixed-tree Poisson convergence (quadrature norm, Q_2):
+   h        L2          ord      H1          ord
+  0.25    0.00087959   -      0.026359     -
+  0.125   0.00010439 3.075    0.0061158  2.108
+  0.0625  1.2689e-5  3.04     0.0014668  2.06
+G28 quadtree Stokes convergence (quadrature norm, p = 2):
+   h        u_L2        ord      u_H1        ord      p_L2        ord
+  0.5     0.023738     -      0.28919      -      0.087743     -
+  0.25    0.0024077  3.301    0.061733   2.228    0.010825   3.019
+  0.125   0.00028972 3.055    0.015141   2.028    0.0027693  1.967
+  0.0625  3.562e-5   3.024    0.0037411  2.017    0.0006588  2.072
+G36 BDF2 energy step, dt ladder: [0.002, 0.001, 0.0005, 0.00025]
+  BDF2 errors = [0.0009837875084534229, 0.00023600558419363004, 5.288283334341707e-5, 1.0666881457644621e-5]
+  BDF2 orders = [2.06, 2.158, 2.31]
+  backward-Euler control errors = [0.0076144431901042356, 0.003845055471939036, 0.001929045890577591, 0.0009630467831744608]
+  backward-Euler control orders = [0.986, 0.995, 1.002]
+G37 free-slip variable-viscosity Stokes convergence (quadrature norm):
+   h        u_L2        ord      u_H1        ord      p_L2        ord
+  0.5     0.020039     -      0.28841      -      0.062643     -
+  0.25    0.0022365  3.163    0.060937   2.243    0.010556   2.569
+  0.125   0.00028291 2.983    0.015037   2.019    0.0027578  1.936
+  0.0625  3.5345e-5  3.001    0.0037279  2.012    0.00065581 2.072
+G60 err=3.534610e-03 N_adapt=1393 N_static=4225
+G63 static N=4225 err=8.360210e-03 | AMR N=2561 err=9.947310e-05
+G63 dynamic N=2801 err=9.791593e-05 | static N=4225 err=8.360210e-03
+G71 N7=13973 N8=27805 e78=4.650767e-08 wall=7/8 int=4/4
+G74 N7=13973 N8=27805 e78=4.650767e-08 wall=7/8 int=4/4
+G77 N9=57893 N8=30237 e89=2.669683e-07 Vrms=6.432e+05/6.432e+05
+G80 nodal=5.472493e-06 L2=1.638056e-10
+G136 u=y^2: totals 0.99999999999999989 / 3, wall 1 / 3, interior -1.110e-16 / 0.000e+00
+G173: budget enforcement ok (driver leaves=40, peak=40, merge path 64->40)
+G174: tree leaves=640
+  same eta: ref1=1 ref2=1  res=4.21e-16
+  perturbed eta: iters=1 rel=7.53e-15 res=3.04e-15 (direct res 5.82e-15)
+  new tree: leaves=652 refactors+1 iters=1 rel=6.86e-15
+G174: stale-factor (S2) gate ok
+G195: depth DP 3 steps: Picard20 iters=[13, 5, 5] Newton iters=[6, 2, 2] |dtheta|/|theta|=1.11e-06  Vrms depth=1.514344e+03 const=1.446056e+03
+G195: depth DP 10 steps Newton: iters=[6, 2, 2, 2, 2, 2, 2, 2, 2, 2] Nu_top=1.0162399828 Vrms=2.173418e+03
+G196: d r_S/d chi share of the momentum rows = 1.000e+00
+G196: 2-D 30 steps: chi[min=0.0000 max=0.9902 mean=0.5396] Vrms=9.5049e+03 Nu=1.777068
+G196: Newton 10 steps iters=[8, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+G196: weak coupling Picard-vs-Newton |dtheta|=3.05e-05 |dchi|=1.63e-04
+G196: strong coupling |dchi|/chi=1.15e-03 (nonsmooth non-uniqueness)
+G196: restart bitwise: |dtheta|=0.0e+00 |dchi|=0.0e+00
+G196: AMR 12 steps N=289 leaves=64 chi max=0.2172
+G186: 1264-leaf over-budget cycle 0.0012 s (nr=0 nc=0)
+G206: assertions passed
+  rel: tau_r=1.000 tau_c=1.000 tau_h=0.500 deadband=true eligible=20 refined=20 coarsened=20 exchanged=24 leaves=640
+  exchange: balanced refined=20 coarsened=20 exchanged=24 leaves=640 budget_limited=true
+  hysteresis: cooldown=1 parents=20 re-refined=0 (cycle refined=0) | cooldown=0 parents=20 re-refined=12 (cycle refined=12)
+  wall rows only: protect=160, merged 120 quartets, 118 strip-only merges, row min level=4
+  random 1x1: 12 cycles -> 898 leaves, defect=0, maxjump=1
+  random 5x2: 12 cycles -> 898 leaves, defect=0, maxjump=1
+  flat: tau_r=1.000 tau_c=1.000 tau_h=0.500 deadband=true refined=16 coarsened=0
+  plan: order=[(2, 2, 0)] refused=1 extended=1
+  cycle: gate off -> coarsened=1 recirc=1 leaves=19 | gate on -> coarsened=2 recirc=0 refused=1 leaves=13
+  mirror: refined=0 coarsened=4 extended=0 refused=0 recirc=0 leaves 22 -> 10 defect=0 jump=1
+  random 1x1: 12 gate cycles -> 898 leaves, merged 266, recirc 18, defect=0 jump=1
+  random 5x2: 12 gate cycles -> 940 leaves, merged 366, recirc 78, defect=0 jump=1
+  round trip: refined=6 coarsened=46 merged=46 cycle=1 nref=46 ncoa=12
+  uninterrupted: theta=b935a0d1aed2c8fc uxuz=44f610fcb6c02650 pv=82667a9692eae7b9 hist=b478d63daa187bf0
+  checkpoint: step=5 cycle=5 nref=42 ncoa=60 stale=false
+  resume:       theta=b935a0d1aed2c8fc uxuz=44f610fcb6c02650 pv=82667a9692eae7b9 hist=c2505c7b2a05221b
+  end cooldown: cycle=10 nref=12 ncoa=4
+  no cooldown:  theta=7718c918c13bc772 hist=e1d8c8dda64f461d
+  legacy resume: row=(14, 0, 0, 0) leaves=502 N=2325 theta=6a380e31ee4c07f6
+  equivalence: 2140 quartets, 96 plans (40 non-empty), 2949 candidates, 159 budget merges
+  tree: 641 leaves; quartet (2, 0, 0)
+  bytes/call: coarsening_allowed new=0 tuple=0 old=944 | merge_allowed=0 | budget_quartet new=0 old=176 | scan=0 | invalidate=0
+  _coarsen_plan bytes: asc=6880 re-sort=53368 (sweeps=4 rounds=2)
+  capped plan: |order|=0 refused=232 sweeps=16 rounds=16 capped=true (MAX rounds=16)
+  normal plan: |order|=22 sweeps=2 rounds=1 capped=false
+  cycle: coarsened=18 plan_sweeps=2 plan_rounds=1 capped=false fund_calls=0 balance_ok=true mirror_ok=true
+  mirror_close!: defect0=0 refined=0 ok=true rounds=1 capped=false
+  mirror_close! maxiter=1: refined=2 ok=true rounds=1 capped=true
+  budget: leaves 220 -> 214 merged=2 scans=1 guard=1 reached=true capped=false
+  table: 614 leaves, 1 rebuilds while building the tree
+  one refine! marks 8 of 617 leaves stale
+  cache: 2468 queries after one mutation, stamp=304
+  after 5 merge+balance cycles: 1 rebuilds (incremental)
+  gate on : coarsened=15 recirc=0 plan_sweeps=2 rounds=1 fund=0/0 leaves=212
+  gate off: coarsened=0 recirc=0 plan_sweeps=0 rounds=0 leaves=257
+  leaf FNV after the gate-on cycle = 74b6cfcb032ca06a
+  wall_graded_tree(4,9): 6208 leaves
+  wall_graded_tree(3,8): 1552 leaves
+  38380 face queries compared with the historical scan
+  60 mutations: 0 rebuilds, at most 13 newly stale leaves each
+  bytes: query=0 boundary=0 snapshot=0 2:1=0 allowed-scan=0 invalidate=0 face_pairs=7242008 | old scan=176 (control)
+  balance! on 12544 leaves (a no-op re-balance): 903560 B
+  post-mutation sequence: 431 leaves, 1 rebuilds
+  local vs balance!: 37/37 merged trees, 40/40 mirror pairs
+  counterexample: local 19 leaves/jump 2, balance! 22/jump 1, repaired 22 equal=true
+  lagrange_eval! bytes = 0
+  subface bytes: new=0 old=1584
+  transfer bytes: new=0.01 MB old=0.11 MB
+  energy assembly bytes: first=17.00 MB second=11.27 MB
+  first-call buffer capacity = 5.70 MB
+  energy buf bytes: pooled=0 raw=6009088
+  ev_nu bytes: hoisted=0 cold=6064
+G246: AMR leaves=16 N=81 max|tau|=8.954e+01 band=1.538e+02 twin=1.173e+02
+G247: R=1000 rel(run,mat)=5.18e-06 rel(run,2a)=2.86e-05 |tau-tau_fp|/tmax=1.5e-16 |tau-tau_eff_fp|/tmax=1.0e-03 ; R=10 rel(run,mat)=5.16e-04 rel(run,2a)=2.56e-03 |tau-tau_fp|/tmax=6.7e-09
+G248: layered max|uz|=9.524e+01 u_z(load)=-9.524e+01 (-1.00 of max) | max|uz| air=6.202e+01 (65%) max|ux| air=2.538e+01 | layered-vs-plain=13.9%
+G249 (a): tr in [0.180, 0.720], ehat_xx/exx in [0.657, 0.800]; |raw-dev| xx = 24.93% of |dev|; |old txx+tyy|/|dev| = 1.56; |raw-projected| shear = 1.7e-16 (round-off)
+G249 (b): |tau_xx+tau_yy+tau_zz| = 1.55e-14 (scale 1.2e+00, relative 1.3e-14); tzz/tmax = 0.521
+G249 (c): |tau-tau_fp|/tmax=1.5e-16 (max tauM|W|=6.0e-03) |trace|/tmax=9.2e-17 |raw fixpoint|/tmax=0.30 rel(run,mat)=1.57e-05 defect=1.57e-05 rel(oldraw,mat)=2.07e-05 rel(tau,raw)=4.37e-01 rel(mat,2a)=2.31e-05
+G249: deviatoric projection active; trace = 1.6e-14 at tau_M; G = 0 leaves the state untouched
+G250: rotation Wxy=-1.000 tauM/T=10.0 dt=T/20000 ; |tau-tau_ana|/|tau_ana| corot 6.2e-05 vs disabled 1.0e+00 ; orientation err corot 1.6e-09 rad vs disabled 7.9e-01 rad (tol 1e-5) ; disabled magnitude err 2.5e-07 ; W=0 round-off 4.3e-17 ; reference vs fine recursion 3.0e-06
+G250 (b) rigid rotation: Omega=1.0, T=pi/4, tauM=7.8540, tau0=T0[[0,1],[1,0]], T0=0.8
+  t=0.1963 analytic=(-0.298588, +0.298588, +0.720855) run=(-0.298593, +0.298593, +0.720866) comp-rel=1.55e-05 orientation run=0.981748 analytic=0.981748 disabled=0.785398 | disabled comp-rel=0.414
+  t=0.3927 analytic=(-0.538097, +0.538097, +0.538097) run=(-0.538113, +0.538113, +0.538113) comp-rel=3.10e-05 orientation run=1.178097 analytic=1.178097 disabled=0.785398 | disabled comp-rel=1.000
+  t=0.5890 analytic=(-0.685699, +0.685699, +0.284026) run=(-0.685730, +0.685730, +0.284039) comp-rel=4.65e-05 orientation run=1.374447 analytic=1.374447 disabled=0.785398 | disabled comp-rel=1.000
+  t=0.7854 analytic=(-0.723870, +0.723870, +0.000000) run=(-0.723915, +0.723915, +0.000000) comp-rel=6.19e-05 orientation run=1.570796 analytic=1.570796 disabled=0.785398 | disabled comp-rel=1.000
+G251 (a) kernel, T = tau_M (spin-free eta=100 G=1000; co-rotational eta=2 G=50 w=0.3)
+  uniform  spin-free err: 4.517e-03 (64 steps) -> 2.266e-03 (128) -> 1.135e-03 (256), order 1.994 / 1.997, tau=0.126280642294634
+  uniform  co-rot    err: 4.656e-03 (64 steps) -> 2.336e-03 (128) -> 1.170e-03 (256), order 1.994 / 1.997
+  factor10 spin-free err: 7.499e-03 (64 steps) -> 3.772e-03 (128) -> 1.892e-03 (256), order 1.988 / 1.994, tau=0.126184942974166
+  factor10 co-rot    err: 7.729e-03 (64 steps) -> 3.888e-03 (128) -> 1.950e-03 (256), order 1.988 / 1.994
+  random   spin-free err: 5.466e-03 (64 steps) -> 2.746e-03 (128) -> 1.376e-03 (256), order 1.991 / 1.995, tau=0.126250132608853
+  random   co-rot    err: 5.634e-03 (64 steps) -> 2.830e-03 (128) -> 1.418e-03 (256), order 1.991 / 1.995
+G251 (a): spin-free analytic = 0.126424111765712 ; co-rotational analytic = (0.611870103936, -0.460161169818, 0.500332564708) ; profile spread -> 7.6e-04 / 7.8e-04 ; spin effect on reference = 8.8e-03
+G251 (b) driver dt = [1.00e-03 2.00e-03 4.00e-03 8.00e-03 1.60e-02 3.20e-02 6.40e-02 1.28e-01 2.56e-01 3.00e-01] (ratio 300, dtmax-clamped last step)
+G251 (b): replay matches driver stress bitwise (tmax=9.106e+00, 10 steps and 6-step prefix); contrasts uniform dt=3.36e-01 first dt=9.26e-01 shifted dt=3.73e-01 (tol 1e-2)
+G252 (a2): covered 4 sources, hash check clean; non-vacuity reports src/physics/maxwell_kernels.jl
+G252 mismatch message:
+ArgumentError: checkpoint /tmp/jl_3mXb8E/g252_rev1.h5 was written under physics revision 1, but this code is physics revision 2: the physics changed between revision 1 and revision 2 (the Maxwell stress update was made deviatoric in 958af5e and co-rotational in 8c27a02), so the stored state -- in particular a Maxwell stress history -- is not compatible with the update that would continue it.  Refusing the restart: resume from a checkpoint written by physics revision 2, or replay the run from the beginning.
+G252 key-less (G > 0) warning:
+checkpoint /tmp/jl_3mXb8E/g252_nokey.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries a Maxwell stress history (txx/tyy/txy) that was advanced by the older update; resuming continues that history under the current update.  Resuming under revision 2.
+G252 key-less (G = 0) warning:
+checkpoint /tmp/jl_3mXb8E/g252_g0_nokey.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries no Maxwell stress history, so there is no stored stress state for the revision change to affect.  Resuming under revision 2.
+G254 (c) in-band report:
+Maxwell co-rotation validity (G254): over 2 stress step(s), max 2|W|dt = 6.000000e-03, max 2*tau_M*|W| = 6.000000e-01, max per-step rotation 2|W|*min(dt, tau_M) = 6.000000e-03; bound = 0.1 -- inside the band.
+G254 (d) over-band warning:
+Maxwell co-rotation validity band exceeded at step 1 (t=3.000000e-01): the update applies the linearised Jaumann rotation 1 + dt*ad_W, valid while the per-step rotation 2|W|*min(dt, tau_M) is small.  Measured maxima over the domain on this step: 2|W|dt = 1.800000e+00, 2*tau_M*|W| = 6.000000e-01, per-step rotation = 6.000000e-01; bound = 0.1.  Above the bound the rotation is no longer faithful: the per-step magnitude error is about (2|W|dt)^2/2 and, for a step longer than tau_M = eta/G, the update keeps an old-stress residue of order 2*tau_M*|W|, so the stress frame (and every diagnostic reading it) drifts by more than the scheme's stated accuracy allows.  The run continues -- this is an accuracy band, not a stability limit -- but treat its stress history as outside the stated band; reduce dt (dtmax/cfl) to get back inside, or use the exact exponential of the rotation if this regime is genuinely needed.
+G254: bound 0.1; in-band max resolved 6.000e-03; over-band max resolved 6.000e-01; guard off bit-identical; G=0 silent
+G255 (c) first-step report:
+Maxwell regime (G=1.000000e+01, first stress step, step 1, t=1.000000e-03, dt=1.000000e-03): material eta in [1.000000e-04, 1.000000e+00], contrast 1.000000e+04; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.900990e-05, 9.900990e-03], contrast 1.000000e+02; G*dt/eta in [1.000000e-02, 1.000000e+02] -- G*dt caps eta_eff from above, so the contrast the solve sees is 100x smaller (2.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+G255 (c) end-of-run report:
+Maxwell regime (G=1.000000e+01, end of run, step 2, t=2.000000e-03, dt=1.000000e-03): material eta in [1.000000e-04, 1.000000e+00], contrast 1.000000e+04; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.900990e-05, 9.900990e-03], contrast 1.000000e+02; G*dt/eta in [1.000000e-02, 1.000000e+02] -- G*dt caps eta_eff from above, so the contrast the solve sees is 100x smaller (2.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+G255: material contrast 1.0000e+04, effective 1.0000e+02 at G*dt = 1.000e-02; collapse 100x (2.00 decades); G = 0 silent and inert
+G256 (a) derived range [0.0, 1.8]; eta(0.5)=1.000000000315197e+00, eta(top)=1.945779e+02, eta(bot)=1.945779e-02, contrast=1.000000000161844e+04
+G256 (b) card contrast over the real range = 1.957303e+06 (>1e+05); over [0.1,0.9] = 1.000000e+04
+G256 (d) variant census: eta in [1.8039e-02, 1.0683e+03], contrast 5.9224e+04, T in [0.000, 1.859], edot in [6.41e+00, 6.24e+03], clipped 0/2673
+G256 (d) card census   : eta in [9.9984e-04, 1.0000e+04], contrast 1.0002e+07, clipped 81/2673
+G257 (b) pinned default state reproduced bit for bit (36 history values, 81 nodes); eta_ref=1 silent
+G257 (c) invariance: hist 2.591e-15, theta 6.293e-16, ux 1.139e-14, uz 2.495e-14 (round-off)
+G257 (c) foot-gun  : hist 1.366e-01, theta 3.802e-02, ux 9.412e+00, uz 9.367e+00 (c=10)
+G257 (c) clamped arm: clamps active (1.052e-01 vs unclamped), scaled bounds invariant (2.536e-16), unscaled bounds break it (6.049e-01)
+G257 (c) viscoelastic arm: hist 3.744e-15, txx 2.930e-15 (G=10.0)
+G257 (d) report fields: eta in [2.000000e-05, 2.000000e-01], eta_interior 4.491913e-03, Ra_interior 2.226223e+05, eta0 2.368635e+25 Pa s
+  wrote /tmp/jl_1nMfUw/validate/checks.csv
+  wrote /tmp/jl_1nMfUw/validate/history.csv (2 rows)
+G267 exactness: u nodal=4.218847493575595e-15  p nodal=6.012967901369848e-13  L2 u=1.6803347489692832e-15  L2 p=8.720040922670759e-14  div L2=1.946081442201047e-14
+G267 traction: u nodal=4.6780155443005706e-14  max|p|=5.297621121877516e-13
+G267 logical-frame invariance: du=9.2148511043888e-15  dp=5.331290964250002e-13
+G267 rigid-motion invariance: du=6.439293542825908e-15  dp=9.346638046858757e-13
+G267 perimeter: measured=4.569771560359223  analytic=4.5697715603592215  rel=3.8871895803487695e-16
+G268 unit     max operator rel=0.0  max RHS rel=0.0  solve u rel=0.0  p rel=0.0  traction rel=1.5923517484663593e-16
+G268 cells73  max operator rel=4.018233467141991e-16  max RHS rel=5.966975153646522e-16  solve u rel=2.369533141128547e-14  p rel=1.0190280983129879e-11  traction rel=2.4604121749558867e-16
+G268 mixed    max operator rel=0.0  max RHS rel=0.0  solve u rel=0.0  p rel=0.0  traction rel=1.2490009027033e-16
+G269 affine(uniform): theta nodal=1.5543122344752192e-15 L2=7.354303454569158e-16 H1=1.723764393127788e-14 mass rel=3.444411487398888e-16
+G269 affine(mixed): theta nodal=2.220446049250313e-15 L2=1.2151527501819093e-15 H1=1.9781347446124968e-14 mass rel=3.444411487398888e-16
+G269 CurvedBox convergence (a=0.2, p=2):
+   h        vel_L2      ord      vel_H1      ord      p_L2        ord      theta_L2    ord      theta_H1    ord
+  0.25    0.000723     -      0.01789      -      0.001696      -      0.0001366     -      0.003537      -
+  0.125   8.936e-5   3.016    0.004508   1.989    0.0002789   2.604    1.718e-5    2.991    0.0008906   1.99
+  0.0625  1.105e-5   3.015    0.00113    1.996    6.495e-5    2.102    2.152e-6    2.997    0.0002231   1.997
+  0.03125 1.373e-6   3.009    0.0002827  1.999    1.596e-5    2.025    2.691e-7    2.999    5.581e-5    1.999
+G269 cross(dyadic): M/K/C/F rel=0.0/0.0/0.0/0.0 EV rel=0.0 step rel=0.0 flux step rel=2.8910854151504005e-16 lap rel=0.0
+G269 cross(cells73): M/K/C/F rel=2.195509399283148e-16/1.5612511283791276e-16/6.024321888771575e-16/3.787401659140734e-16 EV rel=7.222802286765926e-16 step rel=1.1816554917110856e-15 flux step rel=1.9244684464465466e-15 lap rel=0.0
+G269 cross(mixed): M/K/C/F rel=0.0/0.0/0.0/0.0 EV rel=0.0 step rel=0.0 flux step rel=1.9295542664527588e-16 lap rel=0.0
+G269 curvature id x    full=0.0  drop-C=0.0  drop-M12=0.0
+G269 curvature id y    full=2.220446049250313e-16  drop-C=1.9565467599325361  drop-M12=0.7778925074159744
+G269 curvature id x^2  full=4.440892098500626e-16  drop-C=4.440892098500626e-16  drop-M12=4.440892098500626e-16
+G269 curvature id y^2  full=1.7763568394002505e-15  drop-C=4.65466986239241  drop-M12=3.101383328384606
+G269 curvature id x*y  full=4.440892098500626e-16  drop-C=1.2959919113205216  drop-M12=1.2662333172576832
+G269 curvature identities: full err=1.7763568394002505e-15  drop-C err=4.65466986239241  drop-M12 err=3.101383328384606
+G269 FD Laplacian: full rel=8.501883943879004e-10  drop-C rel=0.24730936565830886
+G269 height_laplacian: rel=1.4706338762560696e-10
+G269 EV field: min=0.0 max=0.016315906260141295 nonzero leaves=48
+G270 a1 Vrms           box=0.21778939878291195 mapped=0.21778939878291195 rel=0.0
+G270 a1 meanT          box=1.0416666666666665 mapped=1.0416666666666665 rel=0.0
+G270 a1 nu_energy      box=1.5048388888888888 mapped=1.5048388888888888 rel=0.0
+G270 a1 W              box=0.0022833333333333395 mapped=0.0022833333333333403 rel=3.7986645459346023e-16
+G270 a1 U              box=0.06989999999999998 mapped=0.06990000000000003 rel=7.941509475144177e-16
+G270 a1 BaseAdv        box=-0.015833333333333352 mapped=-0.01583333333333335 rel=2.191229653865438e-16
+G270 a1 theta2divu     box=0.09006249999999998 mapped=0.09006250000000002 rel=4.622719047710574e-16
+G270 a1 divmax         box=0.4199999999999993 mapped=0.41999999999999993 rel=1.4538634846281813e-15
+G270 a1 Nu_top         box=1.75 mapped=1.75 rel=0.0
+G270 a1 Nu_bot         box=0.6499999999999998 mapped=0.6499999999999998 rel=0.0
+G270 a1 NuCbf_top      box=1.7436782769097225 mapped=1.7436782769097225 rel=0.0
+G270 a1 NuCbf_bot      box=0.6604695095486095 mapped=0.6604695095486098 rel=5.042880898698528e-16
+G270 a1 cbf_top        box=-0.24367827690972252 mapped=-0.24367827690972246 rel=2.278050876558992e-16
+G270 a1 cbf_bot        box=-0.1604695095486095 mapped=-0.16046950954860983 rel=2.0755775245056975e-15
+G270 a1 surf_rms       box=0.21946920460700942 mapped=0.2194692046070094 rel=1.264668346765515e-16
+G270 a1 surf_max       box=0.3492849839314597 mapped=0.3492849839314597 rel=0.0
+G270 a1 theta_int      box=0.4583333333333335 mapped=0.4583333333333335 rel=0.0
+G270 a1 flux_top       box=-0.24999999999999992 mapped=-0.24999999999999994 rel=1.1102230246251568e-16
+G270 a1 flux_bot       box=-0.1499999999999998 mapped=-0.1499999999999998 rel=0.0
+G270 a1 flux           box=-0.10000000000000012 mapped=-0.10000000000000014 rel=2.7755575615628874e-16
+G270 a1 heating        box=-1.0439499999999997 mapped=-1.04395 rel=2.126965898031815e-16
+G270 a1 heat_base_adv  box=-0.01583333333333335 mapped=-0.01583333333333335 rel=0.0
+G270 a1 exact_R        box=-0.09075613100977625 mapped=-0.09075613100977628 rel=3.0582590186264193e-16
+G270 a1 exact_flux     box=-0.10000000000000012 mapped=-0.10000000000000014 rel=2.7755575615628874e-16
+G270 a1 exact_rhs      box=-0.00924386899022386 mapped=-0.009243868990223857 rel=3.753241154350884e-16
+G270 a1 exact_area     box=1.0 mapped=0.9999999999999998 rel=2.220446049250313e-16
+G270 a2 Vrms           diag=0.2914820463310448 analytic=0.2914820463310448 rel=0.0
+G270 a2 meanT          diag=1.0416666666666665 analytic=1.0416666666666652 rel=1.2789769243681805e-15
+G270 a2 nu_energy      diag=1.5048388888888888 analytic=1.5048388888888888 rel=0.0
+G270 a2 W              diag=0.0022833333333333473 analytic=0.002283333333333348 rel=3.7986645459345895e-16
+G270 a2 U              diag=0.08316251277717682 analytic=0.0831625127771769 rel=1.001253137576411e-15
+G270 a2 BaseAdv        diag=-0.02042500000000002 analytic=-0.020425000000000013 rel=3.397255277310757e-16
+G270 a2 theta2divu     diag=0.11618062500000002 analytic=0.11618062500000008 rel=4.778004183680178e-16
+G270 a2 Nu_top         diag=1.8529771326085163 analytic=1.852977132608516 rel=1.198312709949364e-16
+G270 a2 Nu_bot         diag=0.7350275722471518 analytic=0.735027572247152 rel=3.020901709118051e-16
+G270 a2 flux_top       diag=-0.4709302325581395 analytic=-0.47093023255813954 rel=1.1787553100958453e-16
+G270 a2 flux_bot       diag=-0.313565891472868 analytic=-0.31356589147286834 rel=1.0621911261555881e-15
+G270 a2 theta_int      diag=0.5912499999999998 analytic=0.5912500000000005 rel=1.126653386511786e-15
+G270 a2 heating        diag=-1.3466954999999998 analytic=-1.3466955 rel=1.6488107736680735e-16
+G270 a2 heat_base_adv  diag=-0.02042500000000002 analytic=-0.020425000000000013 rel=3.397255277310757e-16
+G270 a2 surf_rms       diag=0.29847996970937324 analytic=0.29847996970937324 rel=0.0
+G270 a2 eta_band        diag=1.120000000000001 analytic=1.1199999999999983 rel=2.379049338482476e-15
+G270 a3 Vrms       frame1=0.2914820463310448 frame2=0.2914820463310448 rel=0.0
+G270 a3 theta2divu frame1=0.11618062500000002 frame2=0.11618062499999988 rel=1.1945010459200451e-15
+G270 a3 theta_int  frame1=0.5912499999999998 frame2=0.5912500000000003 rel=7.511022576745241e-16
+G270 a3 U          frame1=0.08316251277717682 frame2=0.08316251277717678 rel=5.0062656878820605e-16
+G270 b dyadic Nu_top      box=1.75 mapped=1.75 rel=0.0
+G270 b dyadic Nu_bot      box=0.6499999999999998 mapped=0.6499999999999998 rel=0.0
+G270 b dyadic Vrms        box=0.21778939878291195 mapped=0.21778939878291195 rel=0.0
+G270 b dyadic meanT       box=1.0416666666666665 mapped=1.0416666666666665 rel=0.0
+G270 b dyadic nu_energy   box=1.5048388888888888 mapped=1.5048388888888888 rel=0.0
+G270 b dyadic W           box=0.0022833333333333395 mapped=0.0022833333333333395 rel=0.0
+G270 b dyadic U           box=0.07559499999999991 mapped=0.07559499999999997 rel=7.343230535254693e-16
+G270 b dyadic BaseAdv     box=-0.015833333333333352 mapped=-0.01583333333333335 rel=2.191229653865438e-16
+G270 b dyadic theta2divu  box=0.09006249999999998 mapped=0.09006249999999999 rel=1.5409063492368586e-16
+G270 b dyadic divmax      box=0.4199999999999993 mapped=0.4199999999999993 rel=0.0
+G270 b dyadic surf_rms_top box=0.21946920460700942 mapped=0.21946920460700942 rel=0.0
+G270 b dyadic surf_max_top box=0.3492849839314597 mapped=0.3492849839314597 rel=0.0
+G270 b dyadic surf_rms_bottom box=0.2283273930948716 mapped=0.2283273930948716 rel=0.0
+G270 b dyadic surf_max_bottom box=0.34132096331752027 mapped=0.34132096331752027 rel=0.0
+G270 b dyadic cbf_top     box=-0.2563676323784726 mapped=-0.2563676323784726 rel=0.0
+G270 b dyadic cbf_bot     box=-0.1485346462673595 mapped=-0.1485346462673595 rel=0.0
+G270 b dyadic NuCbf_top   box=1.7563676323784727 mapped=1.7563676323784727 rel=0.0
+G270 b dyadic NuCbf_bot   box=0.6485346462673595 mapped=0.6485346462673596 rel=1.7118947014088513e-16
+G270 b dyadic budget_theta_int box=0.4583333333333335 mapped=0.4583333333333335 rel=0.0
+G270 b dyadic budget_latent_int box=0.3302846051348152 mapped=0.3302846051348152 rel=0.0
+G270 b dyadic budget_enthalpy box=0.7886179384681486 mapped=0.7886179384681486 rel=0.0
+G270 b dyadic budget_flux_top box=-0.24999999999999992 mapped=-0.24999999999999992 rel=0.0
+G270 b dyadic budget_flux_bot box=-0.1499999999999998 mapped=-0.1499999999999998 rel=0.0
+G270 b dyadic budget_flux box=-0.10000000000000012 mapped=-0.10000000000000012 rel=0.0
+G270 b dyadic budget_heating box=-1.0438744049999997 mapped=-1.0438744049999997 rel=0.0
+G270 b dyadic budget_base_adv box=-0.01583333333333335 mapped=-0.01583333333333335 rel=0.0
+G270 b dyadic budget_latent_src box=-0.013102039971238365 mapped=-0.013102039971238365 rel=0.0
+G270 b dyadic budget_latent_adv box=0.08463655864066706 mapped=0.08463655864066709 rel=3.279383762927787e-16
+G270 b dyadic budget_latent_dgdt box=0.0715345186694287 mapped=0.07153451866942873 rel=3.8800254942500434e-16
+G270 b dyadic budget_u_grad_theta box=0.12574999999999992 mapped=0.12575000000000003 rel=8.828811329027088e-16
+G270 b dyadic exact_R     box=-0.09289479028661059 mapped=-0.09289479028661057 rel=1.4939253067902922e-16
+G270 b dyadic exact_R_over_A box=-0.09289479028661059 mapped=-0.09289479028661059 rel=0.0
+G270 b dyadic exact_flux  box=-0.10000000000000012 mapped=-0.10000000000000012 rel=0.0
+G270 b dyadic exact_dHdt  box=-4.475965874952592e-14 mapped=-4.4759658749525904e-14 rel=4.2298494345658547e-16
+G270 b dyadic exact_sumC  box=0.021830163591226942 mapped=0.021830163591226925 rel=7.946452021431273e-16
+G270 b dyadic exact_Ibase box=-0.015833333333333352 mapped=-0.01583333333333335 rel=2.191229653865438e-16
+G270 b dyadic exact_latent_src box=-0.013102039971238365 mapped=-0.013102039971238365 rel=0.0
+G270 b dyadic exact_rhs   box=-0.007105209713389534 mapped=-0.007105209713389548 rel=1.9531848274178585e-15
+G270 b dyadic exact_area  box=1.0 mapped=0.9999999999999998 rel=2.220446049250313e-16
+G270 b dyadic eta_band    box=1.0750000000000008 mapped=1.0750000000000004 rel=4.131062417209882e-16
+G270 b dyadic hmin_cfl    box=0.25 mapped=0.25 rel=0.0
+G270 b dyadic hmin_hist   box=0.25 mapped=0.25 rel=0.0
+G270 b dyadic closure_nolat box=0.08416666666666672 mapped=0.08416666666666672 rel=0.0
+G270 b dyadic closure_latent box=0.0715345186694287 mapped=0.07153451866942874 rel=5.820038241375063e-16
+G270 b cells73 Nu_top     box=1.75 mapped=1.75 rel=0.0
+G270 b cells73 Nu_bot     box=0.6500000000000014 mapped=0.6500000000000014 rel=0.0
+G270 b cells73 Vrms       box=0.21778939878291212 mapped=0.21778939878291212 rel=0.0
+G270 b cells73 meanT      box=1.041666666666668 mapped=1.041666666666668 rel=0.0
+G270 b cells73 nu_energy  box=1.5048388888888888 mapped=1.5048388888888888 rel=0.0
+G270 b cells73 W          box=0.0022833333333333572 mapped=0.0022833333333333564 rel=3.798664545934574e-16
+G270 b cells73 U          box=0.016844992441421052 mapped=0.016844992441421076 rel=1.4417417370848327e-15
+G270 b cells73 BaseAdv    box=-0.0369444444444445 mapped=-0.0369444444444445 rel=0.0
+G270 b cells73 theta2divu box=0.12292546296296289 mapped=0.12292546296296294 rel=4.515838288767166e-16
+G270 b cells73 divmax     box=0.26000000000000006 mapped=0.26000000000000006 rel=0.0
+G270 b cells73 surf_rms_top box=0.2194690572734883 mapped=0.21946905727348834 rel=1.264669195760097e-16
+G270 b cells73 surf_max_top box=0.3492849839314597 mapped=0.3492849839314597 rel=0.0
+G270 b cells73 surf_rms_bottom box=0.22832725147730476 mapped=0.2283272514773048 rel=1.2156050333916342e-16
+G270 b cells73 surf_max_bottom box=0.34132096331752027 mapped=0.34132096331752027 rel=0.0
+G270 b cells73 cbf_top    box=-0.6037996656378632 mapped=-0.6037996656378627 rel=9.19363729236501e-16
+G270 b cells73 cbf_bot    box=-0.3370316100822986 mapped=-0.3370316100823036 rel=1.4823546104750154e-14
+G270 b cells73 NuCbf_top  box=1.7587712852733706 mapped=1.75877128527337 rel=3.7874953972287245e-16
+G270 b cells73 NuCbf_bot  box=0.6444421186066996 mapped=0.6444421186067016 rel=3.100978950050426e-15
+G270 b cells73 budget_theta_int box=1.0694444444444438 mapped=1.0694444444444438 rel=0.0
+G270 b cells73 budget_latent_int box=0.7872204422082425 mapped=0.7872204422082425 rel=0.0
+G270 b cells73 budget_enthalpy box=1.8566648866526863 mapped=1.8566648866526863 rel=0.0
+G270 b cells73 budget_flux_top box=-0.5833333333333329 mapped=-0.5833333333333329 rel=0.0
+G270 b cells73 budget_flux_bot box=-0.35000000000000303 mapped=-0.35000000000000303 rel=0.0
+G270 b cells73 budget_flux box=-0.2333333333333299 mapped=-0.2333333333333299 rel=0.0
+G270 b cells73 budget_heating box=-2.4358440283509646 mapped=-2.4358440283509646 rel=0.0
+G270 b cells73 budget_base_adv box=-0.0369444444444445 mapped=-0.0369444444444445 rel=0.0
+G270 b cells73 budget_latent_src box=-0.03049337398397904 mapped=-0.03049337398397903 rel=3.4133123023150197e-16
+G270 b cells73 budget_latent_adv box=0.0776768790193394 mapped=0.07767687901933945 rel=7.146418848450006e-16
+G270 b cells73 budget_latent_dgdt box=0.047183505035360354 mapped=0.047183505035360424 rel=1.4706185771292443e-15
+G270 b cells73 budget_u_grad_theta box=0.12308333333333317 mapped=0.12308333333333335 rel=1.4657649952735646e-15
+G270 b cells73 exact_R    box=-0.18586341734129147 mapped=-0.18586341734129147 rel=0.0
+G270 b cells73 exact_R_over_A box=-0.07965575028912507 mapped=-0.07965575028912496 rel=1.3937763696850506e-15
+G270 b cells73 exact_flux box=-0.2333333333333299 mapped=-0.2333333333333299 rel=0.0
+G270 b cells73 exact_dHdt box=1.3895489788604365e-14 mapped=1.3895489788604441e-14 rel=5.450016376056288e-15
+G270 b cells73 exact_sumC box=0.019967902436371213 mapped=0.01996790243637122 rel=3.4750239420582014e-16
+G270 b cells73 exact_Ibase box=-0.0369444444444445 mapped=-0.0369444444444445 rel=0.0
+G270 b cells73 exact_latent_src box=-0.03049337398397904 mapped=-0.03049337398397903 rel=3.4133123023150197e-16
+G270 b cells73 exact_rhs  box=-0.04746991599203844 mapped=-0.04746991599203842 rel=4.3852366865812483e-16
+G270 b cells73 exact_area box=2.333333333333329 mapped=2.333333333333332 rel=1.3322676295501884e-15
+G270 b cells73 eta_band   box=1.141666666666672 mapped=1.1416666666666715 rel=3.8898324950370268e-16
+G270 b cells73 hmin_cfl   box=0.16666666666666666 mapped=0.16666666666666666 rel=0.0
+G270 b cells73 hmin_hist  box=0.16666666666666666 mapped=0.16666666666666663 rel=1.6653345369377348e-16
+G270 b cells73 closure_nolat box=0.06305555555555431 mapped=0.06305555555555431 rel=0.0
+G270 b cells73 closure_latent box=0.020221502158011617 mapped=0.02022150215801162 rel=1.715721673317451e-16
+G270 b hanging Nu_top     box=1.75 mapped=1.75 rel=0.0
+G270 b hanging Nu_bot     box=0.6499999999999998 mapped=0.6499999999999998 rel=0.0
+G270 b hanging Vrms       box=0.21778939878291195 mapped=0.21778939878291195 rel=0.0
+G270 b hanging meanT      box=1.0416666666666665 mapped=1.0416666666666665 rel=0.0
+G270 b hanging nu_energy  box=1.5048388888888888 mapped=1.5048388888888888 rel=0.0
+G270 b hanging W          box=0.0022833333333333395 mapped=0.0022833333333333395 rel=0.0
+G270 b hanging U          box=0.07559499999999991 mapped=0.07559499999999997 rel=7.343230535254693e-16
+G270 b hanging BaseAdv    box=-0.015833333333333352 mapped=-0.01583333333333335 rel=2.191229653865438e-16
+G270 b hanging theta2divu box=0.09006249999999998 mapped=0.09006249999999999 rel=1.5409063492368586e-16
+G270 b hanging divmax     box=0.4199999999999993 mapped=0.4199999999999993 rel=0.0
+G270 b hanging surf_rms_top box=0.21946920460700942 mapped=0.21946920460700942 rel=0.0
+G270 b hanging surf_max_top box=0.3492849839314597 mapped=0.3492849839314597 rel=0.0
+G270 b hanging surf_rms_bottom box=0.2283273930948716 mapped=0.2283273930948716 rel=0.0
+G270 b hanging surf_max_bottom box=0.34132096331752027 mapped=0.34132096331752027 rel=0.0
+G270 b hanging cbf_top    box=-0.2563676323784726 mapped=-0.2563676323784726 rel=0.0
+G270 b hanging cbf_bot    box=-0.1485346462673595 mapped=-0.1485346462673595 rel=0.0
+G270 b hanging NuCbf_top  box=1.7563676323784727 mapped=1.7563676323784727 rel=0.0
+G270 b hanging NuCbf_bot  box=0.6485346462673595 mapped=0.6485346462673596 rel=1.7118947014088513e-16
+G270 b hanging budget_theta_int box=0.4583333333333335 mapped=0.4583333333333335 rel=0.0
+G270 b hanging budget_latent_int box=0.3302846051348152 mapped=0.3302846051348152 rel=0.0
+G270 b hanging budget_enthalpy box=0.7886179384681486 mapped=0.7886179384681486 rel=0.0
+G270 b hanging budget_flux_top box=-0.24999999999999992 mapped=-0.24999999999999992 rel=0.0
+G270 b [ Info: Maxwell regime (G=1.000000e+03, end of run, step 6, t=6.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 6 stress step(s), max 2|W|dt = 7.931808e-02, max 2*tau_M*|W| = 7.931808e-01, max per-step rotation 2|W|*min(dt, tau_M) = 7.931808e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 4, t=4.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+┌ Warning: Maxwell co-rotation validity band exceeded at step 4 (t=4.000000e-04): the update applies the linearised Jaumann rotation 1 + dt*ad_W, valid while the per-step rotation 2|W|*min(dt, tau_M) is small.  Measured maxima over the domain on this step: 2|W|dt = 1.033256e-01, 2*tau_M*|W| = 1.033256e+00, per-step rotation = 1.033256e-01; bound = 0.1.  Above the bound the rotation is no longer faithful: the per-step magnitude error is about (2|W|dt)^2/2 and, for a step longer than tau_M = eta/G, the update keeps an old-stress residue of order 2*tau_M*|W|, so the stress frame (and every diagnostic reading it) drifts by more than the scheme's stated accuracy allows.  The run continues -- this is an accuracy band, not a stability limit -- but treat its stress history as outside the stated band; reduce dt (dtmax/cfl) to get back inside, or use the exact exponential of the rotation if this regime is genuinely needed.
+└ @ QuaST src/driver/run.jl:2123
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 6, t=6.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 1.033256e-01, max 2*tau_M*|W| = 1.033256e+00, max per-step rotation 2|W|*min(dt, tau_M) = 1.033256e-01; bound = 0.1 -- OUTSIDE the band, see the warning above.
+[ Info: Maxwell regime (G=1.000000e+04, first stress step, step 1, t=1.000000e-03, dt=1.000000e-03): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-01, 9.090909e-01], contrast 1.000000e+00; G*dt/eta in [1.000000e+01, 1.000000e+01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+04, end of run, step 8, t=8.000000e-03, dt=1.000000e-03): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-01, 9.090909e-01], contrast 1.000000e+00; G*dt/eta in [1.000000e+01, 1.000000e+01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 8 stress step(s), max 2|W|dt = 1.089307e-01, max 2*tau_M*|W| = 1.089307e-02, max per-step rotation 2|W|*min(dt, tau_M) = 1.089307e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+04, first stress step, step 1, t=1.000000e-03, dt=1.000000e-03): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-01, 9.090909e-01], contrast 1.000000e+00; G*dt/eta in [1.000000e+01, 1.000000e+01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+04, end of run, step 8, t=8.000000e-03, dt=1.000000e-03): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-01, 9.090909e-01], contrast 1.000000e+00; G*dt/eta in [1.000000e+01, 1.000000e+01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 8 stress step(s), max 2|W|dt = 1.464641e-01, max 2*tau_M*|W| = 1.464641e-02, max per-step rotation 2|W|*min(dt, tau_M) = 1.464641e-02; bound = 0.1 -- inside the band.
+┌ Warning: checkpoint /tmp/jl_Yl1ESZ/g246_partial.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries only part of a Maxwell stress state (some but not all of txx/tyy/txy), which is a malformed checkpoint rather than a stress history; a viscoelastic restart refuses it instead of resuming an unknown state.  Resuming under revision 2.
+└ @ QuaST src/driver/restart_guard.jl:330
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e+00, dt=1.000000e+00): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.990010e-01, 1.497753e+00], contrast 1.499251e+00; G*dt/eta in [6.666667e+02, 1.000000e+03] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 10, t=1.000000e+01, dt=1.000000e+00): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.990010e-01, 1.497753e+00], contrast 1.499251e+00; G*dt/eta in [6.666667e+02, 1.000000e+03] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 10 stress step(s), max 2|W|dt = 2.400000e+01, max 2*tau_M*|W| = 2.400000e-02, max per-step rotation 2|W|*min(dt, tau_M) = 2.400000e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-02, dt=1.000000e-02): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-01, 1.304348e+00], contrast 1.434783e+00; G*dt/eta in [6.666667e+00, 1.000000e+01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1.05x smaller (0.02 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 8, t=8.000000e-02, dt=1.000000e-02): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-01, 1.304348e+00], contrast 1.434783e+00; G*dt/eta in [6.666667e+00, 1.000000e+01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1.05x smaller (0.02 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 8 stress step(s), max 2|W|dt = 2.400000e-01, max 2*tau_M*|W| = 2.400000e-02, max per-step rotation 2|W|*min(dt, tau_M) = 2.400000e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e+00, dt=1.000000e+00): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.990010e-01, 1.497753e+00], contrast 1.499251e+00; G*dt/eta in [6.666667e+02, 1.000000e+03] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 10, t=1.000000e+01, dt=1.000000e+00): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.990010e-01, 1.497753e+00], contrast 1.499251e+00; G*dt/eta in [6.666667e+02, 1.000000e+03] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 10 stress step(s), max 2|W|dt = 1.200000e+01, max 2*tau_M*|W| = 1.200000e-02, max per-step rotation 2|W|*min(dt, tau_M) = 1.200000e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+01, first stress step, step 1, t=1.000000e-03, dt=1.000000e-03): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.900990e-03, 9.933775e-03], contrast 1.003311e+00; G*dt/eta in [6.666667e-03, 1.000000e-02] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1.5x smaller (0.17 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+┌ Warning: Maxwell co-rotation validity band exceeded at step 5 (t=3.100000e-02): the update applies the linearised Jaumann rotation 1 + dt*ad_W, valid while the per-step rotation 2|W|*min(dt, tau_M) is small.  Measured maxima over the domain on this step: 2|W|dt = 1.920000e-01, 2*tau_M*|W| = 1.200000e+00, per-step rotation = 1.920000e-01; bound = 0.1.  Above the bound the rotation is no longer faithful: the per-step magnitude error is about (2|W|dt)^2/2 and, for a step longer than tau_M = eta/G, the update keeps an old-stress residue of order 2*tau_M*|W|, so the stress frame (and every diagnostic reading it) drifts by more than the scheme's stated accuracy allows.  The run continues -- this is an accuracy band, not a stability limit -- but treat its stress history as outside the stated band; reduce dt (dtmax/cfl) to get back inside, or use the exact exponential of the rotation if this regime is genuinely needed.
+└ @ QuaST src/driver/run.jl:2123
+[ Info: Maxwell regime (G=1.000000e+01, end of run, step 10, t=8.110000e-01, dt=3.000000e-01): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [7.500000e-01, 1.000000e+00], contrast 1.333333e+00; G*dt/eta in [2.000000e+00, 3.000000e+00] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1.12x smaller (0.05 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 10 stress step(s), max 2|W|dt = 3.600000e+00, max 2*tau_M*|W| = 1.200000e+00, max per-step rotation 2|W|*min(dt, tau_M) = 1.200000e+00; bound = 0.1 -- OUTSIDE the band, see the warning above.
+[ Info: Maxwell regime (G=1.000000e+01, first stress step, step 1, t=1.000000e-03, dt=1.000000e-03): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.900990e-03, 9.933775e-03], contrast 1.003311e+00; G*dt/eta in [6.666667e-03, 1.000000e-02] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1.5x smaller (0.17 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+┌ Warning: Maxwell co-rotation validity band exceeded at step 5 (t=3.100000e-02): the update applies the linearised Jaumann rotation 1 + dt*ad_W, valid while the per-step rotation 2|W|*min(dt, tau_M) is small.  Measured maxima over the domain on this step: 2|W|dt = 1.920000e-01, 2*tau_M*|W| = 1.200000e+00, per-step rotation = 1.920000e-01; bound = 0.1.  Above the bound the rotation is no longer faithful: the per-step magnitude error is about (2|W|dt)^2/2 and, for a step longer than tau_M = eta/G, the update keeps an old-stress residue of order 2*tau_M*|W|, so the stress frame (and every diagnostic reading it) drifts by more than the scheme's stated accuracy allows.  The run continues -- this is an accuracy band, not a stability limit -- but treat its stress history as outside the stated band; reduce dt (dtmax/cfl) to get back inside, or use the exact exponential of the rotation if this regime is genuinely needed.
+└ @ QuaST src/driver/run.jl:2123
+[ Info: Maxwell regime (G=1.000000e+01, end of run, step 6, t=6.300000e-02, dt=3.200000e-02): material eta in [1.000000e+00, 1.500000e+00], contrast 1.500000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [2.424242e-01, 2.637363e-01], contrast 1.087912e+00; G*dt/eta in [2.133333e-01, 3.200000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1.38x smaller (0.14 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 6 stress step(s), max 2|W|dt = 3.840000e-01, max 2*tau_M*|W| = 1.200000e+00, max per-step rotation 2|W|*min(dt, tau_M) = 3.840000e-01; bound = 0.1 -- OUTSIDE the band, see the warning above.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 3, t=3.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 7.931808e-02, max 2*tau_M*|W| = 7.931808e-01, max per-step rotation 2|W|*min(dt, tau_M) = 7.931808e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 1, t=1.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 6, t=6.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 6 stress step(s), max 2|W|dt = 7.931808e-02, max 2*tau_M*|W| = 7.931808e-01, max per-step rotation 2|W|*min(dt, tau_M) = 7.931808e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 4, t=4.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 6, t=6.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 1.343933e-02, max 2*tau_M*|W| = 1.343933e-01, max per-step rotation 2|W|*min(dt, tau_M) = 1.343933e-02; bound = 0.1 -- inside the band.
+[ Info: Maxwell regime (G=1.000000e+03, first stress step, step 4, t=4.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell regime (G=1.000000e+03, end of run, step 6, t=6.000000e-04, dt=1.000000e-04): material eta in [1.000000e+00, 1.000000e+00], contrast 1.000000e+00; effective eta_eff = 1/(1/eta + 1/(G*dt)) in [9.090909e-02, 9.090909e-02], contrast 1.000000e+00; G*dt/eta in [1.000000e-01, 1.000000e-01] -- G*dt caps eta_eff from above, so the contrast the solve sees is 1x smaller (0.00 decades removed): a viscoelastic card solves a softer, different problem than its shear_modulus=0 twin, not the same problem plus memory.
+[ Info: Maxwell co-rotation validity (G254): over 3 stress step(s), max 2|W|dt = 1.343933e-02, max 2*tau_M*|W| = 1.343933e-01, max per-step rotation 2|W|*min(dt, tau_M) = 1.343933e-02; bound = 0.1 -- inside the band.
+┌ Info: G260 threads
+│   nthreads = 8
+└   assemble_threads = 8
+┌ Warning: checkpoint /tmp/jl_HONzzP/g281_ck.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries no Maxwell stress history, so there is no stored stress state for the revision change to affect.  Resuming under revision 2.
+└ @ QuaST src/driver/restart_guard.jl:330
+┌ Warning: checkpoint /tmp/jl_HONzzP/g281_ck.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries no Maxwell stress history, so there is no stored stress state for the revision change to affect.  Resuming under revision 2.
+└ @ QuaST src/driver/restart_guard.jl:330
+┌ Warning: checkpoint /tmp/jl_HONzzP/g281_ck.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries no Maxwell stress history, so there is no stored stress state for the revision change to affect.  Resuming under revision 2.
+└ @ QuaST src/driver/restart_guard.jl:330
+┌ Warning: checkpoint /tmp/jl_HONzzP/g281_old.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries no Maxwell stress history, so there is no stored stress state for the revision change to affect.  Resuming under revision 2.
+└ @ QuaST src/driver/restart_guard.jl:330
+┌ Warning: checkpoint /tmp/jl_HONzzP/g281_old.h5 predates physics revision tracking: it has no `physics_revision` key.  The current physics is revision 2 (the Maxwell stress update became deviatoric in 958af5e and co-rotational in 8c27a02).  It carries no Maxwell stress history, so there is no stored stress state for the revision change to affect.  Resuming under revision 2.
+└ @ QuaST src/driver/restart_guard.jl:330
+hanging budget_flux_bot box=-0.1499999999999998 mapped=-0.1499999999999998 rel=0.0
+G270 b hanging budget_flux box=-0.10000000000000012 mapped=-0.10000000000000012 rel=0.0
+G270 b hanging budget_heating box=-1.0438744049999997 mapped=-1.0438744049999997 rel=0.0
+G270 b hanging budget_base_adv box=-0.01583333333333335 mapped=-0.01583333333333335 rel=0.0
+G270 b hanging budget_latent_src box=-0.013102039971238365 mapped=-0.013102039971238365 rel=0.0
+G270 b hanging budget_latent_adv box=0.08463655864066706 mapped=0.08463655864066709 rel=3.279383762927787e-16
+G270 b hanging budget_latent_dgdt box=0.0715345186694287 mapped=0.07153451866942873 rel=3.8800254942500434e-16
+G270 b hanging budget_u_grad_theta box=0.12574999999999992 mapped=0.12575000000000003 rel=8.828811329027088e-16
+G270 b hanging exact_R    box=-0.09289479028661059 mapped=-0.09289479028661057 rel=1.4939253067902922e-16
+G270 b hanging exact_R_over_A box=-0.09289479028661059 mapped=-0.09289479028661059 rel=0.0
+G270 b hanging exact_flux box=-0.10000000000000012 mapped=-0.10000000000000012 rel=0.0
+G270 b hanging exact_dHdt box=-4.475965874952592e-14 mapped=-4.4759658749525904e-14 rel=4.2298494345658547e-16
+G270 b hanging exact_sumC box=0.021830163591226942 mapped=0.021830163591226925 rel=7.946452021431273e-16
+G270 b hanging exact_Ibase box=-0.015833333333333352 mapped=-0.01583333333333335 rel=2.191229653865438e-16
+G270 b hanging exact_latent_src box=-0.013102039971238365 mapped=-0.013102039971238365 rel=0.0
+G270 b hanging exact_rhs  box=-0.007105209713389534 mapped=-0.007105209713389548 rel=1.9531848274178585e-15
+G270 b hanging exact_area box=1.0 mapped=0.9999999999999998 rel=2.220446049250313e-16
+G270 b hanging eta_band   box=1.0750000000000008 mapped=1.0750000000000004 rel=4.131062417209882e-16
+G270 b hanging hmin_cfl   box=0.25 mapped=0.25 rel=0.0
+G270 b hanging hmin_hist  box=0.25 mapped=0.25 rel=0.0
+G270 b hanging closure_nolat box=0.08416666666666672 mapped=0.08416666666666672 rel=0.0
+G270 b hanging closure_latent box=0.0715345186694287 mapped=0.07153451866942874 rel=5.820038241375063e-16
+G270 c flux_top=-0.4709302325581395 analytic=-0.47093023255813954 wrong_normal=-0.6050289517452638 wrong_jac=-0.3529771326085161
+G270 c measured failure: wrong normal rel=0.22164016911968226 wrong face Jacobian rel=0.2504683110041386 (Nu_top 1.8529771326085163 vs 1.9534883720930232 / 1.7645675463809771)
+G270 d affine/off     steps=3 rows=3 width=18 theta_max=0.049866374449111676
+G270 d affine/off     int(div u)=9.283481101907132e-19 face_flux=0.0 umax=0.21195693235014104 area=1.2900000000000003
+G270 d affine/off     ID1: Qc=-0.27533982429619436 rhs=-0.2753398242961826 R=-1.176836406102666e-14 rel=4.274123028870299e-14
+G270 d curved/off     steps=3 rows=3 width=18 theta_max=0.04961661667635657
+G270 d curved/off     int(div u)=-1.9858202643987513e-11 face_flux=0.0 umax=0.1625264572081622 area=1.1273239544629186
+G270 d curved/off     ID1: Qc=-0.1353215869324519 rhs=-0.13532158693249086 R=3.8968828164342995e-14 rel=4.1192639228440023e-14
+G270 d affine/on      steps=3 rows=3 width=18 theta_max=0.04621919774798002
+G270 d affine/on      int(div u)=5.583641188300348e-18 face_flux=0.0 umax=0.1989784037308222 area=1.2900000000000003
+G270 d affine/on      ID1: Qc=0.15163489334034094 rhs=0.15163489334033337 R=7.577272143066693e-15 rel=4.241325971230794e-15
+G270 d curved/on      steps=3 rows=3 width=18 theta_max=0.0460407591393467
+G270 d curved/on      int(div u)=-1.7238050098672755e-11 face_flux=0.0 umax=0.1593149499758421 area=1.1273239544629186
+G270 d curved/on      ID1: Qc=0.16952056081017092 rhs=0.16952056081017708 R=-6.161737786669619e-15 rel=2.939530723948374e-15
+G270 d affine/adiab   steps=3 rows=3 width=18 theta_max=0.049830582260682155
+G270 d affine/adiab   int(div u)=1.1878790052294308e-17 face_flux=0.0 umax=0.2116790988601521 area=1.2900000000000003
+G270 d affine/adiab   ID1: Qc=-0.27535170518778895 rhs=-0.2753517051877881 R=-8.326672684688674e-16 rel=3.0124493444713626e-15
+G270 d heating changes theta by 0.027337187655996104
+G270 d open/affine  int(div u)=-3.8502729650391476e-16 net face flux=-3.900959416602845e-16 top flux=-3.900959416602845e-16 umax=0.28814671661545976
+== G271 (a) mapped sparse K vs mapped matrix-free apply ==
+  curved/uniform   var       p=2 leaves=64 full=2.4287024797852775e-16 reduced=2.6358473340344997e-16
+  curved/uniform   contrast  p=2 leaves=64 full=2.8269446412840085e-16 reduced=2.4007158676944285e-16
+  curved/mixed     var       p=2 leaves=112 full=2.376996013959631e-16 reduced=2.64014887459644e-16
+  curved/mixed     contrast  p=2 leaves=112 full=2.7547389616217824e-16 reduced=2.2106266565856048e-16
+  affine/uniform   var       p=3 leaves=64 full=2.9051816633996566e-16 reduced=2.861043828553068e-16
+  affine/uniform   contrast  p=2 leaves=64 full=2.8979931645888644e-16 reduced=1.9689125650973243e-16
+  affine/mixed     var       p=2 leaves=112 full=2.4101060664740676e-16 reduced=2.2672645723793275e-16
+  affine/mixed     contrast  p=2 leaves=112 full=2.2154120511360973e-16 reduced=1.9246624188120033e-16
+  deviatoric full=2.7482097446667635e-16
+== G271 (b) mapped :mg vs :direct ==
+  curved/uniform   |du|=2.818543638527939e-11 |dp|=2.2506330096789485e-11 resid_direct=2.885981724187812e-15 resid_mg=3.2158296682644874e-12
+  curved/mixed     |du|=4.113290997876821e-11 |dp|=1.3367992484578351e-11 resid_direct=4.670862735391015e-15 resid_mg=1.7744070737247577e-12
+  affine/uniform   |du|=6.105059833066044e-11 |dp|=5.654274010397159e-10 resid_direct=2.3970367685608943e-15 resid_mg=3.938510911605222e-12
+  affine/mixed     |du|=7.032256404239615e-11 |dp|=1.3032337846957494e-9 resid_direct=1.6748539613216736e-15 resid_mg=3.674899736751643e-12
+== G271 (c) two geometries on one tree ==
+  op diff=0.7437124963171666  hierarchy diff=0.11209523334245972  alloc raw=(0, 0) public=(0, 0) mg-apply=(0, 0)
+  assembly warm alloc=(1314128, 1314128)  cache=(entries = 90, metric_tables = 49, curvature_tables = 4, face_tables = 269, leaves = 7932)
+== G271 (d) wrong cache key: collision + measured failure ==
+  dK=0.337696200188216  wrong-op residual=2.1449558335330753e-15  wrong-op |du|=0.1427974969715094  hierarchy residual box=0.5087852080961285 mapped=0.12482407074829456
+== G271 (e) mapped hierarchy coarse operators ==
+  curved   leaves/level=197 op=2.697827262610866e-16 diag=8.618355960065029e-17 P=0.0 coarse box-vs-mapped=0.32146869409925277
+  affine   leaves/level=197 op=2.690066113503471e-16 diag=1.1459179310609239e-16 P=0.0 coarse box-vs-mapped=0.5731043069584589
+  box map: op=2.285633178797298e-16 D=1.4471358177517977e-16 P=0.0
+  threads=8 serial==threaded bits=true rel=0.0
+== G271 (f) mapped driver linear paths ==
+  driver linear=direct steps=2 theta_max=0.0
+  driver linear=mg steps=2 theta_max=0.0
+  driver linear=auto steps=2 theta_max=0.0
+  mapped auto choice=mg saddle_dofs=2467 contrast=1.0 |du|(auto vs direct)=5.663228175474672e-10
+G272 a.1 AffineBox  coarsening nodal P2: max|err| = 0.000e+00
+G272 a.1 AffineBox  coarsening L2   P2: max|err| = 3.997e-15
+G272 a.1 CurvedBox  coarsening nodal P2: max|err| = 0.000e+00
+G272 a.1 CurvedBox  coarsening L2   P2: max|err| = 3.109e-15
+G272 a.2 box map: mapped-vs-box nodal transfer rel = 0.000e+00
+G272 a.3 CurvedBox: correct max|err| = 0.000e+00, box-formula evaluation point max|err| = 4.417e-01 (field max 3.500e+00)
+G272 a.4 AffineBox  smooth coarsening: nodal=6.216e-06 L2=2.014e-10
+G272 a.4 CurvedBox  smooth coarsening: nodal=5.951e-06 L2=1.787e-10
+G272 b.1 AffineBox  impl-vs-analytic-oracle rel = 2.534e-16
+G272 b.1 CurvedBox  impl-vs-analytic-oracle rel = 3.738e-16
+G272 b.2 rotation invariance: max|diff|/max = 7.025e-15
+G272 b.3 box map: impl-vs-corrected rel = 1.953e-16, impl-vs-historical rel = 9.961e-01
+G272 b.3 linear field: mapped-vs-exact boundary = 1.388e-17, historical box body = 6.250e-04 (spurious interior term)
+G272 c: R0 = 0.55, (R0+1)/R0 = 2.818182, CurvedBox a = -0.645161
+G272 c level 4: wall-leaf measured/predicted max rel = 7.878e-11; compressed=2.778652 tall=1.072123 span=2.591730 (predicted 2.591730)
+G272 c level 5: wall-leaf measured/predicted max rel = 8.094e-14; compressed=2.807998 tall=1.033767 span=2.716277 (predicted 2.716277)
+G272 c level 6: wall-leaf measured/predicted max rel = 8.393e-16; compressed=2.815616 tall=1.016347 span=2.770329 (predicted 2.770329)
+G272 c: measured compressed/tall span levels 4-6 = 2.5917, 2.7163, 2.7703
+G272 c: predicted span = 2.5917, 2.7163, 2.7703; (R0+1)/R0 = 2.818182
+G272 c box map: physical-vs-logical rel = 0.000e+00
+G272 d CurvedBox  steps=4 leaves=28 hist=4 finite=true theta_max=4.946e-02
+G272 d AffineBox  steps=4 leaves=28 hist=4 finite=true theta_max=4.982e-02
+G272 d.2 restart: a=2 b=4 c=4 theta_equal=true hist_tail=true leaves_equal=true
+G272 d.3 tosi mapped: steps=2 finite=true
+G272 d.3 yielding mapped: steps=2 finite=true
+G272 d.3 velocity indicator mapped: steps=2 leaves=22
+G272 d.4 refusal symmetry=:x : ArgumentError: a mapped geometry (CurvedBox) does not support symmetry=:x: the mirror is logical-x, which is n
+G272 d.4 refusal hotspot     : ArgumentError: a mapped geometry (CurvedBox) does not support the Cartesian-y AMR policies (top_wall_level, ho
+G272 d.4 refusal newton      : ArgumentError: a mapped geometry (CurvedBox) supports pic_mode=:picard only in stage 0 cut 5: the mapped Newto
+G272 d.4 refusal schur_cg    : ArgumentError: a mapped geometry (CurvedBox) supports linear=:direct, :mg and :auto in this stage (got linear=
+G272 d.4 refusal maxwell     : ArgumentError: a mapped geometry (CurvedBox) does not support the Maxwell stress history in stage 0 cut 6: the
+G273 (a) map/inverse: ok
+G273 (b) Jacobian/Hessian: ok
+G273 (c) measures: ok
+G273 (d) boundaries/face metric: ok
+G273 (e) height/gravity: ok
+G273 (f) quarter  lap identities err=2.0463630789890885e-12  drop-C err=15.069357472095831
+G273 (f) thick    lap identities err=5.542233338928781e-13  drop-C err=4.530715348095294
+G273 (f2) FD Laplacian: points=256 full rel=2.900903746168063e-10  drop-C rel=0.23997125121474408
+G275 a1 row: nodes = 76  max|n.u| on Cu = 5.551115123125783e-17  max|tau.u| on Cu = 1.414213562373095
+G275 a2: |u|max = 4.800113641190363  solved max|u.n| at the wall = 4.440892098500626e-16
+G275 a3: max|u.n - data| = 2.220446049250313e-16  max|u.tau - f(R)| = 4.440892098500626e-16
+G275 a4: |u0.n - g| = 2.7755575615628914e-17  |u.n - g| = 1.1102230246251565e-16  |u|max = 0.9798490244002603
+G275 b1 level 3: T_in = -13.552237971209877 (exact -13.597080425481582)  T_out = 13.582497012242175  T_in+T_out = 0.030259041032298484
+G275 b1 Couette: |u|L2 = [0.005452502173199542, 0.0007453917425372907, 9.56066112791681e-5]  |u|H1 = [0.07027105052455403, 0.01926154546989579, 0.004951863899587537]  Tin_err = [0.4595791859738263, 0.15313830586156385, 0.044842454271705634]
+G275 b1 orders (level2->3): u_L2 = 2.96281654658688  u_H1 = 1.9596798957517834  torque = 1.7718980567259017
+G275 b2: max|u-uexact| = 7.062035540794653e-6  max|p| = 2.6121471962949373e-5
+G275 c manufactured: u_L2 = [0.011752280998168286, 0.0016382939254043678, 0.00020849353928821803]  u_H1 = [0.15634134990880008, 0.0427810977984824, 0.010889244159442557]  p_L2 = [0.20563960240922255, 0.05426126072542689, 0.013633596668795272]
+G275 c orders (level2->3): u_L2 = 2.9741196294807755  u_H1 = 1.974069686063718  p_L2 = 1.9927563594600675
+G275 d level 2: omega = 0.004161484289274703  S_after = -3.762859164882504e-17  S(Z_h) = 8.668357009404092  int r^2 = 8.668357848008673  |S(Z)-Q|/Q = 9.674318896803441e-8  M-residual = 6.053677979563398e-8
+G275 d level 3: omega = 0.004184961628400729  S_after = 1.1909283238395463e-18  S(Z_h) = 8.668357795586077  int r^2 = 8.668357848008684  |S(Z)-Q|/Q = 6.04758220867204e-9  M-residual = 3.764031939907007e-9
+G275 d cross-mesh: common nodes = 297  projected max diff = 9.748284194885078e-5
+G275 e driver: Nu = (1.3091916428858386, 0.7558945825443036)  Vrms = 0.037951112781888306  meanT = 0.44998040730225164  maxdiv = 0.02250379883042636  bal = -0.0015025532637777627  steps = 3
+G276 a: T_in = -54.20851780166709 (exact -54.38832170192633)  T_out = 54.33035948689772  T_in+T_out = 0.12184168523062766
+G276 a: |u|L2 = [0.006185743065595872, 0.0008418246990037076, 0.00010790419874177643]  |u|H1 = [0.07368356698799398, 0.01989101988296961, 0.005095139100342368]  Tin_err = [1.8831919171282365, 0.6174052414617819, 0.17980390025923754]
+G276 a orders (level2->3): u_L2 = 2.9637688350300095  u_H1 = 1.9649238116693826  torque = 1.77979341500878
+G276 a control (free-slip cut ring): L2 err = 0.3129515638425649  max err = 2.3280851226668906 (exact f(R0) = -2.3280851226668906)
+G276 b1: N = 288  bounded twin N = 297  seam nodes merged = 9
+G276 b2: table-vs-scan mismatches = 0  cross-seam pairs = 4
+G276 b3: unbalanced seam jump: index-only = 2  production = 2
+G276 b3: after balance: jump = 1 last-row leaves 4 -> 5  maxjump = 1
+G276 b4: non-mirrored ring: columns tested = 48  max seam trace jump = 0.0
+G276 b4: bounded control seam trace jump = 2.2407448500989826
+G276 b5: nodal transfer seam jump = 0.0  L2 transfer seam jump = 1.7763568394002505e-15
+G276 b5: common nodes = 80  same-function nodal diff = 0.0
+G276 c: |u_direct - u_mg| = 2.2340196359493802e-10  |u_direct - u_auto| = 0.0  mg residual = 6.274107004673479e-15
+G276 c: |Pfull*c - independent evaluation| = 3.3306690738754696e-15
+G276 c: warm reduced apply allocation = 0 B (448 dofs)
+G276 d level 2: omega*S(Z_h) = -0.33659727778929666  |S| = 1.5661300381553112e-16  M-res = 5.25209538463101e-10  rel normalisations = 2.46740791803448e-5
+G276 d level 3: omega = -0.014285715188169582  S = -1.1484682562595827e-15  S(Z_h) = 23.561908457792644  int r^2 = 23.56194490192343  rel = 1.5467369496399165e-6  M-res = 2.57111281028588e-12  T_in = -0.01222020331305914  T_out = 0.026150583662867464  sum = 0.013930380349808324
+G276 d level 3: omega*S(Z_h) = -0.33659871351774967  |S| = 1.1484682562595827e-15  M-res = 2.57111281028588e-12  rel normalisations = 1.5467369496399165e-6
+G276 d torque balance: [0.0579980283399981, 0.013930380349808324]  order = 2.0577692069585694
+G276 d alternative normalisation: |S_before| = 0.33659727778929666  |S_after_alt|/|S_before| = 2.4674079178746345e-5  implemented |S_after| = 1.5661300381553112e-16
+G276 e driver: Nu = (1.3091908986741911, 0.7558947861160805)  Vrms = 0.03764762217030202  meanT = 0.44998040868169964  maxdiv = 0.053479817832098986  bal = -0.0015067136780381588  steps = 3  leaves = 64
+G276 e AMR: leaves = 94  maxjump = 1  seam jump = 0  theta seam jump = 0.0
+G276 e wedge: steps = 3  Nu = (1.3634439963487017, 0.7238714712592218)  wall-flagged y faces = 8
+G278 oracle uniform unit L2     p=2 random   worst/tol = 1.706e-03, total rel = 0.000e+00
+G278 oracle uniform unit L2     p=2 smooth1  worst/tol = 1.599e-04, total rel = 1.301e-16
+G278 oracle uniform unit L2     p=2 smooth2  worst/tol = 1.218e-03, total rel = 2.541e-16
+G278 oracle uniform unit L2     p=3 random   worst/tol = 1.493e-03, total rel = 0.000e+00
+G278 oracle uniform unit L2     p=3 smooth1  worst/tol = 8.366e-05, total rel = 0.000e+00
+G278 oracle uniform unit L2     p=3 smooth2  worst/tol = 1.021e-03, total rel = 1.383e-16
+G278 oracle hanging unit L2+3   p=2 random   worst/tol = 3.460e-03, total rel = 0.000e+00
+G278 oracle hanging unit L2+3   p=2 smooth1  worst/tol = 1.599e-04, total rel = 1.312e-16
+G278 oracle hanging unit L2+3   p=2 smooth2  worst/tol = 1.218e-03, total rel = 0.000e+00
+G278 oracle hanging unit L2+3   p=3 random   worst/tol = 2.104e-03, total rel = 0.000e+00
+G278 oracle hanging unit L2+3   p=3 smooth1  worst/tol = 8.355e-05, total rel = 1.513e-16
+G278 oracle hanging unit L2+3   p=3 smooth2  worst/tol = 8.332e-04, total rel = 1.549e-16
+G278 oracle hanging 2b 2.5x1    p=2 random   worst/tol = 2.671e-03, total rel = 0.000e+00
+G278 oracle hanging 2b 2.5x1    p=2 smooth1  worst/tol = 3.136e-04, total rel = 3.001e-16
+G278 oracle hanging 2b 2.5x1    p=2 smooth2  worst/tol = 4.452e-04, total rel = 3.557e-16
+G278 oracle hanging 2b 2.5x1    p=3 random   worst/tol = 3.550e-03, total rel = 3.164e-16
+G278 oracle hanging 2b 2.5x1    p=3 smooth1  worst/tol = 4.251e-05, total rel = 4.611e-16
+G278 oracle hanging 2b 2.5x1    p=3 smooth2  worst/tol = 5.226e-04, total rel = 1.210e-16
+G278 exact linear   uniform unit L2     p=2 total rel = 1.696e-15, worst/tol = 4.486e-03
+G278 exact quadratic uniform unit L2     p=2 total rel = 6.168e-16, worst/tol = 8.411e-04
+G278 exact kink     uniform unit L2     p=2 total rel = 0.000e+00, worst/tol = 0.000e+00
+G278 exact linear   uniform unit L2     p=3 total rel = 1.079e-15, worst/tol = 5.467e-03
+G278 exact quadratic uniform unit L2     p=3 total rel = 4.780e-15, worst/tol = 5.888e-03
+G278 exact kink     uniform unit L2     p=3 total rel = 5.921e-15, worst/tol = 6.560e-03
+G278 exact linear   hanging unit L2+3   p=2 total rel = 1.809e-15, worst/tol = 4.486e-03
+G278 exact quadratic hanging unit L2+3   p=2 total rel = 6.168e-16, worst/tol = 8.411e-04
+G278 exact kink     hanging unit L2+3   p=2 total rel = 0.000e+00, worst/tol = 8.217e-21
+G278 exact linear   hanging unit L2+3   p=3 total rel = 1.316e-15, worst/tol = 5.467e-03
+G278 exact quadratic hanging unit L2+3   p=3 total rel = 4.626e-15, worst/tol = 5.888e-03
+G278 exact kink     hanging unit L2+3   p=3 total rel = 6.137e-15, worst/tol = 6.560e-03
+G278 exact linear   hanging 2b 2.5x1    p=2 total rel = 1.249e-16, worst/tol = 1.878e-02
+G278 exact quadratic hanging 2b 2.5x1    p=2 total rel = 6.908e-15, worst/tol = 1.724e-02
+G278 exact kink     hanging 2b 2.5x1    p=2 total rel = 0.000e+00, worst/tol = 0.000e+00
+G278 exact linear   hanging 2b 2.5x1    p=3 total rel = 4.372e-15, worst/tol = 5.313e-02
+G278 exact quadratic hanging 2b 2.5x1    p=3 total rel = 3.121e-14, worst/tol = 7.472e-02
+G278 exact kink     hanging 2b 2.5x1    p=3 total rel = 8.527e-15, worst/tol = 1.302e-02
+G278 scope uniform unit L2     p=2 y-face fine err = 0.000e+00, x-face fine err = 0.000e+00, wrong-index err = 3.074e+00 (|buggy|~1.69)
+G278 scope uniform unit L2     p=3 y-face fine err = 0.000e+00, x-face fine err = 0.000e+00, wrong-index err = 2.941e+00 (|buggy|~1.66)
+G278 scope hanging unit L2+3   p=2 y-face fine err = 0.000e+00, x-face fine err = 0.000e+00, wrong-index err = 3.074e+00 (|buggy|~1.87)
+G278 scope hanging unit L2+3   p=3 y-face fine err = 0.000e+00, x-face fine err = 0.000e+00, wrong-index err = 2.941e+00 (|buggy|~1.86)
+G278 scope hanging 2b 2.5x1    p=2 y-face fine err = 0.000e+00, x-face fine err = 0.000e+00, wrong-index err = 3.332e+00 (|buggy|~2.14)
+G278 scope hanging 2b 2.5x1    p=3 y-face fine err = 0.000e+00, x-face fine err = 0.000e+00, wrong-index err = 3.297e+00 (|buggy|~2.13)
+G278 symmetry: max|eta(L)-eta(mirror L)|/max = 5.997e-17 (old body 8.28e-1)
+G278 dispatch uniform unit L2     p=2 mapped-vs-box maxabs = 4.441e-16, worst/tol = 1.896e-03
+G278 dispatch uniform unit L2     p=3 mapped-vs-box maxabs = 8.882e-16, worst/tol = 1.976e-03
+G278 dispatch hanging unit L2+3   p=2 mapped-vs-box maxabs = 1.110e-16, worst/tol = 1.535e-03
+G278 dispatch hanging unit L2+3   p=3 mapped-vs-box maxabs = 1.776e-15, worst/tol = 2.488e-03
+G278 dispatch hanging 2b 2.5x1    p=2 mapped-vs-box maxabs = 4.441e-16, worst/tol = 3.521e-03
+G278 dispatch hanging 2b 2.5x1    p=3 mapped-vs-box maxabs = 1.776e-15, worst/tol = 3.077e-03
+G279 D1 identity Lx=7/3: box=3.3333333333333335 mapped=3.3333333333333335 analytic=3.3333333333333335
+G279 D1 affine Lx=7/3: mapped=3.641025641025641 analytic=3.641025641025641
+G279 D1 annulus radial eta contrast=10000.000000000064 (construct 1e4)
+G279 D1 selector: dofs=4928 contrast=10000.000000000064 choice=direct
+G279 D1 parent-style contrast (S in [0,Lx])=3.1622776601683915 -> mg
+G279 D4 bottom load: inner=2.2996458224277294 q*measure=2.2996458224277267 q*2piR0=2.2996458224277285
+G279 D4 box-map flux-load rel=5.551115123125783e-16
+G279 D4 flux solve: inner=2.2863409154209275 outer=-2.2927365741281287 target=2.2996458224277285
+G279 D2 CBF flux top=1.0495517485382544 bottom=1.0495517426608316 analytic=1.0495479488627668
+G279 D3 nu_cbf=(0.8999996379702812, 0.8999996385302768) recomposed=(0.8999996379702812, 0.8999996385302768)
+G279 D3 pointwise Nu=(0.9002372551619308, 0.9005771198560863) rel to CBF=(0.00026394952029269974, 0.0006412347294608981)
+G279 D3 box-map CBF: box=(-0.03997424744190804, 0.03997424744190796) identity-map=(-0.03997424744190804, 0.03997424744190796)
+G279 D5 box wall refinement: production=12 gate-local historical=12
+G279 D5 mapped wall refinement: nref=32 leaves=128
+G279 D5 mapped cycle: returns=(16, 0, 0) leaves=80
+G279 B4 box area: total_area=2.5 historical sum=2.5
+G279 B3 box level stats: got=0/1 gate-local=0/1
+G279 B3 mapped level stats: got=0/2 gate-local=0/2
+G279 B5 steady H=1: theta_max=4.960159042839099e-16 closure=2.6473579937426183e-20
+G279 B5 manufactured: closure=-0.4069767441860436 analytic=-0.40697674418604646 flux=4.3982297150256775
+G279 B5 driver closure column=2.230616058432189e-16 width=18
+G279 B5 identity step 1: box closure=-0.005224118284823942 mapped=-0.005224118284823887
+G279 B5 identity step 2: box closure=-0.010310669569281505 mapped=-0.010310669569281505
+G279 B2 identity map: box=1.5 mapped=1.5
+G279 B2 manufactured annulus: nu_energy=1.7999995359789152 expected=1.8
+G280 step10: leaves=2560 N=10853 Nu_top=5.999881326e+00 Nu_bot=-4.029590902e+00 Vrms=6.808272161e+03
+G280 cycles: [(5, 7, 2560, 10853), (10, 16, 2608, 11069)]
+G286 EV known answer: max relative nu error = 1.1913186949288965e-10  (nu range 0.0 .. 0.0003768721497353997)
+G287 reachability: hanging-wall nodes over balanced ring trees = 0 (structural: wall faces partition the side)
+G288: constraints on the coarse face = 8  (production tolerance 1.0e-10; mutation 1.0e-3 would skip all)
+G288: smallest near-coincident separation / face length = 4.76837158203125e-7   (band: 1.0e-10 < sep < 1.0e-3)
+G288: x-face constraints on the coarse face = 8
+Test Summary: |   Pass  Broken   Total      Time
+QuaST gates   | 142225       2  142227  33m28.0s

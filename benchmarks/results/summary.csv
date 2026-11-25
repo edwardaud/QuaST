@@ -1,0 +1,25 @@
+case,level,leaves,quantity,value,reference,delta_pct,observed_order,gci_pct,richardson,safety_factor,status,source,note
+1a,5,16384,Nu,4.88816,4.884409,+0.076795,1.9552,0.0891,4.884675203,1.25,verified,out_julia/agent/p2/run3/1a_L5.log,
+1a,5,16384,Vrms,42.867037,42.864947,+0.004876,,,,,verified,out_julia/agent/p2/run3/1a_L5.log,
+1b,4,4096,Nu,10.670756,10.534095,+1.297321,0.4799,9.4923,9.860438849,1.25,verified,out_julia/agent/p2/run3/1b_L4.log,
+1b,4,4096,Vrms,193.220128,193.21454,+0.002892,,,,,verified,out_julia/agent/p2/run3/1b_L4.log,
+1c,4,4096,Nu,23.038085,21.972465,+4.849797,,,,,verified,out_julia/agent/p2/run3/1c_L4.log,
+1c,4,4096,Vrms,834.009844,833.98977,+0.002407,,,,,verified,out_julia/agent/p2/run3/1c_L4.log,
+1a-hist,5,16384,Nu,4.888163,4.884409,+0.076857,1.9989,0.0833,4.884905552,1.25,recorded,out_julia/benchmarks/1a_L5.log,
+1a-hist,5,16384,Vrms,42.872446,42.864947,+0.017494,,,,,recorded,out_julia/benchmarks/1a_L5.log,
+1b-hist,5,16384,Nu,10.56861,10.534095,+0.327650,1.6520,0.5596,10.52129498,1.25,recorded,out_julia/benchmarks/1b_L5.log,
+1b-hist,5,16384,Vrms,193.213712,193.21454,-0.000429,,,,,recorded,out_julia/benchmarks/1b_L5.log,
+1c-hist,5,16384,Nu,22.31596,21.972465,+1.563298,,,,,recorded,out_julia/benchmarks/1c_L5.log,
+1c-hist,5,16384,Vrms,834.008154,833.98977,+0.002204,,,,,recorded,out_julia/benchmarks/1c_L5.log,
+2a-hist,3,1600,Nu_walls4,10.124814,10.066,+0.584284,,,,,recorded,out_julia/benchmarks/2a_L3_cf5.log,single quoted rung; no GCI
+2a-hist,3,1600,Vrms_walls4,479.694864,480.4334,-0.153723,,,,,recorded,out_julia/benchmarks/2a_L3_cf5.log,single quoted rung; no GCI
+2a,4,4096,Nu_uniform,10.137658,10.066,+0.711882,1.2708,2.8839,9.903770045,1.25,verified,out_julia/agent/p2/run3/2a_L4uniform.log,uniform-tree resolution study
+2a,4,4096,Vrms_uniform,480.07515,480.4334,-0.074568,0.9438,1.2092,484.7191284,1.25,verified,out_julia/agent/p2/run3/2a_L4uniform.log,uniform-tree resolution study
+2a,3,1600,Nu_walls4,10.124846,10.066,+0.584602,,,,,verified,out_julia/agent/p2/run3/2a_L3walls4.log,wall-refined card; published rung
+2a,3,1600,Vrms_walls4,479.698001,480.4334,-0.153070,,,,,verified,out_julia/agent/p2/run3/2a_L3walls4.log,wall-refined card; published rung
+annulus,128,196608,Nu_T,9.567429,9.548,+0.203488,1.6898,0.4618,9.532083869,1.25,recorded,annulus ladder record (ann5_ladder.log),
+annulus,128,196608,Nu_B,9.573026,9.584,-0.114503,1.5943,0.5965,9.527339946,1.25,recorded,annulus ladder record (ann5_ladder.log),
+annulus,128,196608,Vrms,193.25992,193.371,-0.057444,,,,,recorded,annulus ladder record (ann5_ladder.log),
+annulus,128,196608,meanT,0.382465,0.382,+0.121728,,,,,recorded,annulus ladder record (ann5_ladder.log),
+tosi1,3,1024,Nu_top,3.421632,3.4214,+0.006781,,,,,verified,out_julia/agent/p2/run3/tosi1_fixeddef.log,single resolution; no GCI
+tosi1,3,1024,Vrms,249.370429,249.573,-0.081167,,,,,verified,out_julia/agent/p2/run3/tosi1_fixeddef.log,single resolution; no GCI
