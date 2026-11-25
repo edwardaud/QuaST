@@ -29,7 +29,7 @@
 # (measured: 1.7x over the runtime-sized version, 0.31 ms vs 0.54 ms per apply
 # at p=4 on 256 leaves).  The leaf-blocked kernel over `SEMQUAD_KBLK` lanes is
 # `_semquad_kn_blk_core!` (stage D); its width is set so the lane axis survives
-# to the vectoriser -- docs/dev/MG.md  The remaining cost is the
+# to the vectoriser.  The remaining cost is the
 # gather/scatter, which stays scalar because a scatter has loop-carried
 # dependences through shared nodes.
 
@@ -438,8 +438,7 @@ held in **two layouts**:
 The values are the same `Float64`s in the same order; only the addressing moves
 -- a unit-stride lane read instead of the per-lane gather `etav[kofs[b] + kq]`
 -- so every apply stays **bitwise** (G225).  This is the
-`Table<2,VectorizedArray>` pre-gather of deal.II's step-37
-(docs/dev/MG_LITERATURE.md item 1) at `SEMQUAD_KBLK = 32`.
+`Table<2,VectorizedArray>` pre-gather of deal.II's step-37 at `SEMQUAD_KBLK = 32`.
 
 Subtyping `AbstractVector{Float64}` (indexing leaf-major, i.e. through `scalar`)
 lets every existing eta consumer keep working unchanged.
@@ -570,8 +569,8 @@ end
 block-major lane table of [`SemQuadEtaLane`](@ref) -- one unit-stride
 `SEMQUAD_KBLK`-lane read per quadrature point instead of a per-lane gather.
 `false` restores the gather form `etav[kofs[b] + kq]` for the A/B; the two read
-the same values, so the switch changes the instruction mix only, never a bit
-(docs/dev/MG.md, G225).  The switch is consulted only when the eta field
+the same values, so the switch changes the instruction mix only, never a bit.
+The switch is consulted only when the eta field
 carries a lane table, i.e. never for a plain `Vector{Float64}` field.
 """
 const SEMQUAD_MG_ETA_LANES = Ref(true)
@@ -584,7 +583,7 @@ loop index, so the `(p+1)^2` and `nq^2` inner loops become unit-stride vector
 operations across `SEMQUAD_KBLK` independent leaves; the leaf-specific scalars
 (`2/hx`, `2/hy`, `hx hy/4`, `eta`) are gathered into length-`BLK` vectors first.
 
-**32, not 8** (docs/dev/MG.md): at `BLK = 8` LLVM fully unrolls the
+**32, not 8**: at `BLK = 8` LLVM fully unrolls the
 8-lane loop into scalar `vaddsd`/`vmulsd` and the kernel is 2.0-2.4x slower
 than at 16-32 lanes, where the loop survives to the vectoriser and becomes
 `vaddpd`/`vmulpd`/`vsubpd` (4-wide AVX2).  32 is the measured best (1 thread,
@@ -734,7 +733,7 @@ function _semquad_kn_blk_core!(out::Union{Vector{Float64},Nothing},
                                nbmax::Int, ::Val{N},
                                ::Val{STORE}) where {N,STORE}
     # The eta read is the only difference between the two kernel forms and it is
-    # a pure addressing choice (docs/dev/MG.md): with a lane table the
+    # a pure addressing choice: with a lane table the
     # lane axis is unit stride, so LLVM emits a vector load instead of the
     # per-lane `vgather` over `etav[kofs[b] + kq]`.  Both read the same
     # `Float64`s, so the result is bitwise (G225).  `SEMQUAD_MG_ETA_LANES =

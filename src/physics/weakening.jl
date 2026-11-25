@@ -1,4 +1,4 @@
-# Strain weakening for the quadtree SEM path of this solver, docs/dev/PHYSICS.md §9.
+# Strain weakening for the quadtree SEM path of this solver.
 #
 # A scalar field chi(x,y,t) in [0,1] is advected with the flow and integrated
 # with the same BDF2 machinery as the temperature:
@@ -49,7 +49,7 @@ function semquad_weakening_source_g(sq::SemQuad, sp::SemQuad, qt::Quadtree,
     g = sq.geom
     return (x, y) -> begin
         # Box: the historical viscosity row (`Tbar(y,H)`, depth `y`), even with
-        # a reference state (docs/dev/PHYSICS.md §3.3, frozen box behaviour).
+        # a reference state (frozen box behaviour).
         # Mapped (stage 0.5b1): the geometry's base state and `height(g,x,y)`.
         local h, T
         if g isa CartesianBox
@@ -86,7 +86,7 @@ tuple `(M, C, Mg, A, rhs, one, Cfree, u0, Ar, ca, cb, cc, firststep, g)`.
 * `Cfree` is the hanging-node constraint map (no Dirichlet dofs);
 * `chi_src` is the field used for the yielding indicator of `g` (the current
   Picard/Newton iterate), while the *time levels* are always the start-of-step
-  `chi_n` and `chi_nm1` — the same rule as the energy step (docs/dev/PHYSICS.md §3).
+  `chi_n` and `chi_nm1` — the same rule as the energy step.
 """
 function semquad_weakening_parts(sq::SemQuad, sp::SemQuad, qt::Quadtree,
                                  pr::Params, chi_n::Vector{Float64},
@@ -145,7 +145,7 @@ end
                             dt, dt_prev, firststep; advection=:galerkin,
                             chi_src=chi_n, return_parts=false)
 
-One implicit BDF2 step of the strain-weakening field (docs/dev/PHYSICS.md §9.2):
+One implicit BDF2 step of the strain-weakening field:
 returns the clamped `chi` of the new time level, or the assembled parts when
 `return_parts=true` (the per-step Newton needs them for its residual and its
 `d r_W/d chi` block).
@@ -185,7 +185,7 @@ Velocity-direction part of the weakening residual,
 `Cfree' * C(du) * chi`, where `C(du)` is the scalar advection operator of the
 velocity perturbation (`parts.Cfree' * A * chi` and the source `Mg*1` are
 independent of the velocity, so this is the whole `d r_W/du` block up to the
-lagged yielding indicator of `g`; docs/dev/PHYSICS.md §9.4).
+lagged yielding indicator of `g`).
 """
 function semquad_weakening_jvp(parts, sq::SemQuad, qt::Quadtree, pr::Params,
                                dux::Vector{Float64}, duz::Vector{Float64},
@@ -209,7 +209,7 @@ Momentum-block derivative with respect to the weakening field,
 with `coef(x,y,edot)` the pointwise `d eta/d chi` (a wrapper around
 `semquad_deta_chi` carrying T and chi) and the strain rate taken from the
 velocity `u` that enters the viscosity.  This is the exact `d r_S/d chi` block
-of the per-step Newton (docs/dev/PHYSICS.md §9.4): the chi basis is the scalar
+of the per-step Newton: the chi basis is the scalar
 `p`-degree space, the quadrature the Stokes one (`p+2` Gauss points), and the
 layout is the `Kp` one with the pressure test function replaced by `phi_j`.
 """

@@ -8,7 +8,7 @@ using Test, QuaST, LinearAlgebra, Random
 # `refine!` refuses was re-queued unchanged, so a wave that makes no progress
 # used to be retried `maxiter` = 1000 times: the same "state does not change,
 # loop keeps going" bug class as the step-95 leaf-budget spin
-# (docs/dev/SOLVER.md sec. 16), only bounded by `maxiter`.  The fix adds one
+# only bounded by `maxiter`.  The fix adds one
 # comparison per pass:
 #
 #     wave == prev && break        # nothing was refined -> next pass repeats

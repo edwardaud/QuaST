@@ -3,7 +3,7 @@
 The ASPECT 2.5 side of the cross-code comparison. `realistic/` holds the
 production cards, the `realistic composite` material-model plugin and the Python
 analysis that turns ASPECT's statistics and VTU output into the numbers in
-`docs/dev/VALIDATION.md`. `blankenbach_templates/` holds the hand-written ASPECT
+`docs/en/validation.md`. `blankenbach_templates/` holds the hand-written ASPECT
 templates for the Blankenbach 1989 cases. ASPECT and its image are not in this
 repository; build the plugin inside the image with `CMakeLists.txt`. Inputs are
 maintained by hand; every card marked generated below is written by the script

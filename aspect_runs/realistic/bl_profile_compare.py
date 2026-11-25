@@ -4,7 +4,7 @@
 Why this script exists
 ----------------------
 The window-mean `Nu_bot` differs by -6.1 % (ASPECT -3.6368, ours -3.4274) over
-`t_nd = 1e-6 .. 1e-3`, and `docs/dev/VALIDATION.md` section 10 leaves
+`t_nd = 1e-6 .. 1e-3`, and the cross-code comparison leaves
 the late-window part (-9.7 % in `t_nd = 3e-4 .. 1e-3`) attributed to "the two
 solutions' bottom boundary layers" without decomposing it.  This script does the
 decomposition on *measured profiles*: it extracts the x-averaged temperature
@@ -55,7 +55,7 @@ import sys
 
 import numpy as np
 
-# --- the scale set of docs/dev/VALIDATION.md section 2.1 ----------
+# --- the scale set ----------
 D = 2.9e6                 # box depth [m]
 KAPPA = 1.0e-6            # thermal diffusivity [m^2/s]
 DT = 1000.0               # temperature drop [K]
@@ -65,7 +65,7 @@ NORM = L_X * K_COND * DT / D      # W per unit of Nu (= 8250)
 T0 = D * D / KAPPA        # 8.41e18 s, the time scale
 ETA0 = 2.368635e23        # Pa s
 
-# --- the composite law of docs/dev/PHYSICS.md section 1 (case card) -----------
+# --- the composite law (case card) -----------
 COMP_AD = 1.6240183119e5
 COMP_AS = 2.6796419238e-1
 COMP_ED = 12.0
@@ -95,7 +95,7 @@ def eta_branches(T):
 
 
 def eta_isostress(T, edot, z=0.0):
-    """Our `:composite` / `:isostress` viscosity (docs/dev/PHYSICS.md section 1.1).
+    """Our `:composite` / `:isostress` viscosity.
 
     `eta_diff = Ad^-1 exp(Ed/T_nd)`, `eta_disl = As^-1 exp(Es/(n T_nd)) ed^((n-1)/n)`;
     isostress: solve `k x + x^n = 1` with `k = inv_diff/inv_disl`, `eta = x/inv_disl`.
@@ -378,7 +378,7 @@ def wall_gradient(y, T, k=3):
     The polynomial of degree `k-1` through them is differentiated at y=0
     (non-uniform abscissae).  `k = 3` is the unique quadratic through
     (0, h1, h2) - the same family as the codes' own one-sided GLL/Q2 wall
-    derivative (docs/dev/VALIDATION.md section 10.4).
+    derivative.
     """
     y = np.asarray(y[:k], dtype=float)
     T = np.asarray(T[:k], dtype=float)
@@ -764,7 +764,7 @@ def edot_at(prof, y0):
 
 
 def gamma(y, T, y0, slope, width=0.025, Tref=0.5):
-    """The case's phase function Gamma_i(y, T) (docs/dev/PHYSICS.md, case card)."""
+    """The case's phase function Gamma_i(y, T)."""
     return 0.5 * (1.0 + math.tanh(((y0 - y) - slope * (T - Tref)) / width))
 
 

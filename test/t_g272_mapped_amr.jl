@@ -68,7 +68,7 @@
 #       map reproduce the box bodies' *corrected* arithmetic (the box map is a
 #       similarity).  The nine-hash state dump A/B against a worktree
 #       of `2898002` and the affected-gate batch are the process evidence in
-#       `docs/dev/GEOM_PROGRESS.md`; the suite half of the box invariant is the
+# the suite half of the box invariant is the
 #       existing box AMR gates plus this testset.
 #
 # Every assertion names the wrong implementation it catches.

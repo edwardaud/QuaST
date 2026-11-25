@@ -3,7 +3,7 @@ mass_rho_fun(pr) = pr.refstate === nothing ? nothing :
     (pr.refstate.prof !== nothing ? (y -> semquad_rho(pr.refstate, y)) :
      (pr.refstate.rho_fun === nothing ? nothing :
       (y -> semquad_rho(pr.refstate, y))))
-# EOS reference state (docs/dev/PHYSICS.md §11): the anelastic mass form uses the
+# EOS reference state: the anelastic mass form uses the
 # *integrated* drho/dz instead of the finite difference of a user `rho_fun`.
 # `nothing` for every other path, which then stays bit for bit the old code.
 mass_drho_fun(pr) = (pr.refstate === nothing ||

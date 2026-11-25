@@ -9,7 +9,7 @@ using Test, QuaST, LinearAlgebra, Printf
 # five to seven orders below the driver's `stokes_tol=1e-3` acceptance gate; the
 # measured production cost of that excess is 92/108/90 outer iterations and
 # 1.68/2.63/1.54 s warm on `F`/`P1`/`C`, against 81/91/67 and 1.44/2.27/1.30 s
-# at `mg_tol=1e-8` (docs/dev/CASE_REALISTIC.md §1.6).  The card therefore passes
+# at `mg_tol=1e-8`. The card therefore passes
 # `MG_TOL=1e-8` explicitly.
 #
 # This gate pins three things, so a future change cannot silently undo it:
@@ -22,7 +22,7 @@ using Test, QuaST, LinearAlgebra, Printf
 #      the driver gate, needs fewer outer iterations than the 1e-10 solve, and
 #      moves u/p against that tight solve by less than the documented MG
 #      accuracy class `|du|/|u| <= 2.1e-6`, gauge-removed
-#      `|dp|/|p| <= 8.8e-7` (docs/dev/MG.md);
+# `|dp|/|p| <= 8.8e-7`;
 #   3. the same at production-like contrast (1e4) on a small hanging-node tree,
 #      where `mg_tol=1e-6` is measured to exceed the pressure class
 #      (1.28e-6 on P1), i.e. the looser benchmark tolerance is not a

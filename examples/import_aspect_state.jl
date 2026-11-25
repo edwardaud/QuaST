@@ -11,7 +11,7 @@
 # reconstructs the *exact* Q2 field of one ASPECT VTU frame (its nine nodal
 # values per cell) instead of the bilinear patches the VTU literally contains.
 #
-# What this script does (docs/dev/VALIDATION.md §16):
+# What this script does:
 #
 #  1. converts the frame with the section-2 scale set
 #         t_nd = t/(d^2/kappa),  T_nd = T/1000 - 0.5,  u_nd = u d/kappa,
@@ -35,7 +35,7 @@
 #  4. prints the diagnostics of the imported state — `Nu_top`, `Nu_bot`, `Vrms`,
 #     `Tmax`, `Tmean` — which are the interpolation check: they must reproduce
 #     ASPECT's own numbers for that frame (Vrms/Tmax/Tmean to the definition,
-#     Nu to the wall-functional family floor of docs/dev/VALIDATION.md §5).
+#     Nu to the wall-functional family floor).
 #
 # Pressure is not imported: it is not an initial condition of the Boussinesq
 # system (the first Stokes solve recomputes it), so `pv` is written as zeros.
@@ -77,7 +77,7 @@ const B660       = 300.0 / (3300.0 * 3.0e-5 * 1000.0)
 const LATENT_L   = 0.11
 const LATENT_SCALE = (rho_ref=3300.0, cp=1000.0, dT=1000.0, g=9.81, d=2.9e6,
                       T_surface=0.5)
-# scale set (docs/dev/VALIDATION.md §2)
+# scale set
 const D_SCALE = 2.9e6            # d, m
 const KAPPA   = 1.0e-6           # m^2/s
 const T_SCALE = 1000.0           # dT, K

@@ -65,7 +65,7 @@ the Taylor–Hood Schur complement (Elman, Silvester & Wathen 2014, §4.2): use
 integrates to the domain area with `weight=nothing`.
 
 `nq = 0` keeps the historical `p+2` Gauss points; the strain-weakening assembly
-(docs/dev/PHYSICS.md §9) passes the energy quadrature explicitly so that its
+passes the energy quadrature explicitly so that its
 weighted mass matrix uses the same rule as the energy mass matrix.
 """
 function assemble_semquad_pressure_mass(sp::SemQuad;

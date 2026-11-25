@@ -9,7 +9,7 @@
 # the dropped row is a linear combination of the others.  An `:open` wall
 # destroys that: a boundary test function with a non-zero normal trace exists, so
 # the constant is not in the null space and a pin would replace a continuity
-# equation by `p_a = 0` -- a different problem (docs/dev/BC_DESIGN.md §3.5).
+# equation by `p_a = 0` -- a different problem.
 # Stage 3 makes the gauge derived: **pin iff no wall is `:open`**.
 #
 # This gate pins:

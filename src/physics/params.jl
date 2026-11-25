@@ -37,16 +37,15 @@ meaning**; mixing them up silently changes the viscosity by orders of magnitude)
   of the strain rate with the code's `sqrt(0.5 edot:edot)` convention.  The two
   rules agree exactly in the one-mechanism limits and differ by up to 41%
   (n = 3.5) where both mechanisms contribute; ASPECT 2.5.0-pre solves
-  `:isostress` (measured, docs/dev/PHYSICS.md section 14).  The `eta_min/eta_max`
+  `:isostress`. The `eta_min/eta_max`
   bounds of `_clip_eta` apply to `eta_eff` (clip once, after the combination),
   and `comp_eps_min` floors the strain rate of the dislocation branch (so that
   `eps_II -> 0` is the diffusion limit with a finite viscosity instead of
   `eta_disl = Inf` and an infinite derivative).  `comp_n` is ASPECT's "Stress
   exponent for dislocation creep" (n = 3 in the mantle); `comp_Ad`/`comp_As`
   are ASPECT's prefactors in units of `1/eta0` of the code's
-  nondimensionalisation (see docs/dev/PHYSICS.md for the exact ASPECT mapping,
-  including the factor 2 that ASPECT's `eta = stress/edot/2` convention puts
-  into the prefactors).
+  nondimensionalisation, including the factor 2 that ASPECT's
+  `eta = stress/edot/2` convention puts into the prefactors).
 
 `eta_ref` (default `1.0`) is the **Rayleigh-number reference viscosity**, in the
 units the material law returns.  It states the convention the nondimensional
@@ -120,7 +119,7 @@ struct Params
     # bit.  This is the density half of the sticky-air hook: a light layer above
     # `z_a` is `rho_multiplier = (x, z) -> z > z_a ? eps : 1.0` combined with a
     # low-viscosity `eta_multiplier`, without reimplementing a material model
-    # (docs/dev/PHYSICS.md; ASPECT's sticky-air recipes).  It scales a density
+    # (ASPECT's sticky-air recipes). It scales a density
     # that is *already* in a term -- it does not add a compositional density
     # anomaly, so with a Boussinesq/refstate buoyancy `Ra rho(y) alpha(y) theta`
     # it acts on the thermal anomaly only (a temperature-neutral layer carries
@@ -128,8 +127,8 @@ struct Params
     # (`semquad_phase_buoyancy`), which is its own density anomaly anchored to
     # `rho0`, is not scaled.
     rho_multiplier::Union{Nothing,Function}
-    # Maxwell viscoelasticity (ASPECT's `viscoelastic`, docs/dev/PHASE2.md 2a and
-    # 2b): the shear modulus `G` scales the elastic response in both the
+    # Maxwell viscoelasticity (ASPECT's `viscoelastic`): the shear modulus `G`
+    # scales the elastic response in both the
     # effective-viscosity closure eta_eff = 1/(1/eta + 1/(G*dt)) and the stress
     # history tau^{n+1} = (corotate(tau^n) + 2 G dt ehat)/(1 + dt/tau_M),
     # tau_M = eta/G.  Both use the driver's **actual** step `dt`, which is
@@ -148,7 +147,7 @@ struct Params
     # behaviour.  The normal component still comes from `uDx`/`uDz`, so a wall with a
     # prescribed tangential value must also be `:rigid` in `wall_bc`.  This is what
     # makes a lid-driven cavity expressible: the top wall's tangential value no
-    # longer forces the x-walls' normal velocity (docs/dev/PHASE2.md 2a cross-check).
+    # longer forces the x-walls' normal velocity (cross-check).
     wall_u::NTuple{4,Union{Nothing,Function}}
     # Per-wall *normal* velocity, in the same `(xminus, xplus, yminus, yplus)`
     # order.  `nothing` (the default) keeps the global `uDx`/`uDz` closure for
@@ -158,7 +157,7 @@ struct Params
     # exactly the convention of the legacy closures (it is **not** the outward
     # flux `u·n`).  The normal component is Dirichlet on every `:free` and
     # `:rigid` wall either way; `wall_un` only refines its value, per wall
-    # (docs/dev/BC_DESIGN.md §3.4/§3.6, G258).
+    # (G258).
     wall_un::NTuple{4,Union{Nothing,Function}}
     # Per-wall *tangential* traction (BC stage 2, G259/G260), same
     # `(xminus, xplus, yminus, yplus)` order.  `nothing` (the default) is zero
@@ -175,7 +174,7 @@ struct Params
     # value is only allowed where the tangential component is free, i.e. on a
     # `:free` or `:open` wall: on a `:rigid` wall the tangential velocity is
     # Dirichlet and the load would be silently dropped by the constraint matrix,
-    # so it is an error (docs/dev/BC_DESIGN.md §3.2/§3.6).
+    # so it is an error.
     wall_t::NTuple{4,Union{Nothing,Function}}
     # Per-wall *normal* traction (BC stage 3, G261/G262/G263), same
     # `(xminus, xplus, yminus, yplus)` order.  `nothing` (the default) is zero
@@ -225,7 +224,7 @@ struct Params
     comp_Tcut::Float64    # floor on T_nd in the Arrhenius exponent; 0 = off
     comp_eps_min::Float64 # strain-rate floor of the dislocation branch
     comp_rule::Symbol     # :isostress (ASPECT, default) or :isostrain (legacy)
-    # Depth-dependent Drucker-Prager yield (docs/dev/PHYSICS.md §8): with depth
+    # Depth-dependent Drucker-Prager yield: with depth
     # d = 1-y the cohesion and the friction coefficient are linear,
     #   c(d)  = yield_c + yield_c_grad*d
     #   mu(d) = sin(yield_phi) + yield_mu_grad*d
@@ -234,7 +233,7 @@ struct Params
     # surface bit for bit.
     yield_c_grad::Float64   # d(cohesion)/d(depth)
     yield_mu_grad::Float64  # d(mu)/d(depth), mu = pressure coefficient
-    # Strain weakening (docs/dev/PHYSICS.md §9): a scalar field chi in [0,1] with
+    # Strain weakening: a scalar field chi in [0,1] with
     #   f(chi) = 1 - (1-weak_f)*chi,   tau_y <- f(chi)*tau_y
     weak_f::Float64         # residual weakening factor f_weak in [0,1]; 1 = off
     weak_eps_ref::Float64   # reference (end) plastic strain; <= 0 = off
@@ -248,7 +247,7 @@ struct Params
     # wall has no Dirichlet component, so with any `:open` wall the nodal pressure
     # pin is invalid and the solver derives a different gauge (no pin); the
     # well-posedness rules live in the constructor below
-    # (docs/dev/BC_DESIGN.md §3.5, G262).
+    # (G262).
     wall_bc::NTuple{4,Symbol}
     # Rayleigh-number reference viscosity, in the units the material law
     # returns: `Ra` is defined as rho g alpha dT d^3/(kappa eta_ref) and the flow
@@ -410,7 +409,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                                 "wall_bc[$i] = :open (an :open wall has no " *
                                 "Dirichlet component, so its natural condition " *
                                 "IS the traction level and the pressure gauge " *
-                                "becomes derived, docs/dev/BC_DESIGN.md §3.5), " *
+                                "becomes derived), " *
                                 "or drop wall_tn[$i]."))
         end
     end
@@ -451,7 +450,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
                                 "component in that direction and the velocity " *
                                 "of a solution is determined only up to that " *
                                 "rigid translation (the 3x3 rigid-mode Gram " *
-                                "test of docs/dev/BC_DESIGN.md §3.5 would be " *
+                                "test would be " *
                                 "singular).  An :open wall is well posed only " *
                                 "when the normal velocity is Dirichlet on at " *
                                 "least one x-wall and one y-wall: set " *
@@ -507,7 +506,7 @@ function Params(; Ra::Real=1.0e4, H::Real=0.0, H_half_life::Real=Inf,
     latent_L >= 0 ||
         throw(ArgumentError("latent_L must be >= 0 (it is L/(cp dT) of the " *
                             "phase transitions)"))
-    # Latent heat per transition (docs/dev/PHYSICS.md §7.8): `:global` is the
+    # Latent heat per transition: `:global` is the
     # historical single `latent_L` for every transition (bitwise unchanged),
     # `:per_phase` uses each `PhaseTransition.latent` and may be negative.
     latent_mode in (:global, :per_phase) ||

@@ -4,7 +4,7 @@
 # level: gradient-jump indicator, Dörfler marking, coarsening, the wall rule and
 # the 2:1 balance, each cycle transferring `theta`, `theta_prev` and whatever the
 # caller hands it.  It is the function the driver calls every `amr_every` steps;
-# the policy it implements is documented in `docs/dev/AMR.md` and the user guide.
+# the policy it implements is described in the user guide.
 
 """
     semquad_amr_passes!(ss, qt, theta, theta_prev; passes=1, refine_frac=0.2,
@@ -18,11 +18,11 @@ let interior plumes catch up with a heavily refined wall.  Every pass may trade
 coarsening for refinement (the budget exchange), so `coarsen_frac` is not zeroed
 after the first pass.  Returns `(ss, theta, theta_prev, nrefined)`.
 
-The cycle is [`amr_cycle_balanced!`](@ref) (docs/dev/AMR.md §3): relative
+The cycle is [`amr_cycle_balanced!`](@ref): relative
 Dörfler thresholds from above and below, budget exchange instead of a refine
 stop at the budget, a wall-row-only protect set and an `AmrCooldown` hysteresis.
 It is the only adaptive policy: the `:classic` fraction + hard-budget path was
-removed at `8c622df` (docs/dev/AMR.md).  `refine_wall_to_min!` and the hard leaf
+removed at `8c622df`. `refine_wall_to_min!` and the hard leaf
 budget pass below are part of the cycle, not of a policy.
 
 `indicator` selects the field the jump estimator is applied to: `:theta` (the

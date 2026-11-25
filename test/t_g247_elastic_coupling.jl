@@ -1,5 +1,4 @@
-# G247: the elastic force term, `div(tau)` in the Stokes right-hand side
-# (docs/dev/PHASE2.md 2b step 2).
+# G247: the elastic force term, `div(tau)` in the Stokes right-hand side.
 #
 # The Maxwell stress history of 2b step 1 is now coupled to momentum: the
 # backward-Euler update splits the stress into

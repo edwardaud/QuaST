@@ -5,16 +5,16 @@
 # contrast of the eta field actually passed to the solve.  The constants below
 # are calibrated against a same-session A/B of the two paths on the states the
 # previous table named, re-measured at `c7e0f55` after the optimisation
-# campaign of docs/dev/MG.md§16 (that campaign's endpoint is a 2.3-2.6x
-# faster warm MG solve than the one the previous table -- docs/dev/SOLVER.md
-# §18.3/§19.2 -- was calibrated on, while the direct path is untouched).  The
+# campaign (that campaign's endpoint is a 2.3-2.6x faster warm MG solve than
+# the one the previous table was calibrated on, while the direct path is
+# untouched).
 # A/B and every row: `benchmarks/bench_auto_crossover.jl`, one process per
 # state, both paths on the same tree and closures, `BLAS=1`, direct
 # `linear=:direct, stokes_scaling=:equilibrated` (the tolerance-reaching
 # reference), MG `linear=:mg` with the shipped defaults and
 # `mg_tol = 1e-6` (the direct reference's accuracy), warm = best of three
 # in-tree solves after a cold build.  Ratio = t_direct / t_mg, so >1 means MG
-# faster (the convention of docs/dev/SOLVER.md §4.2/§4.4, which carries the same
+# faster (the convention, which carries the same
 # table plus the cold column):
 #
 # | state                                 | saddle dofs | contrast | 1thr | 8thr |
@@ -43,7 +43,7 @@
 # The only contrast boundary left is 100, which is where the pressure block
 # switches from the mass inverse to w-BFBT -- a property of the *MG
 # configuration*, not a measured crossover.  Where each constant sits (cold
-# ratios are the conservative column; `docs/dev/SOLVER.md` §4.2 lists them):
+# ratios are the conservative column):
 #
 #   * 20 000 -- every measured high-contrast state at or above it wins
 #     (19 413 dofs 1.24x at 8 threads, 28 135 dofs 1.32x cold / 2.01x warm,
@@ -69,7 +69,7 @@ const SEMQUAD_AUTO_CONTRAST_MID = 100.0
 # [0,Lx]x[0,1].  Measured on the production blob eta field, 32 intervals
 # recovers the full quadrature contrast to -3%/-9% on the 1024/4096-leaf trees
 # at ~23 us/1 089 evaluations, while the <=256 strided velocity-node sample
-# misses by up to 5x (docs/dev/SOLVER.md §20).  Fixed cost, independent of N.
+# misses by up to 5x. Fixed cost, independent of N.
 const SEMQUAD_AUTO_CONTRAST_GRID = 32
 const SEMQUAD_AUTO_MG_MAX_THREADS = 8
 
@@ -165,7 +165,7 @@ const _SEMQUAD_AUTO_SERIAL_WARNED = Ref(false)
     semquad_auto_mg_threads() -> Int
 
 Thread count used by `linear=:auto` when it picks the matrix-free MG:
-`min(8, Threads.nthreads())`.  Measured (docs/dev/SOLVER.md §19.2), the threaded
+`min(8, Threads.nthreads())`.  Measured, the threaded
 V-cycle is 1.5x faster at 1024 leaves and 2.2x at 4096 leaves; 2 threads are
 not worth it on this machine, 4/8 are.  A single-threaded process falls back to
 1 and warns once.  This never applies to an explicit `linear=:mg` call, whose

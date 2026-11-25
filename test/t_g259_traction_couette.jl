@@ -6,9 +6,9 @@
 # natural (do-nothing) condition is `sigma.n = 0`, so any free boundary
 # component was silently traction-free.  `Params.wall_t` now prescribes the
 # tangential component of the **total** Cauchy traction `tbar = sigma.n` as a
-# boundary-face RHS load `fv_i += int tbar.phi_i dS` (docs/dev/BC_DESIGN.md
-# §3.1/§3.2): integration by parts puts the boundary term on the right-hand
-# side with a **plus** sign and the value is the global component in the
+# boundary-face RHS load `fv_i += int tbar.phi_i dS`: integration by parts puts
+# the boundary term on the right-hand side with a **plus** sign, and the value
+# is the global component in the
 # positive coordinate direction (`t_x` on a horizontal wall, `t_z` on a vertical
 # one), with no outward-normal table.
 #
@@ -299,7 +299,7 @@ end
     @test err2 isa ArgumentError
     msg2 = err2 isa ArgumentError ? sprint(showerror, err2) : ""
     @test occursin("normal traction", msg2) && occursin(":open", msg2)
-    @test occursin("stage 3", msg2) || occursin("§3.5", msg2)
+    @test occursin("pressure gauge becomes derived", msg2)
 
     # The defaults of the public surface: `nothing` (zero load), four entries.
     @test Params().wall_t == (nothing, nothing, nothing, nothing)

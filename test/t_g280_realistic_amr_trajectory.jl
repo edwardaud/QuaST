@@ -20,9 +20,8 @@
 # `symmetry = :none`).  The only omissions are the render stream (it writes no
 # state) and the opt-in `extdiag` residual column (a diagnostic; the audit's
 # card used it, and the state is unchanged by it).
-#
-# The pinned values are the audit's measured corrected arm
-# (docs/dev/BUG_AUDIT_INDICATOR.md §3.2), and every integer is accompanied by
+# The pinned values are the audit's measured corrected arm, and every integer
+# is accompanied by the historical value it replaces:
 # the historical value it replaces:
 #
 #   first cycle (step 5): corrected refines **7** leaves -> 2560 leaves,

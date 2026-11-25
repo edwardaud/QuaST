@@ -6,7 +6,7 @@ using Test, QuaST, LinearAlgebra
 # Historical context: with the pre-fix time loop (`theta_iter` used as the BDF2
 # `theta^n`) the undamped Picard iteration drifted to a different equation and
 # this gate asserted that `maxpic = 6` with `pic_relax = 1` diverges.  After the
-# `theta^n` fix (docs/dev/PHYSICS.md §3) the iteration is a genuine fixed point of
+# `theta^n` fix: the iteration is a genuine fixed point of
 # the BDF2 step, so the undamped variant converges as well and all three rows
 # (lagged reference, adaptive damping, undamped) agree to a few percent.
 
@@ -36,7 +36,7 @@ end
         @test isfinite(vad)
         @test vad < 3.0 * ref
         @test vad > 0.1 * ref
-        # undamped (theta^n fix, docs/dev/PHYSICS.md §3): converges to the same
+        # undamped (theta^n fix): converges to the same
         # state, and no longer throws or diverges
         threw = false
         local vun = NaN

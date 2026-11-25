@@ -4,8 +4,7 @@ The ASPECT input cards, the plugin that gives ASPECT the same composite rheology
 and the scripts that read the results back and compare them with a QuaST run.
 
 Running any of this needs the ASPECT image and the plugin built against it. Neither
-is part of this repository. The comparison is written up in
-[../../docs/dev/VALIDATION.md](../../docs/dev/VALIDATION.md) and summarised in
+is part of this repository. The comparison is summarised in
 [../../docs/en/validation.md](../../docs/en/validation.md).
 
 ## Cards

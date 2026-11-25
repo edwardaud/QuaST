@@ -1,7 +1,7 @@
 # G207: the direct path's diagonal-shift ladder — control flow on a prescribed residual sequence.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
-# G207: the direct path's diagonal-shift ladder (docs/dev/CASE_REALISTIC.md §13).
+# G207: the direct path's diagonal-shift ladder.
 #
 # The direct reduced-saddle solve used to retry *once* with a 1e-12 relative
 # diagonal shift and then accept whatever came out.  On the 8192-leaf realistic
@@ -69,7 +69,7 @@ using Test, QuaST, LinearAlgebra, SparseArrays
 
     # the best rung is kept when the refinement does not improve on it -- and,
     # because that best still misses the gate, the last-resort tiny shifts run
-    # after it (G212, docs/dev/CASE_REALISTIC.md §17.4).  The prescribed sequence is
+    # after it (G212). The prescribed sequence is
     # exhausted, so both tiny rungs repeat 9.0e-3 and the 1.5e-3 rung still wins.
     x, r, sh, nref, rungs = ladder(Ssyn, bsyn; accept_tol=1.0e-3,
                                    resid=prescribed([5.0e-3, 3.0e-3, 2.0e-3,

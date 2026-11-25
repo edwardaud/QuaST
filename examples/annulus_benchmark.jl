@@ -5,9 +5,9 @@ const ANN_MS = QuaST
 # ==========================================================
 #
 # One entry point for the Davies et al. (2022) / ASPECT Ra = 1e5 cylindrical
-# shell case on the closed (periodic) ring.  This is the benchmark of
-# `docs/dev/ANNULUS_REFS.md` §1.3/§2 and the published validation record is
-# `docs/dev/GEOM_PROGRESS.md` stage 0.5c2:
+# shell case on the closed (periodic) ring.  This is the Davies et al. (2022)
+# and ASPECT documentation benchmark; the published validation record is in
+# `docs/en/validation.md`:
 #
 #     julia --project=. examples/annulus_benchmark.jl <nx>x<ny> [tstop]
 #

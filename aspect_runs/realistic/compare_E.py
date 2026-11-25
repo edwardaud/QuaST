@@ -5,8 +5,7 @@ The two runs are the *same card*: 2.5 x 1 Boussinesq box, T_top = 0 / T_bot = 1,
 H = 10, Ra = 1e5, composite isostress diffusion+dislocation rheology with the
 two phase transitions (latent heat per transition), AMR to level 7, run from
 t = 0.  ASPECT is dimensional, our solver is nondimensional, so the ASPECT
-diagnostics are converted with the scale set of
-docs/dev/VALIDATION.md section 2.1:
+diagnostics are converted with the scale set below:
 
     t_nd    = t_ASPECT * kappa / d^2          (d = 2.9e6 m, kappa = 1e-6 m^2/s)
     Vrms_nd = Vrms_ASPECT * d / kappa
@@ -37,7 +36,7 @@ import os
 import re
 import sys
 
-# --- the scale set of docs/dev/VALIDATION.md section 2.1 ----------
+# --- the scale set ----------
 D = 2.9e6                 # box depth [m]
 KAPPA = 1.0e-6            # thermal diffusivity [m^2/s]
 DT = 1000.0               # temperature drop [K]
@@ -97,7 +96,7 @@ def read_aspect(path):
                 nu_bot=-float(v[c_qbot]) / NORM,
                 tmax=float(v[c_tmax]) / DT - 0.5,
                 # the CBF bottom flux of the first step is a postprocessing
-                # artefact (docs/dev/VALIDATION.md section 4)
+                # artefact
                 cbf_ok=(step >= 2)))
         except (ValueError, IndexError):
             continue

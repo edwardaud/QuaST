@@ -25,7 +25,7 @@
 #
 # THE BOX PATH IS A SPECIALIZATION, NOT A ROUTE THROUGH THE GENERAL CODE.
 # `CartesianBox` methods are the current solver's expressions, character for
-# character (`docs/dev/GEOM_DESIGN.md` §4.2, rows E1-E16): `ihx = 2.0/hx`,
+# character (rows E1-E16): `ihx = 2.0/hx`,
 # `wfac = 0.25*hx*hy`, `x = x0 + 0.5*(xi+1)*hx`, `wt = 0.5*h*gl_w[q]`, ...
 # The general Jacobian route is never reachable with a `CartesianBox`: the box
 # `basis_grad` is `dphi*phi*ihx`, not `(J22*phi_xi - J21*phi_eta)/detJ`, and
@@ -34,8 +34,7 @@
 # "clean it up".
 #
 # The validation geometries are NOT reachable from any card in cut 1; they are
-# the proof of the interface (gate G266) and the rehearsal for the annulus
-# (`docs/dev/GEOM_DESIGN.md` §5, `docs/dev/GEOM_PROGRESS.md`).
+# the proof of the interface (gate G266) and the rehearsal for the annulus.
 
 const LOGICAL_SIDES = (:xminus, :xplus, :yminus, :yplus)
 
@@ -1526,8 +1525,8 @@ end
 
 Physical measure of the whole domain (area in 2-D).  The box method is the
 historical E13 `total_area(qt) = sum(leaf_hx*leaf_hy)` over the tree's leaf set,
-**bit for bit** (that is the expression every box diagnostics divides by; see
-`docs/dev/GEOM_DESIGN.md` E13).  A mapped geometry integrates `quad_measure`
+**bit for bit** (that is the expression every box diagnostics divides by).
+A mapped geometry integrates `quad_measure`
 over the leaves; with the caller's `fd` it is the measure of the caller's
 quadrature rule, which is what a mapped mean must divide by (so a constant field
 has the constant as its mean up to round-off).
@@ -1614,7 +1613,7 @@ Physical element size for the CFL/hmin path (GEOM_DESIGN E15).  Box method:
 the historical `min(leaf_hx, leaf_hy)` bit for bit.  Mapped method: the smaller
 of the two physical edge extents at the leaf centre, `min(2|J e_xi|, 2|J e_eta|)`
 (the reference extent is 2 in each direction; for the box map this is exactly
-`min(hx, hy)`).  `docs/dev/GEOM_DESIGN.md` §6.6: on the annulus the angular cell
+`min(hx, hy)`): on the annulus the angular cell
 size grows with `r`, so the CFL minimum is at the inner boundary.
 """
 @inline leaf_min_size(g::CartesianBox, lay, lf::NTuple{3,Int}) =
@@ -2052,7 +2051,7 @@ end
 Stage 0.5a geometry: the 2-D polar annulus `R0 <= r <= R1`, `0 <= phi <= Φ`,
 a wedge of the plane with an inner and an outer circular wall and (for the
 wedge) two radial seam sides.  This is the 2-D Cartesian annulus of
-`docs/dev/ANNULUS_REFS.md` §3 (the benchmark's "2-D cylindrical shell"), not a
+(the benchmark's "2-D cylindrical shell"), not a
 shell of a 3-D sphere.
 
 The logical coordinates are `S in [0,1]` radial and `T in [0,1]` angular, and

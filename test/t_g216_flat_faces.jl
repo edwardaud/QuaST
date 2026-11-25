@@ -1,9 +1,9 @@
 # G216: the flat face-neighbour table and its incremental maintenance.
 using Test, QuaST, Random, Printf
 
-# G216: the flat face-neighbour table (`QuadFaceTable`, stage A of
-# docs/dev/AMR.md §9) and the local 2:1 rebalance that uses it
-# (`rebalance_local!`, stage B, §10).
+# G216: the flat face-neighbour table (`QuadFaceTable`, stage A) and the local
+# 2:1 rebalance that uses it
+# (`rebalance_local!`, stage B).
 #
 # The AMR pass used to answer every `neighbors(qt, leaf, dir)` with a fresh
 # `Vector` refilled by a recursive descent from the base cells: 223.9 MB
@@ -13,8 +13,7 @@ using Test, QuaST, Random, Printf
 # `refine!`/`coarsen!` mark the leaves whose lists change stale, so `balance!`
 # reads arrays between mutations instead of re-querying the tree.  The hard
 # budget pass then replaces its per-merge full `balance!` with a work-queue
-# rebalance seeded at the merged parent
-# (`docs/dev/AMR.md`).
+# rebalance seeded at the merged parent.
 #
 # This gate pins:
 #   1. **Exact equivalence with the historical scan**: `neighbors` returns the
@@ -410,7 +409,7 @@ end
 
         # the documented counterexample: without the 2:1 entry precondition the
         # local pass cannot see a violation that is not in the merged parent's
-        # neighbourhood (docs/dev/AMR.md §4.1)
+        # neighbourhood.
         qb = Quadtree(5)
         for _ in 1:2, lf in collect(qb.leaves)
             refine!(qb, lf)

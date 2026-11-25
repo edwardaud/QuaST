@@ -14,10 +14,10 @@ checked as a warning-only surface because it is owned by the documentation
 batch).  The two `broken` entries are the explicit, documented `@test_skip`
 environment gates in G209 and G214 -- the realistic-state checkpoints they wait
 for are data-dependent states of 8-27 MB produced by long runs and are not
-committed (the decision and the alternatives are recorded in
-`docs/dev/BUG_FIX_LOG.md` §14.11); they are no longer literal tautologies.  The
-batch-P0 part-1 campaign record (code guards, order-gate thresholds, test holes,
-before/after evidence) is `docs/dev/BUG_FIX_LOG.md` §14.
+committed (the decision and the alternatives are recorded in the commit that
+made the change); they are no longer literal tautologies.  The batch-P0 part-1
+campaign record (code guards, order-gate thresholds, test holes, before/after
+evidence) lives in the commit messages of that batch.
 
 History: the earlier cuts' recorded totals were 134 086 / 134 084 / 0 / 2 on 185
 files (cut 1), then 136 980 / 136 978 / 0 / 2 on 194 files (stage 0.5b2), with
@@ -98,7 +98,7 @@ dt rung (measured 2.060/2.158/2.310) with a **first-order backward-Euler
 control** asserted <= 1.4 (measured 0.986/0.995/1.002), and its old single ratio
 threshold of 1.5 is gone.  Nothing was loosened: the old thresholds (2.0 / 2.0 /
 1.0 / 1.5) pass implementations the new ones reject; the old and new thresholds
-and the measured tables are recorded in `docs/dev/BUG_FIX_LOG.md` §14.7.
+and the measured tables are recorded in the gate headers.
 G281 (23 assertions) is the restart-guard geometry comparison (R5: a direct
 caller's config without the `geometry` key must not resume an annulus
 checkpoint), with the reachable driver restart still bitwise.  G282 (43) is the
@@ -120,7 +120,7 @@ a near-coincident-but-distinct node fixture (both face orientations, box and
 mapped bodies); m17/m17b make it red.  The four tautology/skip sites were
 cleaned: G202 and G216 got real assertions, and the two G209/G214 skips became
 explicit documented skips with a reason (the broken count stays 2, by the
-recorded decision).  See `docs/dev/BUG_FIX_LOG.md` §14 for the mutation logs,
+recorded decision).  See the commit messages of the batch for the mutation logs,
 the box nine-hash/allocation evidence and every mistake found on the way.
 `examples/subduction_2d.jl` (the
 regional subduction-style case). It pins only the checks the design classifies

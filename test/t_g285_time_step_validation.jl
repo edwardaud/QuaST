@@ -19,9 +19,9 @@
 #     a blunt `tstop > 0` guard is red here;
 #   * the valid-card row runs a 2-step box integration and asserts the returned
 #     state is finite and the step count/time are the documented ones; the
-#     "bitwise unchanged" part of the contract is the campaign's nine-hash dump
-#     and the box allocation A/B (recorded in docs/dev/BUG_FIX_LOG.md), not a
-#     re-pin here -- a raw-byte hash would be a machine-dependent regression pin
+# "bitwise unchanged" part of the contract is the campaign's nine-hash dump and
+# the box allocation A/B, not a re-pin here -- a raw-byte hash would be a
+# machine-dependent regression pin
 #     and the task forbids re-pinning, so the gate asserts determinism between
 #     two identical runs instead.
 using Test

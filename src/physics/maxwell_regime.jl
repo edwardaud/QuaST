@@ -20,8 +20,8 @@
 # material contrast carried by high-viscosity material (a cold lid, say) can be
 # removed from the problem the Stokes solve sees by several decades, and the
 # solve becomes *softer*.  Measured on the developed production state: material
-# contrast 3.3e6 against an effective ~5e2 at `G dt = 1.485` (docs/dev/PHASE2.md
-# step 2 of the case).  `maxwell_regime` measures both ranges on one viscosity
+# contrast 3.3e6 against an effective ~5e2 at `G dt = 1.485` (the second
+# step of the case).  `maxwell_regime` measures both ranges on one viscosity
 # field and at one step so the driver can report the difference rather than
 # leave it implicit.
 

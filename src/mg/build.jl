@@ -186,7 +186,7 @@ default) overrides the damping factor.  `smoothing=:taper` remains selectable
 `fine_Cu` (optional) is the caller's full->free constraint matrix of the finest
 tree.  `_semquad_mg_geometry` otherwise re-assembles the finest level with eta=1
 only to read that matrix; passing it removes the duplicate assembly (the
-0.17-0.41 s finest row of docs/dev/MG.md) and is bitwise inert (G219).
+0.17-0.41 s finest row) and is bitwise inert (G219).
 
 `fine_mfop`/`fine_mfeta` (optional, `operator=:matrixfree` only) are the
 caller's finest-level leaf-local operator (`semquad_kop(ss, qt)`) and its
@@ -197,7 +197,7 @@ them is bitwise inert (G220) and only removes the duplicate sampling.
 
 Every level's viscosity field is stored as a `SemQuadEtaLane`: the leaf-major
 sample plus the block-major lane table the leaf-blocked kernel reads
-(docs/dev/MG.md).  The table is built here, once per level, never per
+    # The table is built here, once per level, never per
 apply; it is a re-layout, so it changes no value (G225).
 
 `geom_assembly=:minimal` (default) builds the coarse levels' `Cu` with the
@@ -223,8 +223,8 @@ and ignored in that mode (it is the caller's outer-Krylov operator).
 the exact `diag(Cu' K Cu)`, computed leaf-locally without forming `K`;
 `:lumped` is the historical `Cu' diag(K)` (only for A/B -- on hanging rows the
 negative interpolation weights cancel, so it is not the reduced diagonal and its
-positivity clip can make a row a `1e12` smoother amplifier; see
-docs/dev/MG.md §5.2).  The sparse operator path always uses
+positivity clip can make a row a `1e12` smoother amplifier).  The sparse
+operator path always uses
 `diag(A[k])` and is unaffected.
 
 `mg_threads=1` (default) is the serial, bitwise V-cycle.  `mg_threads=n>1`
@@ -233,7 +233,7 @@ damped-Jacobi sweeps and the residual evaluation -- over `n` fixed contiguous
 leaf blocks (`Threads.@threads :static`), with one `SemQuadKScratch` per block
 and a per-leaf element buffer merged **serially in leaf order**, so the result
 is bitwise identical to the serial V-cycle (G190; measured 2.5-3.1x V-cycle
-speedup on 4096-leaf trees, docs/dev/SOLVER.md §19.2).  Only the matrix-free
+speedup on 4096-leaf trees).  Only the matrix-free
 operator path is threaded (the sparse `A[k]` path keeps its serial `mul!`); a
 request larger than `Threads.nthreads()` is clamped with a warning, and a
 single-threaded process warns once and stays serial.
@@ -320,7 +320,7 @@ function make_semquad_mg(ss::SemStokes, qt::Quadtree, p::Int, bc::Symbol,
                 # but recomputing its eta field is not: the caller's
                 # `semquad_eta_field` sampled the identical 131 008 points and
                 # the hierarchy used to do it a second time (0.17 s of the F
-                # build at one thread, docs/dev/MG.md).
+                # build at one thread).
                 opk = fine_mfop
                 (opk.N == geo.sss[k].su.N && opk.p == geo.sss[k].su.p &&
                  opk.q == geo.sss[k].sp.p && opk.deviatoric == deviatoric &&

@@ -1,4 +1,4 @@
-# ---- per-transition latent-heat coefficients (docs/dev/PHYSICS.md §7.8) -------
+# ---- per-transition latent-heat coefficients -------
 # The energy equation carries the latent heat of every transition as
 #
 #     (1 + sum_i L_i Gamma_T,i) Dtheta/Dt = lap(theta) - u_z dTbar/dz

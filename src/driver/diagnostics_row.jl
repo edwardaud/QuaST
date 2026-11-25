@@ -42,14 +42,14 @@ function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
     # layout must stay byte-identical: on the box they are
     # `Nut - Nub - (H - Ibase)` (plus `latent_dgdt/A` when latent heat is on),
     # i.e. the *steady* flux balance evaluated at a transient state.  They are
-    # **not** a flux error and do not close for any Nu definition: by `(DEC)` of
-    # docs/dev/VALIDATION.md §4 the number equals `-dH/dt` plus three
+    # **not** a flux error and do not close for any Nu definition: the `(DEC)`
+    # number equals `-dH/dt` plus three
     # bookkeeping terms (the skew-vs-PDE latent/advection difference, the
     # CBF's `O(h)` wall functional and the solver's constraint residual),
     # divided by `A`.  Read it as the enthalpy-rate residual of the
     # historical formula, never as "the budget misses X".  The exact
     # residual of the quoted pointwise Nu pair is the opt-in `resid_A`
-    # column below (`extdiag=true`, docs/dev/VALIDATION.md §3.2), which is
+    # column below (`extdiag=true`), which is
     # zero for the time-step CBF and `O(h)` for the pointwise family.
     #
     # **Mapped normalisation (stage-0.5 audit defect B5).**  The box formula is
@@ -73,14 +73,13 @@ function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
     # map because there `A_phys = A_box = total_area(qt)` and the box Nusselt
     # identities hold, so the box branch below is kept bit for bit and the
     # mapped branch is the general statement.  The box's own doc record of the
-    # column (`docs/dev/VALIDATION.md` §4) is unchanged — this is a mapped-only
+    # column is unchanged — this is a mapped-only
     # branch.
     #
     # The latent bookkeeping of the historical formula: the assembled
     # energy equation carries the apparent capacity `1 + sum_i L_i
     # Gamma_T,i` and the source `-sum_i L_i Gamma_z,i u_z`, so the
-    # volume-integrated *steady* balance has two extra terms
-    # (docs/dev/PHYSICS.md §7.3):
+    # volume-integrated *steady* balance has two extra terms:
     #   int L_i Gamma_z,i u_z dV        (latent source)
     #   int L_i Gamma_T,i u.grad theta  (capacity's advective correction)
     # `latent_int` (the latent enthalpy) is NOT one of them: its time
@@ -112,8 +111,8 @@ function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
     # Opt-in exact residual of the quoted pointwise pair, per unit area:
     #   R/A = (F_pt - (dH/dt + sum(C theta) + Ibase + latent_src)) / A
     # with the operator rebuilt from this step's stored EV field and its
-    # apparent-capacity temperature (`semquad_exact_residual`,
-    # docs/dev/VALIDATION.md §2.3/§3.2).  Default off: no column, no extra
+    # apparent-capacity temperature (`semquad_exact_residual`).  Default off: no
+    # column, no extra
     # assembly, and every existing history row stays byte-identical.
     resid_A = NaN
     if extdiag
@@ -159,7 +158,7 @@ function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
     end
     if extdiag
         # exact residual of the pointwise pair (appended only when
-        # requested; see the block above and docs/dev/VALIDATION.md §3.2)
+        # requested; see the block above).
         push!(row, resid_A)
     end
     return (row=row, Nut=Nut, Nub=Nub, Vr=Vr, Ta=Ta, closure=closure)

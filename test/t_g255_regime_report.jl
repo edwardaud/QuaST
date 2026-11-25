@@ -5,7 +5,7 @@
 # 2a closure `eta_eff = 1/(1/eta + 1/(G dt))` is the harmonic mean of `eta` and
 # `G dt`, so it caps the viscosity from above and can remove decades of material
 # contrast from what the Stokes solve sees (measured on the developed production
-# state: material 3.3e6, effective ~5e2 at `G dt = 1.485`, docs/dev/PHASE2.md).
+# state: material 3.3e6, effective ~5e2 at `G dt = 1.485`).
 # The card could not set `shear_modulus` at all and the driver said nothing, so
 # a reader could believe a viscoelastic card is "the same problem plus memory".
 # This gate pins:
@@ -137,8 +137,8 @@ end
     @test occursin("shear_modulus=%.3g", src)
     @test occursin(", SHEAR_MODULUS,", src)
     @test occursin("wall_un=%s", src)
-    # the warning comment near the knob points at the regime change, with the
-    # measured numbers of docs/dev/PHASE2.md and the report it points at
+# the warning comment near the knob points at the regime change, with the
+# measured numbers:
     @test occursin("WARNING", src)
     @test occursin("1.485", src)
     @test occursin("5e2", src)

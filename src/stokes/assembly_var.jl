@@ -56,7 +56,7 @@ end
 # data without paying for the operator the caller never stores or forms.
 #
 # `geo_coef`/`dp_coef` are **type parameters**, not `Union{Nothing,Function}`
-# fields.  A function *field* is not specialised (docs/dev/SOLVER.md §17: the
+# fields. A function *field* is not specialised: the
 # `semquad_rho` bug), so `geo_coef(x,y,edot)` inferred as `Any` and the Kgeo
 # accumulation `Kgloc[k,l] += gc * Tux_k * Dux_l * w` was a boxed multiplication
 # inside the innermost `(k,l)` loop: measured 13.0 of the 15.0 ms of the Kgeo
@@ -179,7 +179,7 @@ function _semquad_assemble_block!(buf::SemQuadAsmBuf, cfg::SemQuadAsmCfg,
             # path (`mf_path`): the operator's own eta field
             # (`semquad_eta_field`) samples the same points.  Evaluating the
             # closure here anyway cost 0.15 s of the F setup at one thread
-            # (131 008 calls, measured; docs/dev/MG.md).  `etaq` stays
+            # (131 008 calls, measured). `etaq` stays
             # defined so the `K`-forming branches below compile unchanged.
             etaq = 0.0
             if !mf_path
@@ -714,7 +714,7 @@ end
 # The Stokes assembly had no boundary-face integral at all: the natural
 # (do-nothing) condition of the weak form is `sigma.n = 0`, so every
 # unconstrained boundary component was silently traction-free
-# (docs/dev/BC_DESIGN.md §1.1).  Integration by parts of `-div sigma = f` with
+    # Integration by parts of `-div sigma = f` with
 # `sigma = -p I + 2 eta eps(u)` gives
 #
 #     int 2 eta eps(u):eps(v) - int p div v = int f.v + int_{dOmega} (sigma.n).v dS,
@@ -777,8 +777,8 @@ direction `dir` has no neighbour, `0x00` otherwise.
 
 The mask exists because the quadtree neighbour table is **not thread-safe**
 (its lazy construction writes the table): the leaf assembly must not query
-`has_no_face_neighbor`/`neighbors` from `Threads.@threads`
-(docs/dev/BC_DESIGN.md §3.3 item 1).  It is built once, serially, before the
+`has_no_face_neighbor`/`neighbors` from `Threads.@threads`.  It is built once,
+serially, before the
 threaded leaf assembly and reused by the fixed-dof loop, the net-flux check and
 `_semquad_boundary_traction!`, so those passes never touch the table.  The
 per-face booleans are exactly what those passes asked the table for before the
@@ -819,9 +819,9 @@ tangential component is free: a `:free` wall (stage 2) or an `:open` wall
 (stage 3, both components free).  A tangential traction on a `:rigid` wall
 targets a Dirichlet component; the load would be assembled into `fv` but `Cu'`
 would drop it, i.e. it would be a silent no-op.  The design rejects that
-combination rather than letting a user believe a load was applied
-(docs/dev/BC_DESIGN.md §3.2/§3.6), and the same validation runs in `Params` and
-in `_solve_semquad_stokes_var_core` so a direct library call cannot bypass it.
+combination rather than letting a user believe a load was applied, and the same
+validation runs in `Params` and in `_solve_semquad_stokes_var_core` so a direct
+library call cannot bypass it.
 Note that this is a *wall-level* rule: a face-integrated load also distributes
 to the face's corner nodes, whose dof may be owned by an adjacent wall.  That
 part is not an error -- the test function associated with a Dirichlet dof is
@@ -870,7 +870,7 @@ so the assembled load would land on a dof with no equation and be silently
 dropped by `Cu'` -- refused here (and identically in `Params`), never ignored.
 This is also what makes `wall_tn` the pressure data: on an open boundary the
 traction level fixes the pressure constant, which is why the solve's pressure
-gauge becomes derived (no nodal pin, docs/dev/BC_DESIGN.md §3.5).
+gauge becomes derived (no nodal pin).
 """
 function _semquad_validate_wall_tnormal(wall_tn, resolved_wall_bc)
     names = (:xminus, :xplus, :yminus, :yplus)
@@ -885,8 +885,8 @@ function _semquad_validate_wall_tnormal(wall_tn, resolved_wall_bc)
             "refused instead of being a no-op.  A normal traction carries the " *
             "pressure and needs a wall with a free normal velocity " *
             "(wall_bc[$i] = :open; an :open wall has no Dirichlet component " *
-            "and its pressure gauge becomes derived, docs/dev/BC_DESIGN.md " *
-            "§3.5); set that, or drop wall_tn[$i]."))
+            "and its pressure gauge becomes derived); set that, or drop " *
+            "wall_tn[$i]."))
     end
     return _semquad_has_wall_tn(wall_tn)
 end

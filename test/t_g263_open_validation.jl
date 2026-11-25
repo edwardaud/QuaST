@@ -29,8 +29,7 @@
 #       change, not the open wall;
 #   (e) the per-step Newton path refuses a per-wall configuration instead of
 #       silently solving the single-`bc` (closed) problem with an `:open` wall
-#       (the pre-existing gap recorded in docs/dev/BC_PROGRESS.md §4.4, which
-#       stage 3 makes load-bearing).
+# (a pre-existing gap that stage 3 makes load-bearing).
 #
 # The pre-change hashes are not tautological: they were produced by the stage-2
 # tree in a separate export and this file only compares.  The tolerances in (c)

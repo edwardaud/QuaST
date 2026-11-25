@@ -3,7 +3,7 @@
 # A checkpoint stores the run settings as one canonical string, and the restart
 # guard compares each stored value against the one the new run would use.  Both
 # sides of that comparison go through this file, so how a value is spelled is
-# defined in one place (docs/dev/HANDOVER.md section 7).
+# defined in one place.
 
 """Canonical string form of a run setting, used to compare checkpoints."""
 config_value_string(v::Symbol) = string(v)

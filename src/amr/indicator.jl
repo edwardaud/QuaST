@@ -144,7 +144,7 @@ Per-leaf indicator built from the gradient jump of the *velocity*, the sum of th
 two components' jumps.  The default `semquad_gradient_jump` on `theta` sees the
 thermal boundary layers but not a velocity field that oscillates on the grid
 scale while the temperature stays smooth, which is what happens at high Rayleigh
-number (docs/dev/PHASE1.md).  This indicator is the same estimator applied to a
+number. This indicator is the same estimator applied to a
 field that carries that error.
 
 `sx` and `sz` are the velocity components on the scalar node layout of `sq`
@@ -181,7 +181,7 @@ eta_both = total(jt) * (jt / total(jt) + jv / total(jv))
 The second form is what the code evaluates.  It is the same ranking as the pure
 `jt/total(jt) + jv/total(jv)` sum because `total(jt) > 0` is a common positive
 factor, which changes no threshold and no selected leaf under the mass-based
-cut (`refine_frac` is a fraction of the total; docs/dev/AMR.md §2.2).  Keeping
+cut (`refine_frac` is a fraction of the total). Keeping
 the factor makes the return value literally the theta indicator in the at-rest
 limit instead of a rescaled copy of it.  Either field's absolute units then
 cancel: multiplying `theta` by any positive constant scales the whole
@@ -271,8 +271,8 @@ smooth fields (G272 (b) prints it).  The box path itself never takes this body.
 **History (2026-11-25).**  Until this date the box body's fine-side y-face
 one-sided derivative contracted the wrong nodal index -- `u[idsR[(q-1)*n+i]]`
 (the x index of row q) instead of `u[idsR[(i-1)*n+q]]` (the y index of column
-q).  The defect is recorded in `docs/dev/AMR.md` §2.1, `docs/dev/BUG_AUDIT_INDICATOR.md`
-and `docs/dev/BUG_LEDGER.md` §19; the box body below now contains the corrected
+q).  The defect is recorded in the indicator audit and the bug ledger; the box
+body below now contains the corrected
 index and reproduces the corrected estimator.  The nine-hash process dump
 (`out_julia/agent/state_dump_run.jl`) does **not** pin this arithmetic -- its
 AMR cycle is inert, so its hashes are invariant under the correction; the
@@ -286,7 +286,7 @@ end
 # scalings instead of the mapped chain rule), with the y-face fine-side index
 # corrected on 2026-11-25.  G217/G266 carry gate-local copies of this arithmetic
 # and G278 is the independent oracle.  The nine-hash process dump does not pin
-# the indicator (its AMR cycle is inert; docs/dev/AMR.md §2.1).
+# the indicator (its AMR cycle is inert).
 function _semquad_gradient_jump(::CartesianBox, sq::SemQuad, qt::Quadtree,
                                u::Vector{Float64})
     n = sq.p + 1

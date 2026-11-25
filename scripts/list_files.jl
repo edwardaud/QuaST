@@ -1,6 +1,6 @@
 #!/usr/bin/env julia
-# Regenerate docs/dev/FILES.md: every file in the repository with the one line
-# that says what it is. Run from the repository root:
+# Regenerate the local, untracked file index: every file in the repository
+# with the one line that says what it is. Run from the repository root:
 #
 #     julia --project=. scripts/list_files.jl
 

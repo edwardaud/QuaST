@@ -152,7 +152,7 @@ The generic mapped body keeps the same box convention (`top_ref - st/wt` with
 the mapped wall measure `wt`, and `semquad_base_wall_refs(pr, g)` for the
 references); the annulus dispatches to its per-wall benchmark normalisation,
 `(top_ref - st/wt)/top_ref` and `(bot_ref + sb/wb)/bot_ref`, exactly the
-`semquad_nu_walls` annulus definition (docs/dev/ANNULUS_REFS.md §6.2/§6.5).
+`semquad_nu_walls` annulus definition.
 Before the D2/D3 fix the mapped body summed the logical `y` rows and normalised
 by the *Cartesian* base gradient, so the annulus pair came back `(1,1)` on a
 conduction state whose true pair is `(0.900, 0.901)`.

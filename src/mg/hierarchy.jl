@@ -32,7 +32,7 @@ const _SEMQUAD_MG_CLAMP_WARNED = Ref(false)
 # Resolve the requested `mg_threads` against the actual Julia thread pool: 1 is
 # the serial (bitwise, historical) path, a request larger than the pool falls
 # back to the pool size and a single-threaded process warns once and stays
-# serial.  Same policy as `_semquad_asm_thread_count` (docs/dev/SOLVER.md §12).
+# serial. Same policy as `_semquad_asm_thread_count`.
 function _semquad_mg_thread_count(mg_threads::Int)
     mg_threads >= 1 || throw(ArgumentError("mg_threads must be >= 1"))
     mg_threads == 1 && return 1
@@ -163,8 +163,7 @@ Per-level smoothing-sweep vectors of `make_semquad_mg`, **coarse first**
 * `:uniform` -- `pre` and `post` sweeps on every level (the historical V-cycle);
 * `:taper` -- `1, 2, 2, 4, 4, 8, 8, ...` sweeps from the fine level down.  A
   smoothing sweep on the next coarser level costs ~1/1.7-4 of the finer one, so
-  this spends the smoothing budget where it is cheapest.  See
-  docs/dev/SOLVER.md §14 for the measurement.
+  this spends the smoothing budget where it is cheapest.
 """
 function _mg_smoothing_schedule(schedule::Symbol, nlev::Int, pre::Int,
                                 post::Int)

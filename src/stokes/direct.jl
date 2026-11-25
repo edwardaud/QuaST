@@ -113,7 +113,7 @@ function _lagged_solve!(S::SparseMatrixCSC, rhs::Vector{Float64}, key::UInt64;
 end
 
 # ---------------------------------------------------------------------------
-# The direct path's diagonal-shift ladder (docs/dev/CASE_REALISTIC.md §13)
+# The direct path's diagonal-shift ladder
 # ---------------------------------------------------------------------------
 
 # Relative diagonal shifts tried, in order, by `_shift_ladder_solve`.  The first
@@ -125,7 +125,7 @@ end
 const SEMSTOKES_SHIFT_LADDER = (1.0e-12, 1.0e-10, 1.0e-8)
 
 # Relative diagonal shifts tried *before* the ladder when the unshifted LU has
-# lost the solution outright (docs/dev/CASE_REALISTIC.md §13.10).  The wall-refined
+# lost the solution outright. The wall-refined
 # realistic tree carries a cluster of near-null pressure modes on its level-5
 # wall strips (a discrete inf-sup deficiency of that strip: measured smallest
 # |eigenvalue| 4.6e-10 against sigma_max 1.2e5, the three smallest singular
@@ -144,11 +144,10 @@ const SEMSTOKES_TINY_SHIFTS = (1.0e-14, 1.0e-13)
 # usable answer -- however marginal -- is bitwise unchanged on the historical
 # path.  The threshold is deliberately not lowered: the last-resort phase (rule
 # 7) covers the states just *below* it, where the historical rungs can still sit
-# inside the wall-strip cluster (G step 7641 measured 0.9654, 3.5 % below 1.0;
-# docs/dev/CASE_REALISTIC.md §17.3-§17.4).
+# inside the wall-strip cluster (G step 7641 measured 0.9654, 3.5 % below 1.0).
 const SEMSTOKES_LOST_TOL = 1.0
 # Allowed `stokes_scaling` values of the direct path
-# (docs/dev/BUG_LEDGER.md): `:none` is the historical unscaled saddle,
+# `:none` is the historical unscaled saddle,
 # bit for bit; `:equilibrated` is the symmetric congruence below.  No other
 # value changes an existing path.
 const SEMSTOKES_SCALINGS = (:none, :equilibrated)
@@ -157,18 +156,17 @@ const SEMSTOKES_SCALINGS = (:none, :equilibrated)
     _semquad_stokes_equil_diag(Kred, Bt, Bs) -> Vector{Float64}
 
 Symmetric equilibration diagonal `d = [d_u; d_p]` for the reduced saddle
-`S = [Kred Bt; Bs 0]` (docs/dev/BUG_LEDGER.md):
+`S = [Kred Bt; Bs 0]`:
 
 * `d_u = 1/sqrt(diag Kred)` removes the viscosity scale from the momentum block
   (the lid's `eta = 1e4` against the interior's `1e-3` is the whole reason the
-  wall checkerboard is weak: `beta ~ 0.696/sqrt(eta_lid)`,
-  docs/dev/BUG_LEDGER.md §7);
+  wall checkerboard is weak: `beta ~ 0.696/sqrt(eta_lid)`);
 * `d_p = 2 max|Kred| / max(|Bt|, |Bs|)` is a single scalar that balances the
   constraint block against the momentum block: it makes `d_p |B|` comparable to
   `|K|`.  This is the max-norm equilibration of the two blocks, i.e. the
   matrix-derived form of the `eta/h` pressure scale, with a factor 2 of margin
   (the measured plateau starts at ~0.3 of `max|K|/max|B|` and extends over four
-  decades, docs/dev/BUG_LEDGER.md §2.1).
+  decades).
 
 The congruence `S -> D S D`, `rhs -> D rhs` has the exact same solution
 (`x = D y`); it changes only the arithmetic of the factorisation.  In the
@@ -235,7 +233,7 @@ The rules, in the order they apply:
    factorisation, no shift, `rungs = nothing`.  This is the historical
    behaviour of the direct branch and is what keeps healthy systems bitwise
    identical.
-2. **Lost solution** (docs/dev/CASE_REALISTIC.md §13.10).  If `r > lost_tol` the
+2. **Lost solution**. If `r > lost_tol` the
    unshifted LU did not solve the system at all (its answer is worse than
    `x = 0`): the near-null cluster has swallowed the factorisation, and the
    diagonal shift then has to be chosen at the *cluster's* scale rather than
@@ -263,7 +261,7 @@ The rules, in the order they apply:
 6. **Return the best.**  If even that misses `accept_tol` the best iterate is
    returned with its residual; the caller decides (the driver keeps the fatal
    error as the last resort).
-7. **Last-resort tiny shifts** (docs/dev/CASE_REALISTIC.md §17.4, G212).  A finite
+7. **Last-resort tiny shifts** (G212). A finite
    unshifted residual at or below `lost_tol` skips rule 2, and the historical
    rungs can then sit inside the wall-strip cluster: G step 7641 measured
    `r = 0.9654` (3.5 % below the 1.0 trigger), `1e-12 -> 1.56e-2`, and four

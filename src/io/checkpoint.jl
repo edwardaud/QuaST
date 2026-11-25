@@ -32,15 +32,15 @@ continue with a different configuration.  `meta` is free-form provenance and is
 not validated.  `ev` is the elementwise entropy-viscosity field used by the last
 energy assembly, aligned with `sort(collect(qt.leaves))`; when omitted, no EV
 dataset is written (an EV-free run, or an old checkpoint).  `weak`/`weak_prev`
-are the strain-weakening field at the two BDF2 levels of the next step
-(docs/dev/PHYSICS.md §9); both are optional so an old checkpoint still loads.
-`txx`/`tyy`/`txy` are the three nodal Maxwell stress-history components
-(docs/dev/PHASE2.md 2b step 1); all three are optional and written only when the
+are the strain-weakening field at the two BDF2 levels of the next step; both
+are optional so an old checkpoint still loads.
+`txx`/`tyy`/`txy` are the three nodal Maxwell stress-history components; all
+three are optional and written only when the
 stress history is active, so an old checkpoint (and every `shear_modulus = 0`
 run) has none and loads with `nothing`.
 
 `cooldown` is the `AmrCooldown` hysteresis state of the balanced AMR cycle
-(`src/amr/cycle.jl`, docs/dev/AMR.md §3.5).  When supplied it is
+(`src/amr/cycle.jl`). When supplied it is
 written as two integer datasets (`cooldown_no_refine`/`cooldown_no_coarsen`, one
 column per key: level, ix, iy, remaining cycles) and the integer attribute
 `cooldown_cycle`; they are **state**, not configuration, so they are deliberately
@@ -185,13 +185,13 @@ multi-root 2b checkpoints (5x2 base) loadable.  A stretched single-root box
 whose `Lx` was not stored cannot be recovered and falls back to `Lx = 1`; new
 checkpoints always store `Lx`.  `weak`/`weak_prev` are the two BDF2 levels of
 the strain-weakening field, or `nothing` when weakening is off or the file
-predates it.  `txx`/`tyy`/`txy` are the Maxwell stress-history components
-(docs/dev/PHASE2.md 2b step 1), or `nothing` when the stress state is off or the
+predates it.  `txx`/`tyy`/`txy` are the Maxwell stress-history components, or
+`nothing` when the stress state is off or the
 file predates it.  `cooldown` is the optional `AmrCooldown`
 hysteresis state of the balanced AMR cycle; a checkpoint without the cooldown
 datasets (every file written before the cooldown existed) returns an **empty**
 cooldown (`cycle == 0`), which is exactly the
-historical restart behaviour (docs/dev/BUG_LEDGER.md §10.5).  `velocity_stale`
+historical restart behaviour. `velocity_stale`
 is the optional marker described in `save_semquad_state`: true means the stored
 `ux/uz/pv` are the end-of-run diagnostic re-solve and a restart must zero them to
 continue the trajectory (false/absent = use them verbatim).

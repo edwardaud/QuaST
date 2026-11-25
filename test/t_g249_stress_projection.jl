@@ -164,8 +164,7 @@ using Test, QuaST, LinearAlgebra, Printf
     # over the *raw* components.  The co-rotational part is common to both sides
     # now (G250), so this isolates the projection defect the gate is about.  It
     # is expected to be round-off-identical when tr == 0 and measurably
-    # different otherwise ("a gate must assert that behaviour changes",
-    # docs/dev/HANDOVER.md section 8).
+    # different otherwise ("a gate must assert that behaviour changes").
     function g249_raw_replay(ux, uz, tx, ty, tz)
         eps = QuaST.semquad_strain_rate_components(sqa, ux, uz)
         w = QuaST.semquad_spin_component(sqa, ux, uz)

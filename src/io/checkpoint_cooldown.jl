@@ -1,7 +1,7 @@
 # The optional `:balanced` AMR cooldown state of a checkpoint.
 #
-# The balanced cycle carries a hysteresis cooldown between steps (docs/dev/AMR.md
-# section 4); a checkpoint has to store it or a restart would forget which leaves
+# The balanced cycle carries a hysteresis cooldown between steps; a checkpoint
+# has to store it or a restart would forget which leaves
 # are cooling down.  The datasets are serialised as one deterministic 4 x n Int64
 # matrix and validated on read, so a truncated or reordered file fails loudly
 # instead of resuming an unknown hysteresis state.

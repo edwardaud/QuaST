@@ -2,8 +2,8 @@
 """
     _coarsening_allowed(qt, kids, will_refine, granted) -> Bool
 
-deal.II's `coarsening_allowed()` (`source/grid/tria.cc:10935-10996`, v9.4.0;
-`docs/dev/AMR.md` §1.3) for one quartet: iterate the
+deal.II's `coarsening_allowed()` (`source/grid/tria.cc:10935-10996`, v9.4.0)
+for one quartet: iterate the
 quartet's **external** faces and deny the merge when a face neighbour would end
 the pass more than one level finer than the merged parent (level
 `kids[1][1] - 1`).
@@ -22,7 +22,6 @@ only quartets whose parent is already 2:1-legal *after* the whole pass.
 The neighbour lists come from the flat [`QuadFaceTable`](@ref) (`_face_slot`),
 so the eight queries per quartet are array reads: this predicate runs once per
 candidate quartet in every plan sweep and once per live-funded merge
-(`docs/dev/AMR.md` §9).
 """
 function _coarsening_allowed(qt::Quadtree, kids::NTuple{4,NTuple{3,Int}},
                              will_refine::Set{NTuple{3,Int}},

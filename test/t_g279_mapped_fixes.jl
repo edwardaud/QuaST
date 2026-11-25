@@ -1,4 +1,4 @@
-# G279: the mapped-geometry defect fix campaign (docs/dev/BUG_AUDIT_MAPPED.md).
+# G279: the mapped-geometry defect fix campaign.
 #
 # One gate per confirmed audit defect, plus the (b) rows this campaign closed:
 #

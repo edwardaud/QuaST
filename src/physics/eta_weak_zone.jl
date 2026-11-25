@@ -2,7 +2,7 @@
 # is in use, so no law has to know about it (ASPECT reaches the same effect with
 # a `weak zone` material model beside its rheology plugin).  `weak_active`,
 # `semquad_weak_factor` and the `Params.eta_multiplier` hook are the activity
-# predicates and the weakening factor of `docs/dev/PHYSICS.md` section 9.
+# predicates and the weakening factor.
 
 
 

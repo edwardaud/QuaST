@@ -1,8 +1,8 @@
 # G229: the default AMR path is the balanced policy — no policy keyword required.
 using Test, QuaST, Printf
 
-# G229: the library path of `run_semquad_simulation` is the balanced AMR policy
-# (docs/dev/AMR.md, Stage 1).  Since the classic policy was removed at `8c622df`
+# G229: the library path of `run_semquad_simulation` is the balanced AMR policy.
+# Since the classic policy was removed at `8c622df`
 # the balanced cycle is the only adaptive policy, so this gate pins the
 # *default* driver path itself: a caller that passes no AMR keyword at all gets
 # the balanced cycle, its checkpoint records `amr_policy = "balanced"`, the

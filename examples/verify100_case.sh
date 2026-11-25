@@ -13,7 +13,7 @@
 #   bash examples/verify100_case.sh direct  [steps]  -> out_julia/verify100_direct
 #
 # The log is out_julia/verify100_<arm>.log.  `CASE_OUT` is always set
-# explicitly (docs/dev/CASE_REALISTIC.md section 5), and the arm refuses to reuse
+# explicitly, and the arm refuses to reuse
 # an existing output directory.  `VERIFY100_FOREGROUND=1` runs Julia in the
 # foreground (used under a supervisor that keeps the WSL session alive);
 # otherwise the process is detached with setsid.
@@ -40,7 +40,7 @@ LOG="$QUAST_OUT/${RUN_ID}_$ARM.log"
 
 if [ -e "$OUT" ]; then
     echo "verify100_case.sh: refusing, $OUT already exists" >&2
-    echo "  (CASE_OUT is always explicit: docs/dev/CASE_REALISTIC.md section 5)" >&2
+    echo "  (CASE_OUT is always explicit)" >&2
     exit 3
 fi
 if pgrep -f "case_realistic_2d.jl spinup" >/dev/null 2>&1; then
@@ -49,7 +49,7 @@ if pgrep -f "case_realistic_2d.jl spinup" >/dev/null 2>&1; then
 fi
 
 # The production G card.  CASE_STOKES_SCALING=equilibrated is the documented
-# solver-side saddle equilibration (docs/dev/BUG_LEDGER.md); it only
+# solver-side saddle equilibration; it only
 # engages on a direct solve whose unscaled health check fails, so it is a
 # no-op on the solves that pass and is set for both arms so that the only
 # difference between them is CASE_LINEAR.  Every AMR knob is written out

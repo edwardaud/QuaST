@@ -15,7 +15,7 @@ using Test, QuaST, LinearAlgebra
 #     and the discrete divergence vanishes for it.
 #
 # The numbers here are deliberately only "factor > 5 per order" / "within 20% of
-# uniform"; the measured ratios are much larger (see docs/dev/SOLVER.md).
+# uniform"; the measured ratios are much larger.
 
 function _g151_l2(sq, u, uex)
     p = sq.p

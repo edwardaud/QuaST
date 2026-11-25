@@ -6,7 +6,7 @@ renderers. None of it is solver code, and none of it is a case input.
 | File | What it is |
 |---|---|
 | `check_docs.jl` | Documentation checks, run in CI: display-math layout, formulas against Chinese punctuation, escaped underscores inside inline math, language switchers, code-fence languages. |
-| `list_files.jl` | Regenerate `docs/dev/FILES.md`: every file with its one-line header. Do not hand-edit that table. |
+| `list_files.jl` | Regenerate the local, untracked file index: every file with its one-line header. Do not hand-edit that table. |
 | `check_counts.jl` | Documentation-count consistency, run by hand: the gate-file count in `test/README.md`/`CONTRIBUTING.md` against the tree and `test/runtests.jl`, the committed full-suite totals' structural sanity, and the other surfaces against that record (`README.md` is warning-only; see the script header for the limits). Not part of the gate suite. |
 | `benchmark_table.jl` | Turn the benchmark logs into the rows of the validation table. It checks that a run is steady before quoting it, and labels aborted logs. |
 | `run_benchmarks.sh` | Reproduce the validation campaign: every benchmark row, with the settings the published cards use. |

@@ -237,7 +237,7 @@ enters it into the upward momentum with a **plus** sign
 reproduces ASPECT's operator: prescribing ASPECT's own p field with the force
 `-rho_ad Di gamma p` gives ASPECT's velocity to six digits (Vrms 24.7681 vs
 24.7657, max|u| 46.861 vs 46.858), while the opposite sign gives 27.88.
-See docs/dev/SOLVER.md for the operator-agreement test.
+See the operator-agreement test.
 """
 function semquad_stokes_Pcm(ss, qt::Quadtree; rho_fun::Union{Nothing,Function}=nothing,
                             gamma::Float64=1.0, Di::Float64=1.0,

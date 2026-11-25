@@ -1,5 +1,5 @@
 # ===========================================================================
-# The inner solve of the w-BFBT `S1` block (docs/dev/MG.md)
+# The inner solve of the w-BFBT `S1` block
 #
 # The w-BFBT pressure block applies `Shat^{-1} = S1^{-1} S2 S1^{-1}` and does
 # that twice per outer iteration: two solves with

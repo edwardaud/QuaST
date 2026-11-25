@@ -104,7 +104,7 @@ of `sq`, returned as the named tuple `(exx, ezz, exz)`:
 Computed element-locally with each element's own derivative matrix, the same
 loop as [`semquad_strain_rate_field`](@ref), which only returns the second
 invariant `sqrt(0.5(exx^2+ezz^2+2exz^2))`.  The two would be redundant if the
-invariant were enough: the Maxwell stress history of docs/dev/PHASE2.md 2b
+invariant were enough: the Maxwell stress history
 carries the tensor components, so the shear one in particular needs `exz`.
 
 The historical box body scales *every* derivative with `leaf_hy` (written for

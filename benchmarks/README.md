@@ -1,6 +1,6 @@
 # Benchmarks
 
-Performance instruments behind the numbers in `docs/dev/`. They time the solver on production
+Performance instruments behind the numbers in `results/`. They time the solver on production
 states and on uniform test trees, and print their own tables or one `RESULT key=value` line.
 Run them from the repository root with the project instantiated, for example
 
@@ -33,4 +33,4 @@ below. Every script copies its checkpoint to a temporary directory and opens it 
 
 None of these scripts records a runtime in its header; they print their own timings, so the
 table has no runtime column. The environment variables each script reads are listed in its
-header, and the measurement conditions are in `docs/dev/PERFORMANCE.md`.
+header, and the measurement conditions are recorded per number in `results/`.

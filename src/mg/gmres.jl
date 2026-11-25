@@ -42,7 +42,7 @@ The stopping criterion is the **true** residual `norm(b - A x) / norm(b)`,
 recomputed from the current iterate at every inner step.  The Hessenberg
 estimate `|g[k+1]|` is not used: with a variable preconditioner it can be far
 from the true residual, and even with a fixed one it drifts (S2's lesson, see
-`docs/dev/SOLVER.md` §5).  The true residual is assembled from the stored
+The true residual is assembled from the stored
 `A Z[:, k]` columns, `r_k = r_0 - W[1:k] y`, so it costs `O(k n)` and needs no
 extra operator application.  (`applyA` and `precond` may therefore return a
 reused scratch vector: the values are copied into `Z`/`W` immediately.)
@@ -145,7 +145,7 @@ function gmres_restarted(applyA, b::Vector{Float64};
         r = b - applyA(x)
         beta = norm(r)
         beta / nb < tol && break
-        # G1 (docs/dev/BUG_LEDGER.md S16): honour `maxit` *inside* the cycle.  The
+        # G1: honour `maxit` *inside* the cycle. The
         # historical loop always ran `restart` Arnoldi steps and only tested the
         # budget at the top, so `maxit=80, restart=30` really used 90 vectors.
         m = min(restart, maxit - it_total)
@@ -173,7 +173,7 @@ function gmres_restarted(applyA, b::Vector{Float64};
                 H[i, k] = t
             end
             den = hypot(H[k, k], H[k+1, k])
-            # G3 (docs/dev/BUG_LEDGER.md S16): a lucky breakdown (both entries
+            # G3: a lucky breakdown (both entries
             # zero) made `cs = H[k,k]/den` a NaN that propagated into every
             # later iterate; `fgmres_restarted` already guards this, the
             # non-flexible version did not.  Measured trigger: a diagonal system
@@ -203,7 +203,7 @@ function gmres_restarted(applyA, b::Vector{Float64};
         y = H[1:k_used, 1:k_used] \ g[1:k_used]
         dx = V[:, 1:k_used] * y
         x .+= precond === nothing ? dx : precond(dx)
-        # G2 (docs/dev/BUG_LEDGER.md S16): a full restart cycle that bought less
+        # G2: a full restart cycle that bought less
         # than a factor `stagnation` cannot reach `tol` in the budget that is
         # left, so stop instead of burning the rest of `maxit`.  The test uses
         # the Hessenberg estimate `|g[k+1]|/nb` (already computed), so the cost

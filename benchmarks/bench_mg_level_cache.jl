@@ -98,8 +98,8 @@ function phases_from_config(cfg::Dict{String,String}, pr::Params)
     end
     # The checkpoint stores `latent_mode` and the six phase numbers, not the
     # per-phase coefficients: `case_realistic_2d.jl` derives them from the
-    # Clapeyron slope and the density jump at its ASPECT scale set
-    # (docs/dev/PHYSICS.md §7.8/§14.2), so a resume has to use the same formula.
+    # Clapeyron slope and the density jump at its ASPECT scale set, so a
+    # resume has to use the same formula.
     if pr.latent_mode === :per_phase && !isempty(out) && out[1].latent === nothing
         out = per_phase_latent(pr, out; rho_ref=3300.0, cp=1000.0, dT=1000.0,
                                g=9.81, d=2.9e6, T_surface=0.5)

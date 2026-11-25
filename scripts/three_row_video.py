@@ -31,8 +31,8 @@ Frame sources
                  `solution-NNNNN.PPPP.vtu` pieces.  All pieces of one output are
                  merged, duplicate MPI-interface nodes dropped, and the vertex
                  field `T` interpolated onto a regular grid (default 640 x 256).
-                 Dimensional input is detected and converted with the scale set of
-                 docs/dev/VALIDATION.md section 2.1 (D = 2.9e6 m,
+                 Dimensional input is detected and converted with the scale set
+                 (D = 2.9e6 m,
                  kappa = 1e-6 m^2/s, dT = 1000 K):
                      t_nd = t_s * kappa / D^2,  T_nd = T_K / dT - 0.5,
                      x_nd = x / D,              z_nd = z / D.
@@ -110,7 +110,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 import live_render as lr                             # noqa: E402  (frame readers)
 
-# --- the ASPECT scale set of docs/dev/VALIDATION.md section 2.1 ---
+# --- the ASPECT scale set ---
 D = 2.9e6                 # box depth [m]; the box is 2.5 D long
 KAPPA = 1.0e-6            # thermal diffusivity [m^2/s]
 DT = 1000.0               # temperature drop [K]
@@ -797,7 +797,7 @@ MAX_LEVEL = len(LEVEL_COLOURS) - 1
 WHITE = dict(bg="#ffffff", fg="#111111", dim="#3f3f3f", spine="#8c8c8c",
              header="#5a5a5a", overlay="#6a6a6a", cbar_edge="#8c8c8c")
 
-# --- ASPECT diagnostics scale set, docs/dev/VALIDATION.md 2.1 ------
+# --- ASPECT diagnostics scale set ------
 K_COND = 3.3                     # kappa cp rho0 [W/(m K)]
 NORM_NU = 2.5 * K_COND * DT      # W per unit of Nu (= 8250)
 
@@ -807,7 +807,7 @@ def read_aspect_statistics(path):
 
     The columns are found by their header names, exactly as
     aspect_runs/realistic/compare_E.py does; the conversions are the scale set
-    of docs/dev/VALIDATION.md section 2.1.
+    above.
     """
     names, rows = {}, []
     try:

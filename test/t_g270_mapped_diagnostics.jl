@@ -72,7 +72,7 @@
 #
 #     with `Qc` the full step residual summed over the Dirichlet wall nodes and
 #     `Ibase` density-weighted where the card weights the mass/advection by
-#     `rho = 1-T` (the cut-3 mapped source; docs/dev/VALIDATION.md §4.1).  The
+# `rho = 1-T` (the cut-3 mapped source). The
 #     `int lap(Tbar(h))` term is the mapped base-state curvature the box hides
 #     (`|grad h| = 1`, `lap y = 0`); it is an O(1) term on `CurvedBox`, and the
 #     identity closing there is what proved the cut-3 mapped-source defect
@@ -941,7 +941,7 @@ end
 """
     g270_id1(g, res, states, pr, dt) -> (Qc, rhs, terms...)
 
-The time-step CBF energy-budget identity of docs/dev/VALIDATION.md §4.1 with
+The time-step CBF energy-budget identity with
 the mapped base-curvature term:
 
     Qc = dH/dt + sum(C theta) + Ibase - heating - int lap(Tbar(h)) dV

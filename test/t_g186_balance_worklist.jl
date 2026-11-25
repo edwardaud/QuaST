@@ -5,7 +5,7 @@ using QuaST: FACE_DIRS
 # G186: 2:1 balancing as a local worklist + face/neighbour caching per tree
 # version (the step-95 AMR outlier fix).
 #
-# Background (docs/dev/SOLVER.md §16): on the Ra=1e8 blob production run the
+# Background: on the Ra=1e8 blob production run the
 # step that first hit `max_leaves=1024` (958 -> 1030 leaves after refinement)
 # spent 31.5-31.9 s in one AMR cycle.  The cause was not a single slow balance
 # pass but the *leaf-budget guard* of the then-current fraction cycle (the
@@ -141,8 +141,8 @@ end
     # ---------------------------------------------------------------- (2)
     # the face cache is dropped by refine!/coarsen!/balance! on *every*
     # mutation; a populated-then-mutated tree must agree with a fresh one.
-    # Since the flat neighbour table (`QuadFaceTable`,
-    # docs/dev/AMR.md §9) the invalidation is *per leaf*: a mutation
+    # Since the flat neighbour table (`QuadFaceTable`) the invalidation is *per
+    # leaf*: a mutation
     # marks exactly the leaves whose neighbour lists change stale and a query
     # recomputes those, instead of dropping the whole table.  The contract is
     # unchanged and is what is asserted here: no stale list is ever served.

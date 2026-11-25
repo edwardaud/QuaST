@@ -137,7 +137,7 @@ g257_report_msgs(logs) = [l.message for l in logs
                              occursin("eta_ref convention", l.message)]
 
 # The dimensional scale set the production card passes to the driver (the ASPECT
-# scale set of docs/dev/PHYSICS.md §14.2).
+# scale set.
 const G257_SCALE = (rho=3300.0, g=9.81, alpha=3.0e-5, dT=1000.0, d=2.9e6,
                     kappa=1.0e-6)
 

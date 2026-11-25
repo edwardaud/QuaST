@@ -84,10 +84,10 @@ function _run_config(pr::Params;
         "symmetry" => symmetry, "transfer_mode" => transfer_mode,
         # The balanced cycle is the only AMR policy; the key stays so a
         # checkpoint written before the classic policy was removed still
-        # matches its recorded `balanced` (docs/dev/AMR.md).  A file that
+        # matches its recorded `balanced`. A file that
         # predates the key skips the comparison, like every key added later.
         "amr_policy" => "balanced", "amr_hysteresis" => amr_hysteresis,
-        # The coarsening_allowed pre-check changes the mesh trajectory too (`docs/dev/AMR.md` §4),
+        # The coarsening_allowed pre-check changes the mesh trajectory too,
         # so a restart must not switch it silently either; old checkpoints do not
         # carry the key and skip the comparison, like every key added later.
         "amr_coarsen_gate" => amr_coarsen_gate,
@@ -149,8 +149,8 @@ function _run_config(pr::Params;
         run_config["comp_n"] = pr.comp_n
         run_config["comp_Tcut"] = pr.comp_Tcut
         run_config["comp_eps_min"] = pr.comp_eps_min
-        # The combination rule changes the rheology (isostress vs isostrain,
-        # docs/dev/PHYSICS.md §14), so a restart must not switch it.  Old
+        # The combination rule changes the rheology (isostress vs isostrain), so
+        # a restart must not switch it.  Old
         # checkpoints predate this key and skip the comparison, as with every
         # other key added after them.
         run_config["comp_rule"] = pr.comp_rule
@@ -166,7 +166,7 @@ function _run_config(pr::Params;
     run_config["rho_cp"] = pr.rho_cp
     run_config["H"] = pr.H
     # Drucker-Prager yield surface, including the depth-dependent profiles
-    # (`yield_c_grad`, `yield_mu_grad`, docs/dev/PHYSICS.md §8) and the
+    # (`yield_c_grad`, `yield_mu_grad`) and the
     # strain-weakening parameters (§9).  They change the trajectory exactly like
     # the viscosity law, so a restart must not silently continue with another
     # yield surface.  They are stored unconditionally; old checkpoints without
@@ -178,7 +178,7 @@ function _run_config(pr::Params;
     run_config["yield_damper"] = pr.yield_damper
     run_config["yield_c_grad"] = pr.yield_c_grad
     run_config["yield_mu_grad"] = pr.yield_mu_grad
-    # Strain-weakening parameters (docs/dev/PHYSICS.md §9) and the initial value
+    # Strain-weakening parameters and the initial value
     # of the field.  A checkpoint also stores the field itself (`weak`), so a
     # restart continues the same weakening state; these keys guard the physics.
     run_config["weak_f"] = pr.weak_f

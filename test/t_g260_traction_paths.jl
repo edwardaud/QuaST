@@ -2,8 +2,8 @@
 # the operator, the `:auto` path decision or the multigrid hierarchy, it must be
 # deterministic, and `assemble_only` must return it.
 #
-# Stage 2 adds `int tbar.phi_i dS` to the **unreduced** velocity load vector
-# (docs/dev/BC_DESIGN.md §3.2/§3.3).  That claim has observable consequences
+# Stage 2 adds `int tbar.phi_i dS` to the **unreduced** velocity load vector.
+# That claim has observable consequences
 # this gate pins on the uniform L4 tree (256 leaves, 2 467 saddle dofs, so
 # `linear=:auto` resolves to MG) and on a small L3 tree (`:auto` resolves to
 # direct):

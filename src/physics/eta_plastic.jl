@@ -9,8 +9,8 @@
 #     eta     = min(eta_visc, eta_pl)                      then eta_min/max clip
 #
 # `yield_c` and `yield_taumax` are in units of `eta0 kappa / H^2` and `p` is the
-# *dynamic* pressure of the Stokes solve (top-mean zero).  The depth profiles of
-# `docs/dev/PHYSICS.md` section 8 and the weakening factor of section 9 enter
+# *dynamic* pressure of the Stokes solve (top-mean zero).  The depth-dependent
+# cohesion/friction and the strain-weakening factor enter
 # through `semquad_yield_stress`.  With zero gradients and `f = 1` every
 # expression is the historical one bit for bit.
 
@@ -26,7 +26,7 @@ end
 """
     weak_active(pr)
 
-True when the strain-weakening field of docs/dev/PHYSICS.md §9 is switched on: a
+True when the strain-weakening field is switched on: a
 positive reference plastic strain, a residual weakening factor below one, and an
 active Drucker-Prager yield surface (weakening only scales the yield stress).
 """
@@ -141,7 +141,7 @@ end
 Viscosity at absolute temperature `T` (height `y`, depth `d = 1-y`) with the
 plastic branch: `min(eta_visc, tau_y/(2 edot))`, then the `eta_min/eta_max`
 clip.  With `pr.yield_damper > 0` the plastic branch is first blended by
-`_damper_blend`.  `chi` is the weakening field (docs/dev/PHYSICS.md §9); the
+`_damper_blend`. `chi` is the weakening field; the
 4-argument method is the first weakening level and is bit-identical to the
 historical constant-coefficient law when the depth gradients are zero.
 """
@@ -203,7 +203,7 @@ function semquad_plastic_strain_rate_field(sq::SemQuad, sp::SemQuad,
     out = zeros(Float64, sq.N)
     for (gid, (x, y)) in enumerate(sq.coords)
         # Box: the historical viscosity row (`Tbar(y,H)`, depth `y`), even with
-        # a reference state (docs/dev/PHYSICS.md §3.3, frozen box behaviour).
+        # a reference state (frozen box behaviour).
         # Mapped (stage 0.5b1): the geometry's base state and `height(g,x,y)`.
         local h, T
         if g isa CartesianBox

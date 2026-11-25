@@ -1,4 +1,4 @@
-# G203 / S16 loop guards on the Newton path (docs/dev/BUG_LEDGER.md).
+# G203 / S16 loop guards on the Newton path.
 #
 #   G1  `gmres_restarted` honours `maxit` *inside* the restart cycle.  The
 #       historical loop always ran `restart` Arnoldi steps and only tested the

@@ -5,7 +5,7 @@
 # `@spawn`s + one atomic hand-out cost 6-9 us regardless of the work.  On the
 # levels above `SEMQUAD_MG_SERIAL_DOFS` a 6-level V-cycle still makes ~15 such
 # calls (applies, Jacobi updates, subtracts, transfers) and pays that overhead
-# for every one of them (docs/dev/MG.md, §12).
+# for every one of them.
 #
 # A `SemQuadParRegion` keeps `nt-1` worker tasks alive for the *whole sequence*
 # of parallel phases of one level block (one fork/join per region instead of one
@@ -190,7 +190,7 @@ function SemQuadKPar(op::AbstractSemQuadKOp, nt::Int)
     nt = clamp(nt, 1, max(nl, 1))
     BLK = SEMQUAD_KBLK
     # Chunk *starts* sit on the `SEMQUAD_KBLK` block grid, so a chunk's leaf
-    # window is a whole number of lane-table blocks (docs/dev/MG.md).
+    # window is a whole number of lane-table blocks.
     # The partition stays contiguous, covers 1:nl and is still proportional to
     # the leaf count within one block; it decides only *which worker* computes a
     # leaf, and the element vectors are scattered in leaf order, so the values
@@ -443,7 +443,7 @@ a row gather over `Cut`, `Cu' * y` over the columns of `Cu` -- and the leaf appl
 is the existing leaf phase.  The products are output-entry independent and keep
 the `mul!` arithmetic, so the result is bitwise both the serial and the
 serial-`Cu`/threaded-leaf form (G224).  `SEMQUAD_MG_REGION_CU[] = false` calls
-`mul!` on the calling task for the A/B (docs/dev/MG.md).
+`mul!` on the calling task for the A/B.
 """
 function _semquad_apply_Kred_region!(out::Vector{Float64}, op::AbstractSemQuadKOp,
                                      Cu::SparseMatrixCSC{Float64,Int},

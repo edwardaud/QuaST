@@ -3,7 +3,7 @@
 #
 #   julia --project=. scripts/measure_mg_memory.jl
 #
-# The 25 GB SIGBUS at 160 000 leaves (docs/dev/VALIDATION.md 9.x) says *that* it
+# The 25 GB SIGBUS at 160 000 leaves says *that* it
 # runs out; this says *where*, so the fix can be aimed: a lazier level cache if the
 # per-level matrices dominate, a smaller leaf budget if the tree itself does.
 #

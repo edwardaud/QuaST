@@ -62,7 +62,7 @@
 """
     _annulus_ln_ratio(g) -> Float64
 
-`ln(R1/R0) > 0` (the `|ln f|` of `docs/dev/ANNULUS_REFS.md`), evaluated from
+`ln(R1/R0) > 0` (the `|ln f|`), evaluated from
 the geometry's two radii.
 """
 @inline _annulus_ln_ratio(g::PolarAnnulus) = log(g.R1 / g.R0)
@@ -235,6 +235,6 @@ end
 # subtype, and Julia's default budget (3) would give up at the fourth.  These
 # are inference settings, not code paths (no body, dispatch result or
 # allocation on a concrete call changes); a fifth production geometry raises
-# them to 5.  See `docs/dev/GEOM_PROGRESS.md` stage 0.5a design entry 12.
+# them to 5.
 Base.Experimental.@max_methods 4 function semquad_base_T end
 Base.Experimental.@max_methods 4 function semquad_base_gradient end

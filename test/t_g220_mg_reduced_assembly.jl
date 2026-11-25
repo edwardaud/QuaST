@@ -23,7 +23,7 @@ using Test, QuaST, LinearAlgebra, SparseArrays, Random
 #       rejected;
 #   (e) the saddle solve is bitwise between (c)'s two hierarchies.
 #
-# The measured setup drop is in docs/dev/MG.md; time is not gated here.
+# The setup-drop measurement is not gated here, and neither is time.
 
 const _G220_Z2 = (x, y) -> 0.0
 const _G220_ONE = (x, y) -> 1.0

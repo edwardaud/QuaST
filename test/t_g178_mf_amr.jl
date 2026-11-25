@@ -14,7 +14,7 @@ using Test, QuaST, LinearAlgebra, Printf
 #      with hanging nodes, and the per-frame Tmax must match the direct run to
 #      <= 1e-6 relative.  (The full 25-frame production run is
 #      out_julia/agent/run_blob_kelly_1024_mf.jl; it is too slow for a gate, and
-#      its numbers are recorded in docs/dev/SOLVER.md.)
+#      its numbers are not part of the acceptance.)
 #
 # Acceptance (S3 design, MF-5): Vrms/Nu to <= 1e-8 on 2b L3, and the AMR blob
 # must reproduce the direct field.  The gates also record the wall times.
@@ -190,8 +190,8 @@ end
     @test bm.leaves == bd.leaves            # same AMR decisions
     @info "G178 blob slice" steps = bd.steps frames = length(bd.tmax) leaves = bd.leaves nlev = bd.nlev direct_s = bd.wall mg_s = bm.wall speedup = bd.wall / bm.wall dTmax = dT tmax_mf = bm.tmax
     # NOTE (S3/MF-5): the matrix-free MG path is *not* faster than the direct LU
-    # on this case (it is ~2.6x slower on the full 25-frame production run, see
-    # docs/dev/SOLVER.md §9); the gate therefore only requires correctness and a
+# on this case (it is ~2.6x slower on the full 25-frame production run); the
+    # gate therefore only requires correctness and a
     # sane time, and records both totals.
     @test bm.wall < 3.0 * bd.wall
 

@@ -9,13 +9,13 @@
 #
 # which integrates to Tad(z) = Tsurf * exp(alpha g (1 - z) / cp).
 #
-# Section 11 of docs/dev/PHYSICS.md adds `eos = :adams_williamson` and
+# Section 11 adds `eos = :adams_williamson` and
 # `eos = :murnaghan`: the same interface, but with the reference state obtained
 # by *integrating an equation of state in depth* instead of the closed form, so
 # that rho(y), alpha(y), cp(y), Tad(y), dTad/dz(y), lap(Tad)(y) and drho/dz(y)
 # all come from one EOS.
 
-# --- EOS-integrated reference state (docs/dev/PHYSICS.md section 11) -----------
+# --- EOS-integrated reference state -----------
 #
 # State variables on a uniform grid in height y (0 bottom, 1 top), integrated
 # from the surface down:
@@ -56,15 +56,15 @@ struct SemRefProfile
 end
 
 "Adiabatic lapse-rate coefficient `Lambda(y) = alpha(y) g / cp(y)`."
-# The `::Float64` on the field calls is load-bearing (docs/dev/BUG_LEDGER.md S15):
+# The `::Float64` on the field calls is load-bearing:
 # `alpha_fun`/`cp_fun` are `Function` *fields* of `SemRefProfile`, which are not
 # specialised, so the call inferred as `Any`.  That made `_prof_dT` -> `dTad_dz`
 # -> `semquad_base_gradient` -> the energy kernel's `src` all `Any`, and
 # `F[ids[k]] += ws * phi[k]` boxed inside the quadrature loop even on the
 # default path (`refstate === nothing`), where the branch is never taken:
 # measured 0.743 -> 0.396 ms and 1.86 -> 1.14 MB per energy assembly, i.e. a
-# 1.88x on the 20 energy assemblies of one per-step Newton (docs/dev/BUG_LEDGER.md
-# §4.2).  The values are unchanged (a typeassert on a Float64).  `_prof_phi`
+# 1.88x on the 20 energy assemblies of one per-step Newton.  The values are
+# unchanged (a typeassert on a Float64).  `_prof_phi`
 # below keeps its unasserted `cp_fun`/`alpha_fun` calls: it is only on the
 # anelastic-mass path, which this audit did not measure, and it is recorded as
 # a cold `Any` rather than changed blind.
@@ -207,7 +207,7 @@ Adiabatic reference state for the quadtree SEM path:
 
 `eos = :analytic` (default) is the closed-form constant-property state above.
 `eos = :adams_williamson` / `:murnaghan` instead integrate the equation of state
-in depth (see [`SemRefProfile`](@ref), docs/dev/PHYSICS.md section 11); `alpha_fun`
+in depth (see [`SemRefProfile`](@ref)); `alpha_fun`
 and `cp_fun` then give the depth dependence of the expansivity and the specific
 heat, and `K0`, `K0prime` the Murnaghan bulk modulus at the surface and its
 pressure derivative (in units of `rho0 g d`).
@@ -328,8 +328,7 @@ the volume-integrated energy budget, exactly the closure error it removes).
 
 With an EOS state the curvature comes from the integrated state instead:
 `lap(Tad) = (Lambda^2 - dLambda/dz) Tad`, the exact second derivative of the
-adiabat whose first derivative is the `dTad/dz` used by the advection term
-(docs/dev/PHYSICS.md section 11).
+adiabat whose first derivative is the `dTad/dz` used by the advection term.
 """
 @inline semquad_base_laplacian(pr, z::Float64) =
     (pr.refstate === nothing ? 0.0 :
@@ -363,7 +362,7 @@ it is *not* zero.  Cut 3's first mapped body used `semquad_base_laplacian(pr,h)`
 alone, which is the reference-state second derivative (`0` for the Boussinesq
 base) and therefore silently dropped `H*(1-|grad h|^2)`; this helper is the
 cut-4 correction, shared by the energy assembly and the EV residual so the two
-cannot drift (see `docs/dev/GEOM_PROGRESS.md`, cut-4 defect B1).  For a
+cannot drift (cut-4 defect B1). For a
 **reference state** the base is the adiabat and the term is exactly
 `lap(Tad(h)) = Tad''(h)|grad h|^2 + Tad'(h) lap(h)` (no absorbed `+H`).
 

@@ -1,5 +1,5 @@
 # Validate the dimensional mapping of the QuaST `:composite` rheology onto
-# ASPECT's `diffusion dislocation` model (docs/dev/VALIDATION.md §2).
+# ASPECT's `diffusion dislocation` model.
 #
 # Our law (src/physics/eta.jl, eta_law=:composite, comp_rule=:isostress):
 #

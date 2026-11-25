@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # =============================================================================
 # bench_mg_reduced_assembly.jl -- setup and solve cost of the matrix-free MG
-# path, for the before/after A/B of docs/dev/MG.md
+# path, for the before/after A/B
 #
 #   BENCH_CASE=F BENCH_THR=1 BENCH_NEW=1 julia --project=. --threads=1 \
 #       benchmarks/bench_mg_reduced_assembly.jl
@@ -15,8 +15,8 @@
 #
 #     t_asm = t_full - t_hierarchy - t_bfbt - t_iteration
 #
-# like docs/dev/MG.md and docs/dev/MG.md  One `RESULT key=value`
-# line is printed.  The checkpoint is copied to a temp directory, `chmod 444`ed
+# using the same row arithmetic as the reference campaign.  One
+# `RESULT key=value` line is printed.  The checkpoint is copied to a temp directory, `chmod 444`ed
 # and opened read-only; the script writes nothing into the repository.
 #
 # Environment:

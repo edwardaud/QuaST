@@ -3,8 +3,7 @@ using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G224: the S7 region phases are bitwise the serial path and add no fork/joins.
 #
-# Two costs were left serial inside the S6 region of a threaded level
-# (docs/dev/MG.md):
+# Two costs were left serial inside the S6 region of a threaded level:
 #
 #   1. the restriction into the next coarser level, which stays serial when its
 #      *output* is below `SEMQUAD_MG_SERIAL_DOFS` (`SEMQUAD_MG_REGION_TRANSFER`

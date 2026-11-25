@@ -27,7 +27,7 @@ Levels with at most this many reduced velocity dofs run their vector work
 `@sync` + `nt` `@spawn`s + one atomic hand-out; on the small levels that is
 larger than the work, so threading them is a loss (measured: the apply is 4.2x
 slower at 318 dofs and 1.2x at 1 278, the Jacobi update 43x at 318; break-even
-near 4 930; docs/dev/MG.md).  The serial
+near 4 930).  The serial
 and threaded paths are bitwise identical (G190), so this threshold changes speed
 only.  `0` disables it (every level threaded); `typemax(Int)` makes the whole
 V-cycle serial.
@@ -42,7 +42,7 @@ consolidated regions (`_semquad_mg_vcycle_region!`, one fork/join per level
 block instead of one per op); `false`: the historical per-call fork/join path
 (`_semquad_mg_vcycle!`).  The two paths run the same functions on the same
 chunks in the same order, so they are bitwise identical (G223); the switch
-exists for the gate's A/B and for the measurement of docs/dev/MG.md
+exists for the gate's A/B and for the measurement
 `SEMQUAD_MG_SERIAL_DOFS` still decides which levels are threaded at all.
 """
 const SEMQUAD_MG_REGION = Ref(true)
@@ -58,7 +58,7 @@ finer threaded level already pays a barrier for.  The chunk bodies are the
 serial ones (`_semquad_restrict_chunk!`, `_semquad_prolong_chunk!`), so the
 result is bitwise the serial `mul!` (G190/G224).  `false` restores the S6
 behaviour (a transfer whose output is below the threshold stays serial even
-inside a region), for the A/B of docs/dev/MG.md
+inside a region), for the A/B
 """
 const SEMQUAD_MG_REGION_TRANSFER = Ref(true)
 
@@ -73,7 +73,7 @@ one entry per column of `Cu` with the `mul!` dot-product order, and `Cu * v` one
 entry per row of `Cu` through the cached `Cu` transpose with the `mul!`
 column-order accumulation.  The arithmetic is therefore identical to `mul!`
 (G224 pins it) and the split is only a scheduling change.  `false` restores the
-serial products for the A/B of docs/dev/MG.md
+serial products for the A/B
 """
 const SEMQUAD_MG_REGION_CU = Ref(true)
 
@@ -266,7 +266,7 @@ function _semquad_mg_restrict!(rc::Vector{Float64},
     # Inside an open region the transfer is a phase whose only cost is a barrier,
     # so the *output* size no longer decides whether it is worth publishing: a
     # level above the threshold restricts into a level below it on every cycle
-    # (docs/dev/MG.md).  `SEMQUAD_MG_REGION_TRANSFER[] = false` restores
+    # `SEMQUAD_MG_REGION_TRANSFER[] = false` restores
     # the per-size serial decision for the A/B; the chunk body is the same, so
     # both settings are bitwise the serial `mul!` (G224).
     nt = (region !== nothing && SEMQUAD_MG_REGION_TRANSFER[]) ? nt :

@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # =============================================================================
 # bench_mg_slice.jl -- stage-A instrument of the cache-blocked / slice-wise
-# leaf-kernel question (docs/dev/MG.md).
+# leaf-kernel question.
 #
 #   STATE=F julia --project=. --threads=1 benchmarks/bench_mg_slice.jl
 #   STATE=P1 julia --project=. --threads=1 benchmarks/bench_mg_slice.jl

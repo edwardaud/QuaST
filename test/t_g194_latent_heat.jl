@@ -1,5 +1,5 @@
 # G194: latent heat of the phase transitions in the time-stepping energy
-# equation (apparent heat capacity, docs/dev/PHYSICS.md §7).
+# equation (apparent heat capacity).
 #
 # The time step now carries the phase transitions in the *energy* equation, not
 # only in the buoyancy:
@@ -324,7 +324,7 @@ end
         leaves = Set(qt.leaves)
         th = [0.05 * sinpi(x) * sinpi(z) for (x, z) in sq.coords]
         phases = [G194_PT, PhaseTransition(0.3, 0.08, -0.01, 0.4, 0.05, 0.5)]
-        # Mechanical update (docs/dev/PHYSICS.md §8.4): the `make_eta` contract
+        # Mechanical update: the `make_eta` contract
         # gained the pressure argument for the Drucker-Prager yield stress.
         make_eta = function (theta, ufull, _pfull=nothing)
             ux = ufull[1:N]; uz = ufull[(N + 1):(2N)]

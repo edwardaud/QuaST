@@ -1,7 +1,7 @@
 #!/usr/bin/env julia
 # =============================================================================
 # bench_card_mg_tol.jl -- the realistic card's MG outer tolerance, measured on
-# the three production states (docs/dev/CASE_REALISTIC.md §1.6)
+# the three production states
 #
 #   julia --project=. --threads=8 benchmarks/bench_card_mg_tol.jl F [reps]
 #   julia --project=. --threads=8 benchmarks/bench_card_mg_tol.jl P1

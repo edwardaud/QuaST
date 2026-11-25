@@ -1,8 +1,7 @@
 # G215: the AMR hot path is equivalent to the pre-audit implementation.
 using Test, QuaST, Random, Printf
 
-# G215: the S15/S16 hot-path audit of the `:balanced` AMR code
-# (docs/dev/AMR.md, docs/dev/AMR.md).
+# G215: the S15/S16 hot-path audit of the `:balanced` AMR code.
 #
 # The audit changed allocation behaviour and loop guards in
 # `src/amr/cycle.jl`, `src/amr/leaf_ops.jl` and `src/core/quadtree.jl`.

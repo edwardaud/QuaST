@@ -1,6 +1,6 @@
 # The AMR cycle of the time loop, extracted from `run.jl`.
 #
-# Stage 2 of the `RunState` refactor (docs/dev/ARCH_AUDIT.md sections 4 and 10):
+# Stage 2 of the `RunState` refactor:
 # the block that ran every `amr_every` steps in `run_semquad_simulation` now
 # lives here as one function.  It is the same code in the same order -- the
 # pass, the stage-1 `snapshot!` immediately after it, the transfers, the flow
@@ -136,7 +136,7 @@ function _amr_step!(ss::SemStokes, qt::Quadtree, theta::Vector{Float64},
                        sq.N, length(qt.leaves), max_face_level_jump(qt), nr,
                        diag.amr_stats.coarsened, diag.amr_stats.merged)
     if verbose
-        # Balanced-cycle diagnostics (docs/dev/AMR.md §4.1/§4):
+        # Balanced-cycle diagnostics:
         # the recirculation counter and the coarsening-gate ledger.
         d = diag.amr_balanced
         @printf("      balanced: gate_refused=%d extended=%d recirc=%d post=%+d tau_h=%.3e eligible=%d\n",

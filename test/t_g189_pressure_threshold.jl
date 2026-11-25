@@ -1,12 +1,11 @@
 # G189: the pressure-cache threshold semantics.
 using Test, QuaST, LinearAlgebra, Random
 
-# G189 / S5-1: the *threshold semantics* of the pressure-block cache
-# (docs/dev/SOLVER.md §19.1).
+# G189 / S5-1: the *threshold semantics* of the pressure-block cache.
 #
-# §13.3 measured the outer iteration count of the `linear=:mg` saddle solve to
-# be flat in the cache tolerance (39.7 at 1e-12 ... 39.9 at Inf) while the
-# build count falls from one build per solve to one per tree, so the S5-1
+# The outer iteration count of the `linear=:mg` saddle solve is flat in the cache
+# tolerance (39.7 at 1e-12 ... 39.9 at Inf) while the build count falls from one
+# build per solve to one per tree, so the S5-1
 # retune moved the default `mg_pressure_eta_tol` from 0.5 to 1.0 and documented
 # `Inf` as an explicit opt-in.  This gate pins the *semantics* of that knob:
 #

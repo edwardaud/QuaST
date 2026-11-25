@@ -16,7 +16,7 @@
 # approximation; the hydrostatic part is a function of depth only and is
 # deliberately not included here (this solver has no reference state yet, see P3).
 #
-# Depth dependence (docs/dev/PHYSICS.md §8): with the depth d = 1-y the cohesion
+# Depth dependence: with the depth d = 1-y the cohesion
 # and the friction coefficient are linear profiles,
 #
 #     c(d)  = yield_c + yield_c_grad*d

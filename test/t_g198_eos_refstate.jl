@@ -1,7 +1,7 @@
 # G198: the EOS reference state — Adams-Williamson, density and constructor guards.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
-# G198 -- EOS-integrated reference state (docs/dev/PHYSICS.md section 11).
+# G198 -- EOS-integrated reference state.
 #
 #   dT/dy   = -Lambda(y) T,       Lambda = alpha(y) g / cp(y)
 #   drho/dy = -rho g / phi(y),    phi = K_S/rho

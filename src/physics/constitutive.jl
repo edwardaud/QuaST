@@ -265,8 +265,7 @@ Limits handled in closed form (no iteration, and identical to the
 (pure dislocation) and `n = 1` (both branches linear, where the two
 combination rules coincide).  The two combination rules also agree in the
 one-mechanism limits of the *physics* (one branch overwhelming the other), but
-not in between: the isostress viscosity is larger by up to 41% for `n = 3.5`
-(docs/dev/PHYSICS.md section 14.4b).
+not in between: the isostress viscosity is larger by up to 41% for `n = 3.5`.
 """
 @inline function composite_isostress_state(T::Float64, edot::Float64,
                                            z::Float64, pr::Params)
@@ -363,7 +362,7 @@ needs the strain rate.
 In the code's nondimensionalisation the viscosity unit is the reference
 viscosity `eta0` of the Boussinesq scaling (`dimensionless` ASPECT), so
 `comp_Ad`/`comp_As` are `A_i * eta0^(...)`-style prefactors in units of
-`1/eta0`; docs/dev/PHYSICS.md gives the exact ASPECT mapping (including the
+`1/eta0`; the exact ASPECT mapping (including the
 factor 2 of ASPECT's `eta = stress/edot/2` convention, which is absorbed into
 the prefactors here).
 """

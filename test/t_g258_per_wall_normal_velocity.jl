@@ -3,19 +3,19 @@
 # Before this gate the normal component of every wall was Dirichlet with a value
 # from the *global* `uDx`/`uDz` closures the driver hard-wires to zero: a card
 # could not prescribe a normal velocity on one wall, and there was no `Params`
-# or card knob for it (docs/dev/BC_DESIGN.md §1.3/§1.5).  `Params.wall_un`
+# or card knob for it. `Params.wall_un`
 # (four entries, order `(xminus, xplus, yminus, yplus)`) now refines that value
 # per wall; `nothing` keeps the historical global closure, which is what makes
 # the default path bit-identical.
 #
 # This gate pins:
 #   (a) the pre-change default path, by hashes recorded from the checkout
-#       *before* the feature (docs/dev/BC_PROGRESS.md stage 1 baseline);
+#       *before* the feature (stage 1 baseline);
 #   (b) the analytic Couette solution driven through `wall_un` + `wall_u`, and
 #       that it is bitwise the G238 global-closure answer (same fixed data);
 #   (c) per-wall independence: a wall_un on one wall touches only that wall's
 #       normal dofs, and is imposed exactly;
-#   (d) the corner-owner table of docs/dev/BC_DESIGN.md §1.4/§3.4, per
+#   (d) the corner-owner table, per
 #       component, for every combination of rigid/free walls;
 #   (e) rejection of the invalid (`wall_u` on a resolved `:free` wall, silently
 #       ignored before this stage) and of the **insufficient** combination

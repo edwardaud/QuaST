@@ -47,11 +47,11 @@ known defect: the stage-0.5 fix campaign's scratch-worktree measurement found
 both mapped paths solving the annulus ring to the same state as `:direct`
 (1e-12 relative for `:lagged`, whose stale-LU factor is the *mapped* assembled
 saddle keyed by `_saddle_key(qt, geom, ...)`; `:schur_cg` to its iteration
-tolerance) — `docs/dev/BUG_FIX_LOG.md`, F6.  The history row of a
+tolerance).  The history row of a
 mapped run is the mapped diagnostics: G270 runs the driver on both validation
 geometries with heating off/on, the CBF and exact-residual columns on, and the
-latent-heat closure path, and closes the time-step CBF energy budget identity of
-`docs/dev/VALIDATION.md` §4.1 to the solver's floor; G272 runs the mapped
+latent-heat closure path, and closes the time-step CBF energy budget identity to
+the solver's floor; G272 runs the mapped
 adaptive driver end to end (several steps, `initial_refine` and `amr_every` both
 on, checkpoint and bit-identical resume) and the strain-rate-dependent law paths.
 
@@ -78,7 +78,7 @@ the per-wall pointwise pair the annulus history carries), and, through the
 mapped-geometry block, the reference state, the density hook, `symmetry=:x`,
 per-step Newton and `linear=:schur_cg`/`:lagged` (a gate-coverage restriction;
 a scratch-worktree measurement found those two paths correct on the annulus
-ring, `docs/dev/BUG_FIX_LOG.md` F6).  The **periodic seam** is *not* refused:
+ring).  The **periodic seam** is *not* refused:
 stage 0.5c1 implemented the closed ring and it is accepted (see below).
 Stage 0.5b1 ran `:rigid` walls only; **stage 0.5b2 lifts
 that**: a `:free` wall is the general curved-wall row `n.u = 0` (zero normal

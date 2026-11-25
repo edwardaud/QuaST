@@ -94,8 +94,8 @@ end
 
 Jacobi diagonal of the matrix-free *reduced* level operator `Cu' * K * Cu`.
 
-`mode=:constrained` (the default, and the fix of docs/dev/MG.md
-§5.2) is the **exact** reduced diagonal `diag(Cu' K Cu)`, computed without ever
+`mode=:constrained` (the default) is the **exact** reduced diagonal
+`diag(Cu' K Cu)`, computed without ever
 forming `K` or the product: for every leaf, the constraint rows of its local
 dofs give a dense `m x ncol` matrix `W` (`m = 2 n^2` local dofs, `ncol` the
 reduced columns that touch the leaf, including the free-row identity entries),

@@ -1,8 +1,7 @@
 # A regional subduction-style mantle-flow case built from the per-wall boundary
 # mechanisms: a prescribed normal-velocity inflow, a plate-driven tangential
 # velocity, and an `:open` outflow carrying the normal and tangential traction of
-# the reference channel.  The spec is `docs/dev/REGIONAL_DESIGN.md`; gate G265
-# exercises this file.
+# the reference channel.  Gate G265 exercises this file.
 #
 #   julia --project=. --threads=8 examples/subduction_2d.jl validate
 #   julia --project=. --threads=8 examples/subduction_2d.jl rheology
@@ -36,7 +35,7 @@
 # `validate` mode therefore measures the linear solve, not the discretisation,
 # and every later stage changes only the physics, not the boundary data.
 #
-# The checks and their classes (docs/dev/REGIONAL_DESIGN.md section 6):
+# The checks and their classes:
 #   1  the velocity field against u_ref                    exact identity
 #   2  the pressure field against p_ref                    exact identity
 #   3  the per-wall mass flux and the net-zero identity    exact discrete identity
@@ -51,11 +50,10 @@
 #
 # Checks 5 and 10 are built from the pointwise one-sided wall gradient, which is
 # NOT the discrete boundary exchange for a card with fixed side walls: the
-# side-wall exchange is a Dirichlet reaction of the step (docs/dev/VALIDATION.md
-# section 4.1 says the consistent boundary flux is what closes the step
-# identity, and the library implements it for the top/bottom walls only).  Both
-# are therefore reported with their full term dump and measured residual, not
-# gated; docs/dev/REGIONAL_PROGRESS.md records the measurement.  The mass flux
+# side-wall exchange is a Dirichlet reaction of the step.  The consistent
+# boundary flux is what closes the step identity, and the library implements it
+# for the top/bottom walls only.  Both are therefore reported with their full
+# term dump and measured residual, not gated.  The mass flux
 # and the latent coefficients stay gated, and the plate-cooling check is gated
 # in `rheology`.
 #
@@ -80,7 +78,7 @@
 using QuaST, Printf
 
 # ===========================================================================
-# 1. The card's literals (docs/dev/REGIONAL_DESIGN.md sections 4.1-4.4, 5.1-5.3)
+# 1. The card's literals
 # ===========================================================================
 # Geometry: 2 x 1 box, 4 x 2 base cells (square leaves).
 const REGIONAL_LX = 2.0
@@ -1239,7 +1237,7 @@ the plate-cooling profile in `rheology` (a diagnostic elsewhere, as section 8
 states) and the latent-coefficient mapping in `phases`.  Checks 5 (open-box heat
 budget) and 10 (latent enthalpy) are reported with their full term dump and
 measured residual but stay DIAGNOSTIC: their pointwise-wall-gradient form does
-not close for a fixed-side-wall card (docs/dev/REGIONAL_PROGRESS.md D6/D7).
+not close for a fixed-side-wall card.
 Check 9 (cfl 1 vs 2) is a manual two-run comparison, printed as such.
 """
 function regional_mode_production(mode::Symbol; io::IO=stdout,
@@ -1365,9 +1363,9 @@ function regional_mode_production(mode::Symbol; io::IO=stdout,
     # card -- not because of a sign, but because the two side walls are
     # Dirichlet and their heat exchange is a boundary *reaction* of the discrete
     # step, not the one-sided derivative of a resolved layer (the library's
-    # consistent boundary flux is implemented for the top/bottom walls only;
-    # docs/dev/VALIDATION.md section 4.1 states that the consistent flux is what
-    # closes the step identity).  During the side-wall adjustment the pointwise
+    # consistent boundary flux is implemented for the top/bottom walls only, and
+    # that consistent flux is what closes the step identity).  During the
+    # side-wall adjustment the pointwise
     # value is off by O(1) relative; the series is reported in full below so the
     # sign of every term is visible, and the row is a DIAGNOSTIC, not a gate.
     bw = regional_budget_window(res, buf, pr, ph)
@@ -1380,7 +1378,7 @@ function regional_mode_production(mode::Symbol; io::IO=stdout,
     @printf(io, "[regional]   budget: n=%d mean_sigma=%.3e spread=%.3e mean_storage=%.3e max_ratio=%.3e (steady=%s)\n",
             bw.n, bw.mean_sigma, bw.sigma_spread, bw.mean_storage,
             steady_reached ? bw.max_steady : bw.max_full, steady_reached)
-    @printf(io, "[regional]   budget note: this pointwise-flux form is a diagnostic for a fixed-side-wall card (docs/dev/REGIONAL_PROGRESS.md); the design's 1e-3 conservation class assumes the consistent boundary flux, which the library implements for the top/bottom walls only\n")
+    @printf(io, "[regional]   budget note: this pointwise-flux form is a diagnostic for a fixed-side-wall card; the design's 1e-3 conservation class assumes the consistent boundary flux, which the library implements for the top/bottom walls only\n")
     # --- check 6: the asymptotic plate-cooling profile --------------------
     pc = regional_plate_cooling(res.ss.su, res.qt, pr, res.theta)
     for r in pc.stations
@@ -1572,7 +1570,7 @@ end
 function regional_usage(io::IO=stdout)
     println(io, "usage: julia --project=. --threads=8 examples/subduction_2d.jl <mode>")
     println(io, "  modes: ", join(string.(REGIONAL_MODES), ", "))
-    println(io, "  see docs/en/examples.md and docs/dev/REGIONAL_DESIGN.md")
+    println(io, "  see docs/en/examples.md")
     println(io, "  CASE_* knobs: CASE_OUT, CASE_LEVEL, CASE_WALLMIN, CASE_WALLSTRIP,")
     println(io, "    CASE_CFL, CASE_DT0, CASE_STEPS, CASE_FRAME, CASE_RA, CASE_LINEAR,")
     println(io, "    CASE_EXTDIAG, CASE_MG_TOL, CASE_WALL_T (rate|stress), CASE_LAW (converge)")

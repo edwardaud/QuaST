@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Interior artificial-viscosity statistics of an ASPECT run's VTU frames
-(docs/dev/VALIDATION.md section 15).
+"""Interior artificial-viscosity statistics of an ASPECT run's VTU frames.
 
 The VTU array is `artificial_viscosity` (units W/(m K), plugin
 `source/postprocess/visualization/artificial_viscosity.cc:35,45`), i.e. the same

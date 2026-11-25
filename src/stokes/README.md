@@ -42,7 +42,7 @@ the calls out of this directory are confined to the four files named above, and
 
 ## Geometry: the box path is a specialization, the mapped path a second kernel
 
-Stage 0 cut 2 (docs/dev/GEOM_DESIGN.md §3, docs/dev/GEOM_PROGRESS.md) routed the
+Stage 0 cut 2 routed the
 **assembled** Stokes operator through the geometry layer (`core/geometry.jl`):
 the leaf kernel of `assembly_var.jl`, the load/traction face integral, the
 divergence `B`/`Pcm` of `operators.jl`, the pressure mass/stiffness of
@@ -64,7 +64,7 @@ the project's bitwise rule:
   geom=…)`; cut 2 accepted `linear=:direct` only, and the driver refused mapped
   cards until the energy assembly/diagnostics cuts landed.
 
-Stage 0 cut 5 (`docs/dev/GEOM_PROGRESS.md`) routes the **matrix-free** operator
+Stage 0 cut 5 routes the **matrix-free** operator
 and the multigrid layer through the geometry.  The rule is the same two-body
 rule, with the historical matrix-free kernel kept as a separate family:
 
@@ -100,8 +100,8 @@ restriction**, not because their mapped path is known wrong: the stage-0.5 fix
 campaign measured both in a scratch worktree with the guard lifted (annulus
 ring state vs `:direct`: 1e-12 relative for `:lagged`, whose stale-LU factor is
 the mapped assembled saddle keyed by `_saddle_key(qt, geom, ...)`; the
-`:schur_cg` agreement equals its iteration tolerance) — see
-`docs/dev/BUG_FIX_LOG.md`, F6.  The refusal is lifted when a mapped gate for
+`:schur_cg` agreement equals its iteration tolerance).  The refusal is lifted
+when a mapped gate for
 those paths lands.  G271 is the
 mapped operator/hierarchy gate: mapped sparse `K` vs the mapped matrix-free
 apply (≤1e-12), mapped `:mg` vs mapped `:direct` (≤1e-6), two geometries on one
@@ -114,8 +114,8 @@ logical coarse levels, and the driver's mapped linear paths.
 The box applies boundary data as **Cartesian components**: on an axis-aligned
 wall the normal velocity is one global dof, so free slip is one fixed component
 and a moving rigid wall is two fixed components.  On a mapped geometry the wall
-normal turns along the wall, so stage 0.5b2 (`docs/dev/GEOM_PROGRESS.md`,
-`wall_constraints.jl`) expresses the boundary conditions as **general linear
+normal turns along the wall, so stage 0.5b2 (`wall_constraints.jl`) expresses
+the boundary conditions as **general linear
 relations between the two Cartesian components** at every wall GLL node:
 
 * `:free` -- the free-slip row `n.u = g` (`g` = `wall_un` or 0; the tangential

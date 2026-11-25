@@ -28,7 +28,7 @@
 # The two operations that can run away over thousands of cycles (balance and the
 # hard-budget merge) are pair-aware here, `_coarsen_pair!` refuses a pair it
 # cannot merge on both sides, and `mirror_close!` repairs a tree that was
-# damaged before the fix (`docs/dev/CASE_REALISTIC.md` §15).
+# damaged before the fix.
 
 """Mirror of a leaf about x = Lx/2: `(l, nx0*2^l - 1 - ix, iy)`."""
 @inline _mirror_leaf(qt::Quadtree, lf::NTuple{3,Int}) =
@@ -250,8 +250,8 @@ function balance!(qt::Quadtree; maxiter::Int=1000, symmetry::Symbol=:none)
             end
         end
         wave = sort(collect(next))
-        # Fixed-point guard (same bug class as the step-95 leaf-budget spin,
-        # docs/dev/SOLVER.md §16): the next wave is a pure function of the leaf
+        # Fixed-point guard (same bug class as the step-95 leaf-budget spin):
+        # the next wave is a pure function of the leaf
         # set and of `refine!`'s success, so `wave == prev` means *no* leaf was
         # split this pass and the following pass would repeat this one exactly.
         # A leaf that `refine!` refuses (it is at `maxlevel`) used to be
@@ -292,7 +292,7 @@ end
 # parent usually survives.
 #
 # The 2:1 condition is local, and the reference
-# (`docs/dev/AMR.md`, verified there) makes the replacement
+# (verified there) makes the replacement
 # exact:
 #
 #   **Lemma 1.** If `T` is 2:1 and `T'` replaces one complete quartet by its
@@ -301,8 +301,7 @@ end
 #   violate are the face neighbours of `x` one level coarser than `x`.
 #   **Theorem.** With those seeds the queue closes at exactly `balance!`'s leaf
 #   set (the least 2:1 refinement), *provided the tree is 2:1 at entry*;
-#   without that precondition there is an explicit counterexample
-#   (`docs/dev/AMR.md` §4.1).
+#   without that precondition there is an explicit counterexample.
 #
 # So the pass keeps a FIFO of leaf ids (`queued` dedups, cleared on pop so a
 # leaf tested clean can be re-tested after its neighbour changes), splits only
@@ -405,7 +404,7 @@ the new children and the old neighbours of every split, until the queue is
 empty.  Returns the number of splits and `ok = !capped && unsplittable == 0`.
 
 The result is the leaf set of `balance!(qt)` **provided `qt` was 2:1 before the
-mutation that produced the seeds** (`docs/dev/AMR.md` §4.1:
+mutation that produced the seeds**:
 Lemmas 1-2 make the queue closed under the only two events that create a
 violation, and the closure is the unique least 2:1 refinement).  For a tree that
 is not 2:1 (a legacy checkpoint, a hand-built test tree) pass
@@ -419,7 +418,7 @@ silently -- the repair path for a damaged tree remains `mirror_close!`.
 
 `st.parents` lists the parents of every leaf the pass split (per pass): the
 budget pass blocks all of them, so a quartet the rebalance undid is never
-re-merged (the S16 spin of `docs/dev/AMR.md` §3(e)).
+re-merged (the S16 spin).
 """
 function rebalance_local!(qt::Quadtree, st::LocalBalance=LOCAL_BALANCE;
                           seeds::Tuple=(), symmetry::Symbol=:none,

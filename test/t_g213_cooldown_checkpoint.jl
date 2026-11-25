@@ -2,7 +2,7 @@
 using Test, QuaST, LinearAlgebra, HDF5, Printf
 
 # G213: persist the `:balanced` AMR cooldown in the checkpoint, and prove that a
-# resume is bitwise identical (docs/dev/BUG_LEDGER.md §10.5).
+# resume is bitwise identical.
 #
 # The four parts:
 #   1. save/load round trip of a non-trivial `AmrCooldown` (mirror halves of
@@ -24,8 +24,7 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
 # The card is now the localized wall-plume IC below with `max_leaves = 520`
 # against a 640-leaf start: every cycle must trade, the cooldown is non-empty at
 # the end, and stripping it changes the resumed state.  The old fixture's pins
-# (row (46,46,46,0), leaves 640, N 2853, hash a579666395604f77) are superseded;
-# see docs/dev/BUG_FIX_LOG.md and BUG_AUDIT_INDICATOR.md §4.4.
+# (row (46,46,46,0), leaves 640, N 2853, hash a579666395604f77) are superseded.
 
 # ---- helpers ---------------------------------------------------------------
 fnv(a) = begin

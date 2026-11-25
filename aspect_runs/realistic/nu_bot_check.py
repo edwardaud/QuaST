@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Where does the Nu_bot difference between ASPECT's `realistic_E` and our
-`case_realistic_E` come from?  (docs/dev/VALIDATION.md section 10)
+`case_realistic_E` come from?
 
 Three measurements, all on data the two runs already wrote:
 

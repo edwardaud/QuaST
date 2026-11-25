@@ -1,7 +1,7 @@
 # G256: the card's realised viscosity contrast over the temperature range it
 # actually uses, and the calibration's mantle-contrast variant.
 #
-# **The defect this gate pins.**  docs/dev/HANDOVER.md §10.2 item 2 records that
+# **The defect this gate pins.** The measurement showed that
 # the production card's constitutive contrast is 7.8e6 against the mantle's
 # 1e3 to 1e5, and that "a reader could reasonably think the card is mantle-like
 # when it is not".  The calibration (`examples/calib_realistic_2d.jl`) solved
@@ -11,7 +11,7 @@
 # The card's *field* does not live there: the base state is
 #     Tbar(z,H) = (1-z) + (H/2) z (1-z),  H = 10     (src/physics/params.jl),
 # whose maximum is (H+2)^2/(8H) = 1.8 at z* = (H-2)/(2H), and a developed field
-# spans T in [0, 1.647] (docs/dev/PHYSICS.md §2.3).  At the calibration rate the
+# spans T in [0, 1.647]. At the calibration rate the
 # card's realised contrast over that real range is 1.957e6, and a field census
 # of its step-1 state gives 1.0e7 (the lid sits on eta_max), not ~1e4.
 #
@@ -74,7 +74,6 @@ const G256_V_ES = 9.879452998
 const G256_V_AD = 1.0658847774e3
 const G256_V_AS = 2.4961576276e-2
 # the mantle's viscosity-contrast range this project uses
-# (docs/dev/HANDOVER.md §6 and §10.2 item 2, docs/dev/PHASE1.md §1.2)
 const G256_MANTLE_LO = 1.0e3
 const G256_MANTLE_HI = 1.0e5
 # the old contrast window, kept because it is what fixes the branch ratio

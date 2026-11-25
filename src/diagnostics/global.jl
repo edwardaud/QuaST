@@ -406,7 +406,7 @@ quadrature the energy assembly uses (Gauss for the volumes, the wall GLL rule of
 `h = theta + sum_i latent_i*(Gamma_i(y,T) - Gamma_i(y,Tbar))` (the sensible +
 latent anomaly relative to the conductive base state; `latent_i` is
 `pr.latent_L` in `:global` mode or `PhaseTransition.latent` in `:per_phase`
-mode, docs/dev/PHYSICS.md §7.8), the semi-discrete energy equation integrated over
+mode), the semi-discrete energy equation integrated over
 the box is
 
     d/dt int h = Q + S,        Q = int_wall dtheta/dn ds,
@@ -442,7 +442,7 @@ The steady energy balance the closure diagnostic uses is, per unit area,
     Nut - Nub = H - (base_adv + latent_src + latent_adv)/A,
 
 so `latent_dgdt/A` is the latent contribution to the flux balance (docs/
-RHEOLOGY.md §7.3, `docs/dev/CASE_REALISTIC.md` §7.2).  It is **not**
+RHEOLOGY.md §7.3).  It is **not**
 `latent_int`: that is an enthalpy, and its time derivative is the transient
 term, not a steady source.
 """
@@ -649,7 +649,7 @@ end
                            eta_fun=nothing)
 
 The **exact** residual of the quoted pointwise Nusselt pair against the scheme's
-own discrete identity (docs/dev/VALIDATION.md §2.3, eq. `(ID1)`):
+own discrete identity (eq. `(ID1)`):
 
     R = F_pt - (dH/dt + sum(C theta) + Ibase + latent_src)
     F_pt = flux_top - flux_bot,   dH/dt = 1'(ca M theta - cb M theta_n + cc M theta_nm1)
@@ -659,8 +659,8 @@ elementwise EV field and the same apparent-capacity temperature) and
 `ca/cb/cc` are the BDF2 coefficients of that step.  `R/A` is in Nusselt units.
 It vanishes (to the linear solver's floor) for the time-step CBF and is `O(h)`
 for the pointwise pair, so a non-zero `R/A` at a transient state is a property
-of the pointwise family, **not** an error of the run
-(docs/dev/VALIDATION.md §3.2); the historical `closure` column is a different
+of the pointwise family, **not** an error of the run; the historical `closure`
+column is a different
 quantity and does not close for any definition (NUSSELT_AUDIT §4).
 
 `theta_n`/`theta_nm1` are the two previous BDF2 levels of the step that produced
@@ -673,7 +673,7 @@ pass it explicitly when `maxpic > 1`, where it is the last iterate.
 Returns a named tuple with `R`, `R_over_A = R / total_area(qt)` and the terms of
 the identity (`flux`, `dHdt`, `sumC`, `Ibase`, `latent_src`, `rhs`).  This is a
 pure diagnostic: no solver path calls it unless the caller asks for it (the
-driver's opt-in `extdiag=true`, docs/dev/CASE_REALISTIC.md §7.2).
+driver's opt-in `extdiag=true`).
 """
 function semquad_exact_residual(sq::SemQuad, qt::Quadtree, pr::Params,
                                 theta::Vector{Float64},
@@ -720,7 +720,7 @@ function semquad_exact_residual(sq::SemQuad, qt::Quadtree, pr::Params,
     # A mapped geometry's assembled source carries the physical Laplacian of the
     # base state `lap(Tbar(h))` (`_mapped_base_curvature`), which is identically
     # zero on the box (|grad h| = 1, lap y = 0) but not on a curved map; the
-    # identity (ID1) of docs/dev/VALIDATION.md §4.1 then reads
+    # identity (ID1) then reads
     # `Qc = dHdt + sumC + Ibase + latent_src - int lap(Tbar(h)) dV`.  The box
     # body keeps the historical `rhs` bit for bit.
     g = sq.geom

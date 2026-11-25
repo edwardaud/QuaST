@@ -3,7 +3,7 @@
 written, is there an artificial-viscosity (`kappa_eff`) field, how big is it,
 and what is the temperature profile in y_nd <= 0.05.
 
-Motivation (docs/dev/VALIDATION.md section 12): ASPECT's boundary
+Motivation: ASPECT's boundary
 heat flux is a Gresho CBF whose volume integral uses
 
     kappa_eff = max(k, alpha_AV)        (source/postprocess/heat_flux_map.cc:207-212)

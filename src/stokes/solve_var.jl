@@ -24,11 +24,11 @@ the actual `eta_fun` (`semquad_eta_contrast`, fixed 33x33 grid), fed to
 (`semquad_auto_mg_threads`); `schur_precond` must be `:mass` (the default) or
 the selector falls back to `:direct`.  The decision and its reason are in
 `LAST_SEMSTOKES_AUTO_CHOICE`.  The rule is re-calibrated at `c7e0f55` after the
-MG optimisation campaign (docs/dev/MG.md§16): any contrast takes MG from
+MG optimisation campaign: any contrast takes MG from
 20k dofs, contrast <= 100 from 2k, direct below that -- the old contrast-10
 rung is gone because the measurements cannot tell the two low bands apart
-(`benchmarks/bench_auto_crossover.jl` is the A/B; docs/dev/SOLVER.md §4.2/§4.4
-carry the table and the old, pre-campaign numbers, which are superseded).
+(`benchmarks/bench_auto_crossover.jl` is the A/B; the old, pre-campaign numbers
+are superseded).
 An `:auto` solve that resolves to `:direct` produces the **bitwise** direct
 result; an `:auto` solve that resolves to `:mg` produces the same answer as an
 explicit `linear=:mg` call (<=1e-10; the MG solve is not bitwise vs direct).
@@ -75,16 +75,16 @@ bit for bit.  `stokes_lost_tol` (default `1.0`) is the second trigger of the
 ladder: an unshifted relative residual above it means the factorisation did not
 solve the system at all, and the diagonal shift then has to be chosen at the
 scale of the near-null cluster rather than far above it
-([`SEMSTOKES_TINY_SHIFTS`](@ref); docs/dev/CASE_REALISTIC.md §13.10).  `Inf`
+([`SEMSTOKES_TINY_SHIFTS`](@ref)).  `Inf`
 disables that phase, and it never fires on a solve whose unshifted residual is
 below `1.0`, so every answer that was already usable is bitwise unchanged.
 The rung that produced the returned solution is in
 `LAST_SEMSTOKES_SHIFT`, the refinement count in `LAST_SEMSTOKES_REFINE_ITERS`,
 the per-rung residual history in `LAST_SEMSTOKES_LADDER`, and the two saddle
-blocks separately in `LAST_SEMSTOKES_RESID_SPLIT` (docs/dev/CASE_REALISTIC.md §13).
+blocks separately in `LAST_SEMSTOKES_RESID_SPLIT`.
 `stokes_scaling` (default `:none`) selects the symmetric equilibration of the
 reduced saddle used by the direct branch (`:equilibrated`;
-docs/dev/BUG_LEDGER.md).  The scaling is an exact congruence
+The scaling is an exact congruence
 `S -> D*S*D`, `rhs -> D*rhs` with
 `D = diag(1/sqrt(diag Kred), 2 max|Kred| / max(|Bt|,|Bs|))` and `x = D*y`: it
 removes the viscosity and element-size scales from the operator, so the
@@ -103,7 +103,7 @@ never applied to the `:mg`/`:lagged`/`:schur_cg` paths.  The number of solves
 answered by the scaled path is counted in `LAST_SEMSTOKES_SCALED[]` (cumulative;
 not reset by a solve).  `run_semquad_simulation` exposes the keyword as
 `stokes_scaling`, forwards it to every solve and stores it in the checkpoint's
-`run_config` (docs/dev/BUG_LEDGER.md).
+`run_config`.
 `mg_pressure_mode` selects the Schur approximation: `:auto` (default) uses the
 1/eta-weighted pressure mass for contrast <= 100 and the three-factor w-BFBT
 above it; `:mass`, `:stiffness`, `:lsc` and `:bfbt` force one.
@@ -116,17 +116,17 @@ advection term in the momentum equation `C_p = 0`, so it reduces to the mass
 inverse at three times the cost) and `:lsc` the least-squares commutator.  On
 the 1024-leaf blob tree (16384x contrast) the measured outer iteration counts
 are 39 (`:bfbt`) / 68 (`:scaled_mass`) / 239 (`:lsc`) / not converged
-(`:mass`, `:pcd`), which is why `:auto` keeps BFBT there (docs/dev/SOLVER.md §13).
+(`:mass`, `:pcd`), which is why `:auto` keeps BFBT there.
 `mg_pressure_scale=0` means the mode's default (1 for mass, 0.1 for LSC,
-0.4 for BFBT; measured scale curve in docs/dev/SOLVER.md §13).  `mg_restart`/`mg_maxit` control GMRES (default 100/500).  The outer loop is
+0.4 for BFBT; measured scale curve).  `mg_restart`/`mg_maxit` control GMRES (default 100/500).  The outer loop is
 **flexible** GMRES (FGMRES, `fgmres_restarted`) and stops on the **true**
 reduced-saddle residual, never on the preconditioned one.
 `mg_pressure_cache=true` (S3 stage A) caches the pressure-block factors across
 Stokes solves, keyed by the tree fingerprint and invalidated when the sampled
 viscosity moves by more than `mg_pressure_eta_tol` (default **1.0** since
 S5-1; S3 used 1e-2 and then 0.5).  The BFBT build costs ~0.2-1.1 s on the
-1024-leaf blob tree, and on the measured threshold curve (docs/dev/SOLVER.md
-§13.3) the outer iteration count is flat from 1e-12 to `Inf` (39.7 -> 39.9),
+1024-leaf blob tree, and on the measured threshold curve the outer iteration
+count is flat from 1e-12 to `Inf` (39.7 -> 39.9),
 so the threshold only trades build time against staleness: at **1.0** every
 tree block is built exactly once (25 builds instead of 41 in the 25-frame blob
 run), at the cost of accepting up to 100% eta drift inside a tree block.
@@ -155,7 +155,7 @@ count is dominated by the pressure block, and SGS did not reduce it on 2b's
 velocity-block V-cycle but costs 2-3x per apply.  A Chebyshev smoother was
 implemented and measured during the tuning pass; it diverges on the two
 production trees (the reduced operator has near-null modes outside the
-polynomial's window), so it is not shipped (docs/dev/MG.md).
+polynomial's window), so it is not shipped.
 `mg_coarse=:auto` rediscretises on uniform trees and uses the exact Galerkin
 operator `P' A P` on non-uniform ones (same iteration count to a few percent,
 but no coarse re-assembly per Picard iteration).
@@ -182,7 +182,7 @@ Explicit `mg_pre`/`mg_post` vectors (coarse first) select any per-level
 schedule; `mg_smoothing=:taper` keeps the historical `1, 2, 2, 4, 4, 8, ...`
 shape with omega=0.55.  Measured: the 6-level F hierarchy is best at uniform
 2+2 (81 iterations), the 7-level P1 hierarchy at uniform 3+3 (65); the old
-taper gives 99 / 90 (docs/dev/MG.md).
+taper gives 99 / 90.
 A non-uniform tree is handled by hierarchical coarsening.
 
 `mg_threads=1` (default) keeps the whole `linear=:mg` path serial and bitwise as
@@ -198,7 +198,7 @@ serial `mul!`); a request larger than `Threads.nthreads()` is clamped with a
 warning and a single-threaded process warns once and stays serial.  Measured on
 uniform 4096-leaf (132k velocity dof) trees: 2.6x V-cycle and 1.9x whole-solve
 speedup at 8 threads; at 1024 leaves the V-cycle gain is smaller (1.6x) and the
-whole solve does not improve (docs/dev/SOLVER.md §19.2).
+whole solve does not improve.
 
 `assemble_threads=1` (default) assembles the Stokes leaves serially, exactly as
 before (bitwise).  `assemble_threads=N>1` cuts the leaf list into `N` fixed
@@ -223,8 +223,8 @@ chose `:direct` is bitwise unchanged.  Measured trigger: the 8192-leaf
 realistic case (7498 leaves, `saddle_dofs` ~72k), where the matrix-free MG
 returned relres 4.33 before the exact constrained and BFBT diagonals; the
 direct fallback recovered the solve.  After those fixes the same class of tree
-converges (the card comment in `examples/case_realistic_2d.jl` and
-docs/dev/SOLVER.md §4.4 carry the measurement), so the fallback remains a safety
+converges (the card comment in `examples/case_realistic_2d.jl` carries the
+measurement), so the fallback remains a safety
 net, not the expected path.
 
 `assemble_only` selects what the call is allowed to build:
@@ -241,7 +241,7 @@ net, not the expected path.
   `Cu` only.  `SEMSTOKES_K_ASSEMBLIES` counts every formation of the sparse
   `K`; an `assemble_only=:mg` call does not move it.  The mode requires
   `linear=:mg, mg_operator=:matrixfree` and is bitwise for every object it
-  returns (docs/dev/MG.md, G220).
+  returns.
 
 **Boundary-condition keywords.** The two positional closures `uDx`/`uDz` are
 the historical global Dirichlet data: every wall's *normal* component is taken
@@ -276,7 +276,7 @@ other closure.  The keywords refine that value per wall, in the order
   `2ηε(u)·n` shear traction.  It requires a wall whose tangential component is
   free (a `:free` or `:open` wall); on a `:rigid` wall the tangential velocity
   is Dirichlet, so a traction there would be dropped by the constraints -- a
-  silent no-op, refused with an `ArgumentError` (docs/dev/BC_DESIGN.md §3.2).
+  silent no-op, refused with an `ArgumentError`.
   `nothing` is zero traction, so the default path is bit-identical (G259/G260).
 * `wall_tn` is the wall's *normal traction* (stage 3), the same data term for
   the wall's normal component: the global `t_x` on an x-wall and `t_z` on a
@@ -312,8 +312,7 @@ equations are inconsistent.  With any `:open` wall the free normal velocity
 absorbs the imbalance, so the check is skipped.  A corner dof belongs to two
 walls and the walls are written in the order above, so a later wall owns the
 corner: in particular, a rigid top/bottom wall's tangential value overrides the
-side walls' normal value at its two corners (docs/dev/BC_DESIGN.md §1.4;
-G258 (d)).
+side walls' normal value at its two corners (G258 (d)).
 
 **Mapped geometry (stage 0 cuts 2 and 5).**  When `ss` was built with a non-box
 geometry (`make_semstokes(qt, p; geom=AffineBox(...))`), both the assembled and
@@ -331,7 +330,7 @@ measure.  A mapped space therefore supports `linear=:direct`, `:mg` and `:auto`
 (the selector samples the eta contrast on the mapped domain).  `:schur_cg` and
 `:lagged` are refused as a **gate-coverage restriction**, not because their
 mapped path is known wrong: the stage-0.5 fix campaign's scratch-worktree
-measurement (`docs/dev/BUG_FIX_LOG.md`, F6) lifted the guard and found the
+measurement lifted the guard and found the
 mapped saddle solved by both paths, the annulus state agreeing with `:direct`
 to 1e-12 relative for `:lagged` (whose stale factor is keyed on the *mapped*
 assembled saddle through `_saddle_key(qt, geom, ...)`) and to the Schur-CG

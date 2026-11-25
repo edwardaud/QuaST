@@ -1,8 +1,7 @@
 #!/usr/bin/env julia
 # =============================================================================
 # bench_s1_solve.jl -- the cost of the two chol(S1) triangular solves in the
-# w-BFBT pressure block, broken into parts, and the structure of `F1`
-# (docs/dev/MG.md, part 1)
+# w-BFBT pressure block, broken into parts, and the structure of `F1`.
 #
 #   julia --project=. --threads=1 benchmarks/bench_s1_solve.jl F
 #   julia --project=. --threads=8 benchmarks/bench_s1_solve.jl F

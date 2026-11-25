@@ -34,7 +34,7 @@ const LAST_SEMSTOKES_REGULARIZED = Ref(false)
 # Pressure gauge of the last variable-viscosity solve: `:pin` when one nodal
 # pressure dof was pinned to zero (exact only while the normal velocity is
 # Dirichlet on the whole boundary, i.e. when **no** wall is `:open`), `:none`
-# when an `:open` wall forced the derived gauge (docs/dev/BC_DESIGN.md §3.5).
+# when an `:open` wall forced the derived gauge.
 # `nothing` before the first solve.  G262 pins "the pin is on exactly when no
 # wall is open" on this record plus the column count of the returned `C_p`.
 const LAST_SEMSTOKES_PRESSURE_GAUGE = Ref{Any}(nothing)
@@ -42,8 +42,8 @@ const LAST_SEMSTOKES_PRESSURE_GAUGE = Ref{Any}(nothing)
 # when the boundary rows exclude all three rigid-body modes (the historical
 # behaviour of every box path); `:rotation` when a free-slip curved wall left
 # the solid-body rotation admissible, so one free velocity dof was pinned and
-# the returned velocity was projected to zero net angular momentum
-# (docs/dev/GEOM_PROGRESS.md stage 0.5b2).  Read by the annulus gate G275.
+# the returned velocity was projected to zero net angular momentum.
+# Read by the annulus gate G275.
 const LAST_SEMSTOKES_ROTATION_GAUGE = Ref{Any}(:none)
 # The rotation `omega` removed by the zero-net-angular-momentum projection of the
 # last solve (0 when no gauge ran).  `LAST_SEMSTOKES_ROTATION_GAUGE` says
@@ -51,7 +51,7 @@ const LAST_SEMSTOKES_ROTATION_GAUGE = Ref{Any}(:none)
 # mode (`u_before = u_after + omega * (-y, x)`).
 const LAST_SEMSTOKES_ROTATION_SHIFT = Ref(0.0)
 
-# --- the direct path's shift ladder (docs/dev/CASE_REALISTIC.md §13) -------------
+# --- the direct path's shift ladder -------------
 #
 # The two blocks of the reduced saddle are measured separately: `vel` is
 # `||Kred u + Bt p - fr|| / rden` (momentum rows) and `div` is

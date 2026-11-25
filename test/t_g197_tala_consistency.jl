@@ -1,8 +1,7 @@
 # G197: TALA self-consistency — the analytic state and the discrete momentum balance.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
-# G197 -- TALA self-consistency of this solver (semquad) path
-# (docs/dev/PHYSICS.md section 10).
+# G197 -- TALA self-consistency of this solver (semquad) path.
 #
 # The formulation that is verified here is the one the code implements:
 #   momentum   -div(2 eta eps(u)) + grad p = Ra rho(y) alpha(y) theta   (anomaly)

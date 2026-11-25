@@ -1,8 +1,7 @@
 # G214: symmetric equilibration of the direct saddle.
 using Test, QuaST, LinearAlgebra, SparseArrays
 
-# G214: solver-side symmetric equilibration of the direct saddle
-# (docs/dev/BUG_LEDGER.md).
+# G214: solver-side symmetric equilibration of the direct saddle.
 #
 # The wall-strip near-null pressure cluster of the level-5 lid makes the
 # *unshifted* sparse LU of the reduced saddle unusable (G step 7641: residual

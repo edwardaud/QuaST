@@ -86,7 +86,7 @@ using Test, QuaST, LinearAlgebra, HDF5
         # row only involves the wall element, so the *physical* EV field cannot
         # change the wall flux: the two values must be bitwise identical.  This
         # is the reason the "2b CBF is low because EV is missing" hypothesis is
-        # false; see G149 notes / docs/dev/SOLVER.md.
+        # false; see the G149 notes.
         nt0, nb0 = semquad_nu_cbf(sq, qt, pr, th, ux, uz; advection=:galerkin)
         nt1, nb1 = semquad_nu_cbf(sq, qt, pr, th, ux, uz; advection=:galerkin,
                                   ev_field=evbuf)

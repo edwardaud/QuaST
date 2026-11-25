@@ -28,7 +28,7 @@ polynomial interpolant of the face data).  A corner node belongs to two walls;
 using the final dict is deliberate, because the wall write order
 `(xminus, xplus, yminus, yplus)` lets a later rigid y-wall's *tangential* value
 overwrite the x-wall's normal one at the corner, and that is the data the solve
-actually imposes (docs/dev/BC_DESIGN.md §1.4).  The pass is serial and runs
+actually imposes. The pass is serial and runs
 after the fixed-dof loop, so it changes no assembly order; `bmask` is the
 precomputed serial boundary mask (`_semquad_boundary_face_mask`), so this pass
 never queries the quadtree neighbour table either.
@@ -156,7 +156,7 @@ kernel of `G`; the velocity of a solution is therefore unique iff `G` has rank 3
 of an axis-aligned box produce an eigenvalue at round-off, the well-posed ones
 one of order the number of Dirichlet dofs).  `fixed` carries the *values* too,
 but the uniqueness question is about the homogeneous linearised problem, so only
-the dof set is used -- the rigid-mode rank test of docs/dev/BC_DESIGN.md §3.5.
+the dof set is used -- the rigid-mode rank test
 """
 function _semquad_rigid_mode_gram(ss::SemStokes, fixed::Dict{Int,Float64})
     su = ss.su
@@ -237,7 +237,7 @@ function _semquad_check_rigid_modes(ss::SemStokes,
         "fixes that component along a whole line): set wall_bc = :free (or " *
         ":rigid) on enough walls to remove the printed motion.  Resolved " *
         "wall_bc = ($(join(String.(resolved_wall_bc), ","))).  Test: " *
-        "_semquad_rigid_mode_gram, docs/dev/BC_DESIGN.md §3.5, G262."))
+        "_semquad_rigid_mode_gram, G262."))
 end
 
 # Historical box body of the Dirichlet dof selection, moved verbatim out of the
@@ -277,7 +277,7 @@ function _semquad_fill_fixed!(fixed::Dict{Int,Float64}, ::CartesianBox,
             # coordinate direction, exactly like `uDx`/`uDz`, not the outward
             # flux.  The write order (x walls, then y walls, normal before
             # tangential) is unchanged, so every corner overwrite of the legacy
-            # paths is preserved (docs/dev/BC_DESIGN.md §1.4/§3.4).
+            # paths is preserved.
             un = wall_un[wi]
             if dir === :xminus || dir === :xplus
                 iF = dir === :xminus ? 1 : n
@@ -353,14 +353,14 @@ function _semquad_velocity_boundary(ss::SemStokes, geom::CartesianBox,
     if any(w -> w === :open, resolved_wall_bc)
         # with an `:open` wall the Dirichlet set can shrink enough to leave a
         # rigid-body mode admissible; the numeric 3x3 Gram test runs on exactly
-        # the dofs the solve will impose (docs/dev/BC_DESIGN.md 搂3.5; the
+        # the dofs the solve will impose; the
         # all-`:open` pure-traction case was refused before the assembly).  With
         # every wall closed the historical normal Dirichlet data remove the
         # three modes, so the default path does not run this check.
         _semquad_check_rigid_modes(ss, fixed, resolved_wall_bc)
     else
-        # Net-flux compatibility of the prescribed normal data (docs/dev/
-        # BC_DESIGN.md 搂3.5 eq. 8).  When the normal component is Dirichlet on
+    # Net-flux compatibility of the prescribed normal data (eq. 8).  When the
+    # normal component is Dirichlet on
         # *every* wall (i.e. no wall is `:open`), the constant pressure is in the
         # null space of the reduced gradient and the pinned pressure gauge is
         # exact only when the boundary data satisfy 鈭垈惟 u路n dS = 0.  The default
@@ -748,7 +748,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     mg_operator in (:sparse, :matrixfree) ||
         throw(ArgumentError("mg_operator must be :sparse or :matrixfree"))
     # Production default of the h-coarsening step.  `coarsen_factor=2.0` was
-    # measured on the F tree (1.5x end to end, docs/dev/MG.md) but on
+    # measured on the F tree (1.5x end to end) but on
     # P1 it collapses the hierarchy from 8 to 6 levels and costs 177 outer
     # iterations instead of 61 (8.03 s against 5.45 s, measured at 1e-6).  The
     # shipped default is therefore 1.5: it still removes F's 1.7 %-coarsening
@@ -777,8 +777,8 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         throw(ArgumentError("assemble_threads must be >= 1"))
     # S6: resolve `linear=:auto` **before** the assembly, so an MG decision
     # never pays for or stores the sparse velocity operator.  The decision uses
-    # only O(1) node counts and the fixed 33x33-grid eta sample (measured cost
-    # in docs/dev/SOLVER.md §20); an explicit `:direct`/`:mg` call skips this
+    # only O(1) node counts and the fixed 33x33-grid eta sample (measured cost);
+    # an explicit `:direct`/`:mg` call skips this
     # block entirely and runs exactly as before (bitwise for `:direct`).
     if linear === :auto
         auto_choice, auto_threads = _semquad_resolve_auto(ss, eta_fun;
@@ -819,7 +819,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # agreeing to 1e-12 relative for `:lagged`, and to the Schur-CG iteration
     # tolerance for `:schur_cg`) and the `:lagged` saddle is the *mapped*
     # assembled matrix whose `_saddle_key` already carries the geometry
-    # (docs/dev/BUG_FIX_LOG.md, F6).  The refusal is kept as a gate-coverage
+    # The refusal is kept as a gate-coverage
     # restriction; it can be lifted when a mapped gate lands.
     #
     # The remaining mapped restrictions below are *feature* restrictions owned by
@@ -837,8 +837,8 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                 "gate-coverage restriction, not a known correctness defect: the " *
                 "stage-0.5 fix campaign measured both paths on the annulus ring " *
                 "with the guard lifted, agreeing with :direct to 1e-12 relative " *
-                "(:lagged) and to its iteration tolerance (:schur_cg) " *
-                "(docs/dev/BUG_FIX_LOG.md, F6).  Pass linear=:direct, " *
+                "(:lagged) and to its iteration tolerance (:schur_cg)" *
+                ".  Pass linear=:direct, " *
                 "linear=:mg or linear=:auto."))
         end
         if linear === :mg && schur_precond !== :mass
@@ -868,7 +868,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     end
     # BFBT weight: the exact restricted diagonal
     # `diag(Cu' M_u(sqrt(eta)) Cu)` is the shipped default on the matrix-free
-    # path (docs/dev/MG.md).  It is a zero-per-apply-cost change
+    # path. It is a zero-per-apply-cost change
     # that removes 10 outer iterations on `F` (81 -> 71) and leaves `P1` at 65;
     # its leaf-local construction is cheaper than the historical lumped `:leaf`
     # diagonal at 8 threads and the same at 1 (both are dominated by the
@@ -958,7 +958,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # Dirichlet data) so that `fr = Cu' (fv - K u0 + Bm' p0)` below is the exact
     # virtual work on the admissible test space; `Cu'` redistributes a loaded
     # hanging-master node and drops a loaded Dirichlet dof, which is the
-    # weak-form restriction (docs/dev/BC_DESIGN.md §3.2/§3.3).  With every
+    # weak-form restriction. With every
     # `wall_t`/`wall_tn` entry `nothing` this call returns before touching `fv`,
     # which is what keeps the default path bit-identical (G260).  The pass runs
     # after the threaded leaf assembly and touches no operator (`K`, `Kred`,
@@ -993,7 +993,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # the reference density enters the buoyancy only, not the mass conservation
     # (ASPECT's `truncated anelastic liquid approximation`).  It is the
     # apples-to-apples TALA counterpart of the ALA form for the same reference
-    # state, which is what docs/dev/PHYSICS.md §10.3 measures; it is off unless
+    # state, which is what the TALA form measures; it is off unless
     # requested, so the default path is unchanged.
     Bm = Bref
     Bc = Bref
@@ -1068,8 +1068,8 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     mfpar = nothing
     if mf_path
         mfop = semquad_kop(ss, qt; deviatoric=deviatoric)
-        # sampled once, then laid out for the lane kernel (docs/dev/MG.md
-        # §15): the leaf-major field plus its block-major lane table
+        # sampled once, then laid out for the lane kernel: the leaf-major
+        # field plus its block-major lane table
         mfetav = semquad_eta_lanes(mfop, semquad_eta_field(mfop, eta_fun))
         mfwork = SemQuadKWork(mfop)
         Ku0 = zeros(Float64, Nu2)
@@ -1124,8 +1124,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # to the *upward* momentum.  The sign is not free: with ASPECT's own
     # temperature field this sign reproduces ASPECT's velocity to six digits
     # (Vrms 24.7657 vs 24.7657, max|u| 46.858 vs 46.858), while the opposite
-    # sign gives Vrms 26.94 (the historical 8% King error).  See
-    # docs/dev/SOLVER.md for the operator-agreement test.
+    # sign gives Vrms 26.94 (the historical 8% King error).
     if compress_block !== nothing
         Bmm = sparse(transpose(Bm)) - compress_block
         Bt = -(Cu' * Bmm * Cp)
@@ -1147,7 +1146,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # (:bfbt | :mass | :scaled_mass | :pcd | :lsc); its default `:auto`
         # keeps the historical `mg_pressure_mode` resolution, which picks the
         # three-factor w-BFBT above 100x viscosity contrast -- the measured
-        # winner on the blob tree (docs/dev/SOLVER.md §13).  Not built for the
+        # winner on the blob tree. Not built for the
         # reduced `assemble_only=:mg` geometry call, which never uses it.
         pmode_arg = mg_pressure_mode
         pweight_arg = mg_pressure_weight
@@ -1319,7 +1318,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         # iterative-refinement steps with the same factorisation.  The default
         # `accept_tol = Inf` stops after the first rung, so the well-conditioned
         # systems (uniform meshes, L2-L4 2b, the blob) stay bit-identical.
-        # docs/dev/CASE_REALISTIC.md §13: on the 8192-leaf realistic tree the 1e-12
+        # on the 8192-leaf realistic tree the 1e-12
         # rung alone leaves 1.3e-3 (1.3x the card's 1e-3) and the driver aborted
         # the long run at step 6130.  §13.10: when the unshifted solve is *lost*
         # (`stokes_lost_tol`, default 1.0) the ladder tries the tiny shifts
@@ -1334,7 +1333,7 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
             return max(rv, rd)
         end
         if stokes_scaling === :equilibrated
-            # docs/dev/BUG_LEDGER.md: solver-side symmetric equilibration
+            # solver-side symmetric equilibration
             # of the same saddle.  First the historical unscaled unshifted solve,
             # exactly the ladder's rule 1: a solve that is healthy there is
             # returned untouched, so healthy paths stay bitwise identical even

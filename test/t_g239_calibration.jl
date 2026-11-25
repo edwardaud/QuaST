@@ -1,6 +1,6 @@
 # G239: the card's composite prefactors still satisfy their own calibration.
 #
-# `docs/dev/CASE_REALISTIC.md` §3 derives `comp_Ad` and `comp_As` from two
+# The calibration derives `comp_Ad` and `comp_As` from two
 # conditions at the reference strain rate `edot_ref = 1.65e3` measured on the
 # Ra = 1e5 constant-viscosity precursor:
 #

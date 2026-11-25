@@ -9,7 +9,7 @@
 # `solve_semquad_energy`).  `pic_mode = :picard` iterates that map; it diverges
 # for a strongly strain-rate dependent viscosity because the map's spectral
 # radius exceeds one (measured on the composite law: Vrms 19.8 -> 23.2 -> 43.7
-# over three iterations, docs/dev/PHYSICS.md).
+# over three iterations).
 #
 # This file adds the alternative `pic_mode = :newton`: a damped Newton-Krylov
 # solve of the *coupled* per-step residual
@@ -38,7 +38,7 @@
 # linearise them.  Measured: 18 Picard against 7 Newton iterations over three
 # steps at Ra = 1e6, but 1.87x slower per iteration at 64 leaves and up to 12x at
 # L5, because each iteration pays a direct factorisation instead of a multigrid
-# cycle (docs/dev/SOLVER.md sections 3.2 and 4.6).  A failed Newton falls back to
+# cycle. A failed Newton falls back to
 # Picard and `pic_diag` records it.
 # Picard fallback is taken by the *driver* when this function reports failure.
 #
@@ -65,8 +65,7 @@ latent heat (apparent heat capacity) to the energy operator.  With
 current iterate `theta` (an extra nonlinearity the Jacobian linearises);
 `:lagged` freezes them at the start-of-step `theta_n`, so they are linear in the
 iterate.  `:lagged` is first order in the latent coupling and is meant as a
-diagnostic: the measured orders and the benchmark recommendation are in
-docs/dev/PHYSICS.md §13.
+diagnostic: the measured orders and the benchmark recommendation are recorded.
 """
 function _semquad_step_residual_ctx(ss::SemStokes, qt::Quadtree, pr::Params,
                                     theta_nm1::Vector{Float64},
@@ -95,7 +94,7 @@ function _semquad_step_residual_ctx(ss::SemStokes, qt::Quadtree, pr::Params,
     z2 = (x, y) -> 0.0
     # `make_eta(theta, ufull, pfull[, chi])` returns `(eta_fun, deta_T_fun,
     # deta_eps_fun)` and optionally the Drucker-Prager pressure derivative as a
-    # fourth entry `deta_dp_fun(x, y, edot, p)` (docs/dev/PHYSICS.md §8.4) and the
+    # fourth entry `deta_dp_fun(x, y, edot, p)` and the
     # weakening derivative as a fifth `deta_dchi_fun(x, y, edot)` (§9.4).  A
     # `make_eta` that does not accept the strain-weakening field is called with
     # three arguments, so the historical contract still works.
@@ -172,7 +171,7 @@ function _semquad_step_residual_ctx(ss::SemStokes, qt::Quadtree, pr::Params,
     # mass term of `rhs` belongs to the start-of-step level, so it does not
     # depend on the iterate), and it also defines the Picard-equivalent change.
     FAr = lu(parts.Ar)
-    # ---- strain weakening (docs/dev/PHYSICS.md §9) ---------------------------
+    # ---- strain weakening ---------------------------
     # `chi` is the current iterate of the weakening field, `chi_n`/`chi_nm1`
     # the two BDF2 levels (frozen during the step).  With `chi === nothing`
     # every line below is skipped and the system is exactly the 3-block one.
@@ -392,7 +391,7 @@ function semquad_step_jvp(ctx, theta::Vector{Float64}, ufull::Vector{Float64},
                              Cdl * theta - Fdl)
     end
     if ctx.weak
-        # Strain weakening (docs/dev/PHYSICS.md §9.4): the chi block is appended
+        # Strain weakening: the chi block is appended
         # after [u; p; theta].  `d r_S/d chi = -Cu' Kchi Cfree_W` is exact;
         # `d r_W/d chi = Cfree_W' A chi` is exact; `d r_W/du` is the advection
         # of chi by the velocity perturbation (the yielding indicator of the
@@ -433,7 +432,7 @@ right after the first Picard sweep).
 `deta_T_fun(x,y)` its temperature derivative and `deta_eps_fun(x,y,edot)` its
 strain-rate derivative (`nothing` when the law has none) at the state it was
 built from.  With a Drucker-Prager yield the tuple may carry the pressure and
-weakening derivatives as 4th/5th entries (docs/dev/PHYSICS.md §8.4, §9.4).
+weakening derivatives as 4th/5th entries.
 
 With `chi !== nothing` the strain-weakening field is a fourth unknown block
 (`chi_n`/`chi_nm1` are its two start-of-step BDF2 levels) and the residual is
@@ -447,7 +446,7 @@ halves `alpha` on every increase of the block-scaled residual (up to
 `tol`.  Returns `(theta, ux, uz, pv, converged, iters, history, change, res,
 alpha, ev_field)`; the driver falls back to Picard when `converged == false`.
 
-Two loop guards (docs/dev/BUG_LEDGER.md §S16): `krylov_stagnation` stops a GMRES
+Two loop guards (S16): `krylov_stagnation` stops a GMRES
 attempt whose restart cycle bought less than that factor (the direction is then
 rejected exactly as a `rel > 1e-4` failure, and on the healthy case the guard
 never fires, so the iterates are unchanged), and `gmres_restarted` now honours

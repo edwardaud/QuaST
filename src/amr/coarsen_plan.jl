@@ -47,7 +47,7 @@ end
 """
     MAX_PLAN_SWEEPS, MAX_PLAN_ROUNDS
 
-Structural caps of the plan walk (`docs/dev/AMR.md` §4).  Neither
+Structural caps of the plan walk. Neither
 is reached by a tree whose legal supply is at least `need` (measured on the
 operating state: 2-4 sweeps and 1-2 rounds); they exist so a tree that cannot
 supply the merge budget stops after a bounded amount of work and reports
@@ -68,7 +68,7 @@ are in the tree, so no `granted` set is needed) and merge the first one found.
 
 Top-level rather than a closure over the cycle: as a closure it captured (and
 therefore boxed) `nc`, `gate_extended` and `tau_r`, so every read inside the scan
-was an `Any` load (`docs/dev/AMR.md` §4).  `granted` is the caller's
+was an `Any` load. `granted` is the caller's
 reusable empty set.  Returns `(merged_quartets, extended, leaf)`, where `leaf` is
 the quartet representative that was merged (the caller records it); `(0, false,
 nothing)` when no legal quartet is left.
@@ -118,8 +118,8 @@ merge, computed **before any mutation** so every decision sees the same tree.
    quartet may only rely on decisions that are final, so a refusal is final for
    this level sweep.
 3. **Supply**: the walk only extends past `tau_h` when the deadband's legal
-   quartets cannot pay `need` leaves.  Measured (`docs/dev/AMR.md`
-   §4.1): at the operating point 14 of the 15 deadband quartets are
+   quartets cannot pay `need` leaves. Measured at the operating point 14 of the
+  15 deadband quartets are
    geometrically illegal while the tree has 1635 legal complete quartets, so a
    gate without that extension would refuse the whole exchange and freeze the
    mesh.
@@ -129,7 +129,7 @@ representatives to merge (all legal together, in summed-indicator order),
 `refused` the deadband quartets the 2:1 gate rejected, `extended` the granted
 quartets taken from above `tau_h`, `sweeps`/`rounds` the fixed-point sweeps and
 extension rounds the walk used, and `capped` whether it stopped on one of the two
-structural caps instead of converging (`docs/dev/AMR.md` §4: a
+structural caps instead of converging (a
 monotone measure plus a recorded cap, not an unbounded `while true`).
 
 `asc` is the cycle's already-sorted leaf list (`(eta, leaf)` ascending); passing

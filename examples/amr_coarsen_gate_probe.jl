@@ -1,4 +1,4 @@
-# Coarsening-gate probe for the balanced AMR policy (docs/dev/AMR.md §4.1).
+# Coarsening-gate probe for the balanced AMR policy.
 #
 #   julia --project=. examples/amr_coarsen_gate_probe.jl trace <ckpt.h5>
 #
@@ -27,8 +27,8 @@
 # Nothing here writes into a run directory; pass a *copy* of a checkpoint.
 #
 #   CASE_SYMMETRY=none|x   mirror rule of the replay (default none: the
-#                          production choice of `docs/dev/AMR.md` §3.6; `x`
-#                          reproduces §3.6's arm)
+#                          production choice; `x` reproduces the historical
+#                          arm)
 #   NCYC=12                cycles to replay
 #   CASE_MAXLEAVES=10000 CASE_COARSEN=0.05 CASE_REFINE=0.2
 #   CASE_WALLMIN=5 CASE_WALLSTRIP=0.1 CASE_HYST=1
@@ -93,7 +93,7 @@ facechildren(dir::Symbol, kids::Matrix{NTuple{3,Int}}) =
 External face neighbours of the would-be parent that are two levels finer than
 it, i.e. the 2:1 violations a merge would create: `[(dir, child_level,
 neighbour_leaf), ...]`.  Empty means `coarsening_allowed()` holds.  This is the
-deal.II `fix_coarsen_flags` neighbour test of docs/dev/AMR.md §2.2.
+deal.II `fix_coarsen_flags` neighbour test.
 """
 function gate_offenders(qt::Quadtree, kids::Matrix{NTuple{3,Int}})
     l = kids[1][1]

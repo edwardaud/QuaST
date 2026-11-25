@@ -1,4 +1,4 @@
-# G246: the Maxwell stress history as driver state (docs/dev/PHASE2.md 2b step 1).
+# G246: the Maxwell stress history as driver state.
 #
 # Three Q2 nodal components `txx`, `tyy`, `txy` are carried through the run the
 # same way the weakening field `chi` is: allocated (or restart-loaded), advanced

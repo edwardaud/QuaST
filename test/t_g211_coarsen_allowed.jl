@@ -1,10 +1,9 @@
 # G211: the coarsening_allowed predicate and its live-gated plan.
 using Test, QuaST, Random, Printf
 
-# G211: the coarsening pre-check `coarsening_allowed` (docs/dev/AMR.md §4,
-# docs/dev/AMR.md).
+# G211: the coarsening pre-check `coarsening_allowed`.
 #
-# `docs/dev/AMR.md` §4.1 measured the churn: at the operating point (10000 leaves)
+# The measured churn: at the operating point (10000 leaves)
 # every quartet the coarsening criterion selects is 2:1-illegal and every merge
 # is undone by the post-merge `balance!` -- 100 % of the merges, in the `:none`
 # arm and in the `:x` arm alike -- so the AMR pass did 4x the work for no
@@ -51,7 +50,7 @@ end
 @testset "G211 coarsening_allowed" begin
     # ---- 1. the predicate ------------------------------------------------
     @testset "predicate: illegal next to a finer leaf, legal otherwise" begin
-        # docs/dev/AMR.md §2's minimal repro: 16 leaves at
+        # A minimal repro: 16 leaves at
         # L2, refine (2,1,3) -> 19.  The quartet of (2,2,3) has (2,1,2) and the
         # three L3 children of (2,1,3) on its xminus face.
         qt = g211_tree(5, 2, (2, 1, 3))
@@ -125,7 +124,7 @@ end
         # so the illegal quartet next to it cannot be legalised by merging the
         # neighbour ("or the neighbour itself will be coarsened in this pass"):
         # the gate has to refuse it, while the historical path merges it and the
-        # post-merge `balance!` immediately undoes that (the `docs/dev/AMR.md` §4.1 churn).
+        # post-merge `balance!` immediately undoes that (the churn).
         function one_cycle(gate::Bool)
             qt = g211_tree(5, 2, (2, 1, 3))
             low = Set(g211_kids((2, 2, 3)))
@@ -208,7 +207,7 @@ end
 
         # random cycles on both bases, gate on: invariants hold, the
         # recirculation is a small fraction of the merges (a refinement outside
-        # the plan can still undo one; docs/dev/AMR.md §4.7)
+        # the plan can still undo one)
         for (cx, cy) in ((1, 1), (5, 2))
             rng = MersenneTwister(20261110)
             qq = Quadtree(7; cells_x=cx, cells_y=cy, Lx=cx / cy)

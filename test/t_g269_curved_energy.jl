@@ -234,8 +234,7 @@ end
 # interpolant's boundary flux is O(h^3), not zero, and the guard (correctly)
 # refuses.  Leaving the curved wall's normal component free via an `:open` wall
 # with its exact traction removes the compatibility constraint and still tests
-# the mapped assembly at its optimal order; the deviation is recorded in
-# docs/dev/GEOM_PROGRESS.md.
+# the mapped assembly at its optimal order.
 function g269_top_traction(g::CurvedBox, x, y)
     f = 1.0 + g.a * sinpi(x / g.Lx)
     fp = g.a * pi * cospi(x / g.Lx) / g.Lx

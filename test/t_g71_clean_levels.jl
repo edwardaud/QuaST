@@ -69,7 +69,7 @@ end
     # spurious y-face mass of the pre-fix indicator on an IC with no interior
     # feature (identically zero below y = 0.65); the median corrected depth is
     # 4 at both levels, the wall levels stay 7/8 and e78 improves
-    # 2.868e-7 -> 4.651e-8 (docs/dev/BUG_AUDIT_INDICATOR.md §4.4).  Do not
+    # 2.868e-7 -> 4.651e-8. Do not
     # re-pin the depth upward: the convergence bound is the requirement.
     @test st7.interior_max >= 4
     @test st8.interior_max >= 4

@@ -164,7 +164,7 @@ function _semquad_assemble_energy_block!(buf::SemQuadEnergyBuf,
     phases = cfg.phases
     # Hoisted out of the quadrature loop: `:global` gives one `latent_L` per
     # transition (bitwise the historical coefficient), `:per_phase` the stored
-    # per-transition values (docs/dev/PHYSICS.md §7.8).
+    # per-transition values.
     lcoef = semquad_latent_coefficients(pr, phases)
     # `semquad_latent_active` is a pure function of `(pr, phases)`; it was
     # re-evaluated at every quadrature point (160 000 times per assembly on the
@@ -741,12 +741,12 @@ the serial one, but `F` is a sum of block sums (so it can differ at round-off).
 With 1 Julia thread the request warns once and falls back to serial.
 
 `phases` turns on the latent heat of the phase transitions as an apparent heat
-capacity (docs/dev/PHYSICS.md §7): `M` and `C` are weighted by
+capacity: `M` and `C` are weighted by
 `(1 + sum_i latent_i * Gamma_T,i(y,T))` and the source gains
 `-sum_i latent_i * Gamma_z,i * u_z` (`Gamma_i` is the same `phase_gamma` the
 phase buoyancy uses).  The coefficient `latent_i` is `pr.latent_L` for every
 transition in `latent_mode = :global` (the historical behaviour) and
-`pt.latent` in `latent_mode = :per_phase` (docs/dev/PHYSICS.md §7.8, where the
+`pt.latent` in `latent_mode = :per_phase`, where the
 sign convention — the coefficient is ASPECT's `T dS_A` with the opposite sign —
 is derived).  `theta_lat` evaluates the capacity/source coefficients at a
 different temperature than `theta` (the current iterate of a time step, so the
@@ -878,7 +878,7 @@ Directional derivative of the **latent-heat** part of
 temperature `theta` (the apparent heat capacity is
 `1 + sum_i latent_i * Gamma_T,i` and the source is
 `-sum_i latent_i * Gamma_z,i u_z`; `latent_i` is `pr.latent_L` in `:global`
-mode or `PhaseTransition.latent` in `:per_phase` mode, docs/dev/PHYSICS.md §7.8):
+mode or `PhaseTransition.latent` in `:per_phase` mode):
 
     Md_ij = int  L_i Gamma_TT,i(y,T) dtheta phi_i phi_j
     Cd_ij = int  L_i Gamma_TT,i(y,T) dtheta phi_i (u.grad phi_j)

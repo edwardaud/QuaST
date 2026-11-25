@@ -29,14 +29,14 @@ const SEMQUAD_PRESSURE_CACHE = Ref{Union{Nothing,SemQuadPressureCache}}(nothing)
 # Default cache threshold of the pressure block (S3-press A3, retuned in S5-1).
 # The blob's viscosity moves 5.7-8.9% per *step* (25-37% between stored frames),
 # so the old 1e-2 threshold almost never hit.  The measured threshold curve
-# (docs/dev/SOLVER.md §13.3) shows the outer iteration count is *flat* (39.7 at
+# shows the outer iteration count is *flat* (39.7 at
 # 1e-12, 39.9 even at Inf), so the threshold only trades build time against
 # staleness; the AMR tree changes every 5 steps and forces a rebuild anyway, so
 # 1.0 buys one build per tree block (21 builds instead of 41 in the 25-frame
 # blob run, §19.1).  `Inf` is a *supported but not default* value: it never
 # rebuilds on eta drift (the tree fingerprint still wins) and is only safe for
 # smoothly evolving viscosity -- no phase change and no yield onset inside a
-# tree block (docs/dev/SOLVER.md §19.1).
+# tree block.
 const SEMQUAD_PRESSURE_DEFAULT_ETA_TOL = 1.0
 # Diagnostics for gates/probes: cumulative builds and reuses, and what the last
 # call did.
@@ -65,7 +65,7 @@ factor builder:
 
 `:mass` is the *unweighted* pressure mass matrix on purpose: it is the variant
 the spectral-equivalence theory names, and keeping it distinct from
-`:scaled_mass` makes the two measurable side by side (docs/dev/SOLVER.md §13).
+`:scaled_mass` makes the two measurable side by side.
 """
 function _semquad_pressure_precond_mode(pre::Symbol, weight::Symbol)
     pre === :bfbt && return (:bfbt, weight)
@@ -120,7 +120,7 @@ pressure-cache metric (`_semquad_eta_sample`): measured on the production blob
 frame-19 eta field, the node sample under-estimates the full quadrature-field
 contrast by up to 5x (985x vs 4 926x on the 1024-leaf tree, 995x vs 5 299x on
 the 4096-leaf tree), while 33x33 grid points give 5 087x (-3% / -9% vs the two
-trees) with the same value on every tree (docs/dev/SOLVER.md §20).  Sampling a
+trees) with the same value on every tree. Sampling a
 strided *subset of leaves* is worse still (808-892x on the refined trees) for
 the same reason: the viscosity extrema are spatially localised.  The grid cost
 is fixed and independent of the tree: measured ~20 us on the production blob
@@ -129,8 +129,7 @@ nothing), vs 0.7-2.6 ms for a full O(N) quadrature-field pass on the
 1024-4096-leaf trees.
 
 The grid sample can still miss a sub-grid-scale extremum, but the selector's
-contrast cut-offs are 10x/100x and the measured fields sit at 1x and ~5 000x;
-grid resolution is reported in docs/dev/SOLVER.md §20.
+contrast cut-offs are 10x/100x and the measured fields sit at 1x and ~5 000x.
 """
 function semquad_eta_contrast(su::SemQuad, eta_fun::Function;
                               npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
@@ -210,8 +209,7 @@ MG-accelerated Newton).  Returns `(Fp, pscale)`:
 `(kind=:mass, F=...)`; `pscale` is the block scaling used by the caller.
 
 **The `S1` inner solve.**  `bfbt_s1_solve` selects how the two `F1` solves of the
-w-BFBT apply are carried out (see `src/mg/s1solve.jl` and
-docs/dev/MG.md):
+w-BFBT apply are carried out (see `src/mg/s1solve.jl`):
 
 | value | the solve | measured |
 |---|---|---|
@@ -219,8 +217,8 @@ docs/dev/MG.md):
 | `:level` | the same factor, level-scheduled parallel substitutions | 0.43x of `:chol`: no level can pay for a barrier on this factor |
 | `:cg_diag` / `:cg_ichol` | CG to `bfbt_s1_tol` with the diagonal / an IC(0) | 51-75 CG iterations per solve, 17-22 ms: 40x `:chol` |
 
-The default is the exact solve; the other kinds exist because the measurement is
-reproducible, and docs/dev/MG.md records why neither of them ships.
+The default is the exact solve; the alternatives are measured but none of them
+ships.
 `bfbt_s1_tol` / `bfbt_s1_maxit` configure the CG kinds, and
 `bfbt_s1_minwork` / `bfbt_s1_chunk` the level schedule.  The pressure cache is
 keyed on the resolved kind and tolerance, so switching them rebuilds.
@@ -232,7 +230,7 @@ has moved by at most `eta_tol` (relative, max norm).  Otherwise they are
 rebuilt.  `key=nothing` disables the cache, which keeps the Newton path (one
 factorisation per nonlinear solve) bit-identical to before.
 
-`eta_tol` semantics (S5-1 retune, docs/dev/SOLVER.md §19.1):
+`eta_tol` semantics (S5-1 retune):
 
 | `eta_tol` | rebuilds when |
 |---|---|
@@ -379,7 +377,7 @@ function _semquad_build_pressure_precond(ss::SemStokes, Cu, Cp, Bs, Bt, Kred,
         # the iteration count equals that of `mg_pressure_precond=:mass`.  The
         # mode is kept (and wired) because the measurement is the point: on the
         # 1024-leaf blob tree it costs 2.7x more per apply than `:mass` for the
-        # same outer iteration count (docs/dev/SOLVER.md §13).
+        # same outer iteration count.
         Ap = assemble_semquad_pressure_stiffness(sp;
                                                  weight=(x, y) -> eta_fun(x, y))
         Mp = assemble_semquad_pressure_mass(sp)

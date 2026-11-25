@@ -6,7 +6,7 @@
 # means they can be gated against the analytic curve independently of that
 # machinery, so a failure here cannot be confused with a transport or wiring bug.
 # (The composition of the kernels into the per-step update is
-# `_advance_maxwell_stress!` in `src/driver/run.jl`, docs/dev/PHASE2.md 2b.)
+# `_advance_maxwell_stress!` in `src/driver/run.jl`.
 #
 # The update is *objective*: a Maxwell stress that does not rotate with the
 # material is not frame-indifferent, and every mantle-convection run is a

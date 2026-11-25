@@ -24,7 +24,7 @@ using Test, QuaST, LinearAlgebra, SparseArrays, Random
 # new default must reproduce the historical hierarchy and preconditioner
 # bitwise, and on a mixed-level tree the solution must stay identical to the
 # direct solve to 1e-8.  Measured performance and the negative results (more
-# aggressive coarsening costs outer iterations) are in docs/dev/SOLVER.md §14.
+# aggressive coarsening costs outer iterations) are
 
 const _G183_Z2 = (x, y) -> 0.0
 const _G183_ONE = (x, y) -> 1.0

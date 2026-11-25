@@ -34,7 +34,7 @@ tree itself.
 
 `geometry.jl` is the layer the discretisation is expressed on: the
 `CartesianBox` methods are the historical box arithmetic (they must stay
-bitwise identical, `docs/dev/GEOM_DESIGN.md` §4), the two validation geometries
+bitwise identical), the two validation geometries
 exercise the general mapped path, and the logical topology helpers
 (`global_logical`, `leaf_ref`, `locate_leaf_logical`, `face_pairs_logical`) keep
 node identity and face pairing independent of the metric.  `logical_map(g, S, T)`
@@ -52,7 +52,7 @@ bounded mapped tree (a wedge) is topologically indistinguishable from a box tree
 (the tree stores no geometry), so a caller of that form must pass its geometry
 explicitly; there is no default that can be right.
 
-`PolarAnnulus` (stage 0.5a, `docs/dev/GEOM_DESIGN.md` §6) is the first
+`PolarAnnulus` (stage 0.5a) is the first
 production-shaped curved geometry: one section at the end of the file defines
 the map `r = R0 + (R1-R0)*S`, `phi = Phi*T`, its analytic inverse, the leaf
 Jacobian `det J = Phi*r*(R1-R0)/(4*nx*ny)` and the map Hessian, the radial
@@ -140,7 +140,7 @@ is the **physical** estimator `sum (h/2) int [du/dn]^2 ds` with the true
 one-sided physical normal derivative, the physical face Jacobian and the
 physical normal leaf size `leaf_normal_size`; its box body is the historical
 arithmetic, which contains an index defect on the fine side of a horizontal face
-(see `docs/dev/GEOM_PROGRESS.md`, cut 6) kept for the bitwise invariant.
+kept for the bitwise invariant.
 `_semquad_eval_ref!` and `_semquad_grad_ref` are the logical-point evaluation
 and physical-gradient primitives both use; `leaf_normal_size` (box: the
 historical `leaf_hx`/`leaf_hy`; mapped: `2/|grad xi|` at the face midpoint)

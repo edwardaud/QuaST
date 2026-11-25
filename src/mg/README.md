@@ -25,7 +25,7 @@ needs the V-cycle as its preconditioner: the two directories are mutually
 recursive by design.  `src/stokes/README.md` states the rule that keeps the
 recursion from spreading.
 
-Stage 0 cut 5 (`docs/dev/GEOM_PROGRESS.md`) makes the hierarchy work on a mapped
+Stage 0 cut 5 makes the hierarchy work on a mapped
 geometry.  The coarsening is **logical**: `_mg_coarsen_tree`/`_mg_hierarchy_trees`
 use leaf-index arithmetic only, so a box and a mapped geometry on one tree get the
 same per-level leaf sets (`G271 (e)` checks this level by level).  What changes is
@@ -55,7 +55,7 @@ Every cut-5 cache key carries the geometry identity (`geometry_stamp`):
 `SEMQUAD_MG_CACHE` (per tree), `SemQuadMGLevelKey` (per coarse level),
 `SEMQUAD_KOP_CACHE` (per operator) and the direct path's `_saddle_key` (the
 pressure-cache / stale-LU fingerprint).  The keys are extended, never re-laid
-out: the *level* cache still stores topology only (`docs/dev/MG.md` policy), and
+out: the *level* cache still stores topology only, and
 an entry is a pure function of its key, so a geometry change is a new key and a
 stale hit is impossible.
 

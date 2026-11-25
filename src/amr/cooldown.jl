@@ -14,7 +14,7 @@ when its counter reaches zero or when the leaf stops being a leaf, so the state
 never refers to a stale mesh.  The state is owned by the caller: pass the same
 object to every cycle of a run.  `run_semquad_simulation` creates one for its run,
 returns it in the result (`cooldown`) and writes it through `save_semquad_state`,
-which persists it as optional HDF5 state (docs/dev/BUG_LEDGER.md §10.5); a
+which persists it as optional HDF5 state; a
 checkpoint without it loads an empty cooldown, which is the historical restart
 behaviour.
 """

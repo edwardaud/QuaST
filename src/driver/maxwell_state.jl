@@ -29,7 +29,7 @@ end
 
 One backward-Euler step of the **objective** (co-rotational, Jaumann) Maxwell
 stress for the three nodal tensor components of the viscoelastic stress state
-(docs/dev/PHASE2.md "2b: the design").  The equation is
+(the objective Maxwell update).  The equation is
 
     dtau/dt = 2 G ehat + (W tau - tau W) - tau / tau_M,     tau_M = eta / G,
 

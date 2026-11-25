@@ -23,7 +23,7 @@ const FACE_DIRS = (:xplus, :xminus, :yplus, :yminus)
 end
 
 # ---------------------------------------------------------------------------
-# Flat face-neighbour table (docs/dev/AMR.md §9, stage A)
+# Flat face-neighbour table
 # ---------------------------------------------------------------------------
 #
 # deal.II keeps `TriaLevel::neighbors`, a flat table rebuilt once by
@@ -34,7 +34,7 @@ end
 # `neighbors` used to allocate a fresh `Vector` and refill it through a
 # recursive descent from the base cells on *every* query: 223.9 MB
 # (`_collect_face!`) + 74.6 MB (`neighbors`) per 4 AMR cycles, 42 % of the whole
-# pass (`docs/dev/AMR.md` §4).
+# pass.
 #
 # The table here is maintained **incrementally** instead of being rebuilt per
 # tree version: `balance!` mutates the tree between the queries of one wave, and
@@ -140,7 +140,7 @@ struct Quadtree
     faces::QuadFaceCache
     # Stage 0.5c1: the periodic seam of the logical `y` direction.  The tree owns
     # the *topology*; the geometry only supplies a map that closes (`PolarAnnulus`
-    # with `Phi = 2*pi`, docs/dev/GEOM_DESIGN.md 6.7).
+    # with `Phi = 2*pi`).
     #
     #   * `:none` (default) -- the historical box topology: `y` is a bounded
     #     interval and the four logical sides are the domain boundary.
@@ -305,7 +305,7 @@ Historical face-collection kernel: descend the node `(l, ix, iy)` and push every
 leaf whose box touches the face segment `coord` inside `[lo, hi]`.  Kept as the
 **reference oracle** of the flat table (`_neighbors_scan` below): it is the
 implementation the table replaced, and G216 requires the two to agree leaf by
-leaf on random trees (`docs/dev/AMR.md` §9).  It allocates nothing
+leaf on random trees. It allocates nothing
 itself but pushes into `out` for every hit, and it re-descends from the base
 cells on every query -- that is the 223.9 MB of the audit.
 """
@@ -392,7 +392,7 @@ fresh `Vector` per call (the historical contract: callers may keep or mutate it)
 and is meant for code that iterates the vector.  The hot loops read the table
 directly (`_table_leaf_id!` / `_face_slot` / `_leaf_nbs!` / `_leaf21`), which
 allocates nothing per query -- one `Vector` per `(leaf, dir)` was 74.6 MB per 4
-AMR cycles (`docs/dev/AMR.md` §4).  A key that is not a leaf of the
+AMR cycles. A key that is not a leaf of the
 tree is answered by the historical `_neighbors_scan`.
 """
 function neighbors(qt::Quadtree, leaf::NTuple{3,Int}, dir::Symbol)

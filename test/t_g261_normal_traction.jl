@@ -217,7 +217,7 @@ g261_zero(x, y) = 0.0
     msg = err isa ArgumentError ? sprint(showerror, err) : ""
     @test occursin("normal traction", msg)
     @test occursin(":open", msg)
-    @test occursin("§3.5", msg) || occursin("stage 3", msg)
+    @test occursin("pressure gauge becomes derived", msg)
     # ... and the accepted case really is accepted by Params
     @test Params(bc=:free, wall_bc=top_open,
                  wall_tn=(nothing, nothing, nothing, (x, y) -> T)) isa Params

@@ -2,7 +2,7 @@
 using Test, QuaST, LinearAlgebra, SparseArrays, Random
 
 # G221: the per-level MG hierarchy cache -- reusing a coarse level across AMR
-# cycles (docs/dev/MG.md).
+# cycles.
 #
 # `make_semquad_mg` used to rebuild every level whenever the tree changed, and
 # one AMR cycle changes only ~1-2 % of the leaves, so most coarse levels are
@@ -27,8 +27,7 @@ using Test, QuaST, LinearAlgebra, SparseArrays, Random
 #   (d) the switch and the single global: `SEMQUAD_MG_LEVEL_CACHE[] = false`
 #       rebuilds every level, and `empty!(SEMQUAD_MG_CACHE)` drops the levels.
 #
-# The measured setup/A-B numbers are in docs/dev/MG.md; time is not gated
-# here.
+# The measured setup/A-B numbers are not gates; time is not gated either.
 
 const _G221_Z2 = (x, y) -> 0.0
 const _G221_ONE = (x, y) -> 1.0

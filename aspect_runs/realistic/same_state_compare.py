@@ -34,7 +34,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 
-# scale set, docs/dev/VALIDATION.md section 2.1
+# scale set
 D = 2.9e6
 KAPPA = 1.0e-6
 DT = 1000.0

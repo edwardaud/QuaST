@@ -26,8 +26,8 @@ function semquad_eta_at(sq::SemQuad, theta::Vector{Float64}, x::Float64,
     # profile) and the depth argument of the law is the physical height
     # `h = height(g,x,y)`.  The box keeps its historical viscosity row
     # *verbatim*: `Tbar(y,H)` and the depth `y`, even when a reference state is
-    # set — docs/dev/PHYSICS.md §3.3 records that the box viscosity sees the
-    # Boussinesq base while the buoyancy/energy use the adiabat, and the box
+    # set — the box viscosity sees the Boussinesq base while the
+    # buoyancy/energy use the adiabat, and the box
     # path must stay bitwise (G197 pins it).  The branch on the concrete
     # geometry keeps the box arithmetic identical; the mapped branch is only
     # reached on a mapped space (where the driver refuses a reference state).
@@ -100,8 +100,8 @@ end
     semquad_eta_at(sq, theta, ux, uz, pv, sp, chi, x, y, pr, leaves)
     semquad_eta_at(sq, theta, edot_field, pv, sp, chi, x, y, pr, leaves)
 
-The two yielding methods above with the strain-weakening field `chi`
-(docs/dev/PHYSICS.md §9).  `chi === nothing` is exactly the corresponding
+The two yielding methods above with the strain-weakening field `chi`.
+`chi === nothing` is exactly the corresponding
 weakening-off method (bit for bit), so the driver can pass `nothing` when
 `weak_active(pr)` is false and every old call site keeps its behaviour.
 """
@@ -199,7 +199,7 @@ Derivative of the visco-plastic viscosity with respect to the weakening field,
 when the plastic branch is active, the weakened yield stress is below
 `tau_max`, the viscosity is not clipped, and `weak_active(pr)`; zero otherwise.
 This is the derivative that couples the weakening equation to the momentum
-equation in the per-step Newton (docs/dev/PHYSICS.md §9.4).  Note `tau_raw` may be
+equation in the per-step Newton. Note `tau_raw` may be
 negative (a strongly negative dynamic pressure), so the sign is not hard-wired.
 """
 function semquad_deta_chi(T::Float64, y::Float64, edot::Float64, p::Float64,

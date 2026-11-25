@@ -114,5 +114,5 @@ const PHYSICS_SOURCE_HASHES = (
     "src/physics/maxwell_kernels.jl" => "592d30ad098fae22",
     "src/physics/maxwell_force.jl" => "d9780355291738da",
     "src/physics/maxwell_softening.jl" => "6f12a39bbea5e34e",
-    "src/driver/maxwell_state.jl" => "1e1c4501db863a0c",
+    "src/driver/maxwell_state.jl" => "61016a622340a45a",
 )

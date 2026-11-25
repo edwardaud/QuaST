@@ -215,13 +215,13 @@ each `solve_semquad_stokes_var` call from the current tree size and the
 viscosity contrast of the eta field actually used (`semquad_choose_linear`;
 MG additionally forces `mg_operator=:matrixfree` and
 `mg_threads=min(8, Threads.nthreads())`).  **`linear=:auto` is the default**
-since 2026-11-13 (docs/dev/SOLVER.md §4.4): a driver call with no `linear` gets the
+since 2026-11-13: a driver call with no `linear` gets the
 measured faster path per solve, and an `:auto` solve that resolves to `:direct`
 is bitwise identical to the explicit `:direct` path (G191).  `linear=:direct`
 and `linear=:mg` remain selectable; `:direct` is the only bitwise-reproducible
 path (G150), so a bitwise reference must pin it explicitly, and
 `pic_mode=:newton` requires it explicitly.  The decision and its reason are
-exposed as `LAST_SEMSTOKES_AUTO_CHOICE` for logging (docs/dev/SOLVER.md §20).
+exposed as `LAST_SEMSTOKES_AUTO_CHOICE` for logging.
 `mg_pressure_eta_tol` (default
 `SEMQUAD_PRESSURE_DEFAULT_ETA_TOL` = 1.0) is the pressure-block cache
 threshold of §13.3/§19.1: the factors are rebuilt when the tree changes or the
@@ -229,11 +229,11 @@ sampled viscosity drifts by more than that relative amount (`Inf` = only on a
 tree change; only for smoothly evolving viscosity, no phase change / no yield
 onset).  `mg_threads > 1` forwards the S5-2 threaded matrix-free V-cycle
 (`solve_semquad_stokes_var`'s `mg_threads`; bitwise identical to the serial
-V-cycle, docs/dev/SOLVER.md §19.2).  The MG and solver keyword defaults
+V-cycle).  The MG and solver keyword defaults
 reproduce the previous behaviour exactly; only the `linear` default moved (to
 `:auto`).
 `stokes_scaling` (default `:none`) forwards the direct-path symmetric
-equilibration of docs/dev/BUG_LEDGER.md to every Stokes solve
+equilibration to every Stokes solve
 (`:equilibrated` enables it; it engages only when the historical unscaled
 unshifted solve fails its health check, so a healthy solve stays bitwise
 identical).  It is stored in the checkpoint's `run_config` and compared on
@@ -270,8 +270,8 @@ history -- the only state the revision change can affect -- because refusing
 would invalidate every historical checkpoint, including the `shear_modulus = 0`
 ones whose physics is unchanged.  The cooldown
 is state, not configuration, and is not part of that comparison.
-`phases` adds the phase-transition buoyancy and the latent heat (docs/dev/PHYSICS.md
-§7).  The latent coefficients come from `Params.latent_mode`: `:global` (the
+`phases` adds the phase-transition buoyancy and the latent heat.  The latent
+coefficients come from `Params.latent_mode`: `:global` (the
 default) applies `pr.latent_L` to every transition — the historical behaviour,
 bit for bit — and `:per_phase` uses each `PhaseTransition.latent` (signed, see
 `phase_latent_coefficient`), which is the physically correct form because the
@@ -284,10 +284,10 @@ iterate, so both settings give the same single lagged sweep (bitwise identical,
 G199), which is first order in the latent coupling.  `maxpic > 1` and
 `pic_mode = :newton` make the step (and with it the latent coupling) implicit
 and second order; the measured orders, cost and the benchmark/production
-recommendation are in docs/dev/PHYSICS.md §13.  `weak_chi0` is the initial value of
-the strain-weakening field
-(docs/dev/PHYSICS.md §9; the field is active only when the `Params` weakening
-parameters are set); it is clamped to [0,1] and the field is checkpointed with
+recommendation are measured; `weak_chi0` is the initial value of the
+strain-weakening field, which is active only when the `Params` weakening
+parameters are set.  The field is clamped to [0,1] and checkpointed with
+the state.
 the state.
 `profile_steps=true` fills `SEMQUAD_STEP_PROFILE` with one named tuple per step
 (`stokes`, `work`, `energy`, `diag`, `amr`, `callback`, `total`, in seconds,
@@ -296,10 +296,10 @@ existing sections and changes nothing numerically.
 `extdiag=false` (the default) keeps every output byte-identical.  `extdiag=true`
 adds one history column, `resid_A` = `R/A`, the exact residual of the quoted
 pointwise Nusselt pair against the scheme's own identity `(ID1)`
-(`semquad_exact_residual`, docs/dev/VALIDATION.md §2.3/§3.2).  The historical
+(`semquad_exact_residual`). The historical
 `closure`/`closure_nolatent` columns are **not** changed by it: on the box they
 are the historical formula, which equals `-dH/dt` plus three bookkeeping terms
-at a transient state and is not a flux error (docs/dev/VALIDATION.md §4); on a
+at a transient state and is not a flux error; on a
 mapped geometry the same physical steady-balance residual is evaluated with the
 physical measure, `(Ibase + latent_dgdt - flux)/A_phys` (stage-0.5 fix
 campaign, audit defect B5; the box formula is its area-1 special case and the
@@ -357,8 +357,8 @@ law and refuse `eta_ref != 1` instead of solving a different problem silently.
 Returns a named tuple with the final state and history rows
 `[t, dt, Nu_top, Nu_bot, Vrms, meanT, N, nleaves]` (plus the opt-in columns
 described above; `history_extra` names them).  `txx`/`tyy`/`txy` are the nodal
-Maxwell stress-history components (`nothing` unless `pr.shear_modulus > 0`;
-docs/dev/PHASE2.md 2b): state that is advanced once per step, transferred on AMR
+Maxwell stress-history components (`nothing` unless `pr.shear_modulus > 0`):
+state that is advanced once per step, transferred on AMR
 and checkpointed.  The tensor is the **deviatoric** stress: the update is driven
 by `ehat = eps - (1/3) tr(eps) I` (G249), so the out-of-plane normal stress is
 implied by trace zero, `tau_zz = -(tau_xx + tau_yy)`, rather than stored -- the
@@ -389,8 +389,8 @@ builds the 2-D polar annulus (`PolarAnnulus(R0, R1, Phi; seam=annulus_seam)`;
 built with `Quadtree(...; seam = :periodic)`), and any `AbstractGeometry` is
 accepted unchanged (the stage-0 validation geometries, or a caller-built
 `PolarAnnulus`).  The default `CartesianBox(qt)` keeps every historical card
-bitwise identical.  An annulus run uses the radial log/H conduction base state
-(`docs/dev/ANNULUS_REFS.md` §5.4/§6.5), the two-component radial buoyancy
+bitwise identical.  An annulus run uses the radial log/H conduction base state,
+the two-component radial buoyancy
 `+Ra rho alpha theta e_r`, and the per-wall Nusselt normalisation of
 ANNULUS_REFS §6.2.  Its contract: `R1 - R0 = 1` (the gap is the physics length
 unit and the closures' height is `r - R0`), `side_thermal=:insulating` (there
@@ -467,8 +467,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 amr_hysteresis::Int=1,
                                 amr_coarsen_gate::Bool=true,
                                 # :theta (default, historical), :velocity, or
-                                # :both (normalised sum); see docs/dev/PHASE1.md
-                                # 1.1 and src/amr/indicator.jl
+                                # :both (normalised sum); see src/amr/indicator.jl
                                 amr_indicator::Symbol=:theta,
                                 transfer_mode::Symbol=:nodal,
                                 initial_refine::Int=0,
@@ -672,9 +671,8 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     # there.  For `wall_bc` that is a *wrong answer* once an `:open` wall (or a
     # mixed free/rigid tuple) is requested: the Newton run would solve the closed
     # single-`bc` problem instead.  Refuse a non-default per-wall configuration
-    # on the Newton path instead of ignoring it (the pre-existing gap recorded in
-    # docs/dev/BC_PROGRESS.md §4.4, closed here because stage 3 makes it
-    # load-bearing).
+    # on the Newton path instead of ignoring it (a pre-existing gap that stage 3
+    # makes load-bearing).
     if pic_mode === :newton
         per_wall = any(w -> w !== :same, pr.wall_bc) ||
                    any(t -> t !== nothing, pr.wall_u) ||
@@ -712,7 +710,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         # weakening-dependent viscosity, the phase-transition buoyancy and the
         # latent heat (apparent heat capacity + advective source).  The
         # Drucker-Prager plastic branch is supported through its `Kp` pressure
-        # block and the `deta/dchi` weakening block (docs/dev/PHYSICS.md §8, §9);
+        # block and the `deta/dchi` weakening block;
         # the TALA/ALA reference state (weighted buoyancy), compressible
         # momentum and the CBF diagnostics still add terms it does not
         # linearise, so they are rejected instead of silently degrading the
@@ -788,8 +786,8 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 "ring in a scratch worktree with the guard " *
                                 "lifted, and the state agreed with linear=:direct " *
                                 "to 1e-12 relative (:lagged) and to its " *
-                                "iteration tolerance (:schur_cg) " *
-                                "(docs/dev/BUG_FIX_LOG.md, F6).  Pass " *
+                                "iteration tolerance (:schur_cg)" *
+                                ".  Pass " *
                                 "linear=:direct, linear=:mg or linear=:auto."))
         symmetry === :none ||
             throw(ArgumentError("a mapped geometry ($gname) does not support " *
@@ -865,8 +863,8 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
             throw(ArgumentError("the annulus physics requires R1 - R0 = 1: the " *
                                 "nondimensional height the closures take is " *
                                 "h = r - R0 in [0,1], i.e. the gap is the length " *
-                                "unit of Ra and of every depth law " *
-                                "(docs/dev/ANNULUS_REFS.md §4.1/§4.4).  Got " *
+                                "unit of Ra and of every depth law" *
+                                ".  Got " *
                                 "R1 - R0 = $(geom.R1 - geom.R0) for R0 = " *
                                 "$(geom.R0), R1 = $(geom.R1); build the card with " *
                                 "gap-1 radii (the published benchmark is " *
@@ -1270,7 +1268,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     # verbatim so the first AMR cycle after a resume is the one the uninterrupted
     # run would have executed; an old checkpoint without the data loads an empty
     # cooldown, which is exactly the historical restart behaviour
-    # (docs/dev/BUG_LEDGER.md §10.5).  The cooldown is state, not configuration:
+    # The cooldown is state, not configuration:
     # it is not in `run_config` and the restart guard must not compare it.
     cooldown_state =
         (restart !== nothing && restart.cooldown !== nothing) ?
@@ -1288,7 +1286,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
 
     tosi = pr.eta_law === :tosi
     composite = pr.eta_law === :composite
-    # Strain-weakening field chi (docs/dev/PHYSICS.md §9); `nothing` when
+    # Strain-weakening field chi; `nothing` when
     # `weak_active(pr)` is false, in which case every weakening code path is
     # skipped and the run is bit-identical to the pre-weakening behaviour.
     # `chi` is the start-of-step level chi^n, `chi_prev` is chi^(n-1) and
@@ -1371,8 +1369,8 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     # keep the closure box-free whether or not profiling is on.
     stokes_ns = Ref(0); work_ns = Ref(0)
     # Viscosity closure of the state the last `solve_flow!` used.  Diagnostics
-    # only: the Stokes-failure line reports its eta range (docs/dev/CASE_REALISTIC.md
-    # §13).  `nothing` before the first solve.
+    # only: the Stokes-failure line reports its eta range.
+    # `nothing` before the first solve.
     eta_probe = Ref{Any}(nothing)
     # The same closure *before* the 2a Maxwell effective-viscosity softening.
     # The stress history (2b step 1) advances with the material viscosity, so
@@ -1422,8 +1420,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                     local T, h
                     if geom isa CartesianBox
                         # Historical box viscosity row (the box path is frozen:
-                        # `Tbar(y,H)`/`y`, even with a reference state; see
-                        # docs/dev/PHYSICS.md §3.3 and `semquad_eta_at`).
+                        # `Tbar(y,H)`/`y`, even with a reference state; see `semquad_eta_at`).
                         T = Tbar(y, pr.H) +
                             _semquad_eval_at(sq, th, x, y, leaves)
                         h = y
@@ -1475,8 +1472,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                 eta_fun = (x, y) -> begin
                     local T, h
                     if geom isa CartesianBox
-                        # Historical box viscosity row (frozen; see
-                        # docs/dev/PHYSICS.md §3.3).
+                        # Historical box viscosity row (frozen).
                         T = Tbar(y, pr.H) +
                             _semquad_eval_at(sq, th, x, y, leaves)
                         h = y
@@ -1666,7 +1662,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     # `(eta_fun, deta_T_fun, deta_eps_fun)` evaluated at that state, plus the
     # optional Drucker-Prager entries `deta_dp_fun(x,y,edot,p)` (4th) and
     # `deta_dchi_fun(x,y,edot,p)` (5th) when a plastic branch / weakening field
-    # is active (docs/dev/PHYSICS.md §8.4, §9.4).  This is the only
+    # is active. This is the only
     # rheology-dependent part of the per-step Newton (`semquad_step_newton`),
     # so the solver itself is rheology-agnostic.
     # `deta_eps_fun(x, y, edot)` receives the strain rate that the assembler
@@ -1814,8 +1810,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
             end
             if isfinite(stokes_tol) && diag.residual > stokes_tol
                 # The direct path has already escalated its shift ladder and
-                # refined (src/stokes/, docs/dev/CASE_REALISTIC.md
-                # §13); this error is the last resort, so report the numbers that
+                # refined; this error is the last resort, so report the numbers that
                 # identify the state.  Written to *stderr*, the same unbuffered
                 # stream as the error, so it is adjacent to it in a redirected
                 # log (the stdout step records are block-buffered, §11.1).
@@ -1853,8 +1848,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                       "increase schur_maxiter or use linear=:direct"
                 error("Stokes residual $(diag.residual) exceeds " *
                       "stokes_tol=$stokes_tol at step $step; $fix (the direct " *
-                      "shift ladder and its refinement already ran, " *
-                      "docs/dev/CASE_REALISTIC.md §13)")
+                      "shift ladder and its refinement already ran)")
             end
             verbose && linear === :schur_cg &&
                 @printf("    Stokes res=%.2e nit=%d\n",
@@ -1993,7 +1987,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
             # `pic_reject` can undo this sweep; the chi iterate of the state the
             # flow was solved with must then be restored too.
             chi_iter_saved = weak ? copy(chi_iter) : nothing
-            # Strain weakening (docs/dev/PHYSICS.md §9.3): one implicit BDF2
+            # Strain weakening: one implicit BDF2
             # transport with the velocity of this sweep and the *start-of-step*
             # levels chi^n/chi^(n-1); the yielding indicator sees the current
             # iterate chi_iter (the field the flow was solved with).  The update

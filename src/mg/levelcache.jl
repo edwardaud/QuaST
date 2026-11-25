@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # G221 -- per-level hierarchy cache: reuse the levels whose leaf set did not
-# change across an AMR cycle (docs/dev/MG.md)
+# change across an AMR cycle
 # ---------------------------------------------------------------------------
 # `make_semquad_mg` rebuilds the whole hierarchy whenever the tree changes, and
 # one production AMR cycle changes ~1-2 % of the leaves.  The coarse levels are
@@ -16,13 +16,13 @@
 #
 # What it deliberately does **not** store -- the level's operator data:
 #   * `mfetas[k]`: the viscosity field sampled at that level's Gauss points,
-#     in both layouts (`SemQuadEtaLane`, docs/dev/MG.md);
+# in both layouts (`SemQuadEtaLane`);
 #   * `D[k] = diag(Cu' K(eta) Cu)`: the exact Jacobi diagonal;
 #   * `cA`: the coarsest-level dense operator / factorisation.
 # All three are functions of the eta field sampled at *build* time, and the
 # production solve samples the current viscosity on every build (that is the
 # shipped policy: the geometry is reused per tree, the operator is
-# rediscretised -- docs/dev/MG.md).  Caching them would make a reused
+# rediscretised).  Caching them would make a reused
 # level depend on the eta of the cycle that built it, so a solve after an AMR
 # cycle would stop being bitwise the solve of a forced from-scratch build
 # (G221 (c)).  They are recomputed on every build, exactly as before.  The

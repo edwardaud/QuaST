@@ -28,7 +28,7 @@ box-in-height validation geometries, the two circles on the annulus), and
 (`semquad_base_wall_refs`), adding a per-wall-ratio `PolarAnnulus` method;
 `semquad_exact_residual` subtracts the mapped base-state curvature
 `int lap(Tbar(h)) dV` that the box hides (`_mapped_base_curvature`; see the cut-4
-defect D2 in `docs/dev/GEOM_PROGRESS.md`).  G270
+defect D2).  G270
 (`test/t_g270_mapped_diagnostics.jl`) proves the routing: affine exactness
 against analytic integrals, rotation invariance against the box bodies, a 1e-14
 mapped-vs-box cross-check on the box map, an O(20 %) measured failure for a

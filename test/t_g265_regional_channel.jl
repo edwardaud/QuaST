@@ -1,6 +1,6 @@
 # G265: the regional subduction-style channel example -- the three per-wall
 # mechanisms acting together, checked against the analytic Couette-Poiseuille
-# solution.  Gate of `examples/subduction_2d.jl` (docs/dev/REGIONAL_DESIGN.md).
+# solution. Gate of `examples/subduction_2d.jl`.
 #
 # The example is a 2 x 1 regional box driven by a prescribed normal-velocity
 # inflow (`xminus`, `:rigid` + `wall_un`), a moving plate (`yplus`, `:rigid` +
@@ -27,8 +27,8 @@
 #   * check 4     the outflow pressure against p_out (the `wall_tn` data and the
 #                 derived pressure gauge), 1e-10 relative to the pressure scale
 #                 -- an absolute 1e-10 would sit below the O(1e3) pressure
-#                 level's own round-off (design error D4 in
-#                 docs/dev/REGIONAL_PROGRESS.md) -- plus
+#                 level's own round-off (design error D4)) -- plus
+#                 LAST_SEMSTOKES_PRESSURE_GAUGE == :none;
 #                 LAST_SEMSTOKES_PRESSURE_GAUGE == :none;
 #   * check 8     the `deta_T = 1` continuation with the stage-(ii) card on the
 #                 same tree and linear path (design section 6.7), 1e-10; the
@@ -39,9 +39,9 @@
 #
 # **Not in this gate**, by the same classification: checks 5 (open-box heat
 # budget) and 10 (latent enthalpy) are diagnostics for this fixed-side-wall card
-# (their pointwise-wall-gradient form does not close; D6/D7 in
-# docs/dev/REGIONAL_PROGRESS.md), check 6 is the 10 % asymptotic plate-cooling
-# comparison and check 7 the resolution sequence.  Those live in the example's
+# (their pointwise-wall-gradient form does not close; design defects D6/D7),
+# check 6 is the 10 % asymptotic plate-cooling comparison and check 7 the
+# resolution sequence.
 # `rheology`, `phases`, `full` and `converge` modes, are asymptotic or
 # discretisation-level rather than exact, and each costs minutes; pinning them
 # here would break the three-minute gate budget the task fixes.  `test/README.md`

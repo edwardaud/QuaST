@@ -25,7 +25,7 @@ Run output is written under `out_julia/`, which git ignores.
 | `nusselt_audit.jl` | Arbitration between the three wall-flux definitions against the scheme's own discrete budget. |
 | `nusselt_wall_functional_test.jl` | The algebra relating the pointwise and consistent-boundary-flux functionals on one wall element. |
 | `nu_cbf_compare.jl` | The earlier pointwise-versus-CBF comparison on the realistic card, kept as the provenance of that study. |
-| `amr_coarsen_gate_probe.jl` | Coarsening-gate probe for the balanced AMR policy (`docs/dev/AMR.md` section 4.1). |
+| `amr_coarsen_gate_probe.jl` | Coarsening-gate probe for the balanced AMR policy. |
 
 The benchmark variants that used to live here (`blankenbach_2b_time.jl`,
 `_stretch.jl`, `_wall.jl`, `_cbf_ev.jl`, and `blankenbach_2b.jl`) are gone.

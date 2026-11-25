@@ -188,8 +188,8 @@ end
           SEMSTOKES_PRESSURE_BUILDS[] reuses = SEMSTOKES_PRESSURE_REUSES[]
 
     # ---- 5. the S5-1 default 1.0 and the `Inf` opt-in ---------------------
-    # (docs/dev/SOLVER.md §19.1) The default moved 0.5 -> 1.0 because §13.3's
-    # curve is flat in the iteration count while the build count still halves;
+    # The default moved 0.5 -> 1.0 because the measured threshold curve is flat
+    # in the iteration count while the build count still halves;
     # `Inf` is supported as an explicit opt-in and never rebuilds on eta drift,
     # but the tree fingerprint always wins.
     @test SEMQUAD_PRESSURE_DEFAULT_ETA_TOL == 1.0

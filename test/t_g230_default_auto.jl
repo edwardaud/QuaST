@@ -2,8 +2,7 @@
 using Test, QuaST, LinearAlgebra
 
 # G230: the library default of `run_semquad_simulation` is `linear=:auto`
-# since 2026-11-13 (docs/dev/SOLVER.md §4; the flip follows the staged pattern of
-# docs/dev/AMR.md).
+# since 2026-11-13; the flip follows the staged pattern of the other defaults.
 #
 # G191 tests the selector itself with an *explicit* `linear=:auto` and pins the
 # decision table; this gate is the one that exercises the **default**, so a

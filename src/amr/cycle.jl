@@ -1,8 +1,8 @@
 # The balanced AMR cycle: thresholds, plan execution, budget exchange and report.
-# The balanced AMR policy of docs/dev/AMR.md §3-§5.
+# The balanced AMR policy.
 #
 # It is the only adaptive policy: `run_semquad_simulation` has used it since
-# 2026-11-13 (docs/dev/AMR.md), and the `:classic` fraction + hard-budget path
+# 2026-11-13, and the `:classic` fraction + hard-budget path
 # (formerly `amr_cycle!` in `dgquad.jl`) was removed at `8c622df`, so
 # `semquad_amr_passes!` and the driver's `initial_refine` both call
 # `amr_cycle_balanced!` unconditionally.
@@ -47,7 +47,7 @@
 #        an explicit cycle cooldown (`AmrCooldown`) so a quartet that was just
 #        merged is not re-refined and a leaf that was just created by a split is
 #        not immediately merged again.  Both are **our** choices: ASPECT has no
-#        hysteresis (docs/dev/AMR.md §1.7) and no cell budget.
+# hysteresis and no cell budget.
 #
 # The coarsen *supply* is demand-driven: `deficit = n0 + 6*#candidates -
 # max_leaves` leaves have to disappear to fit the Dörfler refinement set, capped
@@ -69,7 +69,7 @@ quartets).
 
 `merged` is the number of quartets this cycle merged, `recirc` how many of those
 parents the post-merge `balance!`/`mirror_close!` split again (**the
-recirculation counter**; docs/dev/AMR.md §4.1), `post` the leaves the
+recirculation counter**), `post` the leaves the
 post-merge balancing added, and `parents` the parent nodes themselves (one entry
 per merged quartet, both halves under `symmetry=:x`), so a probe can attribute
 the recirculation.  `nmerge`/`npost` are the leaf counts after the coarsening
@@ -78,7 +78,7 @@ pass and after the refinement pass, i.e. before the post-merge balancing, so
 `recirc == 0` means every merge survived the balance exactly as merged; with
 `coarsen_gate=true` the gate promises it.
 
-Loop/guard counters (docs/dev/AMR.md §4, docs/dev/AMR.md):
+Loop/guard counters:
 `plan_sweeps`/`plan_rounds` the fixed-point sweeps and extension rounds the
 coarsening plan used, `plan_capped` whether it stopped on `MAX_PLAN_SWEEPS`/
 `MAX_PLAN_ROUNDS` instead of converging, `fund_calls`/`fund_hits` how often the
@@ -104,12 +104,12 @@ const LAST_AMR_BALANCED = Ref((refined=0, coarsened=0, exchanged=0, n=0, want=0,
                         cooldown=nothing, hysteresis_cycles=1,
                         coarsen_cells=nothing, coarsen_gate=true, geom)
 
-One AMR cycle of the balanced policy (docs/dev/AMR.md §3-§5), the only adaptive
+One AMR cycle of the balanced policy, the only adaptive
 policy.  Returns `(refined, coarsened, exchanged)` in leaves, and records the
 cycle's threshold/limit diagnostics in [`LAST_AMR_BALANCED`](@ref).
 
 The thresholds are cumulative error fractions, computed exactly by sorting
-(deal.II bisects the same quantity, docs/dev/AMR.md §1.3):
+(deal.II bisects the same quantity):
 
     tau_r = eta value at the refine_frac * total point from above
     tau_c = eta value at the coarsen_frac * total point from below
@@ -137,14 +137,13 @@ box callers pass `CartesianBox(qt)` (the driver passes its own concrete
 geometry), mapped callers the mapped geometry.  Omitting it raises an
 `ArgumentError`.
 
-`coarsen_gate` (default `true`) adds deal.II's `coarsening_allowed()` pre-check
-(`docs/dev/AMR.md`, `docs/dev/AMR.md` §4): a
-quartet is merged only when its parent's external faces keep the 2:1 rule after
+`coarsen_gate` (default `true`) adds deal.II's `coarsening_allowed()` pre-check,
+so a quartet is merged only when its parent's external faces keep the 2:1 rule
+after
 the whole pass, counting the rest of the merge plan (`-1` level) and the refine
 plan (`+1`).  The post-merge `balance!` then has nothing to split in the merged
 region (`LAST_AMR_BALANCED[].recirc == 0`).  Because the deadband's lowest-error
-quartets are usually the geometrically illegal ones (`docs/dev/AMR.md` §4.1
-measured 14 of 15),
+quartets are usually the geometrically illegal ones (measured 14 of 15),
 the plan extends the supply past `tau_h` -- but never past `tau_r`, so a
 refine-flagged cell is still never coarsened -- and reports how many merges were
 taken that way (`extended`).  `coarsen_gate=false` is the historical behaviour.

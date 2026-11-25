@@ -52,8 +52,7 @@
 # fixture), and 6/6 identity-map dispatch checks.  With the one-line fix the same
 # file reports **88 passed / 0 failed / 88 total in 5.0 s** and every measured
 # error drops to round-off (max per-leaf box-vs-oracle 3.5e-3 of the allowed
-# tolerance, symmetry 6.0e-17, mapped-vs-box 1.8e-15 absolute).  The audit's
-# measurements are in docs/dev/BUG_AUDIT_INDICATOR.md §2 and §4.1.
+# tolerance, symmetry 6.0e-17, mapped-vs-box 1.8e-15 absolute).
 using Test, LinearAlgebra, Random, Printf
 using QuaST
 

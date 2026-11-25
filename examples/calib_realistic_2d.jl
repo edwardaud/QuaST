@@ -1,8 +1,8 @@
 #!/usr/bin/env julia
 # Calibration of the composite (diffusion + dislocation) prefactors and — when
 # the target contrast needs it — of the activation-energy scale, for the
-# "realistic 2-D" statistical case (`case_realistic_2d.jl`,
-# docs/dev/CASE_REALISTIC.md §3).  This script is the *derivation*; the case
+# "realistic 2-D" statistical case (`case_realistic_2d.jl`).  This script is
+# the *derivation*; the case
 # script carries the resulting numbers as literals, so the production run does
 # not depend on it.
 #
@@ -46,8 +46,8 @@
 #    (`case_ev_0.11` step 7208, 9994 leaves) the realised contrast then rises to
 #    1.6e6 (clamps on) instead of falling, because the cold lid's low strain
 #    rate amplification becomes enormous.  Holding r keeps the mixture that the
-#    project's physics note measured as effectively diffusion-dominated
-#    (docs/dev/PHYSICS.md §2.3).  With the prefactors fixed,
+#    project's physics note measured as effectively diffusion-dominated.
+#    With the prefactors fixed,
 #    the full-range contrast is a one-parameter function C(E_d) of the
 #    activation energy, so:
 #        E_s = (E_s0/E_d0) E_d        (the ASPECT 530/375 kJ/mol ratio is kept,
@@ -94,7 +94,7 @@ const TC    = 0.5      # calibration temperature
 const EDOT_MIN = 1.0e-12   # comp_eps_min
 
 # The *old* contrast window, kept only as the condition that fixes the branch
-# ratio (docs/dev/PHYSICS.md §2.3: "the ratio fixes the branch mixture").
+# ratio ("the ratio fixes the branch mixture").
 const TLOW_REF  = 0.1
 const THIGH_REF = 0.9
 const RATIO_REF = 1.0e4
@@ -107,8 +107,7 @@ const RATIO_REF = 1.0e4
 const TARGET = parse(Float64, get(ENV, "CALIB_TARGET_CONTRAST", "1.0e4"))
 const HHEAT  = 10.0    # internal-heating number of the case (theta equation)
 # The mantle's viscosity-contrast range used throughout this project:
-# 1e3 to 1e5 (docs/dev/HANDOVER.md §6 and §10.2 item 2, docs/dev/PHASE1.md
-# §1.2 — the "7.8e6 against the mantle's 1e3-1e5" account).  The verdict below
+# 1e3 to 1e5 (the "7.8e6 against the mantle's 1e3-1e5" account).  The verdict below
 # compares against it.
 const MANTLE_LO = 1.0e3
 const MANTLE_HI = 1.0e5
@@ -162,8 +161,8 @@ eta_s_unit(T, ES) = exp((ES / NEXP) * (1.0 / Tnd(T) - 1.0 / TNDC))
 
 Isostress effective viscosity of two branches with `eta_d = eta_d_unit(T,ED)` and
 `eta_s = eta_s_unit(T,ES)/r`, using the code's scalar equation `k x + x^n = 1`
-with `k = inv_diff/inv_disl` and `eta = x/inv_disl = x*eta_s`
-(docs/dev/PHYSICS.md §14.8.1).  `r` is the diffusion-to-dislocation branch
+with `k = inv_diff/inv_disl` and `eta = x/inv_disl = x*eta_s`.
+`r` is the diffusion-to-dislocation branch
 ratio at the calibration point.
 """
 function eta_iso_unit(T::Float64, r::Float64, ED::Float64, ES::Float64)
@@ -341,7 +340,7 @@ verdict(C::Float64) = MANTLE_LO <= C <= MANTLE_HI ?
 
 function main()
     printf("=== composite prefactor + activation-energy calibration ")
-    printf("(docs/dev/CASE_REALISTIC.md §3) ===\n")
+    printf("(realistic case) ===\n")
     printf("fixed: n=%.1f eta_T0=%.2f Vd=Vs=0 comp_rule=:isostress\n",
             NEXP, T0)
     printf("card energies: comp_Ed=%.2f comp_Es=%.2f (E_s/E_d=%.4f, " *
@@ -350,7 +349,7 @@ function main()
     # *run* visits strain rates orders of magnitude above the constant-viscosity
     # precursor's, so calibrating at the precursor rate puts the law's knee far
     # below where the flow actually lives and the interior sits on `eta_min`
-    # (docs/dev/PHASE1.md, the Ra = 1e8 account).
+    # (the Ra = 1e8 account).
     edot_env = strip(get(ENV, "CALIB_EDOT", ""))
     edot_ref = isempty(edot_env) ? precursor_edot() : parse(Float64, edot_env)
     # round to 3 significant digits so the card is reproducible by hand
@@ -366,12 +365,11 @@ function main()
             HHEAT)
     printf("  Tbar(z,H) = (1-z) + (H/2) z (1-z)   (src/physics/params.jl)\n")
     printf("  bottom wall z=0    Tbar = %.4f\n", Tbar(0.0, HHEAT))
-    printf("  mid-depth  z=0.5   Tbar = %.4f   (the interior temperature of " *
-            "docs/dev/PHASE1.md §1.2)\n", Tbar(0.5, HHEAT))
+    printf("  mid-depth  z=0.5   Tbar = %.4f   (the interior temperature)\n",
+            Tbar(0.5, HHEAT))
     printf("  maximum    z*=%.3f  Tbar = %.4f   <- derived hot end T_bot\n",
             zstar, TBOT_DERIVED)
-    printf("  field census of a developed run: T in [0, 1.647] " *
-            "(docs/dev/PHYSICS.md §2.3)\n")
+    printf("  field census of a developed run: T in [0, 1.647]\n")
     printf("  calibration range: T_top=%.4f -> T_bot=%.4f  (T_bot %s the " *
             "derived value)\n", TTOP, TBOT,
             TBOT == TBOT_DERIVED ? "is" : "overrides")
@@ -430,9 +428,7 @@ function main()
     printf("\n=== realised contrast over the full range [%.3f, %.3f] ===\n",
             TTOP, TBOT)
     printf("  at z=%.2f, edot_ref=%.4e, clamps off:\n", ZC, edot_ref)
-    printf("  current card : %.6e   (mantle range 1e3-1e5: " *
-            "docs/dev/HANDOVER.md §10.2 item 2, docs/dev/PHASE1.md §1.2)\n",
-            c_card)
+    printf("  current card : %.6e   (mantle range 1e3-1e5)\n", c_card)
     printf("  target       : %.6e\n", TARGET)
     printf("  VERDICT current card: %.6e %s\n", c_card, verdict(c_card))
 

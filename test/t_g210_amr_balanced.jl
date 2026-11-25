@@ -1,15 +1,15 @@
 # G210: the balanced AMR policy — relative coarsening, budget exchange and cooldown.
 using Test, QuaST, Random, Printf
 
-# G210: the balanced AMR policy (docs/dev/AMR.md §3-§4), the only adaptive one
+# G210: the balanced AMR policy, the only adaptive one
 # since the classic policy was removed at `8c622df`.
 #
 # The production run E is pinned at 9994/10000 leaves with 3720 AMR cycles of
 # which only 723 changed anything: the classic policy (absolute
 # `coarsen_theta_tol`, refused leaves charged to the coarsening budget, hard
 # budget guard, strip-wide protect set, driver `refine_frac=0` pin) cannot trade.
-# `docs/dev/BUG_LEDGER.md` §5.2-§5.5 measures the three mechanisms on the live
-# tree; this gate pins the replacement:
+# The measurement campaign covered the three mechanisms on the live tree; this
+# gate pins the replacement:
 #
 #   1. coarsening is *relative*: a quartet is merged only when
 #      `max(eta_child) <= tau_h` with `tau_h = min(tau_c, hysteresis*tau_r)`,
@@ -26,9 +26,9 @@ using Test, QuaST, Random, Printf
 #      `amr_policy = "balanced"`.
 
 # ---- helpers ---------------------------------------------------------------
-# G210 pins the balanced policy exactly as measured in `docs/dev/AMR.md` §3.6, i.e.
+# G210 pins the balanced policy exactly as measured, i.e.
 # with the coarsening pre-check OFF (it did not exist then); G211 pins the gate
-# itself.  Keeping G210 on the pre-gate path makes every number and every
+# itself.
 # assertion in it directly comparable with those sections.
 g210_cycle!(qt, eta; kw...) =
     QuaST.amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), coarsen_gate=false, kw...)
