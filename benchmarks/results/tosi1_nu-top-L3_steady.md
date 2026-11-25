@@ -2,7 +2,7 @@
 
 - **Quantity.** `Nu_top = 3.421632`, `V_rms = 249.370429` (32 x 32, t = 0.5002). Against the
   eleven-code medians of the paper's Table 2 (`Nu_top = 3.4214`, `V_rms = 249.573`, the median
-  values used by `docs/dev/TOSI_CONVENTION.md` §5-6): **+0.0068 %** and **−0.0811 %**. Both lie
+  values used by `` §5-6): **+0.0068 %** and **−0.0811 %**. Both lie
   inside the eleven-code band (`Nu_top` 3.3129 … 3.5889; `V_rms` 248.9252 … 296.6156).
 - **Command.**
   `CASE_CFL=10 CASE_STEADY=Inf julia --project=. --threads=2 examples/benchmark_cases.jl tosi1 3 0.5`
@@ -32,6 +32,6 @@
   `(eta0 = 0.1, Ra = 1000)` run digit for digit (`Nu = 1.00000/1.00039`,
   `Vrms = 6.3988`, closure −3.839e-04); the old `Ra = 10/eta0` default started at
   `Vrms = 6.3988e-01` (Ra_eff = 10), so the fix is confirmed by the run itself.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.
   No resolution study exists for the Tosi cases, so no GCI is quoted: the delta is
   single-resolution and the reference side carries the 11-code spread.

@@ -3,7 +3,7 @@
 # annulus ladder record (2026-11-25) behind docs/en/validation.md lines 55-60;
 # command: ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_PIC_RELAX=0.5, julia --project=. examples/annulus_benchmark.jl <rung>
 # rungs: 16x192 (113 s), 32x384 (193 s), 64x768 (424 s), 128x1536 (1391 s)
-# environment: Julia 1.12.7 WSL2, 8 threads, 25 GB RAM (recorded in docs/dev/GEOM_PROGRESS.md)
+# environment: Julia 1.12.7 WSL2, 8 threads, 25 GB RAM
 # trimmed: no change except header
 === RUNG L4 16x192 start 14:22:41 ===
 # annulus benchmark nx=16 ny=192 level=4 cells_y=12 leaves=3072 dofs=28608 (u=25344 p=3264 T=12672)

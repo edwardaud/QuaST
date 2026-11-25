@@ -26,16 +26,62 @@ using Test, QuaST, LinearAlgebra, SparseArrays, SHA, Random
 #      introduced (the `W` accumulator was boxed per quadrature point).
 #
 # The gate pins (a) the two small kernels against explicit pre-fix reference
-# implementations, (b) the three big ones against SHA-256 fingerprints recorded
-# in the pre-fix worktree (commit 4bbdae9, generator
+# implementations (in process, bitwise), (b) the three big ones against the same
+# process (serial vs 4-block-threaded assembly), against the pre-fix l2
+# fingerprints at 1e-12 relative, and, only on the recording stack
+# (`QUAST_BITWISE_PINS=1`, batch P3), against the raw-byte SHA-256 fingerprints
+# recorded in the pre-fix worktree (commit 4bbdae9, generator
 # `out_julia/agent/stage4/g188_snapshot.jl`), and (c) the inferred return types
-# that item 5 restored.
+# that item 5 restored.  See the portability block below for the measured
+# tolerances.
 
 const _G188_Z2 = (x, y) -> 0.0
 
 _h188(v) = bytes2hex(sha256(collect(reinterpret(UInt8, v))))
 _h188(v::SparseMatrixCSC) = _h188(v.colptr) * "/" * _h188(v.rowval) * "/" *
                             _h188(v.nzval)
+
+# ---------------------------------------------------------------------------
+# P3 portability (batch P3, task 1).  Block (b) used to pin 18 raw-byte SHA-256
+# digests recorded before the stage-4 restructure.  A raw-byte digest of a
+# Float64 field is only reproducible on the recording stack: a different libm /
+# BLAS / Julia build moves one last bit and the digest changes though no
+# arithmetic changed (docs/dev/AUDIT_GATES.md §5.2).  The default path is now
+# portable and keeps the same two-sided evidence:
+#
+#   * **in process**, the serial assembly and the 4-contiguous-leaf-block
+#     threaded assembly (`assemble_threads=4`, the production `S4` discipline,
+#     `_semquad_assemble_blocks(4, ...)`) must compute the same blocks: the
+#     integer structure exactly, the float blocks to 1e-12 relative.  Measured
+#     on this tree: exact for IK/JK/IB/JB; VK/VB/fv and the energy M/K/C rel 0.0,
+#     F rel 8.2e-18 (round-off).  A shared-kernel order change is invisible to
+#     this arm by construction -- it is the *refactoring-lock* half, now portable.
+#   * the pre-restructure **values** are kept as l2-norm fingerprints in
+#     `G188_REF` with a 1e-12 relative band: >=1e4x the measured 8.2e-18
+#     thread noise and >=10 orders below a real defect (the `dev` fixture itself
+#     moves VK by 24% -- 2.0 vs 4/3 kgeo coefficient; a 1e-6 relative
+#     perturbation is rejected, see the controls in (b1)).  The l2 band is a
+#     magnitude lock: a magnitude-preserving sign change of an entry is caught
+#     by the env-gated byte pins (and by the analytic assembly gates), not by
+#     this band.
+#
+# The exact regression lock is still available on the recording stack:
+# `QUAST_BITWISE_PINS=1 julia --project=. --threads=8 test/run_gates.jl
+# t_g188_kernel_specialisation.jl` runs the original 18 SHA-256 assertions.  The
+# gate therefore has exact values in the default path *and* on the exact stack;
+# neither alone is the whole evidence.
+const QUAST_BITWISE_PINS = get(ENV, "QUAST_BITWISE_PINS", "") == "1"
+
+# l2 relative difference of two same-shape arrays; relative error of a norm.
+g188_rel(a, b) = norm(a - b) / max(norm(b), 1.0e-300)
+g188_rel_norm(n, r) = abs(n - r) / max(abs(r), 1.0e-300)
+
+# Pre-restructure l2 fingerprints of the stage-4 block set (the tree reproduces
+# the recorded SHA pins bit for bit, so these ARE the pre-fix values).
+const G188_REF = (VK=510.59163289278666, VKdev=389.63501079893837,
+                  VB=1.4380199006160843, M=0.013138524916054741,
+                  K=233.81880636674845, C=0.09296774220389427,
+                  F=0.014939183515104952, ev=0.014348388350848807)
 
 # --- pre-fix reference implementations (verbatim loops) ---------------------
 
@@ -173,10 +219,14 @@ end
         @test u1 == u0
     end
 
-    # (b1) Stokes K/B/fv fingerprints recorded *before* the restructure
-    #      (worktree /tmp/ms_base at 4bbdae9, g188_snapshot.jl).
+    # (b1) the Stokes K/B/fv blocks: the serial and the 4-block threaded
+    #      assembly are the same computation in one process, and the
+    #      pre-restructure values are the G188_REF l2 fingerprints.
+    #      (The raw-byte pins recorded in the pre-fix worktree /tmp/ms_base at
+    #      4bbdae9, g188_snapshot.jl, run under QUAST_BITWISE_PINS.)
     fd = make_fedata(p, ss.q)
     pleaves = Set(ss.sp.leaves)
+    vk_serial = Float64[]
     for dev in (false, true)
         cfg = QuaST.SemQuadAsmCfg(dev ? 4.0 / 3.0 : 2.0, dev, false,
                                       nothing, nothing, 0.0, nothing, nothing,
@@ -184,21 +234,47 @@ end
         asm = QuaST._semquad_assemble_blocks(1, cfg, ss.su, ss.sp, eta,
                                                  _G188_Z2, _G188_Z2, fd,
                                                  pleaves)
-        if !dev
+        asm4 = QuaST._semquad_assemble_blocks(4, cfg, ss.su, ss.sp, eta,
+                                                  _G188_Z2, _G188_Z2, fd,
+                                                  pleaves)
+        # in-process reference: 4 contiguous leaf blocks concatenated in block
+        # order (the production `assemble_threads>1` discipline) == serial.
+        @test asm4.IK == asm.IK && asm4.JK == asm.JK
+        @test asm4.IB == asm.IB && asm4.JB == asm.JB
+        @test g188_rel(asm4.VK, asm.VK) <= 1.0e-12    # measured 0.0
+        @test g188_rel(asm4.VB, asm.VB) <= 1.0e-12    # measured 0.0
+        @test g188_rel(asm4.fv, asm.fv) <= 1.0e-12    # measured 0.0
+        # portable pre-restructure regression lock (1e-12 relative band)
+        ref_vk = dev ? G188_REF.VKdev : G188_REF.VK
+        @test g188_rel_norm(norm(asm.VK), ref_vk) <= 1.0e-12
+        @test g188_rel_norm(norm(asm.VB), G188_REF.VB) <= 1.0e-12
+        @test all(iszero, asm.fv)          # this load is zero for these closures
+        push!(vk_serial, norm(asm.VK))
+        # (ii) a 1e-6 relative perturbation of the block is rejected by the band
+        @test g188_rel(asm.VK .* (1.0 + 1.0e-6), asm.VK) > 1.0e-12
+        if QUAST_BITWISE_PINS
+            if !dev
+                @test _h188(asm.IK) == "ce2755b75780aa7b695a163030bd63034a57621a4ecfaef8e68dceffb0b7805e"
+                @test _h188(asm.JK) == "7a2116fce1560f2235bef76c64a39cd7f84ee875e2aea0e18115eaa5ce84f270"
+                @test _h188(asm.VK) == "c050e6da98b5d54cb2dd09348b13c94317be99296a7aafeddb43468b3c091345"
+                @test _h188(asm.IB) == "9fb8475e5a7a3312581b8f7746d7f66d0f6aeaba25363ee05c9ec93f48238fab"
+                @test _h188(asm.JB) == "13435ccf836bb885ae6b815b10885c2ce8e71e7e434939200a4bfe1c45df94d1"
+                @test _h188(asm.VB) == "411b7c1ba94a41e44dcc55bad1b2d4d64bf25caa2c1a636c9be34755590972bf"
+                @test _h188(asm.fv) == "467b59659413f71b7e04e27ca263582e832e1838af0d53b8a282b9da0bc368f5"
+            else
+                @test _h188(asm.VK) == "a439fdb7b1ed06f1cbe5f6c4e5cdc31e891416ea9fed450857edc33c80b96195"
+            end
             @test _h188(asm.IK) == "ce2755b75780aa7b695a163030bd63034a57621a4ecfaef8e68dceffb0b7805e"
-            @test _h188(asm.JK) == "7a2116fce1560f2235bef76c64a39cd7f84ee875e2aea0e18115eaa5ce84f270"
-            @test _h188(asm.VK) == "c050e6da98b5d54cb2dd09348b13c94317be99296a7aafeddb43468b3c091345"
-            @test _h188(asm.IB) == "9fb8475e5a7a3312581b8f7746d7f66d0f6aeaba25363ee05c9ec93f48238fab"
-            @test _h188(asm.JB) == "13435ccf836bb885ae6b815b10885c2ce8e71e7e434939200a4bfe1c45df94d1"
-            @test _h188(asm.VB) == "411b7c1ba94a41e44dcc55bad1b2d4d64bf25caa2c1a636c9be34755590972bf"
-            @test _h188(asm.fv) == "467b59659413f71b7e04e27ca263582e832e1838af0d53b8a282b9da0bc368f5"
-        else
-            @test _h188(asm.VK) == "a439fdb7b1ed06f1cbe5f6c4e5cdc31e891416ea9fed450857edc33c80b96195"
         end
-        @test _h188(asm.IK) == "ce2755b75780aa7b695a163030bd63034a57621a4ecfaef8e68dceffb0b7805e"
     end
+    # Non-vacuity of the portable band.  A real value change: the `dev`
+    # fixture itself (kgeo coefficient 2.0 -> 4/3) moves the VK l2 by 24%
+    # (measured 5.11e2 -> 3.90e2), i.e. nine orders above the 1e-12 band; the
+    # 1e-6 perturbation control is asserted inside the loop above.
+    @test g188_rel_norm(vk_serial[2], vk_serial[1]) > 1.0e-2
 
-    # (b2) energy M/K/C/F fingerprints, every optional term on, EV field on.
+    # (b2) energy M/K/C/F and the EV field: the same two-sided evidence, every
+    #      optional term on and the EV field on.
     ev = zeros(Float64, length(qt.leaves))
     M, K, C, F = assemble_semquad_energy(sq, qt, pr, ux, uz; advection=:skew,
                                         theta=th, rho_heating=true,
@@ -207,31 +283,77 @@ end
                                         eta_fun=eta, ev=0.44, ev_cmax=0.052,
                                         ev_alpha=2, ev_timestep=5, evg=evg,
                                         theta_prev=prev, dt=7.0e-11,
-                                        ev_out=ev)
-    @test _h188(M) == "c5b68d88c82ed8a49322c2bc889c3053537513b1978c58b598faf1d858459b61/d9dbe4e6684a4a3e7b46ca34c3a3701d559d1dd06cd62d0214c76a55ee227db6/d7cac3242f84e231f140b67a1ed9162aaddf8deb41f860574ac6793b41589254"
-    @test _h188(K) == "c5b68d88c82ed8a49322c2bc889c3053537513b1978c58b598faf1d858459b61/d9dbe4e6684a4a3e7b46ca34c3a3701d559d1dd06cd62d0214c76a55ee227db6/524283a379979fa40a0af6b53e419e7edd030a7d8ae21b15b352cd9e0adec315"
-    @test _h188(C) == "8f6b4c853685974fe38ec42f64c2fa03e3843ec392a97cc6de259e7d10a2ea6d/eb8ebeaced7f0f69a853eef0a766f1ad3b358281ecfcae70ef2e701feee1c581/1d03d775e5fbdf318be37a72ed4928342a4786886ac7f8fc689d1278f5ed2f84"
-    @test _h188(F) == "7b26f3badbb3024567fe91917cbbf6fc74a85978a7cdfd9c8150bbbf7ab0a468"
-    @test _h188(ev) == "71d752867da97271e0c50dbfd8c3b7f8a9f23d2cac8076748a7a834a92c694aa"
+                                        ev_out=ev, assemble_threads=1)
+    ev4 = zeros(Float64, length(qt.leaves))
+    M4, K4, C4, F4 = assemble_semquad_energy(sq, qt, pr, ux, uz;
+                                        advection=:skew, theta=th,
+                                        rho_heating=true, rho_cp=true,
+                                        heating_adiabatic=true,
+                                        heating_dissipation=true,
+                                        eta_fun=eta, ev=0.44, ev_cmax=0.052,
+                                        ev_alpha=2, ev_timestep=5, evg=evg,
+                                        theta_prev=prev, dt=7.0e-11,
+                                        ev_out=ev4, assemble_threads=4)
+    # in-process reference: 4-block threaded assembly == serial
+    @test g188_rel(M4.nzval, M.nzval) <= 1.0e-12      # measured 0.0
+    @test g188_rel(K4.nzval, K.nzval) <= 1.0e-12      # measured 0.0
+    @test g188_rel(C4.nzval, C.nzval) <= 1.0e-12      # measured 0.0
+    @test g188_rel(F4, F) <= 1.0e-12                  # measured 8.2e-18
+    @test g188_rel(ev4, ev) <= 1.0e-12                # per-leaf, exact
+    # portable pre-restructure l2 fingerprints (1e-12 relative band)
+    @test g188_rel_norm(norm(M.nzval), G188_REF.M) <= 1.0e-12
+    @test g188_rel_norm(norm(K.nzval), G188_REF.K) <= 1.0e-12
+    @test g188_rel_norm(norm(C.nzval), G188_REF.C) <= 1.0e-12
+    @test g188_rel_norm(norm(F), G188_REF.F) <= 1.0e-12
+    @test g188_rel_norm(norm(ev), G188_REF.ev) <= 1.0e-12
+    if QUAST_BITWISE_PINS
+        @test _h188(M) == "c5b68d88c82ed8a49322c2bc889c3053537513b1978c58b598faf1d858459b61/d9dbe4e6684a4a3e7b46ca34c3a3701d559d1dd06cd62d0214c76a55ee227db6/d7cac3242f84e231f140b67a1ed9162aaddf8deb41f860574ac6793b41589254"
+        @test _h188(K) == "c5b68d88c82ed8a49322c2bc889c3053537513b1978c58b598faf1d858459b61/d9dbe4e6684a4a3e7b46ca34c3a3701d559d1dd06cd62d0214c76a55ee227db6/524283a379979fa40a0af6b53e419e7edd030a7d8ae21b15b352cd9e0adec315"
+        @test _h188(C) == "8f6b4c853685974fe38ec42f64c2fa03e3843ec392a97cc6de259e7d10a2ea6d/eb8ebeaced7f0f69a853eef0a766f1ad3b358281ecfcae70ef2e701feee1c581/1d03d775e5fbdf318be37a72ed4928342a4786886ac7f8fc689d1278f5ed2f84"
+        @test _h188(F) == "7b26f3badbb3024567fe91917cbbf6fc74a85978a7cdfd9c8150bbbf7ab0a468"
+        @test _h188(ev) == "71d752867da97271e0c50dbfd8c3b7f8a9f23d2cac8076748a7a834a92c694aa"
+    end
 
-    # (b3) point evaluation on the whole tree and the work/dissipation pair.
+    # (b3) point evaluation and the EV cell statistic over the whole tree,
+    #      against the gate's verbatim pre-fix reference bodies (in process,
+    #      bitwise); work/dissipation against the mapped body on the identity
+    #      map (a different implementation of the same integral, the G279
+    #      identity-map precedent).
     xs = range(0.0, 1.0; length=9)
     vals = Float64[]
+    vals_ref = Float64[]
     for y in xs, x in xs
         push!(vals, QuaST._semquad_eval_at(sq, th, Float64(x), Float64(y),
                                                leaves))
+        push!(vals_ref, _g188_eval_at_ref(sq, th, Float64(x), Float64(y),
+                                          leaves))
     end
-    @test _h188(vals) == "7abc89cd2c8aa55c5fce061e9dd6757d74a350f5c82b854d889c9b894730176b"
+    @test vals == vals_ref
     rmax = Float64[]; umax = Float64[]
+    rmax_ref = Float64[]; umax_ref = Float64[]
     for lf in sq.leaves
         r, u = QuaST.semquad_ev_cell_stats(sq, pr, th, prev, ux, uz,
                                                7.0e-11, lf, evg; alpha=2)
         push!(rmax, r); push!(umax, u)
+        r0, u0 = _g188_ev_cell_stats_ref(sq, pr, th, prev, ux, uz, 7.0e-11,
+                                         lf, evg; alpha=2)
+        push!(rmax_ref, r0); push!(umax_ref, u0)
     end
-    @test _h188(rmax) == "bd43b4d17c22e8ba834fe34bf02a0754ecc47b09557dd3c3e42a8d064473d06c"
-    @test _h188(umax) == "2358880e2c45aa966eac5347a505a749f935586297c258df55dd37447d5a4ce6"
+    @test rmax == rmax_ref
+    @test umax == umax_ref
     W, U = semquad_work_dissipation(sq, qt, pr, th, ux, uz, eta)
-    @test _h188([W, U]) == "8921584e76a0066fb13bb546b02f1267e07d17b5488e2a6f5e83eccfa8293ed9"
+    gid = AffineBox((1.0, 0.0, 0.0, 1.0), (0.0, 0.0), 1.0)
+    sqm = make_semquad(qt, p; geom=gid)
+    Wm, Um = semquad_work_dissipation(sqm, qt, pr, th, ux, uz, eta)
+    # measured: |Wm-W| = 1e-33 (both ~1e-17, the integral cancels), U rel 1.5e-16
+    @test isapprox(Wm, W; atol=1.0e-15)
+    @test isapprox(Um, U; rtol=1.0e-12)
+    if QUAST_BITWISE_PINS
+        @test _h188(vals) == "7abc89cd2c8aa55c5fce061e9dd6757d74a350f5c82b854d889c9b894730176b"
+        @test _h188(rmax) == "bd43b4d17c22e8ba834fe34bf02a0754ecc47b09557dd3c3e42a8d064473d06c"
+        @test _h188(umax) == "2358880e2c45aa966eac5347a505a749f935586297c258df55dd37447d5a4ce6"
+        @test _h188([W, U]) == "8921584e76a0066fb13bb546b02f1267e07d17b5488e2a6f5e83eccfa8293ed9"
+    end
 
     # (c) the `Any` that item 5 removed is gone: these must infer concretely.
     @test (@inferred QuaST.semquad_rho(SemRefState(; rho0=2.0), 0.5)) === 2.0

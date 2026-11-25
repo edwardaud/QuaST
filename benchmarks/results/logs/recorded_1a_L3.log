@@ -2,7 +2,7 @@
 # tag: hist_1a_L3
 # historical campaign log (2026-11-14/15) behind the public Blankenbach table;
 # command: CASE_CFL=0.5 (the then-default), julia --project=. examples/benchmark_cases.jl <case> <level> <tstop>, stopped by the steady criterion
-# environment: Julia 1.12.7, WSL2, 8 threads (recorded in docs/dev/BUG_FIX_LOG.md 搂15)
+# environment: Julia 1.12.7, WSL2, 8 threads
 # trimmed: per-Picard-iteration lines removed, step lines downsampled if over budget
   step    1 t=1.000e-04 dt=1.00e-04 Nu=4.86922/4.86922 Vrms=4.2903e+01 N=4225 leaves=1024 closure=6.143e-09
   step    3 t=3.152e-04 dt=1.10e-04 Nu=4.86553/4.86553 Vrms=4.2907e+01 N=4225 leaves=1024 closure=6.005e-09

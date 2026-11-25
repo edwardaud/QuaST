@@ -4,20 +4,22 @@ One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
 test script that starts with `using`; most wrap one `@testset`.
 
-Recorded full-suite totals: **142 227 total / 142 225 passed / 0 failed / 2 broken**, 30 m 54 s
-(2026-11-26, 8 threads / 16 cores, final tree of remediation batch P0 part 1;
-log `out_julia/agent/p0/suite.log`).  The tree has 207 gate files and `runtests.jl` includes each of them exactly
+Recorded full-suite totals: **142 290 total / 142 288 passed / 0 failed / 2 broken**, 30 m 45 s
+(2026-11-26, 8 threads / 16 cores, final tree of remediation batch P3;
+log `out_julia/agent/p3/suite.log`).  The tree has 208 gate files and `runtests.jl` includes each of them exactly
 once; `scripts/check_counts.jl`
 (run by hand, not part of the suite) checks those counts against this record and
 the other documented surfaces (`CONTRIBUTING.md`; the top-level `README.md` is
-checked as a warning-only surface because it is owned by the documentation
-batch).  The two `broken` entries are the explicit, documented `@test_skip`
-environment gates in G209 and G214 -- the realistic-state checkpoints they wait
-for are data-dependent states of 8-27 MB produced by long runs and are not
-committed (the decision and the alternatives are recorded in the commit that
-made the change); they are no longer literal tautologies.  The batch-P0 part-1
-campaign record (code guards, order-gate thresholds, test holes, before/after
-evidence) lives in the commit messages of that batch.
+checked as a warning-only surface).  This file is the one committed record of a
+full-suite run: the public pages link here for the totals, and the two surfaces
+that must quote them (`README.md` and `CONTRIBUTING.md`) are checked against
+this record.  The two `broken` entries are the explicit, documented
+`@test_skip` environment gates in G209 and G214 -- the realistic-state
+checkpoints they wait for are data-dependent states of 8-27 MB produced by long
+runs and are not committed (the decision and the alternatives are recorded in
+the commit that made the change); they are no longer literal tautologies.  The
+batch-P0 part-1 campaign record (code guards, order-gate thresholds, test holes,
+before/after evidence) lives in the commit messages of that batch.
 
 History: the earlier cuts' recorded totals were 134 086 / 134 084 / 0 / 2 on 185
 files (cut 1), then 136 980 / 136 978 / 0 / 2 on 194 files (stage 0.5b2), with
@@ -144,6 +146,6 @@ and the whole suite:
     julia --project=. --threads=8 test/runtests.jl
 
 A kernel gate such as `t_g0.jl` takes about 2 s warm; the heavy
-checkpoint/regression gates run to minutes. The full suite is 30 m 54 s on eight
+checkpoint/regression gates run to minutes. The full suite is 30 m 45 s on eight
 threads (CI allows 90 at four); the campaign baseline at `f373126` measured
 30 m 49 s.

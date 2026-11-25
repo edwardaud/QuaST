@@ -30,11 +30,12 @@
 #       its header line, the scale set that makes the report print Pa s, and the
 #       calibration's declaration that the prefactors produce `eta_ref = 1`; plus
 #       the library default and the parameter validation;
-#   (b) the default is bit-identical: the pinned state below was captured at HEAD
-#       `2d7ac42` (the commit before this gate) and again from the working tree
-#       with `--threads=8`; the two are byte-identical.  The gate re-runs the
-#       same card and requires exact equality of the history and of theta/ux/uz;
-#       a run at the default convention emits no eta_ref report;
+#   (b) the default path reproduces the pinned state: the state below was
+#       captured at HEAD `2d7ac42` (the commit before this gate) and again from
+#       the working tree with `--threads=8`.  The gate re-runs the same card and
+#       compares the history and theta/ux/uz at 1e-12 relative (portable; the
+#       exact-byte comparison is the QUAST_BITWISE_PINS=1 lock, see the file
+#       header below); a run at the default convention emits no eta_ref report;
 #   (c) the **invariance that defines the convention**: the composite law with
 #       both prefactors divided by c and `eta_ref = c` reproduces the base run to
 #       round-off, while the same scaled law with `eta_ref = 1` changes the flow
@@ -56,6 +57,29 @@
 # G255 documents why a closure inside a `@testset` is the wrong shape for
 # helpers that compare against file-scope constants.
 using Test, QuaST, Logging, Printf
+
+# ---------------------------------------------------------------------------
+# P3 portability (batch P3, task 1).  Section (b) used to require exact equality
+# of the full pinned state, captured with `--threads=8` at HEAD 2d7ac42.  Raw
+# Float64 equality of a driver state is a same-stack claim: a different
+# libm/BLAS/Julia build moves the last bits (docs/dev/AUDIT_GATES.md §5.2).
+# Default path: the same pinned state compared at 1e-12 relative, which the
+# measured noise justifies --
+#   * thread-count drift, measured here: the state and history are BITWISE
+#     identical at `--threads=1`, `2` and `8` (this card is a direct-path,
+#     serial-assembly scenario), so the documented 4.4e-7 multi-thread Vrms
+#     drift (G280) does not apply; using it would be 3e7x looser than needed;
+#   * a 1-ULP change of the law's `deta_T` -- the size of a libm `exp`
+#     difference between machines -- moves the state by <=1.2e-14 relative and
+#     the history by 6.7e-15 (probe out_julia/agent/p3/probe_pins3.jl);
+#   * 1e-12 is therefore ~80x the measured 1-ULP noise and 10 orders below a
+#     real defect: the (c) foot-gun arm at c = 10 changes the state by >=1e-2,
+#     and the in-gate 1e-6 perturbation control is rejected.
+# The exact regression lock stays available: `QUAST_BITWISE_PINS=1
+# julia --project=. --threads=8 test/run_gates.jl t_g257_eta_ref.jl` requires
+# the recorded bytes exactly (the recording stack).
+const QUAST_BITWISE_PINS = get(ENV, "QUAST_BITWISE_PINS", "") == "1"
+const G257_STATE_TOL = 1.0e-12
 
 # ---------------------------------------------------------------- scenario ----
 # A 16-leaf uniform unit square (NOT one leaf: HANDOVER section 8).  Two fixed
@@ -198,17 +222,29 @@ const G257_REF_UZ = [0.0, 0.0, 0.0, 9.499488123024632, 5.299472576614657, -2.099
     @test occursin("run_config[\"eta_ref\"] = pr.eta_ref", guard_src)
 
     # ================================================================ (b) ===
-    # The default is bit-identical: the complete state of the pinned scenario.
+    # The default path reproduces the complete pinned state (1e-12 relative;
+    # exact bytes under QUAST_BITWISE_PINS=1 -- see the file header).
     r_def = g257_silent(() -> g257_run(g257_params_ref()))
     @test r_def.steps == 2
-    @test reduce(vcat, r_def.history) == G257_REF_HISTORY
-    @test r_def.theta == G257_REF_THETA
-    @test r_def.ux == G257_REF_UX
-    @test r_def.uz == G257_REF_UZ
+    @test g257_relhist(r_def.history, G257_REF_HISTORY) <= G257_STATE_TOL
+    @test l2rel(r_def.theta, G257_REF_THETA) <= G257_STATE_TOL
+    @test l2rel(r_def.ux, G257_REF_UX) <= G257_STATE_TOL
+    @test l2rel(r_def.uz, G257_REF_UZ) <= G257_STATE_TOL
+    if QUAST_BITWISE_PINS
+        # the recorded 8-thread state, exact (recording stack only)
+        @test reduce(vcat, r_def.history) == G257_REF_HISTORY
+        @test r_def.theta == G257_REF_THETA
+        @test r_def.ux == G257_REF_UX
+        @test r_def.uz == G257_REF_UZ
+    end
     # the pinned state is not a degenerate all-zero field
     @test maximum(abs, G257_REF_THETA) > 1.0e-2
     @test maximum(abs, G257_REF_UX) > 1.0
-    # explicitly setting the default convention takes the same path
+    # non-vacuity of the 1e-12 band: a 1e-6 relative change of the state is
+    # rejected (the (c) foot-gun arm changes it by >=1e-2)
+    @test l2rel(r_def.theta .* (1.0 + 1.0e-6), r_def.theta) > G257_STATE_TOL
+    # explicitly setting the default convention takes the same path (in-process,
+    # so this stays exact)
     r_one = g257_silent(() -> g257_run(g257_params_ref(eta_ref=1.0)))
     @test r_one.history == r_def.history
     @test r_one.theta == r_def.theta
@@ -218,8 +254,8 @@ const G257_REF_UZ = [0.0, 0.0, 0.0, 9.499488123024632, 5.299472576614657, -2.099
         g257_run(g257_params_ref(eta_ref=1.0))
     end
     @test isempty(g257_report_msgs(logs_one))
-    @printf("G257 (b) pinned default state reproduced bit for bit (%d history values, %d nodes); eta_ref=1 silent\n",
-            length(G257_REF_HISTORY), length(G257_REF_THETA))
+    @printf("G257 (b) pinned default state reproduced within %.0e (%d history values, %d nodes); eta_ref=1 silent\n",
+            G257_STATE_TOL, length(G257_REF_HISTORY), length(G257_REF_THETA))
 
     # ================================================================ (c) ===
     # The invariance: scaling the law's prefactors and eta_ref together cancels;

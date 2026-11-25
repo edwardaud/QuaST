@@ -4,7 +4,7 @@
 
 ## Is the behaviour supposed to be inert?
 
-<!-- An inert change must reproduce the pins bit for bit (docs/dev/MG.md section 3).
+<!-- An inert change must reproduce the pins bit for bit .
      Name the gate that proves it, for example test/t_g222_mg_kernel_variants.jl. -->
 
 ## Did a default change?

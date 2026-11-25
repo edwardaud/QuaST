@@ -177,8 +177,16 @@ end
         # ASPECT's numbers: its
         # coefficient L_A = T dS_A/(cp dT) is +0.060 / -0.131; ours is -L_A.
         @test L410 < 0.0 && L660 > 0.0
-        @test L410 ≈ -0.060 rtol = 2.0e-2        # -0.059364 (T = 1195.5 K)
-        @test L660 ≈ +0.131 rtol = 2.0e-2        # +0.130596 (T = 1578.0 K)
+        # The ASPECT reference numbers above are quoted to two significant
+        # digits, so the *reference* is quantised: the computed values are
+        # L410 = -0.059364269672727281 (-0.060 + 1.06e-2 relative) and
+        # L660 = +0.13059642763636364 (+0.131 - 3.08e-3 relative), measured in
+        # the P3 loose-tolerance review (out_julia/agent/p3/probe_loose.jl).
+        # The bands below are 1.4x/1.6x those quantisation residuals (the old
+        # common 2e-2 let a 9e-3 error pass); the exact coefficients are
+        # separately pinned at 1e-5 absolute below.
+        @test L410 ≈ -0.060 rtol = 1.5e-2        # -0.059364 (T = 1195.5 K)
+        @test L660 ≈ +0.131 rtol = 5.0e-3        # +0.130596 (T = 1578.0 K)
         @test abs(L410 + 5.9364e-2) < 1.0e-5
         @test abs(L660 - 1.30596e-1) < 1.0e-4
         # T_abs = Tbar(z0) + T_surface is the temperature the coefficient uses

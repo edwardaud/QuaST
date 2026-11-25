@@ -72,6 +72,12 @@ using Test, QuaST, LinearAlgebra
     ru = short_run(qu)
     rw = short_run(wall_tree())
     @test rw[1] ≈ ru[1] rtol = 1.0e-3
-    @test rw[2] ≈ ru[2] rtol = 1.0e-2
+    # Vrms on the wall-refined vs the uniform 256-leaf tree.  Measured (P3
+    # loose-tolerance review, out_julia/agent/p3/probe_loose.jl): Nu rel
+    # 8.02e-6, Vrms rel 6.70e-5 (both cards are the same physical run, so the
+    # difference is the mesh); the old band 1e-2 let a 9e-3 physical error
+    # pass.  2e-4 is 3x the measured mesh spread and still ~5e-14 relative
+    # above the cross-machine round-off of a 20-step direct run.
+    @test rw[2] ≈ ru[2] rtol = 2.0e-4
     @test rw[3] < 100.0
 end

@@ -330,13 +330,21 @@ end
         @test abs(divv) <= 1.0e-2 * umax * area
         # the energy diagnostic on the *initial* linear profile: the arc-length
         # averaged radial gradient of T = R1 - r + perturbation is -1, so the
-        # pair reads R_wall|ln f| (a 1% band covers the O(h^2) wall-derivative
-        # error; this is the diagnostic-definition check, not a benchmark run)
+        # pair reads R_wall|ln f| (a band covers the O(h^2) wall-derivative
+        # error; this is the diagnostic-definition check, not a benchmark run).
+        # Measured (P3 loose-tolerance review, probe_loose.jl) on this 192-leaf
+        # smoke: nut0 rel 1.815e-3, nub0 rel 7.730e-3.  nut0's band is tightened
+        # to 3e-3 (1.65x); nub0's measured 0.77 % is already 77 % of the old
+        # 1 % band, so it is kept and documented: the residual is the coarse
+        # O(h^2) wall-derivative family error of the *outer* (R1) wall on this
+        # fixed smoke mesh, and a tighter band would couple the gate to one
+        # resolution.  The check discriminates definition errors at O(1) (a
+        # swapped R0/R1 is a 1.82x change, a missing |ln f| is 1.67x).
         th_ic = [MS277._annulus_ic_theta(:firedrake, g, pr, c[1], c[2])
                  for c in ss.su.coords]
         nut0, nub0 = MS277.semquad_nu_walls(ss.su, qt, th_ic, pr)
         lf = abs(log(g.R0 / g.R1))
-        @test isapprox(nut0, g.R1 * lf; rtol=1.0e-2)
-        @test isapprox(nub0, g.R0 * lf; rtol=1.0e-2)
+        @test isapprox(nut0, g.R1 * lf; rtol=3.0e-3)     # measured 1.815e-3
+        @test isapprox(nub0, g.R0 * lf; rtol=1.0e-2)     # measured 7.730e-3, kept
     end
 end

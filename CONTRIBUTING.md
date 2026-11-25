@@ -2,7 +2,7 @@
 
 QuaST is a research solver for two-dimensional mantle convection. Patches that make it
 faster, more accurate or easier to check are welcome. The habits below are the ones the
-project follows; `docs/dev/HANDOFF.md` section 7 records what each one cost to learn.
+project follows; the private maintainer record kept what each one cost to learn.
 
 ## Set up a development environment
 
@@ -43,14 +43,14 @@ julia --project=. test/runtests.jl
 ```
 
 It takes 30 m 54 s on eight threads; the engineering record prices the same run at
-40 to 75 minutes on a loaded machine. The suite has 207 gate files, and the last
-recorded full-suite run reported 142 225 passed, 0 failed and 2 broken
+40 to 75 minutes on a loaded machine. The suite has 208 gate files, and the last
+recorded full-suite run reported 142 288 passed, 0 failed and 2 broken
 (2026-11-26, the recorded totals live in `test/README.md`).
 
 The suite currently reports no failures; the two `broken` entries are explicit,
 documented `@test_skip` environment gates in G209 and G214 that wait for
 data-dependent realistic-state checkpoints the repository does not ship (the
-decision and the alternatives are recorded in `docs/dev/BUG_FIX_LOG.md` §14.11).
+decision and the alternatives are recorded in the commit that made the change).
 Any failure is a regression.
 
 ## Check the documentation counts
@@ -84,12 +84,12 @@ committed record is checked) are stated in the script header.
    `|du|/|u|` and the gauge-removed `|dp|/|p|` against
    `linear=:direct, stokes_scaling=:equilibrated` in the same process. A converged residual
    does not certify the change: a deflated `S1` reached `relres` 7.2e-7 with a pressure
-   error 20 to 90 times the baseline (`docs/dev/HANDOFF.md` section 7, rule 7).
+   error 20 to 90 times the baseline.
 4. **A default flip is staged and re-baselined.** Pin the dependents, flip the default, run
    the full suite twice, re-baseline the canonical baselines, then document. The AMR flip
    pinned 28 callers in 20 gates and 8 scripts, added G229 with the flip, and re-baselined
    the 25-frame blob; the linear flip pinned the direct-path numbers in Stage 0 (`42ac0f8`)
-   and added G230 (`docs/dev/AMR.md` section 4.4, `docs/dev/HANDOFF.md` section 7).
+   and added G230.
 5. **A commit names its pathspec.** Use `git add -- path` and `git commit -- path`, one
    file or one directory per commit. Shared checkouts carry untracked data, and `git add -A`
    sweeps whatever another process had staged.

@@ -36,4 +36,4 @@
 - **Status.** `verified` — re-run twice in this batch (before and after the only production
   change, the Tosi default in `examples/benchmark_cases.jl`, which does not touch the solver);
   identical both times.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.

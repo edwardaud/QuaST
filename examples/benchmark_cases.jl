@@ -216,7 +216,7 @@ function run_case(c::Case; level::Int=5, tstop::Float64=c.tstop, out::String="")
                                 # every leaf within `strip` of a wall, and the
                                 # wall rows, back to `wall_min`. Nu is a
                                 # one-sided gradient inside that layer, so this
-                                # is where the error lives (docs/dev/AMR.md).
+                                # is where the error lives.
                                 # The depth cap has to allow the wall level, or
                                 # the rule is silently clipped and the run is
                                 # just a uniform mesh.

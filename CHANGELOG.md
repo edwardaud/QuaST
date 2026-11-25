@@ -65,9 +65,62 @@ public release: earlier development happened in a private repository.
 - `corotation_guard` and `regime_report` keywords, plus `MAXWELL_COROTATION_BOUND`, which
   report how far a run sits from the linearized rotation's validity band and what viscosity
   contrast the effective closure produces.
+- The geometry and mapping layer: `AbstractGeometry` with the identity-mapped `CartesianBox`,
+  the validation maps `AffineBox` and `CurvedBox`, and the 2-D polar `PolarAnnulus`; mapped
+  Stokes and energy assembly, mapped diagnostics, transfer and AMR routing, and a geometry
+  identity recorded in the checkpoint config (a checkpoint written under one geometry is
+  refused under another). The box card keeps its historical arithmetic bit for bit.
+- The 2-D polar annulus as a second production geometry: `geom = :annulus` with
+  `annulus_R0`, `annulus_R1`, `annulus_Phi` and `annulus_seam` (the `:wall` wedge or cut
+  ring, or the `:periodic` closed ring), the radial log/internally-heated conduction base
+  state, the per-wall Nusselt normalisation, the solid-body-rotation gauge on the free-slip
+  ring, and curved-wall `:free`/`:rigid`/`:open` conditions in the wall frame.
+- `examples/annulus_benchmark.jl` and the published isoviscous `Ra = 1e5` annulus benchmark
+  of Davies et al. (2022) and the ASPECT documentation, with its documented steady-state
+  criterion and steady-relaxation mode; the validation pages report the ladder, the observed
+  order and the GCI.
+- The finite/positive input guards: NaN/Inf loads and viscosity are refused at the assembly
+  entry points, the driver entry and the per-step entry; `p >= 2` is enforced in the space
+  constructor with a corrected message; `dt0 > 0`, `dtmax >= dt0` and `tstop > 0` are
+  validated before any work; and the restart guard compares the checkpoint's geometry.
+- `benchmarks/results/`: the archived benchmark-evidence campaign — one provenance record per
+  quoted number (command, input card and hash, resolution, environment and log SHA-256), the
+  compact logs, and `summary.md`/`summary.csv` with the observed order, Richardson value and
+  GCI. It covers the Blankenbach 1a/1b/1c/2a ladders, Tosi case 1, the annulus ladder and the
+  full-suite totals.
+- The licensing and availability files: `NOTICE` with the per-directory licence split,
+  `aspect_runs/realistic/LICENSE` (GPL-2.0-or-later for the ASPECT plugin),
+  `examples/data/LICENSE` (CC0-1.0 for the data and the benchmark records) and
+  `docs/paper/availability.md` (ready-to-paste code and data availability statements per
+  journal policy, linked from the documentation map); `CITATION.cff` carries the same facts.
+  The launch scripts and examples take `QUAST_ROOT`, `QUAST_JULIA` and `QUAST_OUT` instead of
+  hard-coded machine paths.
 
 ### Changed
 
+- `examples/benchmark_cases.jl`: the Tosi cases now default to `ra = 100 / eta0` (with
+  `eta0 = 0.1`, `Ra = 1000`) instead of `10 / eta0`. The shipped command runs the benchmark's
+  equivalent Rayleigh number `Ra_eff = Ra*eta0*eta_ref = 100` and reproduces the published
+  state (`Nu_top = 3.4216`); the comment block carries the derivation.
+- The validation pages now state what the evidence supports: the annulus ladder reports the
+  measured observed order and GCI (1.690 / 0.462 % on `Nu_T`, 1.594 / 0.597 % on `Nu_B`) and
+  says the +0.20 % ASPECT deviation is inside the run's own uncertainty rather than an
+  accuracy claim; the Blankenbach table cites the archived runs and gives the observed
+  order/GCI where one is derivable (1a 1.999 / 0.083 %, 1b 1.652 / 0.560 %, 2a's
+  uniform-card study 2.88 %, and none for 1c); the Tosi reference column is labelled as the
+  YACC column of Table 2 and the medians are given separately; the two-code spread is
+  presented as a spread, with the total comparison uncertainty (~0.5–0.7 %) and the list of
+  features that are verified but not validated stated explicitly.
+- The guide gains a section on the annulus geometry and the benchmark mode, and the geometry
+  keywords; the architecture page is regenerated from the tree (six layers, current file and
+  line counts, include order, the geometry layer, the dependency direction and the
+  curved-wall part of the boundary-condition map).
+- The suite counts are taken from the one committed full-suite record, `test/README.md`
+  (207 gate files), and the same numbers are quoted in the top-level READMEs.
+- The public documentation no longer cites the untracked engineering record. The only
+  pointer left is the documentation-map row that says the record is maintainer material and
+  is not tracked; this restates the reference strip of the code, test and benchmark comments
+  in the documentation set.
 - The Maxwell stress update is deviatoric and co-rotational: the strain rate is projected
   onto its deviatoric part, the old stress is rotated with `dt (W tau - tau W)` before the
   backward-Euler relaxation, and the two changes together move the stress fixed point from
@@ -144,7 +197,7 @@ public release: earlier development happened in a private repository.
   the ASPECT constitutive card, and the ASPECT comparison kit in `aspect_runs/realistic/`:
   the `.prm` inputs, the small C++ plugin for ASPECT 2.5, and the analysis scripts.
 - The user documentation: README, quickstart, guide, examples, validation, FAQ, and the
-  engineering record in `docs/dev/`.
+  private engineering record kept with the development repository.
 
 ### Changed
 
@@ -165,8 +218,8 @@ public release: earlier development happened in a private repository.
   run from a clean checkout.
 - The Blankenbach 2b wall record: the level-4 family span is 0.22 percent (was stated as
   0.04), and the pre-`266a656` level-3 rows are kept as a labelled historical row.
-- Source comments that named note files by old paths were repointed at the volumes in
-  `docs/dev/` that absorbed them.
+- Source comments that named note files by old paths were repointed at the volumes of the
+  engineering record that absorbed them.
 
 ### Removed
 

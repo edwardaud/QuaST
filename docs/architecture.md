@@ -1,35 +1,38 @@
 # Architecture
 
-`src/` is a single Julia module. `src/QuaST.jl` is its body: it fixes the include order and the export list, and every other file is loaded by it. The eight folders hold 85 Julia files and 22 331 lines; `QuaST.jl` is the eighty-sixth file, with 233 lines. The discrete objects are Taylor–Hood `p`/`p - 1` pairs on Gauss–Legendre–Lobatto nodes, integrated with Gauss–Legendre quadrature at `p + 2` points per direction and no mass lumping; the default is `p = 2`. The tree is organized by the object a file acts on: the grid knows nothing about the rheology, and the rheology knows nothing about the Stokes solver. The five layers below are a second reading of the same tree; they order the code by what may call what.
+`src/` is a single Julia module. `src/QuaST.jl` is its body: it fixes the include order and the export list, and every other file is loaded by it. The eight folders hold 89 Julia files and 31 617 lines; `QuaST.jl` is the ninetieth file, with 265 lines. The discrete objects are Taylor–Hood `p`/`p - 1` pairs on Gauss–Legendre–Lobatto nodes, integrated with Gauss–Legendre quadrature at `p + 2` points per direction and no mass lumping; the default is `p = 2`. The tree is organized by the object a file acts on: the grid knows nothing about the rheology, and the rheology knows nothing about the Stokes solver. The six layers below are a second reading of the same tree; they order the code by what may call what.
 
-## The five layers
+The package needs one external dependency, `HDF5.jl` (0.17.4, pinned by `Project.toml` and the committed `Manifest.toml`), for the checkpoints. The other entries in `Project.toml` are the standard library: the module body imports `LinearAlgebra`, `SparseArrays` and `Printf`, the test runner imports `Test`, and the test and benchmark scripts use `Random`; `SHA` is declared as well.
+
+## The six layers
 
 | Layer | What it owns | Where it lives |
 |---|---|---|
-| Data and mathematical primitives | GLL nodes, weights and the Gauss–Legendre rule; the reference element; the 2:1-balanced quadtree; the scalar `Q_p` space, its mass matrix and its hanging-node constraints; point evaluation; inter-mesh transfer; the threading helpers | `core/` except `poisson.jl` |
-| Discretization | The weak forms and the discrete objects built from them: the Taylor–Hood reference-element matrices and leaf assembly, the quadrature divergence and compressibility blocks, the boundary-traction face load, the matrix-free velocity stiffness, the `SemStokes` state, the BDF2 energy operator and its entropy-viscosity field, the gradient-jump indicator | `stokes/` (state, assembly, operators, `kop.jl` and `apply.jl`), `physics/` (`energy_assembly.jl`, `energy.jl`, `entropy_viscosity.jl`), `amr/indicator.jl`, `core/poisson.jl` |
+| Data and mathematical primitives | GLL nodes, weights and the Gauss–Legendre rule; the reference element; the 2:1-balanced quadtree; the scalar `Q_p` space, its mass matrix and its hanging-node constraints; point evaluation; inter-mesh transfer; the threading helpers; the named finite/positive input guards | `core/` except `geometry.jl` and `poisson.jl` |
+| Geometry and mapping | The geometry interface `AbstractGeometry` and its four concrete types: the identity-mapped `CartesianBox`, the validation maps `AffineBox` and `CurvedBox`, and the 2-D polar `PolarAnnulus`; the global map, its analytic inverse and its derivatives; the leaf and face metrics; the logical boundary registry; the geometry identity a checkpoint records; the geometry-dependent conductive base state | `core/geometry.jl`, `physics/annulus_base.jl` |
+| Discretization | The weak forms and the discrete objects built from them: the Taylor–Hood reference-element matrices and leaf assembly, the quadrature divergence and compressibility blocks, the boundary-traction face load, the matrix-free velocity stiffness, the `SemStokes` state, the BDF2 energy operator and its entropy-viscosity field, the gradient-jump indicator — all evaluated through the geometry's metrics | `stokes/` (state, assembly, operators, `kop.jl` and `apply.jl`), `physics/` (`energy_assembly.jl`, `energy.jl`, `entropy_viscosity.jl`), `amr/indicator.jl`, `core/poisson.jl` |
 | Linear solvers | The `:auto` selector, the sparse direct saddle with its shift ladder, the multigrid hierarchy with its V-cycle, cached levels and pressure block, and the Krylov solver around it | `stokes/` (`selector.jl`, `direct.jl`, `diag.jl`, the solve paths), `mg/` |
-| Physics | The parameter card, the viscosity laws and their derivatives, the Drucker–Prager and weak-zone branches, the phase transitions and their latent heat, the reference state and equation of state, the Maxwell kernels and regime diagnostics, strain weakening | `physics/` except the three discretization files |
+| Physics | The parameter card, the viscosity laws and their derivatives, the Drucker–Prager and weak-zone branches, the phase transitions and their latent heat, the reference state and equation of state, the Maxwell kernels and regime diagnostics, strain weakening | `physics/` except the three discretization files and `annulus_base.jl` |
 | Driver and services | The time loop and the per-step nonlinear solvers, the AMR step of the loop and the driver-owned diagnostics snapshot, the `eta_ref` and Maxwell reports, the balanced AMR policy, the HDF5 checkpoint and its configuration codec, the acceptance diagnostics | `driver/`, `amr/` except `indicator.jl`, `io/`, `diagnostics/` |
 
-A file belongs to the discretization layer when it assembles, applies or evaluates a discrete operator, or holds the state of one. It belongs to the physics layer when it states a material or thermodynamic relation on its arguments. A folder groups files by the object they act on, so one folder can feed more than one layer: `stokes/` and `physics/` each feed two layers, `amr/` gives its indicator to the discretization layer and its policy to the driver layer, and `core/` holds the primitives with one verification operator beside them.
+A file belongs to the discretization layer when it assembles, applies or evaluates a discrete operator, or holds the state of one. It belongs to the physics layer when it states a material or thermodynamic relation on its arguments. It belongs to the geometry layer when it defines the map between the logical reference square and physical space, or a quantity that depends on that map (a metric, a wall normal, the base state of a mapped domain); the layer is separate from the primitives because a leaf metric is a property of the map, not of the tree. A folder groups files by the object they act on, so one folder can feed more than one layer: `stokes/` and `physics/` each feed two layers, the geometry layer takes one file from `core/` and one from `physics/`, `amr/` gives its indicator to the discretization layer and its policy to the driver layer, and `core/` holds the primitives, the geometry layer and one verification operator.
 
 ## The folders
 
 | Folder | Files | Lines | Layer | What belongs there |
 |---|---:|---:|---|---|
-| `core/` | 11 | 2 223 | 1, and `poisson.jl` in 2 | GLL and quadrature, `FEData`, the quadtree with its face table and balancer, `SemQuad` with its constraints, point evaluation, transfer, threading |
-| `physics/` | 23 | 4 372 | 4, and three files in 2 | `Params` and the material laws, yielding, weak zones, phases and latent heat, reference state and EOS, Maxwell kernels, weakening, the energy assembly and step, entropy viscosity |
-| `stokes/` | 13 | 5 283 | 2 and 3 | `SemStokes`, the reference-element and variable-viscosity assembly, the boundary-traction load, the matrix-free operator, the direct solve, the Jacobi diagonal, the `:auto` selector, the solve entry points |
-| `mg/` | 9 | 3 446 | 3 | The hierarchy, the level cache, the V-cycle, the pressure block, the BFBT diagonal, the inner solves and FGMRES |
-| `amr/` | 9 | 1 847 | 5, and `indicator.jl` in 2 | The gradient-jump indicator, the leaf primitives and hard budget, the coarsening gate and plan, the balanced cycle, the cooldown, the hooks and wall refinement |
-| `driver/` | 14 | 3 936 | 5 | `run_semquad_simulation`, the Picard and Newton paths, the strain-rate and Maxwell driver state, the Maxwell and `eta_ref` reports, the restart guard, the driver-owned diagnostics snapshot (`run_diagnostics.jl`), the AMR step of the loop (`amr_step.jl`), the history row |
-| `io/` | 4 | 452 | 5 | The HDF5 checkpoint, its configuration codec, the cooldown datasets and the tree rebuild |
-| `diagnostics/` | 2 | 772 | 5 | The acceptance quantities — wall Nusselt numbers, Vrms, mean temperature, work and dissipation, the energy budget — and the consistent boundary flux |
+| `core/` | 13 | 5 501 | 1, `geometry.jl` in 2, `poisson.jl` in 3 | GLL and quadrature, `FEData`, the finite/positive input guards, the quadtree with its face table and balancer, the geometry interface with its map, metrics and boundary registry, `SemQuad` with its constraints, point evaluation, transfer, threading |
+| `physics/` | 24 | 5 674 | 5, `annulus_base.jl` in 2, three files in 3 | `Params` and the material laws, yielding, weak zones, phases and latent heat, reference state and EOS, the annulus radial base state, Maxwell kernels, weakening, the energy assembly and step, entropy viscosity |
+| `stokes/` | 14 | 7 725 | 3 and 4 | `SemStokes`, the reference-element and variable-viscosity assembly, the boundary-traction load, the curved-wall constraint rows and rigid-mode analysis, the matrix-free operator, the direct solve, the Jacobi diagonal, the `:auto` selector, the solve entry points |
+| `mg/` | 9 | 3 662 | 4 | The hierarchy, the level cache, the V-cycle, the pressure block, the BFBT diagonal, the inner solves and FGMRES |
+| `amr/` | 9 | 2 134 | 6, and `indicator.jl` in 3 | The gradient-jump indicator, the leaf primitives and hard budget, the coarsening gate and plan, the balanced cycle, the cooldown, the hooks and wall refinement |
+| `driver/` | 14 | 4 861 | 6 | `run_semquad_simulation`, the Picard and Newton paths, the strain-rate and Maxwell driver state, the Maxwell and `eta_ref` reports, the restart guard, the driver-owned diagnostics snapshot (`run_diagnostics.jl`), the AMR step of the loop (`amr_step.jl`), the history row |
+| `io/` | 4 | 468 | 6 | The HDF5 checkpoint, its configuration codec (including the geometry identity), the cooldown datasets and the tree rebuild |
+| `diagnostics/` | 2 | 1 592 | 6 | The acceptance quantities — wall Nusselt numbers, Vrms, mean temperature, work and dissipation, the energy budget — and the consistent boundary flux |
 
-The counts are Julia files and their lines; each folder also carries a `README.md`.
+The counts are Julia files and their line counts (`wc -l`); each folder also carries a `README.md`.
 
-Outside the module are the `examples/` cards, the `test/` gates and their runner, the `benchmarks/` timings, the `scripts/` campaign and documentation tools, and the `aspect_runs/` inputs and plugin. None of them is loaded by `QuaST`; the Julia ones call it, and `aspect_runs/` belongs to the other code in the comparison.
+Outside the module are the `examples/` cards, the `test/` gates and their runner, the `benchmarks/` timings and the archived benchmark-evidence records in `benchmarks/results/`, the `scripts/` campaign and documentation tools, and the `aspect_runs/` inputs and plugin. None of them is loaded by `QuaST`; the Julia ones call it, and `aspect_runs/` belongs to the other code in the comparison.
 
 ## Include order
 
@@ -37,16 +40,18 @@ Outside the module are the `examples/` cards, the `test/` gates and their runner
 
 ```text
 physics/     revision tosi_law refstate params constitutive phase
-core/        gll fe quadtree quadtree_table quadtree_balance semquad
-             parallel constraints poisson eval transfer
+core/        gll guards fe quadtree quadtree_table quadtree_balance geometry
+physics/     annulus_base
+core/        semquad parallel constraints poisson eval transfer
 amr/         leaf_ops indicator
 physics/     latent entropy_viscosity energy_assembly energy eta_weak_zone
              eta_plastic eta_laws eta maxwell_kernels maxwell_band
-             maxwell_regime maxwell_reference maxwell_force
-             maxwell_softening viscoelastic weakening phase_buoyancy
+             maxwell_regime maxwell_reference maxwell_force maxwell_softening
+             viscoelastic weakening phase_buoyancy
 amr/         cooldown coarsen_gate coarsen_plan cycle
 stokes/      state selector direct assembly kop apply diag solve_const
-             assembly_var solve_var_core solve_var_fallback solve_var operators
+             assembly_var wall_constraints solve_var_core solve_var_fallback
+             solve_var operators
 mg/          hierarchy levelcache build vcycle pressure bfbt saddle s1solve gmres
 amr/         wall_refine amr_pass hooks
 driver/      strain_rate picard_control picard newton_tangent step_newton
@@ -56,9 +61,11 @@ io/          checkpoint_cooldown checkpoint_config checkpoint_tree checkpoint
 diagnostics/ global flux
 ```
 
-The two `physics/` blocks are not a duplication. The first holds the type layer: `TosiLaw` and `SemRefState` are field types of `Params` in `physics/params.jl`, so `tosi_law.jl` and `refstate.jl` precede `params.jl`, and `constitutive.jl` and `phase.jl` follow it because their methods annotate `pr::Params`. `physics/revision.jl` opens the sequence: it is a bare constant with no dependencies. The second block holds the rest of the physics: the energy assembly and step, the laws that take a `SemQuad`, and the Maxwell kernels.
+The opening `physics/` block holds the type layer: `TosiLaw` and `SemRefState` are field types of `Params` in `physics/params.jl`, so `tosi_law.jl` and `refstate.jl` precede `params.jl`, and `constitutive.jl` and `phase.jl` follow it because their methods annotate `pr::Params`. `physics/revision.jl` opens the sequence: it is a bare constant with no dependencies. The second `physics/` block holds the rest: the energy assembly and step, the laws that take a `SemQuad`, and the Maxwell kernels.
 
-Three further seams are visible. `physics/entropy_viscosity.jl` precedes `physics/energy_assembly.jl`, whose `evg` argument is annotated `SEMEVGlobals`. The `amr/` hooks block follows `stokes/` because `semquad_amr_passes!` names `SemStokes` in its signature. `driver/run_diagnostics.jl` follows every producer because its field types are read from the producer Refs at include time (`typeof(LAST_SEMSTOKES_RESID_SPLIT[])` and three more), and `driver/amr_step.jl` and `driver/run.jl` follow it. The blocks otherwise follow the layers: primitives, then the operators and laws, then the solvers, then the hooks and the driver.
+The geometry layer interrupts the `core/` block for a reason. `core/geometry.jl` follows the quadtree because `CartesianBox(qt)` names `Quadtree`, and it must precede `core/semquad.jl`, whose constructors call the geometry accessors. `physics/annulus_base.jl` follows `core/geometry.jl` because its methods dispatch on the concrete geometry types and extend the base-state functions of `physics/refstate.jl`; nothing else constrains its position, because nothing earlier calls it at definition time. `core/guards.jl` has no dependency at all and is included as early as possible, right after `core/gll.jl`.
+
+Three further seams are visible. `physics/entropy_viscosity.jl` precedes `physics/energy_assembly.jl`, whose `evg` argument is annotated `SEMEVGlobals`. The `amr/` hooks block follows `stokes/` because `semquad_amr_passes!` names `SemStokes` in its signature. `driver/run_diagnostics.jl` follows every producer because its field types are read from the producer Refs at include time (`typeof(LAST_SEMSTOKES_RESID_SPLIT[])` and three more), and `driver/amr_step.jl` and `driver/run.jl` follow it. The blocks otherwise follow the layers: primitives, then the geometry, then the operators and laws, then the solvers, then the hooks and the driver.
 
 ## The dependency direction
 
@@ -69,23 +76,25 @@ Apart from the accepted cycles below, the calls between layers run down and not 
 | `driver/` | every other layer | nothing calls the driver |
 | `amr/` | `core/`; `stokes/` in `amr_pass.jl`, which rebuilds `SemStokes` after a cycle | assembles no operator |
 | `mg/` | `stokes/` for the matrix-free operator, `core/` | no physics, and no direct factorization of the fine saddle |
-| `stokes/` | `core/`; `mg/` for the preconditioner; the material closures handed in by the driver | does not build `Params` and does not own the time step |
-| `physics/` | `core/` in the files that evaluate or assemble a field | assembles no Stokes block |
-| `io/` | `core/` for the tree rebuild | writes no frames and no history; the case scripts do |
-| `diagnostics/` | `core/`, the card it reads, and the solved fields | changes no state |
+| `stokes/` | `core/`; the geometry layer for every leaf and face metric; `mg/` for the preconditioner; the material closures handed in by the driver | does not build `Params` and does not own the time step |
+| `physics/` | `core/` in the files that evaluate or assemble a field; the geometry layer in `annulus_base.jl` | assembles no Stokes block |
+| geometry layer (`core/geometry.jl`, `physics/annulus_base.jl`) | `core/` for the tree and the reference element; `physics/` for `Params` and the base-state functions in `annulus_base.jl` | defines a map and its metrics; never assembles, solves or integrates |
+| `io/` | `core/` for the tree rebuild; the geometry layer for the identity it records | writes no frames and no history; the case scripts do |
+| `diagnostics/` | `core/`, the geometry it evaluates the wall functionals on, the card it reads, and the solved fields | changes no state |
 
 ## The boundary-condition implementation map
 
-The boundary conditions cross four files, one per layer. The card holds the data and checks it, the Stokes core turns it into constraints and a pressure gauge, the variable-viscosity assembly integrates the traction data, and the driver hands the card's fields to the solve.
+The boundary conditions cross five files, and the geometry layer decides which form the constraint has. The card holds the data and checks it, the Stokes core turns it into constraints and a pressure gauge, the curved-wall kernel writes the mapped rows, the variable-viscosity assembly integrates the traction data, and the driver hands the card's fields to the solve.
 
 | Part | File | What it does |
 |---|---|---|
 | Card API and validation | `physics/params.jl` | `Params` carries `bc` (`:free` or `:rigid`), the per-wall condition tuple `wall_bc`, and the per-wall data `wall_u`, `wall_un`, `wall_t` and `wall_tn`. The constructor resolves `:same` against `bc`. It refuses a value on a wall where the constraint would silently drop it, the all-open pure-traction configuration, and a configuration that leaves a rigid translation unconstrained. |
 | Constraint construction, pressure gauge and refusals | `stokes/solve_var_core.jl` | Resolves the tuple, writes the Dirichlet values into `fixed` (the normal value from `wall_un`, the tangential one from `wall_u` on a `:rigid` wall only; an `:open` wall writes nothing), builds the constraint matrix, and pins one pressure dof iff no wall is `:open`, recording the choice in `LAST_SEMSTOKES_PRESSURE_GAUGE`. With an open wall it runs the 3x3 rigid-mode Gram test on the actual Dirichlet dof set; with every wall closed it runs the net-flux guard on the prescribed normal data. It refuses `:schur_cg` and `:lagged` on an open wall. |
+| Curved-wall rows and the rigid-mode projection | `stokes/wall_constraints.jl` | On a mapped geometry a free-slip wall is the linear relation `n . u = g`, a moving rigid wall prescribes the wall-frame velocity `u = un n + ut tau`, and an open wall writes no velocity row; the wall-frame data are `u . n` and `u . tau` there, not global components. The file also assembles the Gram matrix of the three rigid modes, pins one velocity dof when a solid-body rotation is the only admissible nullspace (the free-slip ring), projects the returned velocity to zero net angular momentum, and refuses any other nullspace with the motion named. |
 | Boundary-face load | `stokes/assembly_var.jl` | `_semquad_boundary_traction!` integrates the tangential (`wall_t`) and normal (`wall_tn`) traction data over the wall faces into the unreduced load vector, so the constraint matrix projects the load onto the admissible test space. `_semquad_validate_wall_traction` and `_semquad_validate_wall_tnormal` repeat the wall-type checks for direct library calls. |
 | Driver hand-off | `driver/run.jl` | Passes `pr.bc`, `pr.wall_bc`, `pr.wall_u`, `pr.wall_un`, `pr.wall_t` and `pr.wall_tn` to `solve_semquad_stokes_var` in `solve_flow!`. The per-step Newton path refuses any non-default per-wall field, because it solves the single-`bc` problem. |
 
-Every per-wall entry defaults to `nothing` and `wall_bc` to `:same`, so a card that sets none of them follows the closed-wall path unchanged.
+Every per-wall entry defaults to `nothing` and `wall_bc` to `:same`, so a card that sets none of them follows the closed-wall path unchanged; the geometry layer is what makes the box case a set of Cartesian dof rows and the annulus case the wall-frame relations above.
 
 ## The three deliberate cycles
 
@@ -132,7 +141,7 @@ run_semquad_simulation                              driver/run.jl
        └─ save_semquad_state                        io/checkpoint.jl
 ```
 
-1. The step starts by copying the start-of-step temperature and weakening field, then enters the Picard loop (`pic_mode = :picard`, up to `maxpic` iterations; one on the production card). Each iteration calls `solve_flow!`, which builds the viscosity closure: temperature from the current iterate, the strain rate from the current velocity for the stress-dependent laws, the weak-zone factor, the `eta/eta_ref` normalization, and the Maxwell effective viscosity when the shear modulus is positive. It then assembles the vertical buoyancy `Ra theta` plus the phase anomaly and calls `solve_semquad_stokes_var`, which resolves `:auto` before assembly, runs the direct or multigrid path, and publishes the residual and the chosen path in the `LAST_SEMSTOKES_*` records. The driver snapshots those records and compares the residual with `stokes_tol`; on a miss it writes the identifying numbers and aborts the step.
+1. The step starts by copying the start-of-step temperature and weakening field, then enters the Picard loop (`pic_mode = :picard`, up to `maxpic` iterations; one on the production card). Each iteration calls `solve_flow!`, which builds the viscosity closure: temperature from the current iterate, the strain rate from the current velocity for the stress-dependent laws, the weak-zone factor, the `eta/eta_ref` normalization, and the Maxwell effective viscosity when the shear modulus is positive. Every metric it uses — the leaf height in the depth laws, the wall normals, the buoyancy direction — comes from the geometry. It then assembles the vertical buoyancy `Ra theta` plus the phase anomaly and calls `solve_semquad_stokes_var`, which resolves `:auto` before assembly, runs the direct or multigrid path, and publishes the residual and the chosen path in the `LAST_SEMSTOKES_*` records. The driver snapshots those records and compares the residual with `stokes_tol`; on a miss it writes the identifying numbers and aborts the step.
 2. On the first iteration the CFL block updates `dt` from the maximum velocity and the smallest leaf height. The update sits inside the loop because the AMR pass zeroes the velocity, so an end-of-step update could only shrink `dt`.
 3. `solve_semquad_energy` assembles the mass, stiffness, advection and source blocks for the temperature with the velocity just solved, adds the entropy-viscosity diffusion, the latent apparent capacity and the radiogenic decay, and applies the variable-step BDF2 update. With strain weakening on, one BDF2 transport for the weakening field follows the same pattern.
 4. The Picard loop compares the new temperature with its iterate, under-relaxes, and stops below `pic_tol`; the optional trial rejection restores the previous flow state and halves the relaxation. `pic_mode = :newton` replaces the loop with a damped Newton on the coupled per-step residual (`driver/step_newton.jl`, `driver/newton_tangent.jl`), takes a snapshot after it, and falls back to Picard if the Newton fails.

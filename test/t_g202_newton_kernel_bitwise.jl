@@ -8,15 +8,48 @@
 #       tree, same push order) — equality is bitwise (`==` on Float64),
 #   (b) `sys.Kp` (the Drucker-Prager block, same treatment of `dp_coef`) against
 #       the same kind of reference,
-#   (c) SHA-256 fingerprints of `K, B, Kgeo, Kp, Kred, fv` recorded in the
-#       pre-fix worktree (`/tmp/ms_base`, commit 8b08af3, generator: this file
-#       with `G202_SNAPSHOT=1`), so a future change to the loop that keeps the
+#   (c) the value of `K, B, Kgeo, Kp, Kred, fv` against the pre-fix recording:
+#       in process (serial vs 4-block-threaded assembly), as l2 fingerprints at
+#       1e-12 relative, and -- only on the recording stack, under
+#       `QUAST_BITWISE_PINS=1`, batch P3 -- as raw-byte SHA-256 fingerprints
+#       recorded in the pre-fix worktree (`/tmp/ms_base`, commit 8b08af3,
+#       generator: this file with `G202_SNAPSHOT=1`), so a change that keeps the
 #       value but changes the order is caught as well,
 #   (d) the inferred types that the fix restored: `gc`/`deta_q` are `Float64`.
 using Test, QuaST, LinearAlgebra, SparseArrays, SHA
 
 const _G202_Z2 = (x, y) -> 0.0
 const SNAPSHOT = get(ENV, "G202_SNAPSHOT", "") == "1"
+
+# ---------------------------------------------------------------------------
+# P3 portability (batch P3, task 1).  Block (c) used to pin six raw-byte
+# SHA-256 digests recorded in the pre-fix worktree.  Raw Float64 bytes are only
+# reproducible on the recording stack (libm/BLAS/Julia build; see
+# docs/dev/AUDIT_GATES.md §5.2).  The default path is portable:
+#
+#   * (a)/(b) keep the verbatim pre-fix loops and are bitwise in process;
+#   * in process, the serial assembly and the 4-contiguous-leaf-block assembly
+#     (`assemble_threads=4`, the production S4 discipline) must agree to
+#     1e-12 relative (measured 0.0 for every block and for fv);
+#   * the pre-restructure values are kept as l2 fingerprints in `G202_REF` with
+#     a 1e-12 relative band (>=1e4x the measured round-off; a real defect is
+#     >=O(1e-2) -- the 1e-6 perturbation control below is rejected).  The l2
+#     band is a magnitude lock; a magnitude-preserving sign change is caught by
+#     the env-gated byte pins, not here.
+#
+# The exact regression lock stays available:
+# `QUAST_BITWISE_PINS=1 julia --project=. --threads=8 test/run_gates.jl
+#  t_g202_newton_kernel_bitwise.jl` runs the original six byte pins.
+const QUAST_BITWISE_PINS = get(ENV, "QUAST_BITWISE_PINS", "") == "1"
+
+g202_rel(a, b) = norm(a - b) / max(norm(b), 1.0e-300)
+g202_rel_norm(n, r) = abs(n - r) / max(abs(r), 1.0e-300)
+
+# Pre-restructure l2 fingerprints (the pre-fix SHA pins are reproduced bit for
+# bit by this tree, so these ARE the pre-fix values).  Kgeo/Kp are not listed:
+# (a)/(b) already pin them bitwise against the verbatim pre-fix loops.
+const G202_REF = (K=55505.54777749606, B=0.9084225236537682,
+                  Kred=39919.06503036601, fv=6855.861836965361)
 
 _h202(v::Vector{Int}) = bytes2hex(sha256(collect(reinterpret(UInt8, v))))
 _h202(v::Vector{Float64}) = bytes2hex(sha256(collect(reinterpret(UInt8, v))))
@@ -218,7 +251,33 @@ end
         2.0, false, false, uf, de_fun, 0.0, uf, pv, dp_fun)), :geo_coef) ==
           typeof(de_fun)
 
-    # ---- (c) SHA-256 pins recorded in the pre-fix worktree -----------------
+    # ---- (c) the pre-restructure fingerprints, portably --------------------
+    # (c1) in-process reference: the same assembly cut into 4 contiguous leaf
+    # blocks and concatenated in block order (the production
+    # `assemble_threads>1` discipline) must reproduce the serial assembly.
+    sys4 = solve_semquad_stokes_var(ss, qt, eta_fun, _G202_Z2, fz, _G202_Z2,
+                                    _G202_Z2; bc=pr.bc, linear=:direct,
+                                    deviatoric=false, assemble_only=true,
+                                    geo_u=uf, geo_coef=de_fun,
+                                    dp_u=uf, dp_pfield=pv, dp_coef=dp_fun,
+                                    assemble_threads=4)
+    @test g202_rel(sys4.K.nzval, sys.K.nzval) <= 1.0e-12       # measured 0.0
+    @test g202_rel(sys4.B.nzval, sys.B.nzval) <= 1.0e-12       # measured 0.0
+    @test g202_rel(sys4.Kgeo.nzval, sys.Kgeo.nzval) <= 1.0e-12 # measured 0.0
+    @test g202_rel(sys4.Kp.nzval, sys.Kp.nzval) <= 1.0e-12     # measured 0.0
+    @test g202_rel(sys4.Kred.nzval, sys.Kred.nzval) <= 1.0e-12 # measured 0.0
+    @test g202_rel(sys4.fv, sys.fv) <= 1.0e-12                 # measured 0.0
+    # (c2) portable pre-restructure regression lock: l2 fingerprints at 1e-12.
+    @test g202_rel_norm(norm(sys.K.nzval), G202_REF.K) <= 1.0e-12
+    @test g202_rel_norm(norm(sys.B.nzval), G202_REF.B) <= 1.0e-12
+    @test g202_rel_norm(norm(sys.Kred.nzval), G202_REF.Kred) <= 1.0e-12
+    @test g202_rel_norm(norm(sys.fv), G202_REF.fv) <= 1.0e-12
+    # non-vacuity: a 1e-6 relative change of the block is rejected by the band
+    # (a real coefficient defect is >=O(1e-2); the (a)/(b) verbatim references
+    # pin Kgeo/Kp bitwise, so the band is never the only value evidence).
+    @test g202_rel(sys.K.nzval .* (1.0 + 1.0e-6), sys.K.nzval) > 1.0e-12
+
+    # (c3) the raw-byte pins, available for an exact-stack regression lock.
     pins = ("K" => _h202(sys.K), "B" => _h202(sys.B), "Kgeo" => _h202(sys.Kgeo),
             "Kp" => _h202(sys.Kp), "Kred" => _h202(sys.Kred),
             "fv" => _h202(sys.fv))
@@ -234,7 +293,7 @@ end
         @test length(pins) == 6
         @test all(p -> occursin(r"^[0-9a-f]{64}(/[0-9a-f]{64})*$", last(p)), pins)
         @test all(p -> !isempty(first(p)), pins)
-    else
+    elseif QUAST_BITWISE_PINS
         @test pins[1].second == "a7ab253441e8cd8696c518e513aa29c5384875e42642c668f070e167c038f9a8/967b8aa7c54b2da3377079faf1d18b62e167910216bafcb2d620b1a4ee3e4d9f/c1fb569e7c221d1f85f451708a97859631cf46e25da75e8d6ecdc983c19cb967"
         @test pins[2].second == "5aeb295244d0ea45b9e9cad6bddf7303bfbe86ef2de40d98ccaaf48910c8d4bd/7f9861051ec0a7dc110ad418bcc955abcc7bb8b7d571635b07d136be6930d5ee/bbc380b5d5afed4877a65b6a8cde8d2f3c429886a8957f53aecfcc916a661b23"
         @test pins[3].second == "a7ab253441e8cd8696c518e513aa29c5384875e42642c668f070e167c038f9a8/967b8aa7c54b2da3377079faf1d18b62e167910216bafcb2d620b1a4ee3e4d9f/70d3807cb8495cac1507363324defbc91bfb2b472759af866966449ecb6de1fc"

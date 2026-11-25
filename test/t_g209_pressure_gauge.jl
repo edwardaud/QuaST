@@ -194,9 +194,14 @@ end
         # the historical rung sits on the Schur complement: the pressure is lost
         xh = lu(S + (1.0e-12 * dmax) * I) \ b
         @test norm(xh[5:6]) > 1.0e3 * norm(pe)       # measured 9.1e17
-        # two decades below it: stable, 1 % bias, residual < 1e-6
+        # two decades below it: stable, ~1 % bias, residual < 1e-6.  Measured
+        # (P3 loose-tolerance review, probe_loose.jl): norm(xt[5:6]) =
+        # 1.8384115882021517e6 against the exact 1.8200274723201296e6, i.e.
+        # 1.0101e-2 relative -- the bias is the 1e-14 rung itself, so the band
+        # is 2x the measured bias rather than a solver error (the old 0.05 let
+        # a 4% bias pass; the blow-up control is the 1e3x check above).
         xt = lu(S + (1.0e-14 * dmax) * I) \ b
-        @test isapprox(norm(xt[5:6]), norm(pe); rtol=0.05)   # measured 1.84e6
+        @test isapprox(norm(xt[5:6]), norm(pe); rtol=2.0e-2)   # measured 1.84e6
         @test norm(S * xt - b) / norm(b) < 1.0e-6
         # and the ladder with the default trigger leaves the (healthy)
         # unshifted answer untouched -- bitwise

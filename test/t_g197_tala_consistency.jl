@@ -113,7 +113,14 @@ using Test, QuaST, LinearAlgebra, SparseArrays
     end
     th1 = drift10(q3, prA, zeros(sq.N); dt=1.0e-5)
     th2 = drift10(q3, prA, zeros(sq.N); dt=5.0e-6)
-    @test maximum(abs, th1[inner]) ≈ 2 * maximum(abs, th2[inner]) rtol=0.1
+    # First order in dt: the drift is 10 dt lap(Tad) + O(dt^2), so the ratio is
+    # 2 - O(dt).  Measured (P3 loose-tolerance review, probe_loose.jl):
+    # m1 = 5.7607074607152039e-05, m2 = 2.9151965577425412e-05, ratio
+    # 1.9760957268610932 -> relative error 1.195e-2, i.e. the whole residual is
+    # the un-resolved O(dt) term.  2e-2 is 1.67x that (the old 0.1 let a 9%
+    # first-order error pass); tightening further would only measure the
+    # finite-dt truncation, not a defect.
+    @test maximum(abs, th1[inner]) ≈ 2 * maximum(abs, th2[inner]) rtol=2.0e-2
     lapint = Lam * (semquad_Tad(rs, 0.0) - semquad_Tad(rs, 1.0))
     bud = semquad_heat_budget(sq, q3, prA, th1;
                               ux=zeros(sq.N), uz=zeros(sq.N))

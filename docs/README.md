@@ -14,11 +14,11 @@ This page is the map of the documentation. It lists every document with the ques
 | [Validation](en/validation.md) · [验证](zh/validation.md) | What has been verified, against what, with which measured numbers, and what does the evidence not cover? |
 | [Code and data availability](paper/availability.md) | Where are the code, the archived release and its DOI, the data and the per-number benchmark records, and which licence covers each part? |
 | [FAQ](en/faq.md) · [常见问题](zh/faq.md) | How do I make a specific change once the quick start is behind me? |
-| [Architecture](architecture.md) | How is the code organized into five layers, where do the boundary conditions enter, and where does one time step go? |
+| [Architecture](architecture.md) | How is the code organized into six layers, where do the boundary conditions enter, and where does one time step go? |
 | [English pages](en/README.md) · [中文页面](zh/README.md) | Which user pages exist in this language, and what is each one for? |
 | Engineering record, `docs/dev/` | Why does a default have the value it has, and which measurement settled it? This is maintainer material and is not tracked by this repository. |
 
-The repository records — `CHANGELOG.md`, `CONTRIBUTING.md`, and the `README.md` files under `src/`, `test/`, `examples/`, `benchmarks/`, `scripts/` and `aspect_runs/` — are reference pages of the repository, not pages of this documentation set.
+The repository records — `CHANGELOG.md`, `CONTRIBUTING.md`, and the `README.md` files under `src/`, `test/`, `examples/`, `benchmarks/` (including the per-number provenance records under `benchmarks/results/`), `scripts/` and `aspect_runs/` — are reference pages of the repository, not pages of this documentation set.
 
 ## Reading order
 

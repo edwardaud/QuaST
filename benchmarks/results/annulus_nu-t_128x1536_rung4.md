@@ -42,4 +42,4 @@
   re-run** (1 391 s, 13.7 GB); the GCI above is computed from the recorded values, and the
   steady-state / relaxation-dt uncertainty is separately re-measured on the coarse rung in
   `annulus_steady-dt_L4_relaxation.md`.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.

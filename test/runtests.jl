@@ -211,4 +211,6 @@ using QuaST
     include("t_g286_ev_known_answer.jl")
     include("t_g287_hanging_rigid_wall.jl")
     include("t_g288_constraint_tolerance.jl")
+    # remediation batch P3 (2026-11-26): portable pins, MG convergence criterion
+    include("t_g289_mg_convergence.jl")
 end

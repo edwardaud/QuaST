@@ -180,9 +180,15 @@ end
     @test length(ph) == 2
     @test ph[1].z0 == 0.59 && ph[2].z0 == 0.34
     @test ph[1].width == 0.02 && ph[2].width == 0.02
-    # the design's section-5.3 closed forms for the regional scale set
-    @test isapprox(ph[1].latent, -0.0512; atol=5.0e-4)
-    @test isapprox(ph[2].latent, 0.1053; atol=5.0e-4)
+    # the design's section-5.3 closed forms for the regional scale set.
+    # Measured (P3 loose-tolerance review, out_julia/agent/p3/probe_loose.jl):
+    # latent1 = -0.051193303069090916 (vs -0.0512: 6.70e-6 abs, 1.31e-4 rel)
+    # and latent2 = +0.10528819723636361 (vs +0.1053: 1.18e-5 abs, 1.12e-4
+    # rel) -- the residual is the design's 4-digit rounding of the closed form.
+    # The old common atol 5e-4 was 40-75x looser than needed; the bands below
+    # are 1.5x/1.7x the measured quantisation residual.
+    @test isapprox(ph[1].latent, -0.0512; atol=1.0e-5)
+    @test isapprox(ph[2].latent, 0.1053; atol=2.0e-5)
     # the production trees of the design's section 4.1/6.6
     @test length(regional_tree(3).leaves) == 512
     @test length(regional_tree(4).leaves) == 2048

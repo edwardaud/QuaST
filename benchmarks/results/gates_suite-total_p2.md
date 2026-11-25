@@ -21,4 +21,4 @@
   packaging batch's comment-only documentation-reference strip (mtimes
   02:00-02:33, before this batch's runs); the suite and the nine-hash dump are
   the behavioural evidence that the strip did not change the code's answers.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.

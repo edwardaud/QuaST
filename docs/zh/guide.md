@@ -286,6 +286,32 @@ $$
 
 生产参数卡的默认值是 `eta_ref = 1` ，但它的材料定律在盒内跨越多个数量级，所以内部 Rayleigh 数远高于名义值。报告只在 `eta_ref != 1` 时打印；用同一套约定算出的该卡成熟状态数值是 `eta_interior = 4.280635e-3` 、 `Ra_interior = 2.336102e7` 和 `eta_0 = 2.368635e23 Pa s` （ `Ra` 定义所对应的物理黏度），由此得到物理内部黏度 `1.013926e21 Pa s` 。在标定所用的热内部点（ `T = 1.75` ， `edot_ref` ）上，同一套约定给出 `Ra = 7.84e7` 与 `3.02e20 Pa s` 的黏度。所以 `Ra = 1e5` 这个标签描述的是标定点，而不是内部：引用时要和 `Ra_interior` 一起给出。
 
+### 1.10 第二种几何：二维极坐标圆环
+
+同一套离散也跑在二维极坐标圆环上，驱动用 `geom` 关键字来选择它。 `run_semquad_simulation` 的几何关键字是 `geom`、`annulus_R0`、`annulus_R1`、`annulus_Phi` 与 `annulus_seam`： `geom = :annulus` 用四个形状关键字构造 `PolarAnnulus(R0, R1, Phi; seam = annulus_seam)`；也可以直接传入任意 `AbstractGeometry` 对象，它会原样使用。默认值是已发表的半径 $R\_0 = 1.22$ 、 $R\_1 = 2.22$ 与四分之一楔形（ $\Phi = \pi/2$ ， `seam = :wall` ）；已发表的基准卡为闭合环传入 $\Phi = 2\pi$ 与 `seam = :periodic` 。间隙必须是一， $R\_1 - R\_0 = 1$ ，因为间隙是 `Ra` 与每一条深度律的长度单位：物理闭合取无量纲高度 $h = r - R\_0 \in [0,1]$ 。
+
+周期接缝是拓扑，不是壁面。圆环几何需要 `Quadtree(...; seam = :periodic)` 建出的树并且 $\Phi = 2\pi$ ；同一几何放在有界树上就是楔形或切口环，它的两条径向切割是绝热的对称切割。驱动会拒绝接缝与几何不匹配的树，所以一次运行不会悄悄把壁面换成周期边。圆环上两个圆面是唯一的壁面；楔形上两条径向切割保持绝热。
+
+有三个闭合随几何改变。基态是径向传导解： $H = 0$ 时是对数型 $\bar T(r) = \ln(R\_1/r)/\ln(R\_1/R\_0)$ ， $H \neq 0$ 时再加上 $T'' + T'/r = -H$ 的特解（`src/physics/annulus_base.jl` 里两种形式都有）； $H = 0$ 是基准情形。浮力是径向投影 $+Ra\,\theta\,e\_r$ 。Nusselt 数用逐壁的点式对与对数归一化
+
+$$
+Nu_{wall} = \frac{R_{wall}\lvert\ln f\rvert\,\langle -\partial T/\partial r\rangle}{\Delta T},
+\qquad
+f = R_0/R_1,
+$$
+
+其中 `Nu_T` 是外壁、 `Nu_B` 是内壁。闭合自由滑移环同时带整体旋转规范与节点压力钉。
+
+基准模式是 `examples/annulus_benchmark.jl`。在已发表分辨率上它用松弛模式：很大的固定 `ANN_DT0` 加 `ANN_CFL = 0` 让时间导数可以忽略，于是每次能量求解就是稳态对流–扩散问题，步序列成为 Stokes 与能量方程的 Picard 迭代。停止判据—— $T$ 、 $Nu\_T$ 与 $V\_{RMS}$ 的相对变化在连续 `ANN_WINDOW` 个外层步内低于 `ANN_TOL` ——写在脚本头部。ASPECT 级 $128 \times 1536$ 阶梯的命令是
+
+```bash
+ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_PIC_RELAX=0.5 ANN_TMIN=0 \
+ANN_WINDOW=3 ANN_TSTOP=1e12 ANN_CKPT_DIR=out_julia/ann_ckpt \
+julia --project=. --threads=8 examples/annulus_benchmark.jl 128x1536
+```
+
+[验证](validation.md#二维圆环)给出阶梯、观测阶与 GCI；[算例](examples.md#二维圆环基准)给出更小的阶梯与要对照的数。映射卡会拒绝 `linear = :schur_cg` 或 `:lagged`、`pic_mode = :newton`、`symmetry = :x`、Maxwell 应力历史（ `shear_modulus > 0` ）、参考态、 `rho_multiplier`、笛卡尔 y 方向的 AMR 策略（`top_wall_level`、热点规则、`zero_side_eta`）以及 `nu_cbf`/`extdiag` 历史列； `side_thermal` 必须保持 `:insulating` 。默认盒子卡逐位不变。
+
 ## 2. 边界条件参考
 
 本节是边界条件的唯一参考：壁型、四组数据、牵引的符号约定、派生压力基准、角点归属、每一种被拒绝的配置，以及重启守卫记录了什么。参数名与默认值见 6.1 节，本节不再重复它们；把几种壁型组合成区域入流/出流问题的配方见[算例](examples.md)的区域通道一节。
@@ -393,6 +419,8 @@ $$
 ### 3.1 网格与空间
 
 网格是四叉树。每个叶用 $(\ell,i\_x,i\_y)$ 标记，树始终保持 2:1 平衡，即相邻叶最多相差一级。加密把一个四兄弟拆成四个，粗化把四个合回一个。参数卡把深度限制在 `max_level = 7` ，所以最细的叶高是盒高的 $1/(2\cdot2^{7})=1/256$ 。初始树由 5 × 2 个基础单元各均匀细分三次得到，即均匀的 level 3、共 640 个叶。
+
+网格本身只是拓扑。空间建立在几何层给出的 `AbstractGeometry` 上，有两种生产几何：本算例与盒子基准用的恒等映射 `CartesianBox` ，以及 1.10 节的二维极坐标 `PolarAnnulus` ；`AffineBox` 与 `CurvedBox` 是用来验证映射内核的验证几何。装配用到的每个叶度量、面法向与体积权重都来自这个对象，所以盒子路径保持它的历史算术，映射卡得到映射的解析 Jacobian。
 
 空间离散是 Taylor–Hood 元：速度取 $Q\_p$ ，压力取 $Q\_{p-1}$ ，本卡取 $p=2$ ，即 $Q\_2$ 速度、 $Q\_1$ 压力。节点是参考正方形上的 Gauss–Legendre–Lobatto 点，每个单元上的基函数是这些节点上的 Lagrange 基：速度每方向 $p+1$ 个节点，压力每方向 $p$ 个。单元矩阵用 Gauss–Legendre 求积，每方向取 `p+2` 个点，即 `make_fedata` 的默认 `nq = p + 2` 。这是过积分：它精确积分 $Q\_p$ 的质量矩阵与刚度矩阵。代码不做质量集中，质量矩阵按完整求积组装成一致矩阵而不是对角阵，所以这里没有用 GLL 求积换对角质量矩阵的余地。
 
@@ -643,6 +671,12 @@ $$
 
 | 关键字 | 默认值 | 参数卡 | 作用 |
 |---|---|---|---|
+| `geom` | `CartesianBox(qt)` | `:annulus` 或一个 `AbstractGeometry` | 空间、装配与诊断使用的几何。取 `:annulus` 时用后面四个关键字构造极坐标圆环（见 1.10 节）；传入几何对象则原样使用。 |
+| `annulus_R0`、`annulus_R1` | 1.22、2.22 | 浮点；`R1 - R0 = 1` | 内、外半径。间隙是 `Ra` 与每一条深度律的长度单位。 |
+| `annulus_Phi` | `0.5 * pi` | (0, 2π] 内的浮点 | 角向范围。闭合环需要 $2\pi$ 。 |
+| `annulus_seam` | `:wall` | `:wall`、`:periodic` | 取 `:periodic` 时闭合圆环，要求 `annulus_Phi = 2π` 且树用 `seam = :periodic` 建；取 `:wall` 时是楔形或切口环。 |
+| `annulus_ic` | `:none` | `:none`、`:firedrake`、`:aspect` | 圆环基准的初始温度：`:firedrake` 是 Davies 等（2022）Eq. 41，`:aspect` 是 ASPECT 的扰动；需要 `geom = :annulus` 。 |
+| `steady_vrms` | false | true、false | 把 `V_RMS` 的变化计入稳态停止判据；圆环基准卡把它设为 true。 |
 | `p` | 2 | 2 | 多项式阶：速度 $Q\_p$ ，压力 $Q\_{p-1}$ 。 |
 | `maxsteps` | 10000 | `CASE_STEPS` | 停止的绝对步号。 |
 | `tstop` | 1e-3 | `Inf` | 达到该无量纲时间即停止。 |

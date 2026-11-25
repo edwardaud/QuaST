@@ -37,4 +37,4 @@
   for L5 and below 1 % of the L3-L4 difference for the coarse levels, so the ladder is
   space-dominated. Reproduces the recorded CFL 0.5 ladder (4.936942 / 4.897925 / 4.888163) to
   +1.3e-4 / +2.7e-4 / −6.1e-7 relative; the L5 values agree to the last printed digit.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.

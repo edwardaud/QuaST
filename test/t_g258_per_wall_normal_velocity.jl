@@ -5,12 +5,17 @@
 # could not prescribe a normal velocity on one wall, and there was no `Params`
 # or card knob for it. `Params.wall_un`
 # (four entries, order `(xminus, xplus, yminus, yplus)`) now refines that value
-# per wall; `nothing` keeps the historical global closure, which is what makes
-# the default path bit-identical.
+# per wall; `nothing` keeps the historical global closure, which is what keeps
+# the default path on the historical code path (its portable state check is the
+# tolerance fingerprint of block (a), and the exact bytes are the
+# QUAST_BITWISE_PINS=1 lock).
 #
 # This gate pins:
-#   (a) the pre-change default path, by hashes recorded from the checkout
-#       *before* the feature (stage 1 baseline);
+#   (a) the pre-change default path: the state of two stage-1 baseline driver
+#       runs is compared at 1e-12 relative against l2+signed-sum fingerprints measured from
+#       the checkout *before* the feature (`G258_REF`); the exact raw-byte pins
+#       are the QUAST_BITWISE_PINS=1 branch (batch P3 portability conversion --
+#       see the file header below for the tolerance evidence);
 #   (b) the analytic Couette solution driven through `wall_un` + `wall_u`, and
 #       that it is bitwise the G238 global-closure answer (same fixed data);
 #   (c) per-wall independence: a wall_un on one wall touches only that wall's
@@ -25,10 +30,11 @@
 #       when resumed with another (the marker format itself is pinned by G245).
 #
 # The numbers in (b) are measured; see the comments there for the exact values.
-# The pin in (a) is not tautological: the five constants of each run were
-# produced by the tree with the feature absent, and this file only compares.
+# The lock in (a) is not tautological: the fingerprints were produced by the
+# tree with the feature absent, and this file only compares; the two runs differ
+# from each other and the lid drives the flow (checked in the same block).
 
-using Test, QuaST, SHA
+using Test, QuaST, SHA, LinearAlgebra
 
 # The suite's small unit box: Quadtree(2) fully refined twice -> 8x8 square
 # leaves, which carries corners and non-corner wall nodes for (b)-(e).
@@ -44,15 +50,70 @@ end
 g258_hash(a) = bytes2hex(sha256(reinterpret(UInt8, vec(collect(Float64, a)))))
 g258_zero(x, y) = 0.0
 
+# ---------------------------------------------------------------------------
+# P3 portability (batch P3, task 1).  Block (a) used to pin ten raw-byte
+# SHA-256 digests of two driver states.  Raw Float64 bytes are only reproducible
+# on the recording stack (libm/BLAS/Julia build; docs/dev/AUDIT_GATES.md §5.2),
+# and this is a 2-step driver state at `--threads=8`.  The default path is:
+#
+#   * the pre-change **values** are kept as l2 + signed-sum fingerprints in `G258_REF`,
+#     compared at 1e-12 relative.  The measured noise behind that band: the same
+#     state is byte-identical at 1, 2 and 8 Julia threads (thread-count drift
+#     exactly 0 for this direct-path card), and a 1-ULP change of the law's
+#     `deta_T` (the size of a libm/exp difference between machines) moves the
+#     state by <=2.0e-15 relative and the history by 3.2e-16 (probe
+#     `probe_pins3.jl`); 1e-12 is >=500x that noise and 10 orders below any real
+#     defect (the 1e-6 perturbation control below is rejected; a dropped lid or
+#     a global-closure leak changes ux by O(1)).
+#   * non-vacuity stays as before: the two runs differ and the lid drives the
+#     flow; the wall-data and corner semantics are pinned exactly by (c)/(d).
+#
+# The exact regression lock remains: `QUAST_BITWISE_PINS=1 julia --project=.
+# --threads=8 test/run_gates.jl t_g258_per_wall_normal_velocity.jl` runs the
+# original ten byte pins.
+const QUAST_BITWISE_PINS = get(ENV, "QUAST_BITWISE_PINS", "") == "1"
+
+g258_reln(n, r) = abs(n - r) / max(abs(r), 1.0e-300)
+g258_relv(a, b) = sqrt(sum(abs2, a .- b)) / max(sqrt(sum(abs2, b)), 1.0e-300)
+# l2 + signed sum: the l2 alone is sign-blind for a mirror-symmetric state (a
+# lid moving in -x has the same u l2 as one moving in +x), and the mutation
+# campaign showed exactly that on run B; the signed sum is compared with a
+# tolerance scaled by the state's own l2, so a sign flip of an O(1) field is
+# rejected while an uncorrelated round-off shift of the sum is not.
+g258_pair(v, l2ref, sumref) =
+    max(g258_reln(norm(v), l2ref),
+        abs(sum(v) - sumref) / max(abs(l2ref), 1.0e-300))
+function g258_golden(r, ref)
+    return max(g258_pair(r.theta, ref.theta, ref.theta_sum),
+               g258_pair(r.ux, ref.ux, ref.ux_sum),
+               g258_pair(r.uz, ref.uz, ref.uz_sum),
+               g258_pair(r.pv, ref.pv, ref.pv_sum),
+               g258_pair(reduce(vcat, r.history), ref.hist, ref.hist_sum))
+end
+
+# Pre-change l2+sum fingerprints of the two stage-1 baseline runs (measured on
+# the tree whose byte pins reproduce; identical at 1/2/8 threads).
+const G258_REF = (
+    A=(theta=0.19529806613223943, theta_sum=0.6026243618563805,
+       ux=0.6779372295974183, ux_sum=9.547918011776346e-15,
+       uz=1.7016570964925415, uz_sum=-1.5065910801057707,
+       pv=85.34110357978864, pv_sum=189.41217376179142,
+       hist=37.04986528020379, hist_sum=83.76746076522163),
+    B=(theta=0.0012104427582513469, theta_sum=-5.772977779037666e-7,
+       ux=2.30820339557187, ux_sum=4.537175172081432,
+       uz=0.6389036103670742, uz_sum=-3.3306690738754696e-16,
+       pv=4.872021782343046, pv_sum=-2.8807505038521266,
+       hist=36.40842179341503, hist_sum=79.51400064252805))
+
 @testset "G258 per-wall normal velocity" begin
-    # ---- (a) the default path is bit-identical to the pre-change reference ----
+    # ---- (a) the default path reproduces the pre-change reference ----------
     # Two driver runs on a 16-leaf tree, both exactly as the stage-1 baseline
-    # script ran them (same tree, theta, Params and keywords).  The hashes were
-    # recorded there and are reproduced verbatim only if the whole wall path --
-    # the fixed-dict write order, the u0 lift, the net-flux guard and the solve --
-    # is unchanged.  Run A is the plain free-slip buoyancy card; run B is the
-    # mixed per-wall card with a moving lid from `wall_u`, i.e. the path whose
-    # threading `wall_un` could have disturbed.
+    # script ran them (same tree, theta, Params and keywords): run A is the plain
+    # free-slip buoyancy card, run B the mixed per-wall card with a moving lid
+    # from `wall_u`, i.e. the path whose threading `wall_un` could have disturbed.
+    # The pre-change values are the G258_REF l2 + signed-sum fingerprints at 1e-12 relative
+    # (portable; see the file header for the measured noise); the exact byte
+    # pins are the QUAST_BITWISE_PINS branch below.
     kw = (p=2, tstop=2.0e-3, dt0=1.0e-3, dtmax=1.0e-3, dtmin=1.0e-16,
           amr_every=0, ev=0.0, linear=:direct, maxpic=1, verbose=false,
           mass_form=:boussinesq)
@@ -69,16 +130,7 @@ g258_zero(x, y) = 0.0
     thA = [0.1 * sinpi(x) * sinpi(z) for (x, z) in ssA.su.coords]
     prA = Params(Ra=1.0e3, H=0.0, eta_law=:expT, deta_T=1.0, bc=:free)
     rA = run_semquad_simulation(qtA, prA, thA; kw...)
-    @test g258_hash(rA.theta) ==
-          "51359c4befac180b3ea7f8fb82f42cbdc263a7aee1461faf0c032767f8b96fd0"
-    @test g258_hash(rA.ux) ==
-          "f92e85ee6439d1ba8ee88d8d59a9577b55dc29e9b967185fe0901ea56683bc3f"
-    @test g258_hash(rA.uz) ==
-          "c50e5e15f08b39e9882b2bd0cb143e78d9068b9262893a3388677b86141f3930"
-    @test g258_hash(rA.pv) ==
-          "77a6db263391a424c84f05e3d060495097e31f5fc794348ed327bf8626854c91"
-    @test g258_hash(reduce(vcat, rA.history)) ==
-          "4079e2e621d437460833aba96974b1247fbe4bd2fbbb14295e31e612381bc02d"
+    @test g258_golden(rA, G258_REF.A) <= 1.0e-12
 
     qtB = g258_driver_tree()
     ssB = make_semstokes(qtB, 2)
@@ -87,20 +139,35 @@ g258_zero(x, y) = 0.0
                  wall_bc=(:free, :free, :free, :rigid),
                  wall_u=(nothing, nothing, nothing, (x, y) -> 1.0))
     rB = run_semquad_simulation(qtB, prB, thB; kw...)
-    @test g258_hash(rB.theta) ==
-          "4cda5ddb4685b67e12d3993c0cad1621784dc54e18dd367471edee792eb62cb6"
-    @test g258_hash(rB.ux) ==
-          "ac74fb469bb6b100a0610cbbfb586719b81137333d82e773de9a8746ad9f3108"
-    @test g258_hash(rB.uz) ==
-          "bcaf3dca77535cabac2962b75485f6dbd7923c96e3771180f8142e884dc212e5"
-    @test g258_hash(rB.pv) ==
-          "500fec4bb77d3adc3c2a03606a3eeaf0972537817db8fc1a5250c16538c2e928"
-    @test g258_hash(reduce(vcat, rB.history)) ==
-          "c66ef70a507e25cdefa74e8a266a887649af7aec10bd61dc7a26dba187491ae4"
+    @test g258_golden(rB, G258_REF.B) <= 1.0e-12
     # non-vacuous: the two reference runs are different, and the lid actually
-    # drives the flow that run B pins (a zeroed ux would make the hash trivial)
-    @test g258_hash(rB.ux) != g258_hash(rA.ux)
+    # drives the flow that run B pins (a zeroed ux would make the check trivial);
+    # a 1e-6 relative change of the state is rejected by the 1e-12 band.
+    @test any(rB.ux .!= rA.ux)
     @test maximum(abs, rB.ux) > 0.1
+    @test g258_relv(rA.uz .* (1.0 + 1.0e-6), rA.uz) > 1.0e-12
+    if QUAST_BITWISE_PINS
+        @test g258_hash(rA.theta) ==
+              "51359c4befac180b3ea7f8fb82f42cbdc263a7aee1461faf0c032767f8b96fd0"
+        @test g258_hash(rA.ux) ==
+              "f92e85ee6439d1ba8ee88d8d59a9577b55dc29e9b967185fe0901ea56683bc3f"
+        @test g258_hash(rA.uz) ==
+              "c50e5e15f08b39e9882b2bd0cb143e78d9068b9262893a3388677b86141f3930"
+        @test g258_hash(rA.pv) ==
+              "77a6db263391a424c84f05e3d060495097e31f5fc794348ed327bf8626854c91"
+        @test g258_hash(reduce(vcat, rA.history)) ==
+              "4079e2e621d437460833aba96974b1247fbe4bd2fbbb14295e31e612381bc02d"
+        @test g258_hash(rB.theta) ==
+              "4cda5ddb4685b67e12d3993c0cad1621784dc54e18dd367471edee792eb62cb6"
+        @test g258_hash(rB.ux) ==
+              "ac74fb469bb6b100a0610cbbfb586719b81137333d82e773de9a8746ad9f3108"
+        @test g258_hash(rB.uz) ==
+              "bcaf3dca77535cabac2962b75485f6dbd7923c96e3771180f8142e884dc212e5"
+        @test g258_hash(rB.pv) ==
+              "500fec4bb77d3adc3c2a03606a3eeaf0972537817db8fc1a5250c16538c2e928"
+        @test g258_hash(reduce(vcat, rB.history)) ==
+              "c66ef70a507e25cdefa74e8a266a887649af7aec10bd61dc7a26dba187491ae4"
+    end
 
     # the defaults of the public surface
     @test Params().wall_un == (nothing, nothing, nothing, nothing)

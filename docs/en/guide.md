@@ -286,6 +286,32 @@ When `eta_ref != 1` the driver reports the convention, once at the first flow so
 
 The production card's default is `eta_ref = 1`, but its material law varies by orders of magnitude across the box, so the interior Rayleigh number is far above the nominal one. The report prints only for `eta_ref != 1`; the convention's numbers at the card's developed state are `eta_interior = 4.280635e-3`, `Ra_interior = 2.336102e7` and `eta_0 = 2.368635e23 Pa s`, the physical viscosity that `Ra` is defined with, which puts the physical interior viscosity at `1.013926e21 Pa s`. At the calibration's hot interior point (`T = 1.75`, `edot_ref`) the same convention gives `Ra = 7.84e7` and a viscosity of `3.02e20 Pa s`. The label `Ra = 1e5` therefore describes the calibration point, not the interior: quote both.
 
+### 1.10 The second geometry: the 2-D polar annulus
+
+The same discretization runs on the 2-D polar annulus, which the driver selects with the `geom` keyword. The geometry keywords of `run_semquad_simulation` are `geom`, `annulus_R0`, `annulus_R1`, `annulus_Phi` and `annulus_seam`: `geom = :annulus` builds `PolarAnnulus(R0, R1, Phi; seam = annulus_seam)` from the four shape keywords, and any `AbstractGeometry` object is accepted unchanged. The defaults are the published radii $R\_0 = 1.22$, $R\_1 = 2.22$ and a quarter wedge ($\Phi = \pi/2$, `seam = :wall`); the published benchmark card passes $\Phi = 2\pi$ and `seam = :periodic` for the closed ring. The gap must be one, $R\_1 - R\_0 = 1$, because the gap is the length unit of `Ra` and of every depth law: the physics closures take the nondimensional height $h = r - R\_0 \in [0,1]$.
+
+The periodic seam is topology, not a wall. A ring geometry needs a tree built with `Quadtree(...; seam = :periodic)` and $\Phi = 2\pi$; the same geometry on a bounded tree is the wedge or the cut ring, whose radial cuts are insulating symmetry cuts. The driver refuses a tree whose seam does not match the geometry, so a run cannot silently exchange a wall for a periodic edge. On the ring the two circles are the only walls; on the wedge the radial cuts stay insulating.
+
+Three closures change with the geometry. The base state is the radial conduction solution: for $H = 0$ it is the logarithmic $\bar T(r) = \ln(R\_1/r)/\ln(R\_1/R\_0)$, and for $H \neq 0$ the particular solution of $T'' + T'/r = -H$ is added (`src/physics/annulus_base.jl` carries both forms); $H = 0$ is the benchmark case. The buoyancy is the radial projection $+Ra\,\theta\,e\_r$. The Nusselt numbers are the per-wall pointwise pair with the logarithmic normalisation
+
+$$
+Nu_{wall} = \frac{R_{wall}\lvert\ln f\rvert\,\langle -\partial T/\partial r\rangle}{\Delta T},
+\qquad
+f = R_0/R_1,
+$$
+
+where `Nu_T` is the outer wall and `Nu_B` the inner one. The closed free-slip ring also carries the solid-body-rotation gauge together with the nodal pressure pin.
+
+The benchmark mode is `examples/annulus_benchmark.jl`. At the published resolution it uses the relaxation mode: a large fixed `ANN_DT0` with `ANN_CFL = 0` makes the time derivative negligible, so each energy solve is the steady advection-diffusion problem and the step sequence becomes the Stokes/energy Picard iteration. The stop criterion — relative changes of $T$, $Nu\_T$ and $V\_{RMS}$ below `ANN_TOL` for `ANN_WINDOW` consecutive outer steps — is stated in the script header. The command for the ASPECT-like $128 \times 1536$ rung is
+
+```bash
+ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_PIC_RELAX=0.5 ANN_TMIN=0 \
+ANN_WINDOW=3 ANN_TSTOP=1e12 ANN_CKPT_DIR=out_julia/ann_ckpt \
+julia --project=. --threads=8 examples/annulus_benchmark.jl 128x1536
+```
+
+[Validation](validation.md#the-2-d-cylindrical-annulus) gives the ladder, the observed order and the GCI; [examples](examples.md#the-2-d-annulus-benchmark) gives the smaller rungs and the numbers to check. The mapped card refuses `linear = :schur_cg` or `:lagged`, `pic_mode = :newton`, `symmetry = :x`, a Maxwell stress history (`shear_modulus > 0`), a reference state, `rho_multiplier`, the Cartesian-y AMR policies (`top_wall_level`, the hotspot rules, `zero_side_eta`) and the `nu_cbf`/`extdiag` history columns; `side_thermal` must stay `:insulating`. The default box card is unchanged bit for bit.
+
 ## 2. Boundary conditions
 
 This section is the single reference for the boundary conditions: the four wall types, the four data arrays and their sign conventions, the traction convention, the derived pressure gauge, the corner rule, every refused configuration, and what the restart guard records. Section 6.1 lists the names and defaults of the knobs; this section does not repeat them.
@@ -367,6 +393,8 @@ A checkpoint stores `wall_bc` as its four values, and stores `wall_u`, `wall_un`
 ### 3.1 Mesh and spaces
 
 The mesh is a quadtree. A leaf is `(level, ix, iy)`, and the tree stays 2:1 balanced: face neighbors differ by at most one level. Refinement splits a quartet of siblings; coarsening merges one. The case caps depth at `max_level = 7`, which puts the finest leaf at $1/256$ of the box height, and caps the leaf count at `max_leaves = 10000`. The initial tree is uniform level 3 with 640 leaves.
+
+The mesh alone is only the topology. The space is built on an `AbstractGeometry` from the geometry layer, and there are two production geometries: the identity-mapped `CartesianBox` used by this case and the box benchmarks, and the 2-D polar `PolarAnnulus` of section 1.10; `AffineBox` and `CurvedBox` are the validation maps the mapped kernels are gated on. Every leaf metric, face normal and volume weight the assembly uses comes from that object, so the box path keeps its historical arithmetic and a mapped card gets the map's analytic Jacobians.
 
 Velocity and pressure form a Taylor–Hood pair: velocity in $Q\_p$ , pressure in $Q\_{p-1}$ , with `p = 2` on this case, so $Q\_2$ velocity and $Q\_1$ pressure. Both are continuous nodal bases on the Gauss–Legendre–Lobatto (GLL) points of the reference square, $p+1$ nodes per direction for velocity and $p$ for pressure. The element integrals use Gauss–Legendre quadrature with `p+2` points per direction, the default `nq = p + 2` of `make_fedata`, which over-integrates the $Q\_p$ mass and stiffness matrices exactly. There is no mass lumping: the mass matrices are the full consistent ones, so GLL quadrature would gain nothing and is not used.
 
@@ -574,6 +602,12 @@ The defaults are the library defaults; the case column is the value `case_realis
 
 | Keyword | Default | Case | Effect |
 |---|---|---|---|
+| `geom` | `CartesianBox(qt)` | `:annulus` or an `AbstractGeometry` | The geometry the space, the assembly and the diagnostics use. `:annulus` builds the polar annulus from the next four keywords (section 1.10); a geometry object is used unchanged. |
+| `annulus_R0`, `annulus_R1` | 1.22, 2.22 | floats; `R1 - R0 = 1` | Inner and outer radius. The gap is the length unit of `Ra` and of every depth law. |
+| `annulus_Phi` | `0.5 * pi` | float in (0, 2π] | Angular extent. The closed ring needs $2\pi$. |
+| `annulus_seam` | `:wall` | `:wall`, `:periodic` | `:periodic` closes the ring and requires `annulus_Phi = 2π` and a tree built with `seam = :periodic`; `:wall` is the wedge or the cut ring. |
+| `annulus_ic` | `:none` | `:none`, `:firedrake`, `:aspect` | The annulus benchmark's initial temperature: `:firedrake` is Davies et al. (2022) Eq. 41 and `:aspect` the ASPECT perturbation; requires `geom = :annulus`. |
+| `steady_vrms` | false | true, false | Include the change of `V_RMS` in the steady-state stop criterion; the annulus benchmark card sets it to true. |
 | `p` | 2 | 2 | Polynomial order: velocity $Q\_p$ , pressure $Q\_{p-1}$ . |
 | `maxsteps` | 10000 | mode default, `CASE_STEPS` overrides | Absolute step number to stop at. |
 | `tstop` | 1e-3 | `Inf` | Stop at this nondimensional time. |

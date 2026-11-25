@@ -33,4 +33,4 @@
   recorded L3-L5 ladder's GCI (0.56 %) is the quoted uncertainty. Each run reaches its plateau
   (last-10 % drift +1.9e-4, −2.7e-5, −2.7e-5 relative on `Nu_top`). L5 (16 384 leaves, ~35 min at
   CFL=20 in this budget) was **not re-run**; its recorded log is archived as `logs/recorded_1b_L5.log`.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.

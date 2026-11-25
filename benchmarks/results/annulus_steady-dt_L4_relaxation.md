@@ -70,4 +70,4 @@
   `logs/annulus_a16_dt1e3_r08.log` (sha256 `96f7f3b47a367eeae201f7d084bf1b49910d93f9e3d9b4de1e4ac0efbdf0939a` (567 bytes), the non-converged 0.8 run).
 - **Status.** `verified` — all settings listed converge to the same fixed point and the
   reproductions of the recorded 32×384 / 16×192 ladder values agree to ≤1e-6.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.

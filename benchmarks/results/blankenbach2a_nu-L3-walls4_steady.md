@@ -45,4 +45,4 @@
 - **Status.** `verified` (published rung reproduced; uniform study measured); **no GCI for the
   quoted non-uniform rung**, uniform-card GCI 2.88 % / 1.21 % labelled as such. Plateaus: the
   last-10 % drift on `Nu_top` is +8e-5 (published rung), ≤2e-4 (uniform levels).
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.

@@ -318,7 +318,12 @@ end
         # a full energy solve with a prescribed bottom flux: the inner circle
         # carries `q` per unit measure (integral q*2πR0) and the Dirichlet
         # outer wall the opposite total.  The pointwise GLL flux differs from
-        # the reaction by the measured O(h) family difference.
+        # the reaction by the measured O(h) family difference.  Measured (P3
+        # loose-tolerance review, run log g279 of the loose-gates probe): f_in
+        # rel 5.786e-3, f_out rel 3.004e-3 against target 2.2996458224277285,
+        # i.e. the residual is the wall-derivative discretisation of this
+        # fixed mesh; the bands below are 1.6x/1.7x those values (the old 1e-2
+        # let a 9e-3 definition error pass).
         prf = Params(Ra=100.0, H=0.0, eta_law=:expT, bc=:free,
                      wall_bc=(:free, :free, :free, :free))
         z = zeros(Float64, sq.N)
@@ -328,8 +333,8 @@ end
         f_out, _ = QuaST._semquad_wall_flux(g, sq, th, :xplus)
         println("G279 D4 flux solve: inner=", f_in, " outer=", f_out,
                 " target=", q * 2 * pi * R0)
-        @test f_in ≈ q * 2 * pi * R0 rtol = 1.0e-2
-        @test f_out ≈ -q * 2 * pi * R0 rtol = 1.0e-2
+        @test f_in ≈ q * 2 * pi * R0 rtol = 9.0e-3     # measured 5.786e-3
+        @test f_out ≈ -q * 2 * pi * R0 rtol = 5.0e-3   # measured 3.004e-3
         @test abs(f_in + f_out) <= 1.0e-2 * (q * 2 * pi * R0)
     end
 

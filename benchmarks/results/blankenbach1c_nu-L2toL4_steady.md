@@ -35,4 +35,4 @@
   (23.687756 / 23.037486) to +6.6e-5 and +2.6e-5 relative. L5 (16 384 leaves, ~2.5 h at
   CFL=20 in this budget) was **not re-run**; its recorded value is archived in
   `logs/recorded_1c_L5.log`.
-- **Recorded.** 2026-11-26, batch P2 part 1; campaign record `docs/dev/BUG_FIX_LOG.md` §15.
+- **Recorded.** 2026-11-26, batch P2 part 1; the raw log is archived beside this record.
