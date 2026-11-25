@@ -328,9 +328,15 @@ load integrates `t.n`/`t.tau` with the mapped outward normal and positive
 tangent, the fixed-dof loop evaluates the Dirichlet closures at the mapped
 wall-node positions, and the net-flux check/perimeter use the mapped face
 measure.  A mapped space therefore supports `linear=:direct`, `:mg` and `:auto`
-(the selector samples the eta contrast on the mapped domain); `:schur_cg` and
-`:lagged` keep the box reference-matrix / stale-LU gauge assumptions and are
-refused with an actionable message.  **stage 0.5b2** lifted the wall-kind restriction: a mapped geometry supports
+(the selector samples the eta contrast on the mapped domain).  `:schur_cg` and
+`:lagged` are refused as a **gate-coverage restriction**, not because their
+mapped path is known wrong: the stage-0.5 fix campaign's scratch-worktree
+measurement (`docs/dev/BUG_FIX_LOG.md`, F6) lifted the guard and found the
+mapped saddle solved by both paths, the annulus state agreeing with `:direct`
+to 1e-12 relative for `:lagged` (whose stale factor is keyed on the *mapped*
+assembled saddle through `_saddle_key(qt, geom, ...)`) and to the Schur-CG
+iteration tolerance for `:schur_cg`.  The refusal can be lifted when a mapped
+gate for those paths lands in the suite.  **stage 0.5b2** lifted the wall-kind restriction: a mapped geometry supports
 `:free`, `:rigid` and `:open` walls.  On a mapped wall the data are the
 **wall-frame** components: a `:free` wall is the linear constraint
 `u.n = wall_un` (or 0; zero tangential traction is natural), a `:rigid` wall is

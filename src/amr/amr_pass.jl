@@ -246,9 +246,10 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
         # (a')+(b')+(d'): relative coarsening, budget exchange, hysteresis.
         # The exchange has to be able to trade on every pass, so the coarsen
         # fraction is not zeroed after pass 1.  The box branch is the historical
-        # call (no `geom` keyword), so the box path's keyword container keeps its
-        # concrete types and the box path allocates exactly the historical
-        # amount (measured in the cut-6 A/B).
+        # call body (no mapped `protect`/strip bodies), so the box path's
+        # arithmetic is unchanged; stage-0.5 audit D5 makes `geom` a required
+        # keyword and the box branch passes its already-concrete geometry, so no
+        # default `CartesianBox` object is constructed.
         if g isa CartesianBox
             n, nc0, _nex = amr_cycle_balanced!(qt, eta;
                         refine_frac=refine_frac, coarsen_frac=coarsen_frac,
@@ -256,9 +257,9 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                         symmetry=symmetry, protect=protect,
                         wall_min_level=wall_min_level, wall_strip=wall_strip,
                         cooldown=cool, hysteresis_cycles=amr_hysteresis,
-                        coarsen_gate=amr_coarsen_gate)
+                        coarsen_gate=amr_coarsen_gate, geom=g)
             refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
-                                symmetry=symmetry)
+                                symmetry=symmetry, geom=g)
         else
             n, nc0, _nex = amr_cycle_balanced!(qt, eta;
                         refine_frac=refine_frac, coarsen_frac=coarsen_frac,

@@ -214,7 +214,7 @@ end
             refine!(qt, lf)
         end
         balance!(qt)
-        refine_wall_to_min!(qt, wall; strip=0.1)
+        refine_wall_to_min!(qt, wall; geom=CartesianBox(qt), strip=0.1)
         balance!(qt)
         return qt
     end

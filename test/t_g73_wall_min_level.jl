@@ -20,7 +20,7 @@ end
 @testset "G73 wall minimum level" begin
     qt = uniform_tree(2)
     n0 = length(qt.leaves)
-    nr = refine_wall_to_min!(qt, 4; strip=0.1)
+    nr = refine_wall_to_min!(qt, 4; geom=CartesianBox(qt), strip=0.1)
     @test nr > 0
     @test length(qt.leaves) > n0
     bad = 0
@@ -37,8 +37,8 @@ end
 
     qt2 = uniform_tree(2)
     n2 = length(qt2.leaves)
-    @test refine_wall_to_min!(qt2, 0) == 0
+    @test refine_wall_to_min!(qt2, 0; geom=CartesianBox(qt2)) == 0
     @test length(qt2.leaves) == n2
 
-    @test_throws ArgumentError refine_wall_to_min!(uniform_tree(2), 3; strip=0.6)
+    @test_throws ArgumentError refine_wall_to_min!(uniform_tree(2), 3; geom=CartesianBox(uniform_tree(2)), strip=0.6)
 end

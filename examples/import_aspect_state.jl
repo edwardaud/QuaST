@@ -274,11 +274,11 @@ function build_tree(a::AspField; max_leaves::Int=10000, wall_min::Int=5,
         theta = zeros(Float64, sq.N)
         interp_state!(theta, nothing, nothing, sq, a)
         eta = semquad_gradient_jump(sq, qt, theta)
-        amr_cycle_balanced!(qt, eta; refine_frac=refine_frac,
+        amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=refine_frac,
                             coarsen_frac=coarsen_frac,
                             max_level=amr_max_level,
                             max_leaves=max_leaves, symmetry=symmetry)
-        refine_wall_to_min!(qt, wall_min; strip=wall_strip, symmetry=symmetry)
+        refine_wall_to_min!(qt, wall_min; geom=CartesianBox(qt), strip=wall_strip, symmetry=symmetry)
         symmetry === :x && mirror_close!(qt; max_level=amr_max_level)
         balance!(qt; symmetry=symmetry)
         eta_cap = copy(eta)

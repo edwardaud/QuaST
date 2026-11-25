@@ -24,7 +24,7 @@ end
     uz = [0.3 * sq.coords[i][1] - 0.2 * sq.coords[i][2] for i in 1:sq.N]
 
     eta = semquad_gradient_jump(sq, qt, theta)
-    nr, _, _ = amr_cycle_balanced!(qt, eta; refine_frac=0.3, coarsen_frac=0.0)
+    nr, _, _ = amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=0.3, coarsen_frac=0.0)
     @test nr > 0
     @test max_face_level_jump(qt) <= 1
 

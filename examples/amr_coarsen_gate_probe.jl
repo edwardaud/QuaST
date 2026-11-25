@@ -241,7 +241,7 @@ function trace(ckpt::String)
         v0, mj0 = violations(qt)
 
         # ---- phase 1: the AMR cycle ---------------------------------------
-        nr, nc, nex = amr_cycle_balanced!(qt, eta; refine_frac=REFINE,
+        nr, nc, nex = amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=REFINE,
                                           coarsen_frac=COARSEN,
                                           hysteresis=HYSPARAM,
                                           max_level=qt.maxlevel,
@@ -286,7 +286,7 @@ function trace(ckpt::String)
         v1, mj1 = violations(qt)
 
         # ---- phase 2: wall refinement -------------------------------------
-        nref_wall = MS.refine_wall_to_min!(qt, WALLMIN; strip=WALLSTRIP,
+        nref_wall = MS.refine_wall_to_min!(qt, WALLMIN; geom=CartesianBox(qt), strip=WALLSTRIP,
                                            symmetry=SYMMETRY)
         n2 = length(qt.leaves)
         res_wall = n2 - n1 - 3 * nref_wall

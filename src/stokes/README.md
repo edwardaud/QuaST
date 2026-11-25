@@ -95,8 +95,14 @@ rule, with the historical matrix-free kernel kept as a separate family:
 
 A mapped space now supports `linear=:direct`, `:mg` (sparse and matrix-free
 operators) and `:auto` (the selector's eta-contrast sampler covers the mapped
-domain); `:schur_cg` and `:lagged` stay box-only (reference-matrix / stale-LU
-gauge assumptions) and are refused with an actionable message.  G271 is the
+domain).  `:schur_cg` and `:lagged` are refused as a **gate-coverage
+restriction**, not because their mapped path is known wrong: the stage-0.5 fix
+campaign measured both in a scratch worktree with the guard lifted (annulus
+ring state vs `:direct`: 1e-12 relative for `:lagged`, whose stale-LU factor is
+the mapped assembled saddle keyed by `_saddle_key(qt, geom, ...)`; the
+`:schur_cg` agreement equals its iteration tolerance) — see
+`docs/dev/BUG_FIX_LOG.md`, F6.  The refusal is lifted when a mapped gate for
+those paths lands.  G271 is the
 mapped operator/hierarchy gate: mapped sparse `K` vs the mapped matrix-free
 apply (≤1e-12), mapped `:mg` vs mapped `:direct` (≤1e-6), two geometries on one
 tree giving two operators/caches/hierarchies and a zero-allocation warm apply,

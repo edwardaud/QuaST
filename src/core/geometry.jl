@@ -308,9 +308,14 @@ end
 """
     logical_map(g, S, T) -> (x, y)
 
-The global map from logical `(S,T) in [0,Lx] x [0,1]` to physical coordinates.
-This is the only place a geometry defines its map; every mapped point in the
-solver goes through it (directly or through `element_map`).
+The global map from the **global logical** coordinate `(S,T) in [0,1] x [0,1]`
+to physical coordinates.  `S`/`T` are the normalised logical coordinates
+`element_map` builds from the leaf reference point; the geometry performs its
+own physical scaling, and for the box that scaling is `x = g.Lx*S` — i.e. a
+caller must pass `S in [0,1]`, never a physical-like `Lx*S` (the stage-0.5
+audit's D1 defect, `src/mg/pressure.jl` `semquad_eta_contrast`).  This is the
+only place a geometry defines its map; every mapped point in the solver goes
+through it (directly or through `element_map`).
 """
 @inline function logical_map(g::CartesianBox, S::Float64, T::Float64)
     return (g.Lx * S, T)

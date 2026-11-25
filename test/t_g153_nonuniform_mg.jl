@@ -22,7 +22,7 @@ function _g153_wall_tree(level::Int, wall::Int; cx::Int=5, cy::Int=2,
         refine!(qt, lf)
     end
     balance!(qt)
-    refine_wall_to_min!(qt, wall; strip=strip)
+    refine_wall_to_min!(qt, wall; geom=CartesianBox(qt), strip=strip)
     balance!(qt)
     return qt
 end

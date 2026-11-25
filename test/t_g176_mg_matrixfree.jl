@@ -169,7 +169,7 @@ end
         refine!(qtw, lf)
     end
     balance!(qtw)
-    refine_wall_to_min!(qtw, 4; strip=0.1)
+    refine_wall_to_min!(qtw, 4; geom=CartesianBox(qtw), strip=0.1)
     balance!(qtw)
     @test length(unique(lf[1] for lf in qtw.leaves)) > 1
     ssw = make_semstokes(qtw, 2)

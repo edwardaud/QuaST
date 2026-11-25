@@ -102,7 +102,7 @@ const LAST_AMR_BALANCED = Ref((refined=0, coarsened=0, exchanged=0, n=0, want=0,
                         max_leaves=typemax(Int), symmetry=:none,
                         protect=Set(), wall_min_level=0, wall_strip=0.1,
                         cooldown=nothing, hysteresis_cycles=1,
-                        coarsen_cells=nothing, coarsen_gate=true)
+                        coarsen_cells=nothing, coarsen_gate=true, geom)
 
 One AMR cycle of the balanced policy (docs/dev/AMR.md §3-§5), the only adaptive
 policy.  Returns `(refined, coarsened, exchanged)` in leaves, and records the
@@ -123,11 +123,19 @@ and the mirror quartet (`symmetry=:x`) passes the same test.  `coarsen_cells`
 caps the leaves dropped per cycle (default `round(coarsen_frac * n)`).
 
 The wall strip is a **physical distance from the Dirichlet walls** (stage 0 cut
-6): `geom` (default the box) selects the criterion -- the historical Cartesian
-`y` rows on the box, the physical `height` and `nu_wall_sides` of a mapped
-geometry through [`_amr_in_wall_strip`](@ref).  The refinement and coarsening
-thresholds themselves are geometry-independent: they consume the indicator
-dictionary, whose mapped body is physical.
+6): `geom` selects the criterion -- the historical Cartesian `y` rows on the
+box, the physical `height` and `nu_wall_sides` of a mapped geometry through
+[`_amr_in_wall_strip`](@ref).  The refinement and coarsening thresholds
+themselves are geometry-independent: they consume the indicator dictionary,
+whose mapped body is physical.
+
+**`geom` is required** (stage-0.5 audit defect D5: the default was
+`CartesianBox(qt)`, so a caller holding a mapped tree silently ran the box wall
+criterion -- on an annulus ring the logical `y` direction is the periodic seam,
+not the circles).  The tree stores no geometry, so every caller must state it:
+box callers pass `CartesianBox(qt)` (the driver passes its own concrete
+geometry), mapped callers the mapped geometry.  Omitting it raises an
+`ArgumentError`.
 
 `coarsen_gate` (default `true`) adds deal.II's `coarsening_allowed()` pre-check
 (`docs/dev/AMR.md`, `docs/dev/AMR.md` §4): a
@@ -155,7 +163,15 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
                              hysteresis_cycles::Int=1,
                              coarsen_cells::Union{Nothing,Int}=nothing,
                              coarsen_gate::Bool=true,
-                             geom::AbstractGeometry=CartesianBox(qt))
+                             geom::Union{Nothing,AbstractGeometry}=nothing)
+    geom === nothing &&
+        throw(ArgumentError("amr_cycle_balanced! now requires the geometry: " *
+                            "pass geom=CartesianBox(qt) for a box tree, or the " *
+                            "mapped geometry the tree belongs to (the quadtree " *
+                            "does not store it, and defaulting to the box " *
+                            "silently applied the logical y wall criterion — the " *
+                            "periodic seam on an annulus ring — instead of the " *
+                            "physical walls; stage-0.5 audit defect D5)."))
     symmetry in (:none, :x) ||
         throw(ArgumentError("symmetry must be :none or :x"))
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))

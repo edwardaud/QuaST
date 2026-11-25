@@ -571,8 +571,11 @@ end
                                        _G271_Z2, _G271_Z2, _G271_Z2;
                                        bc=:rigid, linear=:auto) isa Tuple
         @test QuaST.LAST_SEMSTOKES_AUTO_CHOICE[].choice in (:direct, :mg)
-        # `:schur_cg` / `:lagged` stay refused for a mapped space, with the
-        # actionable message (not a silent box-body run)
+        # `:schur_cg` / `:lagged` are refused for a mapped space, with the
+        # actionable message (not a silent box-body run).  Since the stage-0.5
+        # fix campaign (audit F6) the stated reason is gate coverage, not a
+        # claimed box assumption; the message must say so and name the mapped
+        # alternatives.
         for lin in (:schur_cg, :lagged)
             err = try
                 solve_semquad_stokes_var(ss, qt, (x, y) -> 1.0, _G271_Z2,
@@ -585,7 +588,8 @@ end
             @test err isa ArgumentError
             msg = sprint(showerror, err)
             @test occursin("mapped geometry", msg)
-            @test occursin("box", msg)
+            @test occursin("no mapped gate", msg)
+            @test occursin("linear=:direct", msg)
         end
         # mapped `linear=:auto` must be able to resolve to the mapped MG: above
         # the selector's crossover (2*Nu+Np >= 2000, contrast 1) it picks :mg,

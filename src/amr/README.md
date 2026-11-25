@@ -39,10 +39,20 @@ The design's §6.8 physical-vs-logical decision is measured in G272 (c).  The
 (`_amr_in_wall_strip` / `_amr_wall_leaf` in `leaf_ops.jl`, using `height` and
 `nu_wall_sides`; the box methods are the historical Cartesian-`y` predicates).
 They consume the physical indicator, so the strip and the protect set are where
-the estimator's units matter.  The cycle, wall refinement and
-`wall_graded_tree` take an optional `geom` (default the box) and their box call
-sites are the historical ones, so the box path is bitwise and allocates exactly
-what it did before the cut (G272 (e), the dump, the A/B).
+the estimator's units matter.  The cycle and wall refinement **require** the
+geometry (stage-0.5 fix campaign, audit defect D5): their old
+`geom=CartesianBox(qt)` default silently applied the logical-`y` criterion to a
+caller holding a mapped tree — on an annulus ring that refines the periodic
+seam, not the circles (measured in the audit: 16 refined leaves on the seam
+against 32 on the circles) — and the tree stores no geometry, so no default can
+be right.  Box call sites pass `CartesianBox(qt)` (the driver passes its
+currently concrete geometry object, so no default object is constructed and the
+box branch keeps its allocation); a caller that omits the keyword gets an
+`ArgumentError` naming the geometry.  `wall_graded_tree` still takes an
+optional `geom` (default the box) because it is a tree *builder* whose callers
+own the geometry they are about to attach.  The box call sites are the
+historical ones, so the box path is bitwise and allocates exactly what it did
+before the cut (G272 (e), G279, the dump, the A/B).
 
 Stage 0.5c1 (the periodic ring) matters to the adaptive layer in two places.
 The **gradient-jump indicator** iterates the logical pair list, which on a ring

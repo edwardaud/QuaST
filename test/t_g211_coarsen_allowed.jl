@@ -133,7 +133,7 @@ end
             @test all(k -> k in qt.leaves, protect)
             eta = Dict{NTuple{3,Int},Float64}(lf => (lf in low ? 0.0 : 1.0)
                                              for lf in qt.leaves)
-            nr, nc, nex = amr_cycle_balanced!(qt, eta; refine_frac=0.0,
+            nr, nc, nex = amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=0.0,
                                              coarsen_frac=0.5, max_level=5,
                                              max_leaves=16, symmetry=:none,
                                              protect=protect,
@@ -186,7 +186,7 @@ end
         n0 = length(q.leaves)
         eta = Dict{NTuple{3,Int},Float64}(lf => (lf[2] < 2 ? 0.0 : 1.0)
                                           for lf in q.leaves)
-        nr, nc, _ = amr_cycle_balanced!(q, eta; refine_frac=0.0,
+        nr, nc, _ = amr_cycle_balanced!(q, eta; geom=CartesianBox(q), refine_frac=0.0,
                                         coarsen_frac=0.5, max_level=6,
                                         max_leaves=n0 - 6, symmetry=:x,
                                         protect=Set{NTuple{3,Int}}(),
@@ -225,7 +225,7 @@ end
                     eta[lf] = rand(rng)^2 *
                               exp(-2.0 * (lf[3] + 0.5) / (qq.ny0 * (1 << lf[1])))
                 end
-                amr_cycle_balanced!(qq, eta; refine_frac=0.25,
+                amr_cycle_balanced!(qq, eta; geom=CartesianBox(qq), refine_frac=0.25,
                                     coarsen_frac=0.08, max_level=7,
                                     max_leaves=900, symmetry=:x,
                                     protect=g211_rows(qq), cooldown=cool,

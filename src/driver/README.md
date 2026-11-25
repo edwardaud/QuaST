@@ -42,8 +42,12 @@ annulus must run `:none`), the Cartesian-y AMR policies (`top_wall_level`,
 `hotspot_*`, `zero_side_eta`), the per-step Newton
 path, the Maxwell stress history (the advance is mapped but its elastic force
 load into the Stokes right-hand side is still the cut-2 box-only kernel), and
-the Cartesian-y reference-state / density-hook physics wiring.  `:schur_cg`/`:lagged` stay box-only
-for their reference-matrix / stale-LU gauge assumptions.  The history row of a
+the Cartesian-y reference-state / density-hook physics wiring.  `:schur_cg`/`:lagged` are refused as a **gate-coverage restriction**, not a
+known defect: the stage-0.5 fix campaign's scratch-worktree measurement found
+both mapped paths solving the annulus ring to the same state as `:direct`
+(1e-12 relative for `:lagged`, whose stale-LU factor is the *mapped* assembled
+saddle keyed by `_saddle_key(qt, geom, ...)`; `:schur_cg` to its iteration
+tolerance) — `docs/dev/BUG_FIX_LOG.md`, F6.  The history row of a
 mapped run is the mapped diagnostics: G270 runs the driver on both validation
 geometries with heating off/on, the CBF and exact-residual columns on, and the
 latent-heat closure path, and closes the time-step CBF energy budget identity of
@@ -66,10 +70,17 @@ temperature and the depth argument through the geometry
 (`semquad_base_T(pr,geom,x,y)`/`height(geom,x,y)`), so the annulus uses the
 radial log/H base state and `r - R0`.  The annulus card requires
 `R1 - R0 = 1` (the gap is the physics length unit), `side_thermal=:insulating`
-(the wedge cuts are symmetry cuts, not Cartesian side walls) and refuses the
-box-only `nu_cbf`/`extdiag` diagnostics and, through the mapped-geometry block,
-the reference state, density hook, `symmetry=:x`, per-step Newton and
-`:periodic` seam.  Stage 0.5b1 ran `:rigid` walls only; **stage 0.5b2 lifts
+(the wedge cuts are symmetry cuts, not Cartesian side walls) and keeps the
+`nu_cbf`/`extdiag` **history columns** out of the annulus run as a
+definition/units choice (both diagnostics are mapped now — see
+`src/diagnostics/README.md` — but the published annulus Nusselt definition is
+the per-wall pointwise pair the annulus history carries), and, through the
+mapped-geometry block, the reference state, the density hook, `symmetry=:x`,
+per-step Newton and `linear=:schur_cg`/`:lagged` (a gate-coverage restriction;
+a scratch-worktree measurement found those two paths correct on the annulus
+ring, `docs/dev/BUG_FIX_LOG.md` F6).  The **periodic seam** is *not* refused:
+stage 0.5c1 implemented the closed ring and it is accepted (see below).
+Stage 0.5b1 ran `:rigid` walls only; **stage 0.5b2 lifts
 that**: a `:free` wall is the general curved-wall row `n.u = 0` (zero normal
 velocity, natural zero tangential traction), a `:rigid` wall takes the
 wall-frame data `wall_un = u.n`/`wall_u = u.tau`, and `:open` walls use the

@@ -350,7 +350,23 @@ function semquad_mean_T(sq::SemQuad, qt::Quadtree, theta::Vector{Float64},
     return s / total_area(qt)
 end
 
-"""Energy Nusselt number 1 + H/2 + <u_z theta> on the quadtree."""
+"""
+    semquad_nu_energy(sq, qt, pr, theta, ux, uz) -> Float64
+
+Energy Nusselt number `1 + H/2 + <u·grad h θ>` — the volume-mean convective
+heat-flux functional in Nusselt units, with `u_z` on the box and
+`upward_velocity(g,x,y,ux,uz) = u.grad h` on a mapped geometry, normalised by
+`total_area(qt)` (box, bit for bit) resp. `total_measure(g, sq)` (mapped).
+
+It is **not** the wall Nusselt pair of the benchmark: it is an auxiliary
+volume-mean quantity, it is not a history column in any run (box or mapped),
+and its annulus value is not the published benchmark Nu.  The mapped body
+existed since cut 4 but was ungated until the stage-0.5 fix campaign's G279
+(the audit's B2 row found the body correct and only the `GEOM_PROGRESS`
+sentence "stays box-normalised" stale); G279 pins the box/identity-map bitwise
+equality, the annulus conduction value `1 + H/2`, and a manufactured annulus
+state against the analytic `1 + H/2 + <θ>`.
+"""
 function semquad_nu_energy(sq::SemQuad, qt::Quadtree, pr::Params,
                            theta::Vector{Float64}, ux::Vector{Float64},
                            uz::Vector{Float64})
@@ -728,8 +744,25 @@ Leaf-level histogram plus the finest level in the wall strips (`y <= strip` or
 `y >= 1-strip`) and in the interior.  This is the cheap "is the AMR actually
 tracking the boundary layer?" diagnostic: for a wall-refined tree
 `wall_max > interior_max`, for a uniform tree they are equal.
+
+This signature is the **box-tree** wall claim: the strips are the logical `y`
+rows, which the quadtree does not know are physical walls.  A periodic-seam
+tree (an annulus ring) is refused (stage-0.5 audit defect B3) — on one it
+reports `wall_max = 1` where the mapped method reports `wall_max = 0` — and a
+mapped geometry must use the geometry-aware
+[`semquad_level_stats`](@ref)`(g, qt; strip)` method.  A bounded mapped tree (a
+wedge) cannot be detected (the tree stores no geometry); the box signature is
+documented as the logical-`y` claim for that case.
 """
 function semquad_level_stats(qt::Quadtree; strip::Float64=0.1)
+    qt.seam === :none ||
+        throw(ArgumentError("semquad_level_stats(qt) is the box-tree wall " *
+                            "claim (the strips are the logical y rows, which " *
+                            "are not physical walls on a mapped topology) and " *
+                            "a periodic-seam tree is not a box tree.  Use the " *
+                            "geometry-aware method: " *
+                            "semquad_level_stats(g, qt; strip=$strip) " *
+                            "(stage-0.5 audit defect B3)."))
     hist = Dict{Int,Int}()
     wall_max = 0
     interior_max = 0
@@ -1296,7 +1329,9 @@ end
 Mapped method of [`semquad_level_stats`](@ref): a leaf is in a wall strip when
 its **physical height** extent lies inside `h <= strip` (bottom) or
 `h >= 1-strip` (top), tested on the four mapped leaf corners.  The box method
-above keeps its historical physical-`y` leaf test (E16).
+above keeps its historical physical-`y` leaf test (E16); this is the method a
+mapped caller must use (the box signature refuses a periodic-seam tree with an
+actionable message, stage-0.5 audit defect B3).
 """
 function semquad_level_stats(g::AbstractGeometry, qt::Quadtree;
                              strip::Float64=0.1)

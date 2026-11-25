@@ -40,7 +40,16 @@ mapped geometry (fine node logical position, O(maxlevel) logical descent,
 are the same 1-D GLL interpolation weights as the box's — G271 (e) measures them
 equal).  The pressure block is built from the mapped pressure mass / w-BFBT
 diagonal (`pressure.jl`/`bfbt.jl` mapped bodies), and the driver's contrast
-sampler covers the mapped domain (`semquad_eta_contrast` mapped method).
+sampler covers the mapped domain: `semquad_eta_contrast`'s mapped body maps the
+*global logical* grid `[0,1]^2` through `logical_map` (the box's `Lx` scaling is
+inside the map).  The stage-0.5 fix campaign repaired that sampler (audit defect
+D1): it had handed `logical_map` a physical-like `Lx*(i/n)`, sampling
+`x in [0,Lx^2]` on the box map (outside the domain for `Lx > 1`) and a 12.5 %
+radial sliver on an annulus ring tree (`Lx = 1/8`), which measured a true 1e4
+contrast as 3.16 and flipped the `linear=:auto` selector at production saddle
+sizes.  G279 pins the identity-map equality with the box body, the analytic
+corner contrast of a sheared affine map, the annulus radial-`eta` contrast, and
+the selector decision.
 
 Every cut-5 cache key carries the geometry identity (`geometry_stamp`):
 `SEMQUAD_MG_CACHE` (per tree), `SemQuadMGLevelKey` (per coarse level),

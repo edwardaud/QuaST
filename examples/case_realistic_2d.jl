@@ -1028,7 +1028,7 @@ function wall_checkpoint(src::String; wall_min_level::Int=WALL_MIN,
     # the gradient-jump indicator of the *current* tree: the interior quartets
     # that get merged are the lowest-error ones, exactly the budget's rule
     eta = semquad_gradient_jump(ss_old.su, qt, st.theta)
-    nref = refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
+    nref = refine_wall_to_min!(qt, wall_min_level; geom=CartesianBox(qt), strip=wall_strip,
                                symmetry=SYMMETRY)
     leaves_wall = length(qt.leaves)
     # The source checkpoint is not mirror-closed (120 non-mirrored leaves at

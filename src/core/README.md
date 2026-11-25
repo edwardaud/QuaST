@@ -36,7 +36,20 @@ tree itself.
 bitwise identical, `docs/dev/GEOM_DESIGN.md` §4), the two validation geometries
 exercise the general mapped path, and the logical topology helpers
 (`global_logical`, `leaf_ref`, `locate_leaf_logical`, `face_pairs_logical`) keep
-node identity and face pairing independent of the metric.
+node identity and face pairing independent of the metric.  `logical_map(g, S, T)`
+takes the **global logical** `(S,T) in [0,1]^2`; each geometry applies its own
+physical scaling internally (the box's `x = Lx*S`), so a caller must never pass
+a physical-like `Lx*S` (the stage-0.5 audit's D1 defect in
+`mg/pressure.jl`'s contrast sampler).
+
+Two measures are easy to confuse: `total_area(qt)` (`quadtree.jl`) is the
+logical E13 box-tree measure, `sum leaf_hx*leaf_hy` — it has no geometry, and
+since the stage-0.5 fix campaign it **refuses a periodic-seam tree** with an
+`ArgumentError` pointing at `total_measure(g, lay)`; the physical normaliser of
+a mapped domain is `total_measure(g, lay)` (stage-0.5 audit defect B4).  A
+bounded mapped tree (a wedge) is topologically indistinguishable from a box tree
+(the tree stores no geometry), so a caller of that form must pass its geometry
+explicitly; there is no default that can be right.
 
 `PolarAnnulus` (stage 0.5a, `docs/dev/GEOM_DESIGN.md` §6) is the first
 production-shaped curved geometry: one section at the end of the file defines

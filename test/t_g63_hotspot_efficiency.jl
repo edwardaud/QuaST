@@ -52,7 +52,7 @@ function h63_run_dynamic(qt, p, nsteps, dt; pre=2, pre_frac=0.35,
     for _ in 1:pre
         eta = semquad_gradient_jump(sq, qt, theta)
         if length(qt.leaves) < cap
-            amr_cycle_balanced!(qt, eta; refine_frac=pre_frac, coarsen_frac=0.0)
+            amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=pre_frac, coarsen_frac=0.0)
             sq2 = make_semquad(qt, p)
             theta = h63_blob(sq2)
             sq = sq2
@@ -74,10 +74,10 @@ function h63_run_dynamic(qt, p, nsteps, dt; pre=2, pre_frac=0.35,
         if step % 2 == 0 && step < nsteps
             eta = semquad_gradient_jump(sq, qt, theta)
             if length(qt.leaves) < cap
-                amr_cycle_balanced!(qt, eta; refine_frac=dyn_frac,
+                amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=dyn_frac,
                                     coarsen_frac=0.1)
             else
-                amr_cycle_balanced!(qt, eta; refine_frac=0.0, coarsen_frac=0.2)
+                amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=0.0, coarsen_frac=0.2)
             end
             sq2 = make_semquad(qt, p)
             theta = transfer_semquad(sq, theta, sq2)

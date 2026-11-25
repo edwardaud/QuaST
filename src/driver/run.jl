@@ -297,12 +297,15 @@ existing sections and changes nothing numerically.
 adds one history column, `resid_A` = `R/A`, the exact residual of the quoted
 pointwise Nusselt pair against the scheme's own identity `(ID1)`
 (`semquad_exact_residual`, docs/dev/VALIDATION.md §2.3/§3.2).  The historical
-`closure`/`closure_nolatent` columns are **not** changed by it: they are the
-historical formula, which equals `-dH/dt` plus three bookkeeping terms at a
-transient state and is not a flux error (docs/dev/VALIDATION.md §4).  The extra
-column changes `history.csv`'s layout, so
-`examples/case_realistic_2d.jl` only accepts `CASE_EXTDIAG=1` in a new
-output directory.
+`closure`/`closure_nolatent` columns are **not** changed by it: on the box they
+are the historical formula, which equals `-dH/dt` plus three bookkeeping terms
+at a transient state and is not a flux error (docs/dev/VALIDATION.md §4); on a
+mapped geometry the same physical steady-balance residual is evaluated with the
+physical measure, `(Ibase + latent_dgdt - flux)/A_phys` (stage-0.5 fix
+campaign, audit defect B5; the box formula is its area-1 special case and the
+box branch is bit for bit unchanged).  The extra column changes `history.csv`'s
+layout, so `examples/case_realistic_2d.jl` only accepts `CASE_EXTDIAG=1` in a
+new output directory.
 `corotation_guard=true` (the default) checks the **validity band** of the
 linearised co-rotational (Jaumann) term, `1 + dt*ad_W` (G254).  The term is
 valid where `2|W|dt << 1` (elastic regime) and `2*tau_M*|W|` is not large
@@ -393,8 +396,10 @@ ANNULUS_REFS §6.2.  Its contract: `R1 - R0 = 1` (the gap is the physics length
 unit and the closures' height is `r - R0`), `side_thermal=:insulating` (there
 are no Cartesian side walls; the wedge's radial cuts are insulating symmetry
 cuts and the ring's seam is not a boundary at all) and no
-`nu_cbf`/`extdiag` (those diagnostic families are box-only until the
-curved-wall residual rows exist).  The tree/geometry seam agreement is checked
+`nu_cbf`/`extdiag` history columns (a definition/units choice: those mapped
+diagnostics exist — the CBF rows/references now follow the geometry — but the
+published annulus benchmark Nu is the per-wall pointwise pair, stage-0.5 fix
+campaign F2/F3/F7).  The tree/geometry seam agreement is checked
 before setup ([`check_seam_compat`](@ref)): a ring geometry on a bounded tree (or
 the reverse) is refused instead of silently running a half-glued topology.
 """
@@ -773,12 +778,19 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         gname = geometry_name(geom)
         (linear === :direct || linear === :mg || linear === :auto) ||
             throw(ArgumentError("a mapped geometry ($gname) supports " *
-                                "linear=:direct, :mg and :auto in stage 0 " *
-                                "cut 5 (got linear=:$linear): :schur_cg and " *
-                                ":lagged keep the box reference-matrix / " *
-                                "stale-LU gauge assumptions and are box-only.  " *
-                                "Pass linear=:direct, linear=:mg or " *
-                                "linear=:auto."))
+                                "linear=:direct, :mg and :auto in this stage " *
+                                "(got linear=:$linear): :schur_cg and :lagged " *
+                                "have no mapped gate in the suite, so they are " *
+                                "not part of the supported mapped card set.  " *
+                                "This is a gate-coverage restriction, not a " *
+                                "known box-arithmetic defect: the stage-0.5 fix " *
+                                "campaign measured both paths on the annulus " *
+                                "ring in a scratch worktree with the guard " *
+                                "lifted, and the state agreed with linear=:direct " *
+                                "to 1e-12 relative (:lagged) and to its " *
+                                "iteration tolerance (:schur_cg) " *
+                                "(docs/dev/BUG_FIX_LOG.md, F6).  Pass " *
+                                "linear=:direct, linear=:mg or linear=:auto."))
         symmetry === :none ||
             throw(ArgumentError("a mapped geometry ($gname) does not support " *
                                 "symmetry=:x: the mirror is logical-x, which is " *
@@ -885,30 +897,44 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         #   mask, so `bc`/`wall_bc`/`wall_u`/`wall_un` entries 3-4 are inert), and
         #   the free-slip ring is the configuration where the solid-body rotation
         #   gauge and the pressure pin coexist.
-        # * `nu_cbf` and `extdiag` sum the residual on the box's logical y wall
-        #   rows and normalise by `total_area`; on the annulus the thermal walls
-        #   are the circles (`nu_wall_sides = (:xminus, :xplus)`), so those
-        #   diagnostics would silently read the wrong rows.  The mapped
-        #   pointwise `semquad_nu_walls` pair is wired and is the benchmark
-        #   definition; the CBF / exact-residual families stay box-only until the
-        #   curved-wall residual rows exist.
+        # * `nu_cbf` and `extdiag` are diagnostic *definition* refusals, not
+        #   box-arithmetic ones (stage-0.5 fix campaign F2/F3/F7): the CBF
+        #   family now selects the mapped wall rows (`nu_wall_sides`) and the
+        #   per-wall base references (`semquad_base_wall_refs`), and the
+        #   exact residual already runs on an annulus state with the generic
+        #   mapped normalisation (top-wall measure) and the mapped base
+        #   curvature.  They stay out of the annulus *history* because the
+        #   benchmark Nusselt definition is the per-wall pointwise pair that
+        #   G274/G277 gate (ANNULUS_REFS §6.2/§6.5), and the generic mapped
+        #   `resid_A`/CBF units are not the per-wall benchmark units.
         nu_cbf &&
-            throw(ArgumentError("the annulus does not support nu_cbf in stage " *
-                                "0.5b1: the consistent-boundary-flux family sums " *
-                                "the residual on the logical y wall rows and " *
-                                "normalises by the box area, while the annulus " *
-                                "thermal walls are the circles (xminus/xplus).  " *
-                                "Use the pointwise mapped Nusselt pair in the " *
-                                "history (columns 3/4); the curved-wall CBF is " *
-                                "stage 0.5b2 work."))
+            throw(ArgumentError("the annulus keeps nu_cbf out of the run " *
+                                "history in this stage: the CBF family is " *
+                                "mapped now (its wall rows come from " *
+                                "nu_wall_sides and its references from " *
+                                "semquad_base_wall_refs; G279 gates the " *
+                                "annulus flux pair against the analytic " *
+                                "conduction flux), but the benchmark Nusselt " *
+                                "definition of the annulus history is the " *
+                                "per-wall pointwise pair in columns 3/4 " *
+                                "(ANNULUS_REFS §6.2/§6.5), which G274/G277 " *
+                                "gate; the CBF columns are a generic mapped " *
+                                "diagnostic, not the published normalisation.  " *
+                                "Pass nu_cbf=false."))
         extdiag &&
-            throw(ArgumentError("the annulus does not support extdiag in stage " *
-                                "0.5b1: the exact-residual diagnostic is " *
-                                "derived and normalised for the box wall rows " *
-                                "(docs/dev/VALIDATION.md §3.2).  Use the " *
-                                "pointwise mapped Nusselt pair; the exact " *
-                                "residual of the curved-wall family is stage " *
-                                "0.5b2/0.5c work."))
+            throw(ArgumentError("the annulus keeps extdiag out of the run " *
+                                "history in this stage: the exact residual is " *
+                                "a generic mapped diagnostic (it normalises by " *
+                                "the top-wall measure `_nusselt_area` and " *
+                                "subtracts the mapped base curvature; it runs " *
+                                "on an annulus state), while the annulus " *
+                                "history uses the per-wall benchmark Nusselt " *
+                                "normalisation (ANNULUS_REFS §6.2/§6.5).  This " *
+                                "is a definition/units choice, not a " *
+                                "box-arithmetic restriction.  Pass " *
+                                "extdiag=false; the benchmark checks are the " *
+                                "per-wall Nu pair and the H-inclusive flux " *
+                                "identity."))
     end
     initial_refine >= 0 || throw(ArgumentError("initial_refine must be >= 0"))
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
@@ -1076,7 +1102,9 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         # walls (stage 0 cut 6: the box's historical y rows; a mapped geometry's
         # `nu_wall_sides`, the annulus's inner/outer circles).  The box branch is
         # the historical body and the historical AMR call, so the box path
-        # allocates exactly the pre-cut amount.
+        # allocates exactly the pre-cut amount.  Stage-0.5 audit D5: `geom` is a
+        # required keyword now; the box branch passes its already-concrete
+        # `geom` (no default geometry is constructed, so this stays alloc-free).
         if geom isa CartesianBox
             for lf in qt.leaves
                 if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1
@@ -1091,9 +1119,9 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 wall_strip=wall_strip,
                                 cooldown=cooldown_state,
                                 hysteresis_cycles=amr_hysteresis,
-                                coarsen_gate=amr_coarsen_gate)
+                                coarsen_gate=amr_coarsen_gate, geom=geom)
             refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
-                                symmetry=symmetry)
+                                symmetry=symmetry, geom=geom)
         else
             for lf in qt.leaves
                 if _amr_wall_leaf(geom, qt, lf)

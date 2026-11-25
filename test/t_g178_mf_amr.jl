@@ -63,7 +63,7 @@ function _g178_wall_tree()
         refine!(qt, lf)
     end
     balance!(qt)
-    refine_wall_to_min!(qt, 5; strip=0.1)
+    refine_wall_to_min!(qt, 5; geom=CartesianBox(qt), strip=0.1)
     return qt
 end
 

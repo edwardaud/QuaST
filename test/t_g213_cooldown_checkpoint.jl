@@ -73,7 +73,7 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
         rows = Set(lf for lf in qt.leaves
                    if lf[3] == 0 || lf[3] == qt.ny0 * (1 << lf[1]) - 1)
         cool = AmrCooldown()
-        nr, nc, nex = amr_cycle_balanced!(qt, eta; refine_frac=0.2,
+        nr, nc, nex = amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=0.2,
                                           coarsen_frac=0.05, max_level=7,
                                           max_leaves=640, symmetry=:x,
                                           protect=rows, cooldown=cool,

@@ -227,7 +227,35 @@ end
 @inline leaf_hy(qt::Quadtree, l::Int) = 1.0 / (qt.ny0 * (1 << l))
 @inline leaf_h(qt::Quadtree, l::Int) = leaf_hy(qt, l)
 @inline leaf_area(qt::Quadtree, l::Int) = leaf_hx(qt, l) * leaf_hy(qt, l)
-total_area(qt::Quadtree) = sum(leaf_area(qt, l) for (l, _, _) in qt.leaves)
+
+"""
+    total_area(qt) -> Float64
+
+The **logical E13 box-tree measure** `sum leaf_hx*leaf_hy` over the leaf set —
+the historical normaliser of every box diagnostics body (with the box height
+fixed at 1, the area equals the wall length the Nusselt quantities divide by).
+It carries no geometry, so it is only meaningful for a box tree: the physical
+measure of a mapped domain is [`total_measure`](@ref)`(g, sq)`.
+
+A **periodic-seam tree** (`seam = :periodic`, the annulus ring) is refused
+(stage-0.5 audit defect B4): on an annulus ring this function returns the
+logical `Lx = 1/ny0` (`0.125` on the audit's `cells_y = 8` ring) where the
+physical annulus area is `10.807`, i.e. a plausible wrong number.  A bounded
+mapped tree (a wedge) is topologically indistinguishable from a box tree — the
+tree stores no geometry — so callers of that form must pass their geometry and
+use `total_measure`; the refusal cannot detect it.
+"""
+function total_area(qt::Quadtree)
+    qt.seam === :none ||
+        throw(ArgumentError("total_area(qt) is the logical box-tree measure " *
+                            "(E13 sum of leaf_hx*leaf_hy) and a periodic-seam " *
+                            "tree is not a box tree: this would return " *
+                            "Lx = $(qt.Lx) (the logical measure) instead of the " *
+                            "physical domain measure.  Use " *
+                            "total_measure(g, sq) with the mapped geometry " *
+                            "(stage-0.5 audit defect B4)."))
+    return sum(leaf_area(qt, l) for (l, _, _) in qt.leaves)
+end
 
 # The tree is split by concern: this file holds the type, its constructor and
 # the refinement primitives (`refine!`, `coarsen!`), the neighbour queries and

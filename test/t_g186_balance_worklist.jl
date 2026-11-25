@@ -211,10 +211,10 @@ end
     q = copy_tree(qt)
     # JIT warm-up on a throwaway copy (the cycle is a no-op fixed point anyway)
     qw = copy_tree(qt)
-    amr_cycle_balanced!(qw, eta; refine_frac=0.0, coarsen_frac=0.0,
+    amr_cycle_balanced!(qw, eta; geom=CartesianBox(qw), refine_frac=0.0, coarsen_frac=0.0,
                         max_level=7, max_leaves=n0 - 4, symmetry=:none)
     t0 = time()
-    nr, nc, _ = amr_cycle_balanced!(q, eta; refine_frac=0.0, coarsen_frac=0.0,
+    nr, nc, _ = amr_cycle_balanced!(q, eta; geom=CartesianBox(q), refine_frac=0.0, coarsen_frac=0.0,
                                     max_level=7, max_leaves=n0 - 4,
                                     symmetry=:none)
     elapsed = time() - t0

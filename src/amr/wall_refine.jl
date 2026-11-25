@@ -8,8 +8,7 @@
 # `balance!`, so the wall refinement cannot break the x-mirror invariant.
 
 """
-    refine_wall_to_min!(qt, min_level; strip=0.1, symmetry=:none,
-                        geom=CartesianBox(qt))
+    refine_wall_to_min!(qt, min_level; strip=0.1, symmetry=:none, geom)
 
 Refine leaves whose centers lie within `strip` of the bottom/top walls until
 they reach at least `min_level`, then balance.  This is the numerical
@@ -24,6 +23,15 @@ outer circles).  The strip test is shared with the balanced cycle
 ([`_amr_in_wall_strip`](@ref)), and its box method is the historical expression,
 so the box path is bitwise unchanged.
 
+**`geom` is required** (stage-0.5 audit defect D5): the quadtree carries no
+geometry, so a default `CartesianBox(qt)` silently refined the *logical* `y`
+strips of a mapped tree — on an annulus ring the periodic seam, not the circles
+(measured: 16 refined leaves on the seam against 32 on the circles).  Every
+caller must now state the geometry; the box callers pass `CartesianBox(qt)`
+(the driver passes its own already-concrete geometry object).  A caller with a
+mapped tree that omits `geom` gets an `ArgumentError` instead of a silent box
+refinement.
+
 `symmetry=:x` refines the mirror partner with every wall leaf and uses the
 mirror-aware `balance!`, so the wall refinement cannot break the x-mirror
 invariant (the wall criterion depends only on `iy`, so on a closed tree it is
@@ -34,7 +42,15 @@ because the logical x mirror is not a physical symmetry of a mapped mesh
 """
 function refine_wall_to_min!(qt::Quadtree, min_level::Int; strip::Float64=0.1,
                              symmetry::Symbol=:none,
-                             geom::AbstractGeometry=CartesianBox(qt))
+                             geom::Union{Nothing,AbstractGeometry}=nothing)
+    geom === nothing &&
+        throw(ArgumentError("refine_wall_to_min! now requires the geometry: " *
+                            "pass geom=CartesianBox(qt) for a box tree, or the " *
+                            "mapped geometry the tree belongs to (the quadtree " *
+                            "does not store it, and defaulting to the box " *
+                            "silently refined the logical y strips — the " *
+                            "periodic seam on an annulus ring — instead of the " *
+                            "physical walls; stage-0.5 audit defect D5)."))
     min_level <= 0 && return 0
     0.0 < strip < 0.5 || throw(ArgumentError("strip must be in (0, 0.5)"))
     symmetry in (:none, :x) || throw(ArgumentError("symmetry must be :none or :x"))

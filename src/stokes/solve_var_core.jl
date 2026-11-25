@@ -812,8 +812,15 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     # and the multigrid hierarchy.  A mapped geometry is therefore accepted for
     # the **linear** paths `:direct`, `:auto` and `:mg` (`:auto` is resolved above
     # and becomes one of the two; on a mapped space it decides from the mapped
-    # eta contrast).  `:schur_cg` and `:lagged` still carry box reference-matrix
-    # / gauge assumptions and are refused with an actionable message.
+    # eta contrast).  `:schur_cg` and `:lagged` are refused here because they have
+    # no mapped gate in the suite — *not* because a box formula was found on
+    # their mapped path: the stage-0.5 fix campaign measured both on the annulus
+    # ring in a scratch worktree with this guard lifted (state vs `:direct`
+    # agreeing to 1e-12 relative for `:lagged`, and to the Schur-CG iteration
+    # tolerance for `:schur_cg`) and the `:lagged` saddle is the *mapped*
+    # assembled matrix whose `_saddle_key` already carries the geometry
+    # (docs/dev/BUG_FIX_LOG.md, F6).  The refusal is kept as a gate-coverage
+    # restriction; it can be lifted when a mapped gate lands.
     #
     # The remaining mapped restrictions below are *feature* restrictions owned by
     # later cuts (strain-rate Jacobian, wall BC kinds), not by the linear solver;
@@ -825,9 +832,14 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         if !(linear === :direct || linear === :mg)
             throw(ArgumentError("a mapped geometry ($gname) supports " *
                 "linear=:direct, :auto and :mg (resolved linear = :$linear): " *
-                ":schur_cg carries the box reference-matrix Schur assumption " *
-                "and :lagged the box stale-LU gauge; both stay box-only in " *
-                "stage 0.  Pass linear=:direct, linear=:mg or linear=:auto."))
+                ":schur_cg and :lagged have no mapped gate in the suite and " *
+                "stay out of the supported mapped set.  This is a " *
+                "gate-coverage restriction, not a known correctness defect: the " *
+                "stage-0.5 fix campaign measured both paths on the annulus ring " *
+                "with the guard lifted, agreeing with :direct to 1e-12 relative " *
+                "(:lagged) and to its iteration tolerance (:schur_cg) " *
+                "(docs/dev/BUG_FIX_LOG.md, F6).  Pass linear=:direct, " *
+                "linear=:mg or linear=:auto."))
         end
         if linear === :mg && schur_precond !== :mass
             throw(ArgumentError("a mapped geometry ($gname) with linear=:mg " *

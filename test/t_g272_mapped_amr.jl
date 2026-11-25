@@ -971,7 +971,9 @@ end
             ("symmetry=:x", (symmetry=:x,), "GEOM_DESIGN"),
             ("hotspot", (hotspot_weight=1.0,), "Cartesian-y AMR policies"),
             ("newton", (pic_mode=:newton, linear=:direct), "mapped Newton"),
-            ("schur_cg", (linear=:schur_cg,), "box-only"))
+            # stage-0.5 fix campaign (audit F6): the stated reason is gate
+            # coverage now, not a claimed box reference-matrix assumption
+            ("schur_cg", (linear=:schur_cg,), "no mapped gate"))
         err = nothing
         try
             g272_refusal(gcur; kw...)
@@ -1049,27 +1051,35 @@ end
         end
     end
 
-    # ---- (e.3) the box-default AMR cycle and wall refinement are the
-    #      explicit-box-geometry calls (catches a default that routes to the
-    #      mapped height body)
+    # ---- (e.3) the AMR cycle and the wall refinement REQUIRE the geometry
+    #      (stage-0.5 audit D5): the old default `CartesianBox(qt)` silently
+    #      refined the logical y strips (the periodic seam on a ring); omitting
+    #      `geom` must now throw before touching the tree, and the explicit-box
+    #      call is the historical box body.
     qt = g272_tree(2)
     sq = make_semquad(qt, 2)
     u = [0.3 * sinpi(x) * sinpi(y) for (x, y) in sq.coords]
     eta = semquad_gradient_jump(sq, qt, u)
     qa = deepcopy(qt); qb = deepcopy(qt)
-    ra = amr_cycle_balanced!(qa, eta; refine_frac=0.2, coarsen_frac=0.05,
-                             wall_min_level=1, wall_strip=0.15,
-                             hysteresis_cycles=0)
+    @test_throws ArgumentError amr_cycle_balanced!(qa, eta; refine_frac=0.2,
+                                                   coarsen_frac=0.05,
+                                                   wall_min_level=1,
+                                                   wall_strip=0.15,
+                                                   hysteresis_cycles=0)
+    @test Set(qa.leaves) == Set(qt.leaves)   # refused before any mutation
     rb = amr_cycle_balanced!(qb, eta; refine_frac=0.2, coarsen_frac=0.05,
                              wall_min_level=1, wall_strip=0.15,
                              hysteresis_cycles=0, geom=CartesianBox(1.0))
-    @test ra == rb
-    @test Set(qa.leaves) == Set(qb.leaves)
+    # the box body really refines here, i.e. the refusal above is not hiding a
+    # no-op: the cycle added leaves to the explicit-geometry arm
+    @test rb[1] > 0
+    @test length(qb.leaves) > length(qt.leaves)
     qc = deepcopy(qt); qd = deepcopy(qt)
-    rc = refine_wall_to_min!(qc, 2; strip=0.15)
-    rd = refine_wall_to_min!(qd, 2; strip=0.15, geom=CartesianBox(1.0))
-    @test rc == rd
-    @test Set(qc.leaves) == Set(qd.leaves)
+    @test_throws ArgumentError refine_wall_to_min!(qc, 3; strip=0.15)
+    @test Set(qc.leaves) == Set(qt.leaves)
+    rd = refine_wall_to_min!(qd, 3; strip=0.15, geom=CartesianBox(1.0))
+    @test rd > 0
+    @test length(qd.leaves) > length(qt.leaves)
 
     # ---- (e.4) wall_graded_tree defaults are the historical box tree ------
     for (base, wl, strip) in ((2, 5, 0.15), (3, 6, 0.2))

@@ -258,9 +258,15 @@ bottom wall, where the outward normal is -z, a positive `q` therefore means
 
 The `CartesianBox` method is the historical body, verbatim: the GLL weights
 `0.5*hx*sq.w[i]` integrate the wall basis exactly.  The mapped method integrates
-the same form with the leaf's mapped face Jacobian and Gauss face weights, on
-the logical wall row; on the box map the two agree to round-off (they are the
-same integral, `t_g269_curved_energy.jl` part (c)).
+the same form with the leaf's mapped face Jacobian and Gauss face weights on the
+geometry's own wall sides — `nu_wall_sides(g)`, so on the validation geometries
+the logical `y` sides (the box body's walls) and on the annulus the two circles.
+A stage-0.5 audit defect (D4) had this method hardcode the logical `y` sides, so
+a prescribed flux landed on the annulus's insulating radial cuts while the
+circle kept its natural zero-flux condition; the Dirichlet side of the same
+branch was already routed (`_semquad_energy_fixed_mapped!`, stage 0.5b1).
+On the box map the two methods agree to round-off (they are the same integral,
+`t_g269_curved_energy.jl` part (c)); the box body stays untouched.
 """
 function _add_semquad_wall_flux!(F::Vector{Float64}, sq::SemQuad, qt::Quadtree,
                                  q::Float64, wall::Symbol)
@@ -293,18 +299,21 @@ function _add_semquad_wall_flux_mapped!(F::Vector{Float64}, g::AbstractGeometry,
                                         wall::Symbol)
     wall in (:top, :bottom) || throw(ArgumentError("wall must be :top or :bottom"))
     n = sq.p + 1
-    side = wall === :top ? :yplus : :yminus
+    # Stage-0.5 audit defect D4: the wall is the geometry's own Nusselt side
+    # (`nu_wall_sides`, the same pair the Dirichlet branch uses), not the
+    # logical `y` rows.  On the box-in-height validation geometries that pair is
+    # `(:yminus,:yplus)`, so this body is the historical one there.
+    side = wall === :top ? nu_wall_sides(g)[2] : nu_wall_sides(g)[1]
     fd = make_fedata(sq.p, sq.p)
     for lf in sq.leaves
-        row = wall === :top ? n : 1
-        nsidey = leaf_nside_y(sq, lf[1])
-        (wall === :top ? lf[3] == nsidey - 1 : lf[3] == 0) || continue
+        _on_logical_wall(lf, side, sq) || continue
         ids = sq.elem[lf]
         fm = face_metric(g, sq, lf, side, fd)
         for qq in 1:fd.nq
             wq = face_weight(fm, fd, qq) * q
-            for i in 1:n
-                F[ids[(row - 1) * n + i]] += wq * fd.phi_v[i, qq]
+            for ii in 1:n
+                gid = _logical_wall_node(ids, n, side, ii)
+                F[gid] += wq * fd.phi_v[ii, qq]
             end
         end
     end

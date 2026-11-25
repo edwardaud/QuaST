@@ -481,7 +481,7 @@ end
         # (b) the caps are structural, not a behaviour change: a cycle on the
         # same uniform tree reports them in LAST_AMR_BALANCED and they do not fire
         q3 = deepcopy(qt)
-        amr_cycle_balanced!(q3, eta; refine_frac=0.0, coarsen_frac=0.2,
+        amr_cycle_balanced!(q3, eta; geom=CartesianBox(q3), refine_frac=0.0, coarsen_frac=0.2,
                             max_level=6, max_leaves=length(qt.leaves) - 30,
                             symmetry=:none, coarsen_gate=true)
         d = LAST_AMR_BALANCED[]
@@ -606,11 +606,11 @@ end
         q2 = deepcopy(qt)
         e1 = copy(eta)
         e2 = copy(eta)
-        r1 = amr_cycle_balanced!(q1, e1; refine_frac=0.0, coarsen_frac=0.3,
+        r1 = amr_cycle_balanced!(q1, e1; geom=CartesianBox(q1), refine_frac=0.0, coarsen_frac=0.3,
                                  max_level=6, max_leaves=n0 - 30, symmetry=:none,
                                  coarsen_gate=true)
         d1 = LAST_AMR_BALANCED[]
-        r2 = amr_cycle_balanced!(q2, e2; refine_frac=0.0, coarsen_frac=0.3,
+        r2 = amr_cycle_balanced!(q2, e2; geom=CartesianBox(q2), refine_frac=0.0, coarsen_frac=0.3,
                                  max_level=6, max_leaves=n0 - 30, symmetry=:none,
                                  coarsen_gate=false)
         d2 = LAST_AMR_BALANCED[]

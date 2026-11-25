@@ -31,7 +31,7 @@ using Test, QuaST, Random, Printf
 # itself.  Keeping G210 on the pre-gate path makes every number and every
 # assertion in it directly comparable with those sections.
 g210_cycle!(qt, eta; kw...) =
-    QuaST.amr_cycle_balanced!(qt, eta; coarsen_gate=false, kw...)
+    QuaST.amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), coarsen_gate=false, kw...)
 
 function g210_seed_tree(cx::Int, cy::Int, base::Int, maxlev::Int)
     qt = Quadtree(maxlev; cells_x=cx, cells_y=cy, Lx=cx / cy)

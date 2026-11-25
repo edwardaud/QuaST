@@ -48,7 +48,7 @@ end
     @test all(isfinite, values(eta))
 
     frac_left_before = count(lf -> lf[2] * 2.0^(-lf[1]) < 0.25, qt.leaves) / length(qt.leaves)
-    nr, _, _ = amr_cycle_balanced!(qt, eta; refine_frac=0.5, coarsen_frac=0.0)
+    nr, _, _ = amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=0.5, coarsen_frac=0.0)
     @test nr > 0
     @test max_face_level_jump(qt) <= 1
     sq2 = make_semquad(qt, 2)
@@ -76,7 +76,7 @@ end
     ug0, _ = solve_semquad_poisson(sqg, qtg, fg, ug)
     eg0 = l2err(sqg, ug0, ug)
     etag = semquad_gradient_jump(sqg, qtg, ug0)
-    nrg, _, _ = amr_cycle_balanced!(qtg, etag; refine_frac=0.5, coarsen_frac=0.0)
+    nrg, _, _ = amr_cycle_balanced!(qtg, etag; geom=CartesianBox(qtg), refine_frac=0.5, coarsen_frac=0.0)
     @test nrg > 0
     sqg2 = make_semquad(qtg, 2)
     ug1, _ = solve_semquad_poisson(sqg2, qtg, fg, ug)

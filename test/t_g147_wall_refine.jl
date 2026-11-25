@@ -15,7 +15,7 @@ using Test, QuaST, LinearAlgebra
             refine!(qt, lf)
         end
         balance!(qt)
-        refine_wall_to_min!(qt, 5; strip=0.1)
+        refine_wall_to_min!(qt, 5; geom=CartesianBox(qt), strip=0.1)
         return qt
     end
 
@@ -25,7 +25,7 @@ using Test, QuaST, LinearAlgebra
     end
     balance!(qw)
     n0 = length(qw.leaves)
-    n1 = refine_wall_to_min!(qw, 5; strip=0.1)
+    n1 = refine_wall_to_min!(qw, 5; geom=CartesianBox(qw), strip=0.1)
     @test n1 > 0
     @test length(qw.leaves) > n0
     @test total_area(qw) ≈ 1.0 rtol = 1.0e-12
@@ -45,7 +45,7 @@ using Test, QuaST, LinearAlgebra
     end
     balance!(q5)
     m0 = length(q5.leaves)
-    refine_wall_to_min!(q5, 4; strip=0.1)
+    refine_wall_to_min!(q5, 4; geom=CartesianBox(q5), strip=0.1)
     @test length(q5.leaves) > m0
     @test total_area(q5) ≈ 2.5 rtol = 1.0e-12
 
