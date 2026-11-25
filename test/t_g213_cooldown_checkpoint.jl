@@ -7,8 +7,8 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
 # The four parts:
 #   1. save/load round trip of a non-trivial `AmrCooldown` (mirror halves of
 #      merged pairs, the four children of split leaves, and the cycle counter);
-#   2. a small driver case: 20 steps uninterrupted vs 11 steps with an in-loop
-#      checkpoint at step 10 + resume to 20.  theta/ux/uz/pv/history must be
+#   2. a small driver case: 10 steps uninterrupted vs 6 steps with an in-loop
+#      checkpoint at step 5 + resume to 10.  theta/ux/uz/pv/history must be
 #      bitwise identical, and the first AMR cycle after the resume must be the
 #      one the uninterrupted run executed;
 #   3. the legacy path: a checkpoint without cooldown data must load an empty
@@ -16,6 +16,16 @@ using Test, QuaST, LinearAlgebra, HDF5, Printf
 #      old in-loop file, the fixture also rewrites `dt_prev` to the previous
 #      step's `dt` (the old writer stored it before `dt_prev = dt`, which is the
 #      separate ordering fix this gate pins).
+#
+# **2026-11-25 re-fixture.**  The box element's gradient-jump indicator had a
+# wrong y-face index until this date; the corrected indicator changed this card's
+# trajectory (the old 20-step card went quiet by cycle 20, so its end cooldown
+# aged out and stripping the cooldown from the step-10 checkpoint moved nothing).
+# The card is now the localized wall-plume IC below with `max_leaves = 520`
+# against a 640-leaf start: every cycle must trade, the cooldown is non-empty at
+# the end, and stripping it changes the resumed state.  The old fixture's pins
+# (row (46,46,46,0), leaves 640, N 2853, hash a579666395604f77) are superseded;
+# see docs/dev/BUG_FIX_LOG.md and BUG_AUDIT_INDICATOR.md §4.4.
 
 # ---- helpers ---------------------------------------------------------------
 fnv(a) = begin
@@ -39,7 +49,11 @@ function g213_case()
     end
     balance!(qt)
     ss = make_semstokes(qt, 2)
-    th = [0.1 * sinpi(y) * cospi(x / qt.Lx) for (x, y) in ss.su.coords]
+    # Localized wall plume (2026-11-25 re-fixture): a theta feature whose
+    # gradient jump stays concentrated, so the balanced cycle keeps refining and
+    # merging for the whole 10-step window instead of going quiet after cycle 10.
+    th = [0.15 * sinpi(y) * exp(-((x - 0.4)^2) / 0.05) +
+          0.05 * sinpi(y) * cospi(2.0 * x / qt.Lx) for (x, y) in ss.su.coords]
     for (g, (_, y)) in enumerate(ss.su.coords)
         (y <= 1.0e-12 || y >= 1.0 - 1.0e-12) && (th[g] = 0.0)
     end
@@ -52,11 +66,11 @@ function g213_drv(; maxsteps, checkpoint="", restart="", cb=nothing)
                                   dt0=1.0e-4, maxsteps=maxsteps, amr_every=1,
                                   coarsen_frac=0.05, refine_frac=0.2,
                                   max_level=7,
-                                  max_leaves=640, linear=:direct,
+                                  max_leaves=520, linear=:direct,
                                   symmetry=:x,
                                   verbose=false, cfl=0.5,
                                   checkpoint_path=checkpoint,
-                                  checkpoint_every=10,
+                                  checkpoint_every=5,
                                   callback=cb,
                                   restart_from=restart)
 end
@@ -75,7 +89,7 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
         cool = AmrCooldown()
         nr, nc, nex = amr_cycle_balanced!(qt, eta; geom=CartesianBox(qt), refine_frac=0.2,
                                           coarsen_frac=0.05, max_level=7,
-                                          max_leaves=640, symmetry=:x,
+                                          max_leaves=520, symmetry=:x,
                                           protect=rows, cooldown=cool,
                                           coarsen_gate=true)
         d = LAST_AMR_BALANCED[]
@@ -162,12 +176,12 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
     @testset "bitwise resume" begin
         a_cycle = Ref{Any}(nothing)
         cbA = st -> begin
-            if st.step == 11
+            if st.step == 6
                 a_cycle[] = (row=cycle_row(LAST_AMR_BALANCED[]),
                              leaves=length(st.qt.leaves), N=st.sq.N)
             end
         end
-        a = g213_drv(maxsteps=20; cb=cbA)
+        a = g213_drv(maxsteps=10; cb=cbA)
         @test a_cycle[] !== nothing
         @printf("  uninterrupted: theta=%s uxuz=%s pv=%s hist=%s\n",
                 fnv(reinterpret(UInt8, a.theta)),
@@ -176,46 +190,46 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
                 fnv(reinterpret(UInt8, reduce(vcat, a.history))))
 
         path = joinpath(mktempdir(), "g213_resume.h5")
-        ck10 = joinpath(dirname(path), "g213_resume_step10.h5")
+        ck5 = joinpath(dirname(path), "g213_resume_step5.h5")
         cbB = st -> begin
-            if st.step == 11
-                cp(path, ck10; force=true)
+            if st.step == 6
+                cp(path, ck5; force=true)
             end
         end
-        b1 = g213_drv(maxsteps=11; checkpoint=path, cb=cbB)
-        st10 = load_semquad_state(ck10)
+        b1 = g213_drv(maxsteps=6; checkpoint=path, cb=cbB)
+        st5 = load_semquad_state(ck5)
         @printf("  checkpoint: step=%d cycle=%d nref=%d ncoa=%d stale=%s\n",
-                st10.step, st10.cooldown.cycle,
-                length(st10.cooldown.no_refine),
-                length(st10.cooldown.no_coarsen), st10.velocity_stale)
-        @test st10.step == 10
-        @test st10.cooldown.cycle == 10
-        @test !isempty(st10.cooldown.no_refine)
-        @test !isempty(st10.cooldown.no_coarsen)
-        @test !st10.velocity_stale          # in-loop checkpoint stores zeros
+                st5.step, st5.cooldown.cycle,
+                length(st5.cooldown.no_refine),
+                length(st5.cooldown.no_coarsen), st5.velocity_stale)
+        @test st5.step == 5
+        @test st5.cooldown.cycle == 5
+        @test !isempty(st5.cooldown.no_refine)
+        @test !isempty(st5.cooldown.no_coarsen)
+        @test !st5.velocity_stale          # in-loop checkpoint stores zeros
 
         b_cycle = Ref{Any}(nothing)
         cbB2 = st -> begin
-            if st.step == 11
+            if st.step == 6
                 b_cycle[] = (row=cycle_row(LAST_AMR_BALANCED[]),
                              leaves=length(st.qt.leaves), N=st.sq.N)
             end
         end
-        b2 = g213_drv(maxsteps=20; restart=ck10, cb=cbB2)
+        b2 = g213_drv(maxsteps=10; restart=ck5, cb=cbB2)
         @test b_cycle[] !== nothing
         @printf("  resume:       theta=%s uxuz=%s pv=%s hist=%s\n",
                 fnv(reinterpret(UInt8, b2.theta)),
                 fnv(reinterpret(UInt8, vcat(b2.ux, b2.uz))),
                 fnv(reinterpret(UInt8, b2.pv)),
                 fnv(reinterpret(UInt8, reduce(vcat, b2.history))))
-        @test b2.steps == 20
+        @test b2.steps == 10
         @test b2.t == a.t
         @test b2.theta == a.theta
         @test b2.ux == a.ux
         @test b2.uz == a.uz
         @test b2.pv == a.pv
         @test Set(b2.qt.leaves) == Set(a.qt.leaves)
-        @test b2.history == a.history[11:20]
+        @test b2.history == a.history[6:10]
         # the first AMR cycle after the resume is the uninterrupted one, and the
         # final hysteresis state is the one the uninterrupted run ended with.
         # The end-state check is stronger than the old mid-run `cycle` global
@@ -227,7 +241,7 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
         @test b_cycle[].N == a_cycle[].N
         @test !isempty(a.cooldown.no_refine)
         @test !isempty(a.cooldown.no_coarsen)
-        @test a.cooldown.cycle == 20
+        @test a.cooldown.cycle == 10
         @test b2.cooldown.cycle == a.cooldown.cycle
         @test b2.cooldown.no_refine == a.cooldown.no_refine
         @test b2.cooldown.no_coarsen == a.cooldown.no_coarsen
@@ -237,15 +251,20 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
 
         # Sensitivity: the same checkpoint with the cooldown stripped diverges.
         nocool = joinpath(dirname(path), "g213_resume_nocool.h5")
-        save_semquad_state(nocool, st10.qt, st10.theta, st10.theta_prev,
-                           st10.ux, st10.uz, st10.pv;
-                           t=st10.t, dt=st10.dt, dt_prev=st10.dt_prev,
-                           step=st10.step, p=st10.p, config=st10.config)
-        b3 = g213_drv(maxsteps=20; restart=nocool)
+        save_semquad_state(nocool, st5.qt, st5.theta, st5.theta_prev,
+                           st5.ux, st5.uz, st5.pv;
+                           t=st5.t, dt=st5.dt, dt_prev=st5.dt_prev,
+                           step=st5.step, p=st5.p, config=st5.config)
+        b3 = g213_drv(maxsteps=10; restart=nocool)
         @printf("  no cooldown:  theta=%s hist=%s\n",
                 fnv(reinterpret(UInt8, b3.theta)),
                 fnv(reinterpret(UInt8, reduce(vcat, b3.history))))
-        @test b3.theta != a.theta          # the cooldown is load-bearing here
+        # the cooldown is load-bearing on the repaired card: without it the
+        # resumed cycles re-refine leaves that were just merged (measured
+        # cellwise max|dtheta| 4.4e-5 after the 2026-11-25 re-fixture; the old
+        # card's stripped arm was bit-identical, which is why it was re-fixtured
+        # rather than re-pinned).
+        @test b3.theta != a.theta
         @test load_semquad_state(nocool).cooldown.cycle == 0
     end
 
@@ -256,17 +275,17 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
         # from the previous step (the old write position).  The state itself is
         # the same bitwise trajectory.
         path = joinpath(mktempdir(), "g213_legacy_src.h5")
-        ck10 = joinpath(dirname(path), "g213_legacy_step10.h5")
-        cbB = st -> (st.step == 11 && cp(path, ck10; force=true))
-        b1 = g213_drv(maxsteps=11; checkpoint=path, cb=cbB)
-        st10 = load_semquad_state(ck10)
-        @test st10.step == 10
+        ck5 = joinpath(dirname(path), "g213_legacy_step5.h5")
+        cbB = st -> (st.step == 6 && cp(path, ck5; force=true))
+        b1 = g213_drv(maxsteps=6; checkpoint=path, cb=cbB)
+        st5 = load_semquad_state(ck5)
+        @test st5.step == 5
         legacy = joinpath(dirname(path), "g213_legacy.h5")
-        save_semquad_state(legacy, st10.qt, st10.theta, st10.theta_prev,
-                           st10.ux, st10.uz, st10.pv;
-                           t=st10.t, dt=st10.dt,
-                           dt_prev=b1.history[9][2],   # the old write position
-                           step=st10.step, p=st10.p, config=st10.config)
+        save_semquad_state(legacy, st5.qt, st5.theta, st5.theta_prev,
+                           st5.ux, st5.uz, st5.pv;
+                           t=st5.t, dt=st5.dt,
+                           dt_prev=b1.history[4][2],   # the old write position
+                           step=st5.step, p=st5.p, config=st5.config)
         ld = load_semquad_state(legacy)
         @test isempty(ld.cooldown.no_refine)
         @test isempty(ld.cooldown.no_coarsen)
@@ -279,21 +298,24 @@ cycle_row(d) = (d.refined, d.coarsened, d.merged, d.recirc)
 
         got = Ref{Any}(nothing)
         cbL = st -> begin
-            if st.step == 11
+            if st.step == 6
                 got[] = (row=cycle_row(LAST_AMR_BALANCED[]),
                          leaves=length(st.qt.leaves), N=st.sq.N)
             end
         end
-        b = g213_drv(maxsteps=20; restart=legacy, cb=cbL)
+        b = g213_drv(maxsteps=10; restart=legacy, cb=cbL)
         @printf("  legacy resume: row=%s leaves=%d N=%d theta=%s\n",
                 got[].row, got[].leaves, got[].N,
                 fnv(reinterpret(UInt8, b.theta)))
-        # The pre-change binary's numbers on this fixture (measured with a
-        # `git archive HEAD` worktree, docs/dev/BUG_LEDGER.md §10.5): empty
-        # cooldown + stale dt_prev -> 46/46/46, 640 leaves, N=2853 and this hash.
-        @test got[].row == (46, 46, 46, 0)
-        @test got[].leaves == 640
-        @test got[].N == 2853
-        @test fnv(reinterpret(UInt8, b.theta)) == "a579666395604f77"
+        # The pre-change semantics on the REPAIRED fixture: an old in-loop
+        # checkpoint (no cooldown datasets, `dt_prev` from the previous step)
+        # loads an empty cooldown and resumes on the legacy path.  These are the
+        # fixed-tree values measured on 2026-11-25; the superseded fixture's
+        # pins were row (46,46,46,0), 640 leaves, N=2853, hash
+        # a579666395604f77 (buggy indicator, old card).
+        @test got[].row == (14, 0, 0, 0)
+        @test got[].leaves == 502
+        @test got[].N == 2325
+        @test fnv(reinterpret(UInt8, b.theta)) == "6a380e31ee4c07f6"
     end
 end

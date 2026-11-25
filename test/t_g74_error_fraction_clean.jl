@@ -57,8 +57,13 @@ end
     @test r8.steps == 2
     @test st7.wall_max == 7
     @test st8.wall_max == 8
-    @test st7.interior_max >= 5
-    @test st8.interior_max >= 5
+    # Corrected 2026-11-25: was `>= 5` at both levels.  Same fixture and same
+    # numbers as G71 (docs/dev/BUG_AUDIT_INDICATOR.md §3.6): the old 5 was the
+    # spurious y-face mass of the pre-fix indicator, the corrected depth is 4,
+    # the wall levels stay 7/8 and e78 improves 2.868e-7 -> 4.651e-8.  The
+    # `<= 6` bounds below are unchanged.
+    @test st7.interior_max >= 4
+    @test st8.interior_max >= 4
     @test st7.interior_max <= 6
     @test st8.interior_max <= 6
     @test r7.ss.su.N < r8.ss.su.N

@@ -3,11 +3,14 @@
 # Two jobs, both in-process (no recorded SHA literal, so a Julia/LAPACK upgrade
 # cannot make them fail spuriously):
 #
-#   (a) the box path is the *historical arithmetic*: the geometry-built
-#       coordinates, node ids, leaf/face metrics, transfer, AMR indicator and
-#       checkpoint geometry record are compared, bit for bit, against verbatim
-#       historical implementations carried in this file as the oracle (the G217
-#       pattern);
+#   (a) the box path is the box arithmetic: the geometry-built coordinates,
+#       node ids, leaf/face metrics, transfer, AMR indicator and checkpoint
+#       geometry record are compared, bit for bit, against gate-local copies of
+#       the same arithmetic carried in this file (the G217 pattern).  The
+#       transfer copy is the verbatim historical body; the indicator copies
+#       carry the y-face fine-side index the production body has since
+#       2026-11-25 (the pre-fix copy pinned the defect twice, audit D2; the
+#       independent pin of the arithmetic is test/t_g278_indicator_oracle.jl);
 #   (b) the map identities on the two validation geometries: point -> inverse
 #       -> point, det J against an independent analytic formula and against a
 #       4th-order finite difference of the map, outward unit normals against the
@@ -94,8 +97,11 @@ function g266_hist_transfer(old::SemQuad, uold::Vector{Float64}, new::SemQuad)
     return unew
 end
 
-# Historical oracle #3: the per-pair normal-derivative kernel and the full AMR
-# indicator, verbatim from G217's oracle (the pre-refactor code).
+# Reference oracle #3: the per-pair normal-derivative kernel and the full AMR
+# indicator, verbatim from G217's oracle (the pre-refactor code).  The y-face
+# fine-side index is the production one (corrected 2026-11-25): before that the
+# copy carried the same wrong index as the box body, which made this gate pin
+# the defect instead of detecting it.
 function g266_hist_subface_derivs(sq::SemQuad, L, R, dir, u)
     p = sq.p
     n = p + 1
@@ -133,7 +139,8 @@ function g266_hist_subface_derivs(sq::SemQuad, L, R, dir, u)
         cL = (2.0 / hL) .* sq.D[iFL, :]
         cR = (2.0 / hR) .* sq.D[iFR, :]
         gidL = (i, a) -> sq.elem[L][(i - 1) * n + a]
-        gidR = (i, q) -> sq.elem[R][(q - 1) * n + i]
+        # the corrected y-face fine-side index: column q, y node i
+        gidR = (i, q) -> sq.elem[R][(i - 1) * n + q]
     end
     dL = zeros(Float64, n)
     dR = zeros(Float64, n)
@@ -231,6 +238,11 @@ end
 # face point and the coarse reference abscissa come from element_map /
 # element_inverse; the face weight from the face Jacobian |d(x,y)/d(face
 # parameter)| of element_jacobian; the derivative scales from leaf_metric.
+# This is the same arithmetic routed through the geometry API -- it is *not* an
+# independent oracle for the y-face index (the pre-2026-11-25 version carried
+# the same wrong index as the box body and the gate pinned the defect twice,
+# audit D2).  Both sides now use the corrected index; G278 is the independent
+# oracle for the arithmetic itself.
 # ---------------------------------------------------------------------------
 function g266_geo_indicator(sq::SemQuad, qt::Quadtree, u::Vector{Float64})
     g = sq.geom
@@ -296,7 +308,9 @@ function g266_geo_indicator(sq::SemQuad, qt::Quadtree, u::Vector{Float64})
                 end
                 dR = 0.0
                 for i in 1:n
-                    dR += cR[i] * u[sq.elem[R][(q - 1) * n + i]]
+                    # corrected 2026-11-25: contract over the y index i of
+                    # column q (the old line used row q / x index)
+                    dR += cR[i] * u[sq.elem[R][(i - 1) * n + q]]
                 end
                 J += wq * (dL - dR)^2
             end

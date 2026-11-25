@@ -1,9 +1,14 @@
 # G217 / assembly-allocation audit: the SEM hot-path kernels (indicator,
 # nodal transfer, Lagrange basis, energy assembly) are bitwise unchanged by the
 # scratch/out-parameter refactor, and the refactored per-call paths allocate
-# their budget or less.  The historical implementations are carried verbatim as
-# the "before" side, so every 0-B assertion has a positive control next to it
-# (the G215 pattern, not a re-recorded number).
+# their budget or less.  The allocating implementations are carried verbatim
+# next to the workspace form as the "before" side and the bitwise oracle, so
+# every 0-B assertion has a positive control next to it (the G215 pattern, not a
+# re-recorded number).  The y-face fine-side index of the allocating copy was
+# corrected on 2026-11-25 together with the production body: this gate tests the
+# workspace refactor, not the historical arithmetic.  The one-line pre-fix index
+# (the defect the box body had until 2026-11-25) is pinned independently by
+# test/t_g278_indicator_oracle.jl.
 #
 # Measured context (docs/dev/PERFORMANCE.md): `--track-allocation=user`
 # over 4 AMR cycles of out_julia/s340/ab_none/resume.h5 (10 000 leaves, p=2)
@@ -14,8 +19,10 @@ using Test, QuaST, LinearAlgebra, SparseArrays, Random, Printf
 const MS = QuaST
 
 # ---------------------------------------------------------------------------
-# Historical implementations (HEAD 8501b53), verbatim, as the positive control
-# and the bitwise oracle.
+# Allocating reference implementations, verbatim (HEAD 8501b53), as the positive
+# control and the bitwise oracle.  The y-face fine-side index of the sub-face
+# kernel is the production one (corrected 2026-11-25); the pre-fix line is the
+# defect, not this gate's subject.
 # ---------------------------------------------------------------------------
 function g217_old_subface_derivs(sq::SemQuad, L, R, dir, u)
     p = sq.p
@@ -54,7 +61,10 @@ function g217_old_subface_derivs(sq::SemQuad, L, R, dir, u)
         cL = (2.0 / hL) .* sq.D[iFL, :]
         cR = (2.0 / hR) .* sq.D[iFR, :]
         gidL = (i, a) -> sq.elem[L][(i - 1) * n + a]
-        gidR = (i, q) -> sq.elem[R][(q - 1) * n + i]
+        # y-face fine side: the normal derivative at fixed x-node q is a
+        # contraction over the *y* node index of column q (the pre-fix line
+        # contracted over the x index of row q; G278 pins that defect)
+        gidR = (i, q) -> sq.elem[R][(i - 1) * n + q]
     end
     dL = zeros(Float64, n)
     dR = zeros(Float64, n)

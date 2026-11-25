@@ -1,5 +1,5 @@
 # G136: the stretched box (Lx) — square leaves, multi-root equivalence and the guards.
-using Test, QuaST, LinearAlgebra
+using Test, QuaST, LinearAlgebra, Printf
 
 # G136: stretched box (Lx != 1).
 #
@@ -192,6 +192,8 @@ end
     # no jump and only the Dirichlet walls contribute; the indicator is an
     # integral over x, so it must scale exactly with Lx
     vals = Float64[]
+    walls = Float64[]
+    interiors = Float64[]
     for Lx in (1.0, 3.0)
         qti = Quadtree(3; Lx=Lx)
         for _ in 1:1, lf in collect(qti.leaves)
@@ -202,6 +204,28 @@ end
         ui = [c[2]^2 for c in sqi.coords]
         et = semquad_gradient_jump(sqi, qti, ui)
         push!(vals, sum(values(et)))
+        # the analytic Dirichlet-wall term: du/dy = 2y, so only the y = 1 wall
+        # contributes, (hy/2) * int_0^Lx 4 dx = 2*hy*hx per top-row leaf
+        wall = 0.0
+        for lf in qti.leaves
+            hx = QuaST.leaf_hx(qti, lf[1])
+            hy = QuaST.leaf_hy(qti, lf[1])
+            lf[3] == qti.ny0 * (1 << lf[1]) - 1 && (wall += 2.0 * hx * hy)
+        end
+        push!(walls, wall)
+        push!(interiors, vals[end] - wall)
     end
+    @printf("G136 u=y^2: totals %.17g / %.17g, wall %.17g / %.17g, interior %.3e / %.3e\n",
+            vals[1], vals[2], walls[1], walls[2], interiors[1], interiors[2])
     @test vals[2] / vals[1] ≈ 3.0 rtol = 1.0e-12
+    # D7: the ratio test above cannot see the old defect -- both the true wall
+    # term and the historical spurious y-face mass scale with Lx, so the pre-fix
+    # body also gave exactly 3:1.  Assert the decomposition instead: the
+    # analytic wall term is the sum over the top row of 2*hx*hy (du/dy = 2 at
+    # y = 1; the bottom wall has du/dy = 0), which is Lx on this level-1 tree
+    # (hy = 0.5), and the interior term must be zero.  Measured on the pre-fix
+    # body: interior 0.5 (Lx=1) / 1.5 (Lx=3), i.e. exactly 0.5*Lx (two interior
+    # y-face pairs per tree); after the 2026-11-25 fix both interiors are 0.
+    @test abs(interiors[1]) <= 1.0e-13 * abs(vals[1])
+    @test abs(interiors[2]) <= 1.0e-13 * abs(vals[2])
 end

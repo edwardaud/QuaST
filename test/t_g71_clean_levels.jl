@@ -5,9 +5,15 @@
 # t=2e-10; the two solutions are compared on a fixed level9 reference tree.
 # This is the clean-protocol gate (no n16 seed, no fixed tree, converged
 # Stokes); the 5-step/1e-9 run gives e78=1.13e-6 as a diagnostic.
-# With the balanced (cumulative-error) marking the interior reaches level 5
-# rather than the classic policy's 6 at the same refine_frac; the wall levels
-# and the self-convergence ratio are unchanged.
+# With the balanced (cumulative-error) marking the interior reached level 5 at
+# this refine_frac until the 2026-11-25 correction of the box indicator's y-face
+# fine-side index; it now reaches level 4.  The TOPSTRONG IC is exactly zero for
+# y <= 0.65, so the IC has no interior feature: the old interior depth was
+# produced by the spurious interior y-face mass the index defect injected.  The
+# wall levels are unchanged (7/8) and the level-7/8 self-convergence IMPROVES
+# from e78 = 2.868e-7 to 4.651e-8 while N falls (N7 14459 -> 13973, N8 28291 ->
+# 27805): better accuracy on fewer leaves.  The surviving anchor is e78 below,
+# not the old over-refinement depth.
 using Test
 using LinearAlgebra
 using Printf
@@ -59,8 +65,14 @@ end
     @test r8.steps == 2
     @test st7.wall_max == 7
     @test st8.wall_max == 8
-    @test st7.interior_max >= 5
-    @test st8.interior_max >= 5
+    # Corrected 2026-11-25: was `>= 5` at both levels.  The old 5 was the
+    # spurious y-face mass of the pre-fix indicator on an IC with no interior
+    # feature (identically zero below y = 0.65); the median corrected depth is
+    # 4 at both levels, the wall levels stay 7/8 and e78 improves
+    # 2.868e-7 -> 4.651e-8 (docs/dev/BUG_AUDIT_INDICATOR.md §4.4).  Do not
+    # re-pin the depth upward: the convergence bound is the requirement.
+    @test st7.interior_max >= 4
+    @test st8.interior_max >= 4
     @test r7.ss.su.N < r8.ss.su.N
     @test e78 < 1.0e-5
     @test maximum(abs, r7.theta) < 0.1

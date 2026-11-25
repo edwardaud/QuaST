@@ -199,5 +199,7 @@ using QuaST
     include("t_g275_annulus_walls.jl")
     include("t_g276_annulus_ring.jl")
     include("t_g277_annulus_benchmark.jl")
+    include("t_g278_indicator_oracle.jl")
     include("t_g279_mapped_fixes.jl")
+    include("t_g280_realistic_amr_trajectory.jl")
 end

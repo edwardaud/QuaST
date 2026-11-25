@@ -122,7 +122,7 @@ function _semquad_subface_derivs!(w::SemQuadJumpWork, sq::SemQuad,
             w.dL[q] = dq
             dq = 0.0
             for i in 1:n
-                dq += w.cR[i] * u[idsR[(q - 1) * n + i]]
+                dq += w.cR[i] * u[idsR[(i - 1) * n + q]]
             end
             w.dR[q] = dq
         end
@@ -244,8 +244,8 @@ The value is continuous, but the normal derivative is not; the jump between the
 coarse and fine one-sided derivatives is the same indicator the DG prototype
 used, with the coarse side interpolated at the fine-side quadrature points.
 
-Stage 0 cut 6: the box body below is the historical arithmetic, verbatim; a
-mapped geometry uses the **physical** variant (GEOM_DESIGN §6.8):
+Stage 0 cut 6: a mapped geometry uses the **physical** variant (GEOM_DESIGN
+§6.8); the box body below is the box specialisation of the same estimator:
 
   * the normal derivative is the true physical one-sided `n . grad u`, with
     `n` the outward unit normal of the fine side's face (from the cached
@@ -264,16 +264,29 @@ mapped geometry uses the **physical** variant (GEOM_DESIGN §6.8):
 
 On the box map this reduces to the box estimator up to floating-point
 association (the chain rule with the cached `J^{-1}` instead of the precomputed
-`2/h` coefficients, and `2/|grad xi|` instead of `leaf_hx`): the measured
-relative difference is ~1e-16 and is printed by G272 (b).  The box path itself
-never takes this body.
+`2/h` coefficients, and `2/|grad xi|` instead of `leaf_hx`): measured max
+absolute difference 1.7e-18 and max relative difference 1.0e-16 on general
+smooth fields (G272 (b) prints it).  The box path itself never takes this body.
+
+**History (2026-11-25).**  Until this date the box body's fine-side y-face
+one-sided derivative contracted the wrong nodal index -- `u[idsR[(q-1)*n+i]]`
+(the x index of row q) instead of `u[idsR[(i-1)*n+q]]` (the y index of column
+q).  The defect is recorded in `docs/dev/AMR.md` §2.1, `docs/dev/BUG_AUDIT_INDICATOR.md`
+and `docs/dev/BUG_LEDGER.md` §19; the box body below now contains the corrected
+index and reproduces the corrected estimator.  The nine-hash process dump
+(`out_julia/agent/state_dump_run.jl`) does **not** pin this arithmetic -- its
+AMR cycle is inert, so its hashes are invariant under the correction; the
+independent oracle of `test/t_g278_indicator_oracle.jl` is the pin.
 """
 function semquad_gradient_jump(sq::SemQuad, qt::Quadtree, u::Vector{Float64})
     return _semquad_gradient_jump(sq.geom, sq, qt, u)
 end
 
-# Historical box body, verbatim: do not rewrite it (the nine-hash dump and G266
-# pin it bit for bit).
+# Box body: the box specialisation of the estimator above (precomputed 2/h
+# scalings instead of the mapped chain rule), with the y-face fine-side index
+# corrected on 2026-11-25.  G217/G266 carry gate-local copies of this arithmetic
+# and G278 is the independent oracle.  The nine-hash process dump does not pin
+# the indicator (its AMR cycle is inert; docs/dev/AMR.md §2.1).
 function _semquad_gradient_jump(::CartesianBox, sq::SemQuad, qt::Quadtree,
                                u::Vector{Float64})
     n = sq.p + 1

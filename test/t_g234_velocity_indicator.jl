@@ -42,8 +42,17 @@ using Test, QuaST, LinearAlgebra
     n0 = length(qt.leaves)
     sq = make_semquad(qt, 2)
     th = [sinpi(x) * sinpi(z) for (x, z) in sq.coords]
-    ux = [sin(8pi * x) * sinpi(z) for (x, z) in sq.coords]
-    uz = [cospi(x) * sin(6pi * z) for (x, z) in sq.coords]
+    # Re-fixtured 2026-11-25 (audit D12): the old global grid-scale velocity
+    # field made the corrected combined 20% head coincide with the theta head,
+    # so the "the combined indicator is not theta" property below lost its
+    # discriminating power.  Two localized wave packets put the velocity
+    # indicator's mass away from the theta indicator's interior peak; the
+    # normalised mixture then selects a genuinely mixed head, different from
+    # both fields'.
+    ux = [sin(6pi * x) * cospi(2z) *
+          exp(-40.0 * ((x - 0.25)^2 + (z - 0.30)^2)) for (x, z) in sq.coords]
+    uz = [cospi(2x) * sin(6pi * z) *
+          exp(-40.0 * ((x - 0.75)^2 + (z - 0.70)^2)) for (x, z) in sq.coords]
 
     # (a) the estimators themselves
     jv = semquad_velocity_jump(sq, qt, ux, uz)
@@ -177,9 +186,19 @@ using Test, QuaST, LinearAlgebra
     @test all(abs(jcs[lf] - jc[lf]) <= 1.0e-12 * jc[lf] for lf in keys(jc))
     k = max(1, round(Int, 0.2 * length(sq.leaves)))
     topk(d) = Set(sort(collect(keys(d)), by=lf -> -d[lf])[1:k])
-    @test topk(jcs) == topk(jc)        # same ranking: scale-invariant
-    @test topk(jc) != topk(jt)         # not theta
-    @test topk(jc) != topk(jvs)        # not velocity
+    # Tie-aware: the scale-invariance claim is a claim about the selected
+    # *values*, not about a tie-break at the prefix boundary.  The old exact set
+    # equality failed after the 2026-11-25 indicator correction because one
+    # boundary leaf `(3,0,0)` swapped with `(3,0,7)` whose eta agreed to
+    # round-off -- a tie, not a behaviour change (audit D12).  Comparing the
+    # sorted prefix values allows a swap among equal values and still catches a
+    # real ranking change (a leaf's value moving across the cut).
+    prefix_values(d) = sort([d[lf] for lf in keys(d)]; rev=true)[1:k]
+    pv_s, pv_c = prefix_values(jcs), prefix_values(jc)
+    @test all(abs(pv_s[i] - pv_c[i]) <=
+              1.0e-9 * abs(pv_c[i]) + 1.0e-300 for i in 1:k)
+    @test topk(jc) != topk(jt)         # not theta (strengthened fixture)
+    @test topk(jc) != topk(jvs)        # not velocity (strengthened fixture)
     plain = copy(jt)
     for (lf, v) in jvs
         plain[lf] += v

@@ -28,12 +28,14 @@
 #       the fine-side one-sided derivative on a horizontal face in the *x* index
 #       (`src/amr/indicator.jl`, `u[idsR[(q-1)*n + i]]` summed over `i`), i.e.
 #       d/dx instead of d/dy, so a linear field, whose normal derivative is
-#       continuous, gets a spurious interior indicator.  The mapped body is the
-#       corrected physical estimator; the box path keeps its historical body
-#       because the nine-hash bitwise invariant forbids changing it (the fix is
-#       recorded as a latent defect for a dedicated commit).  This is why the
-#       design's "reduces to the box indicator" is *not* available bitwise; the
-#       measured difference is given here.
+#       continuous, gets a spurious interior indicator.  The box body was
+#       corrected on 2026-11-25 (the one-line index fix) and now computes the
+#       corrected estimator; this gate keeps the pre-fix kernel verbatim as
+#       `g272_hist_subface_derivs`, so (b.3)'s "the historical body is
+#       measurably different" assertions are genuine defect detectors instead
+#       of self-comparisons (audit D10).  The nine-hash process dump is
+#       invariant under the correction (its AMR cycle is inert); the
+#       independent pin of the arithmetic is test/t_g278_indicator_oracle.jl.
 #
 #   (c) physical-vs-logical decision: on a `CurvedBox` whose physical cell size
 #       in the layer direction varies by the annulus's `(R0+1)/R0 = 2.82`
@@ -57,13 +59,14 @@
 #       dependent law paths run mapped, and the still-refused mapped paths name
 #       their missing piece.
 #
-#   (e) box path: the transfer and indicator functions are the pre-cut bodies
-#       bit for bit (against the historical bodies carried here, the G217/G266
-#       pattern), the new wall-strip/protect helpers reproduce the historical
-#       box predicates, the box-default AMR cycle and wall refinement equal the
-#       explicit `geom=CartesianBox` calls, and the mapped transfer/indicator on
-#       the box map reproduce the box bodies' *corrected* arithmetic (the box
-#       map is a similarity).  The nine-hash state dump A/B against a worktree
+#   (e) box path: the transfer function is the pre-cut body bit for bit, the
+#       indicator is the corrected body (checked against the gate-local
+#       corrected copy and against the pre-fix body, which must differ), the
+#       new wall-strip/protect helpers reproduce the historical box predicates,
+#       the box-default AMR cycle and wall refinement equal the explicit
+#       `geom=CartesianBox` calls, and the mapped transfer/indicator on the box
+#       map reproduce the box bodies' *corrected* arithmetic (the box map is a
+#       similarity).  The nine-hash state dump A/B against a worktree
 #       of `2898002` and the affected-gate batch are the process evidence in
 #       `docs/dev/GEOM_PROGRESS.md`; the suite half of the box invariant is the
 #       existing box AMR gates plus this testset.
@@ -151,18 +154,76 @@ function g272_hist_nodal_transfer(old::SemQuad, uold::Vector{Float64},
     return unew
 end
 
-# the pre-cut gradient-jump indicator, verbatim (including the fine-side y-face
-# derivative index defect; this is what the box path still computes)
+# the pre-2026-11-25 gradient-jump indicator, verbatim: the gate-local per-pair
+# kernel below carries the defect (the fine-side y-face derivative contracts
+# over the x index of row q).  It is what the box path computed until the fix,
+# and it is used here as the *defect witness* of (b.3); the production body must
+# NOT be called for it (that was the tautology audit D10).
+function g272_hist_subface_derivs(sq::SemQuad, L, R, dir, u)
+    p = sq.p
+    n = p + 1
+    hL = MS272.leaf_hy(sq, L[1]); hR = MS272.leaf_hy(sq, R[1])
+    hxL = MS272.leaf_hx(sq, L[1]); hxR = MS272.leaf_hx(sq, R[1])
+    xL = L[2] * hxL; yL = L[3] * hL
+    xR = R[2] * hxR; yR = R[3] * hR
+    rule = gll_rule(p)
+    BL = zeros(n, n)
+    vertical = dir === :xplus || dir === :xminus
+    if vertical
+        wq = 0.5 * hR .* sq.w
+        iFL = dir === :xplus ? n : 1
+        iFR = dir === :xplus ? 1 : n
+        pos = yR .+ 0.5 .* (sq.xi .+ 1) .* hR
+        xiL = 2.0 .* (pos .- yL) ./ hL .- 1.0
+        for q in 1:n
+            Lb, _ = lagrange_eval(rule, xiL[q])
+            BL[q, :] .= Lb
+        end
+        cL = (2.0 / hxL) .* sq.D[iFL, :]
+        cR = (2.0 / hxR) .* sq.D[iFR, :]
+        gidL = (i, a) -> sq.elem[L][(a - 1) * n + i]
+        gidR = (i, q) -> sq.elem[R][(q - 1) * n + i]
+    else
+        wq = 0.5 * hxR .* sq.w
+        iFL = dir === :yplus ? n : 1
+        iFR = dir === :yplus ? 1 : n
+        pos = xR .+ 0.5 .* (sq.xi .+ 1) .* hxR
+        xiL = 2.0 .* (pos .- xL) ./ hxL .- 1.0
+        for q in 1:n
+            Lb, _ = lagrange_eval(rule, xiL[q])
+            BL[q, :] .= Lb
+        end
+        cL = (2.0 / hL) .* sq.D[iFL, :]
+        cR = (2.0 / hR) .* sq.D[iFR, :]
+        gidL = (i, a) -> sq.elem[L][(i - 1) * n + a]
+        gidR = (i, q) -> sq.elem[R][(q - 1) * n + i]     # WRONG (pre-fix)
+    end
+    dL = zeros(Float64, n)
+    dR = zeros(Float64, n)
+    for q in 1:n
+        for a in 1:n
+            da = 0.0
+            for i in 1:n
+                da += cL[i] * u[gidL(i, a)]
+            end
+            dL[q] += BL[q, a] * da
+        end
+        for i in 1:n
+            dR[q] += cR[i] * u[gidR(i, q)]
+        end
+    end
+    return wq, dL, dR
+end
+
 function g272_hist_indicator(sq::SemQuad, qt::Quadtree, u::Vector{Float64})
     n = sq.p + 1
     eta = Dict{NTuple{3,Int},Float64}()
     for lf in sq.leaves
         eta[lf] = 0.0
     end
-    w = MS272.SemQuadJumpWork(n)
     for pf in face_pairs(qt)
         L, R, dir = pf.leafL, pf.leafR, pf.dir
-        wq, dL, dR = MS272._semquad_subface_derivs!(w, sq, L, R, dir, u)
+        wq, dL, dR = g272_hist_subface_derivs(sq, L, R, dir, u)
         J = 0.0
         for q in eachindex(wq)
             J += wq[q] * (dL[q] - dR[q])^2
@@ -1015,17 +1076,23 @@ end
 
 # ===========================================================================
 @testset "G272 (e) box path and dispatch identity" begin
-    # ---- (e.1) transfer and indicator are the pre-cut bodies, bit for bit ---
-    # (the nine-hash dump covers the driver; this pins the functions the cut
-    # touched against the historical bodies carried in this file)
+    # ---- (e.1) transfer is the pre-cut body; the indicator is the corrected
+    #      body, pinned against the gate-local corrected copy, and the carried
+    #      pre-fix body must be measurably different (non-tautology, D10) ----
     for (lvl, base) in ((2, 2), (3, 2), (3, 1))
         qt = g272_tree(lvl; base=base)
         sq = make_semquad(qt, 2)
         u = [0.3 * sinpi(x) * sinpi(y) + 0.05 * sinpi(3x) * sinpi(2y)
              for (x, y) in sq.coords]
         eta = semquad_gradient_jump(sq, qt, u)
+        # Before 2026-11-25 this compared production with
+        # `g272_hist_indicator`, whose interior kernel was the production
+        # function itself: a self-comparison that never pinned the suspect line
+        # (audit D10).  It now compares against the gate-local corrected body.
+        eta_corr = g272_corrected_indicator(sq, qt, u)
+        @test all(isequal(eta[lf], eta_corr[lf]) for lf in qt.leaves)
         eta_hist = g272_hist_indicator(sq, qt, u)
-        @test all(isequal(eta[lf], eta_hist[lf]) for lf in qt.leaves)
+        @test any(!isequal(eta[lf], eta_hist[lf]) for lf in qt.leaves)
         qt2 = deepcopy(qt)
         for lf in sort(collect(qt2.leaves))[1:min(3, length(qt2.leaves))]
             refine!(qt2, lf)
