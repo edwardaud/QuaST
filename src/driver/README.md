@@ -65,13 +65,29 @@ hook ride in the same scalar.  The driver's eta closures evaluate the base
 temperature and the depth argument through the geometry
 (`semquad_base_T(pr,geom,x,y)`/`height(geom,x,y)`), so the annulus uses the
 radial log/H base state and `r - R0`.  The annulus card requires
-`R1 - R0 = 1` (the gap is the physics length unit), all four logical walls
-`:rigid` (free-slip curved walls need the general normal-velocity constraint
-rows of stage 0.5b2), `side_thermal=:insulating` (the wedge cuts are symmetry
-cuts, not Cartesian side walls) and refuses the box-only `nu_cbf`/`extdiag`
-diagnostics and, through the mapped-geometry block, the reference state,
-density hook, `symmetry=:x`, per-step Newton and `:periodic` seam.  G274 is the
-gate: conduction fixed point, H-inclusive flux identity, hydrostatic balance,
-the end-to-end run with checkpoint/resume and every refusal, and the
-depth-dependent closure wiring.
+`R1 - R0 = 1` (the gap is the physics length unit), `side_thermal=:insulating`
+(the wedge cuts are symmetry cuts, not Cartesian side walls) and refuses the
+box-only `nu_cbf`/`extdiag` diagnostics and, through the mapped-geometry block,
+the reference state, density hook, `symmetry=:x`, per-step Newton and
+`:periodic` seam.  Stage 0.5b1 ran `:rigid` walls only; **stage 0.5b2 lifts
+that**: a `:free` wall is the general curved-wall row `n.u = 0` (zero normal
+velocity, natural zero tangential traction), a `:rigid` wall takes the
+wall-frame data `wall_un = u.n`/`wall_u = u.tau`, and `:open` walls use the
+natural traction `wall_t`/`wall_tn` in the same `(n, tau)` frame with the
+derived (unpinned) pressure gauge.  The default `Params` is `bc = :free`, so a
+plain `geom=:annulus` card now runs free-slip circles and free-slip radial
+cuts.  The annular initial condition is a knob: `annulus_ic = :firedrake`
+(Davies et al. 2022 Eq. (41)) or `:aspect` (the ASPECT spherical hexagonal
+perturbation, angular mode 4) sets the paper's/ASPECT's documented **total**
+temperature, converted by the driver to the perturbation `theta = T_ic - Tbar(r)`
+through the annulus base state and re-sampled by the existing `theta_ic` hook
+after every AMR cycle; it needs `geom=:annulus` and cannot be combined with a
+user `theta_ic` or with `restart_from`.  The full periodic ring remains the
+0.5c prerequisite: `seam=:periodic` is refused by the `PolarAnnulus`
+constructor, so every `geom=:annulus` card is a walled wedge.  G274 is the
+stage-0.5b1 gate (conduction fixed point, H-inclusive flux identity, hydrostatic
+balance, the end-to-end rigid run with checkpoint/resume and the remaining
+refusals, depth-dependent closure wiring); G275 is the stage-0.5b2 gate
+(free-slip rows, Couette/manufactured analytic gates, `:open` traction, rotation
+gauge, annular IC and the free-slip end-to-end driver run).
 

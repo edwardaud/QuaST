@@ -330,16 +330,29 @@ wall-node positions, and the net-flux check/perimeter use the mapped face
 measure.  A mapped space therefore supports `linear=:direct`, `:mg` and `:auto`
 (the selector samples the eta contrast on the mapped domain); `:schur_cg` and
 `:lagged` keep the box reference-matrix / stale-LU gauge assumptions and are
-refused with an actionable message.  `:rigid`/`:open` walls only (a `:free` wall
-or `wall_un` prescribe a *global component*, which is the wall-normal direction
-only on an axis-aligned wall; the general normal-velocity row is the annulus BC
-stage), and `geo_u`/`dp_u`/`elastic_stress` and the Cartesian density multiplier
-are refused (their leaves are box-only).  `wall_t`/`wall_tn` on a mapped
-geometry are the wall-local components `t.tau` and `t.n` of the total traction
-(GEOM_DESIGN §6.3), not the box's global components.  The box path is unchanged
-and bitwise: the box methods are the historical bodies (GEOM_DESIGN §4), the
-mapped kernels are separate bodies (G267 exactness, G268 cross-path consistency,
-G271 mapped sparse-vs-matrix-free and mapped MG-vs-direct).
+refused with an actionable message.  **stage 0.5b2** lifted the wall-kind restriction: a mapped geometry supports
+`:free`, `:rigid` and `:open` walls.  On a mapped wall the data are the
+**wall-frame** components: a `:free` wall is the linear constraint
+`u.n = wall_un` (or 0; zero tangential traction is natural), a `:rigid` wall is
+`u = un n + ut tau` with `un = wall_un` (or the normal component of the global
+exact-field closures `uDx`/`uDz`) and `ut = wall_u` (or their tangential
+component), and `:open` keeps the natural traction with `wall_t`/`wall_tn` as
+`t.tau`/`t.n` (GEOM_DESIGN §6.3).  So on a mapped geometry `wall_un` means
+`u.n` and `wall_u` means `u.tau` -- along the mapped outward normal / positive
+logical tangent, which on the annulus circles are `+-e_r` and `+e_phi`; on the
+box they keep the historical global positive-component meaning.  The rows are
+built by `stokes/wall_constraints.jl` (one linear relation per free wall node,
+the box's corner write order, hanging composition, the mapped net-flux data
+integration, and the rigid-mode analysis with the rotation gauge: a free-slip
+curved wall admits the solid-body rotation, which is pinned out of the linear
+system and projected out of the returned velocity to zero net angular momentum;
+a torque-imbalanced load and a translation nullspace are refused).
+`geo_u`/`dp_u`/`elastic_stress` and the Cartesian density multiplier are still
+refused (their leaves are box-only).  The box path is unchanged and bitwise: the
+box methods are the historical bodies (GEOM_DESIGN §4), the mapped kernels are
+separate bodies (G267 exactness, G268 cross-path consistency, G271 mapped
+sparse-vs-matrix-free and mapped MG-vs-direct, G275 the curved-wall rows, the
+gauges and the annular IC).
 """
 function solve_semquad_stokes_var(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,

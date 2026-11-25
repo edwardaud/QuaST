@@ -107,6 +107,7 @@ include("stokes/apply.jl")
 include("stokes/diag.jl")
 include("stokes/solve_const.jl")
 include("stokes/assembly_var.jl")
+include("stokes/wall_constraints.jl")
 include("stokes/solve_var_core.jl")
 include("stokes/solve_var_fallback.jl")
 include("stokes/solve_var.jl")
@@ -225,6 +226,7 @@ export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, l
        solve_semquad_poisson, semquad_eval, LAST_SEMSTOKES_RESIDUAL,
        LAST_SEMSTOKES_SCHUR_ITERS, LAST_SEMSTOKES_VEL_CG_ITERS, LAST_SEMSTOKES_REGULARIZED,
        LAST_SEMSTOKES_PRESSURE_GAUGE,
+       LAST_SEMSTOKES_ROTATION_GAUGE, LAST_SEMSTOKES_ROTATION_SHIFT,
        LAST_SEMSTOKES_RESID_SPLIT, LAST_SEMSTOKES_SHIFT, LAST_SEMSTOKES_REFINE_ITERS,
        LAST_SEMSTOKES_LADDER, LAST_SEMSTOKES_LADDER_PHASE, LAST_SEMSTOKES_SCALED,
        SEMSTOKES_K_ASSEMBLIES, LAST_SEMSTOKES_LAGGED_ITERS, LAST_SEMSTOKES_LAGGED_REFACTOR,

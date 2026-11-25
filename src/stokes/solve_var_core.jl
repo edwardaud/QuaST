@@ -240,74 +240,13 @@ function _semquad_check_rigid_modes(ss::SemStokes,
         "_semquad_rigid_mode_gram, docs/dev/BC_DESIGN.md §3.5, G262."))
 end
 
-"""
-    _semquad_dirichlet_fixed_mapped!(fixed, g, su, bmask, resolved_wall_bc, wall_u, uDx, uDz)
-
-Mapped Dirichlet dof selection (cut 2, GEOM_DESIGN §3 cut 2: "fixed-dof loop
-physical positions through the map").  The wall bookkeeping is the same as the
-box body — the boundary mask is the precomputed logical face flag, the resolved
-wall condition decides which components are written, the wall order is
-`(xminus, xplus, yminus, yplus)` and normal-before-tangential, so the corner
-overwrite order is preserved — and the only difference is that the evaluation
-points of the closure data are the **mapped** physical positions
-`element_map(g, su, lf, +-1, su.xi[j])`, not the box formulas.
-
-`uDx`/`uDz` are the global Cartesian components of the exact Dirichlet field,
-evaluated at those physical points (a `:rigid` wall fixes both components, so
-this is coordinate-free); `wall_u` overrides the tangential component on a
-`:rigid` wall exactly as on the box.  `:free` walls and `wall_un` are refused
-for a mapped geometry by the caller: "normal component" there is a global
-component, which is only the wall-normal direction for an axis-aligned wall.
-"""
-function _semquad_dirichlet_fixed_mapped!(fixed::Dict{Int,Float64},
-                                          g::AbstractGeometry, su::SemQuad,
-                                          bmask::Vector{UInt8},
-                                          resolved_wall_bc,
-                                          wall_u, uDx::Function, uDz::Function)
-    n = su.p + 1
-    nu = su.N
-    @inbounds for it in eachindex(su.leaves)
-        lf = su.leaves[it]
-        uids = su.elem[lf]
-        fb = 4 * (it - 1)
-        for (wi, dir) in enumerate(LOGICAL_SIDES)
-            bmask[fb + wi] != 0x00 || continue
-            wbc = resolved_wall_bc[wi]
-            wbc === :open && continue
-            rigid_wall = wbc === :rigid
-            if dir === :xminus || dir === :xplus
-                xipm = dir === :xminus ? -1.0 : 1.0
-                iF = dir === :xminus ? 1 : n
-                for j in 1:n
-                    xf, yv = element_map(g, su, lf, xipm, su.xi[j])
-                    gidx = uids[(j - 1) * n + iF]
-                    fixed[gidx] = uDx(xf, yv)
-                    tang = wall_u[wi]
-                    rigid_wall && (fixed[nu + gidx] =
-                                   tang === nothing ? uDz(xf, yv) : tang(xf, yv))
-                end
-            else
-                etpm = dir === :yminus ? -1.0 : 1.0
-                jF = dir === :yminus ? 1 : n
-                for i in 1:n
-                    xv, yf = element_map(g, su, lf, su.xi[i], etpm)
-                    gidx = uids[(jF - 1) * n + i]
-                    fixed[nu + gidx] = uDz(xv, yf)
-                    tang = wall_u[wi]
-                    rigid_wall && (fixed[gidx] =
-                                   tang === nothing ? uDx(xv, yf) : tang(xv, yf))
-                end
-            end
-        end
-    end
-    return fixed
-end
-
 # Historical box body of the Dirichlet dof selection, moved verbatim out of the
-# core solve so the mapped geometry can have its own method.  The statements,
-# the write order and the corner overwrites are unchanged; only `n`/`nu` are
-# recomputed from `su` (the same values the caller had).  This is the *only*
-# structural change the box path receives in cut 2.
+# core solve so the mapped geometry can have its own path (stage 0.5b2: the
+# general curved-wall rows of `stokes/wall_constraints.jl`; the box statements,
+# write order and corner overwrites are unchanged).  The statements, the write
+# order and the corner overwrites are unchanged; only `n`/`nu` are recomputed
+# from `su` (the same values the caller had).  This is the *only* structural
+# change the box path receives in cut 2.
 function _semquad_fill_fixed!(fixed::Dict{Int,Float64}, ::CartesianBox,
                               su::SemQuad, bmask::Vector{UInt8},
                               resolved_wall_bc, wall_u, wall_un,
@@ -368,17 +307,6 @@ function _semquad_fill_fixed!(fixed::Dict{Int,Float64}, ::CartesianBox,
     return fixed
 end
 
-function _semquad_fill_fixed!(fixed::Dict{Int,Float64}, g::AbstractGeometry,
-                              su::SemQuad, bmask::Vector{UInt8},
-                              resolved_wall_bc, wall_u, wall_un,
-                              uDx::Function, uDz::Function)
-    all(t -> t === nothing, wall_un) ||
-        throw(ArgumentError("_semquad_fill_fixed!: wall_un is box-only for a " *
-                            "mapped geometry"))
-    return _semquad_dirichlet_fixed_mapped!(fixed, g, su, bmask,
-                                            resolved_wall_bc, wall_u, uDx, uDz)
-end
-
 """
     _semquad_perimeter(su, bmask) -> Float64
 
@@ -394,6 +322,150 @@ non-zero) and only scales a round-off-level threshold, never an operator.
                            bmask::Vector{UInt8}) = perimeter(g)
 @inline _semquad_perimeter(g::AbstractGeometry, su::SemQuad,
                            bmask::Vector{UInt8}) = perimeter(g, su, bmask)
+
+# ---------------------------------------------------------------------------
+# The velocities boundary preparation (stage 0.5b2)
+# ---------------------------------------------------------------------------
+# One function barrier, dispatched on the concrete geometry, replacing the
+# cut-2 boundary block of the core solve.  The `CartesianBox` method is the
+# historical body **verbatim** (the fixed-dof loop, the open-wall rigid-mode
+# check, the net-flux compatibility check, the hanging constraints and the
+# affine system) plus the no-wall sentinel; the mapped method builds the
+# stage-0.5b2 general curved-wall rows (`stokes/wall_constraints.jl`), the
+# mapped net-flux data integral and the merged affine system with offsets.
+# The barrier exists for the box allocation contract: geometry-dependent
+# branches and union-typed locals inside the 1 300-line core changed its
+# codegen by +208 B per assembly in the A/B, while moving them behind a typed
+# method boundary keeps the box path's compiled body identical in shape to the
+# cut-2 code.  Both methods return the same concrete tuple
+# `(fixed, cons2, u0, Cu, wd)`; `wd` is `_SEMQUAD_NO_WALLS` for the box.
+function _semquad_velocity_boundary(ss::SemStokes, geom::CartesianBox,
+                                    su::SemQuad, qt::Quadtree,
+                                    bmask::Vector{UInt8}, resolved_wall_bc,
+                                    wall_u, wall_un, uDx::Function,
+                                    uDz::Function, fd::FEData, n::Int,
+                                    nu::Int, Nu2::Int)
+    fixed = Dict{Int,Float64}()
+    _semquad_fill_fixed!(fixed, geom, su, bmask, resolved_wall_bc, wall_u,
+                         wall_un, uDx, uDz)
+    # BC stage 3: is there an `:open` wall?  It decides the pressure gauge (pin
+    # only when *no* wall is open) and the well-posedness / net-flux checks.
+    if any(w -> w === :open, resolved_wall_bc)
+        # with an `:open` wall the Dirichlet set can shrink enough to leave a
+        # rigid-body mode admissible; the numeric 3x3 Gram test runs on exactly
+        # the dofs the solve will impose (docs/dev/BC_DESIGN.md 搂3.5; the
+        # all-`:open` pure-traction case was refused before the assembly).  With
+        # every wall closed the historical normal Dirichlet data remove the
+        # three modes, so the default path does not run this check.
+        _semquad_check_rigid_modes(ss, fixed, resolved_wall_bc)
+    else
+        # Net-flux compatibility of the prescribed normal data (docs/dev/
+        # BC_DESIGN.md 搂3.5 eq. 8).  When the normal component is Dirichlet on
+        # *every* wall (i.e. no wall is `:open`), the constant pressure is in the
+        # null space of the reduced gradient and the pinned pressure gauge is
+        # exact only when the boundary data satisfy 鈭垈惟 u路n dS = 0.  The default
+        # card (driver closures `(x,y)->0.0`, every `wall_un` nothing) integrates
+        # to zero exactly, so the `umax == 0` shortcut keeps the default path
+        # free of extra arithmetic.
+        netflux, wumax = _semquad_wall_normal_flux(ss, geom, fixed, fd, n, nu,
+                                                   bmask)
+        if wumax > 0.0
+            # The box keeps the historical analytic `2*(Lx+1)` perimeter.
+            perimeter = _semquad_perimeter(su, bmask)
+            # The relative threshold is the design's `1e-12 * u_scale *
+            # perimeter`, with one necessary correction: an **absolute floor** of
+            # `1e-12` (in the solver's nondimensional velocity unit).  A
+            # manufactured-solution gate (G33/G44/G150/G151/G154) prescribes the
+            # exact field as its Dirichlet data; the *mathematical* net flux of
+            # that data is zero, but its floating-point evaluation at the
+            # boundary nodes is not (e.g. `sin(pi) = 1.2e-16`), so a strictly
+            # data-scaled test would reject legitimate reference gates whose
+            # imbalance is a round-off artefact and physically irrelevant.  The
+            # floor only decides cases whose flux inconsistency is below 1e-12
+            # of a unit velocity -- far below any accuracy gate in the suite --
+            # and it does not weaken the user-facing check (a card's wall_un
+            # values are O(1..1e3)).
+            tol = 1.0e-12 * max(wumax * perimeter, 1.0)
+            if abs(netflux) > tol
+                throw(ArgumentError("the prescribed normal wall velocities have a " *
+                    "net outward boundary flux of $(netflux) (threshold $(tol) = " *
+                    "1e-12 * max(umax * perimeter, 1), umax = $(wumax)).  Every wall " *
+                    "keeps a Dirichlet normal component, and the discrete continuity " *
+                    "equations are consistent only when 鈭垈惟 u路n dS = 0.  " *
+                    "`wall_un[i]` (and the legacy `uDx`/`uDz` closures) is the wall's " *
+                    "normal *component* in the positive coordinate direction, so the " *
+                    "outward flux is its face integral with the sign -1 on " *
+                    "xminus/yminus and +1 on xplus/yplus; balance the inflow and the " *
+                    "outflow (e.g. `wall_un = (U, U, 0, 0)` for a uniform " *
+                    "through-flow)."))
+            end
+        end
+    end
+    cons2 = Dict{Int,Tuple{Vector{Int},Vector{Float64}}}()
+    for (c, (ms, ws)) in semquad_constraints(su, qt)
+        cons2[c] = (ms, ws)
+        cons2[nu + c] = (nu .+ ms, ws)
+    end
+    u0, Cu, _ = _affine_constraint(Nu2, cons2, fixed)
+    return fixed, cons2, u0, Cu, _SEMQUAD_NO_WALLS
+end
+
+function _semquad_velocity_boundary(ss::SemStokes, geom::AbstractGeometry,
+                                    su::SemQuad, qt::Quadtree,
+                                    bmask::Vector{UInt8}, resolved_wall_bc,
+                                    wall_u, wall_un, uDx::Function,
+                                    uDz::Function, fd::FEData, n::Int,
+                                    nu::Int, Nu2::Int)
+    fixed = Dict{Int,Float64}()
+    cons_hang = Dict{Int,Tuple{Vector{Int},Vector{Float64}}}()
+    for (c, (ms, ws)) in semquad_constraints(su, qt)
+        cons_hang[c] = (ms, ws)
+        cons_hang[nu + c] = (nu .+ ms, ws)
+    end
+    wd = _semquad_mapped_wall_data(geom, su, bmask, resolved_wall_bc, wall_u,
+                                   wall_un, uDx, uDz, cons_hang)
+    for (k, v) in wd.fixed
+        fixed[k] = v
+    end
+    if wd.gauge === :rotation
+        LAST_SEMSTOKES_ROTATION_GAUGE[] = :rotation
+    end
+    if any(w -> w === :open, resolved_wall_bc)
+        # The rigid-mode analysis ran inside the wall-row pass, which knows the
+        # free-slip rows; the Cartesian-dof Gram test would false-refuse them.
+    else
+        # Net-flux compatibility of the *prescribed outward normal data*; on a
+        # curved free-slip wall the nodal normal components are the data and the
+        # tangential components are free, so the box's Cartesian component
+        # integral is not the mapped data's flux.
+        netflux, wumax = _semquad_wall_normal_flux(geom, su, bmask, wd.un, fd)
+        if wumax > 0.0
+            perimeter = _semquad_perimeter(su, bmask)
+            tol = 1.0e-12 * max(wumax * perimeter, 1.0)
+            if abs(netflux) > tol
+                throw(ArgumentError("the prescribed normal wall velocities have a " *
+                    "net outward boundary flux of $(netflux) (threshold $(tol) = " *
+                    "1e-12 * max(umax * perimeter, 1), umax = $(wumax)).  Every wall " *
+                    "keeps a Dirichlet normal component, and the discrete continuity " *
+                    "equations are consistent only when 鈭垈惟 u路n dS = 0.  " *
+                    "`wall_un[i]` is the wall's normal *velocity* (on a mapped " *
+                    "geometry the outward-normal component `u.n`; on the box the " *
+                    "normal component in the positive coordinate direction), and the " *
+                    "flux above is its outward face integral; balance the inflow and " *
+                    "the outflow (e.g. `wall_un = (U, U, 0, 0)` for a uniform " *
+                    "through-flow, or the wall-frame data of a manufactured " *
+                    "solution)."))
+            end
+        end
+    end
+    # Compose the hanging constraints with the wall rows (masters that the wall
+    # rows constrain, and the wall rows of hanging wall nodes, are already
+    # folded into the affine representation by the wall pass) and build
+    # u = u0 + Cu u_free with the affine offsets of the wall rows.
+    cons2, offsets = _semquad_merge_wall_constraints(cons_hang, wd)
+    u0, Cu, _ = _affine_constraint(Nu2, cons2, fixed, offsets)
+    return fixed, cons2, u0, Cu, wd
+end
 
 function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                   eta_fun::Function,
@@ -770,25 +842,11 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                 "block (dp_u) or the elastic force (elastic_stress) in cut 2: " *
                 "their elements still run the box-only leaf kernel.  Use a " *
                 "CartesianBox geometry for those."))
-        for (wi, wbc) in enumerate(resolved_wall_bc)
-            (wbc === :rigid || wbc === :open) ||
-                throw(ArgumentError("a mapped geometry ($gname) supports only " *
-                    ":rigid and :open walls in stage 0 cut 2 (wall $(wi) " *
-                    "resolves to :$wbc).  A :free wall prescribes the normal " *
-                    "*global component*, which is the wall-normal velocity only " *
-                    "on an axis-aligned wall; the general normal-velocity " *
-                    "Dirichlet row is the annulus BC-stage work " *
-                    "(docs/dev/GEOM_DESIGN.md §6.5).  Use bc=:rigid (or " *
-                    "wall_bc = :rigid/:open)."))
-            wall_un[wi] === nothing ||
-                throw(ArgumentError("a mapped geometry ($gname) does not " *
-                    "support wall_un (wall $(wi)): it is the normal velocity " *
-                    "as a *global component in the positive coordinate " *
-                    "direction*, which is a wall-normal component only on an " *
-                    "axis-aligned wall.  On a mapped geometry use bc=:rigid " *
-                    "with the global-component closures uDx/uDz, or the " *
-                    "traction data wall_tn = t.n / wall_t = t.tau."))
-        end
+        # Stage 0.5b2: `:free` walls and `wall_un` are supported on a mapped
+        # geometry (the general curved-wall rows of
+        # `stokes/wall_constraints.jl`); the wall-frame semantics are
+        # `wall_un = u.n` and `wall_u = u.tau`, documented in that file.  No
+        # per-wall-kind restriction remains here.
         mass_rho_mult === nothing ||
             throw(ArgumentError("a mapped geometry ($gname) does not support " *
                 "the Cartesian density multiplier (mass_rho_mult): its " *
@@ -935,79 +993,28 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
                                 "nonsymmetric (Bm != Bc'); use linear=:direct"))
     end
 
-    # affine Dirichlet data on the domain boundary.  Cut 2: the box method is
-    # the historical loop moved verbatim into `_semquad_fill_fixed!`; a mapped
-    # geometry evaluates the closures at the mapped wall-node positions.
-    fixed = Dict{Int,Float64}()
-    _semquad_fill_fixed!(fixed, geom, su, bmask, resolved_wall_bc, wall_u,
-                         wall_un, uDx, uDz)
-    # BC stage 3: is there an `:open` wall?  It decides two things below: the
-    # pressure gauge (pin only when *no* wall is open) and the well-posedness
-    # test / net-flux skip.
+    # Stage 0.5b2: the velocity gauge of the previous solve is stale; every
+    # solve resolves it again (`:none` on the box and on every configuration
+    # whose wall rows exclude the rigid-body modes).  Two Ref writes, no
+    # allocation and no arithmetic on the box path.
+    LAST_SEMSTOKES_ROTATION_GAUGE[] = :none
+    LAST_SEMSTOKES_ROTATION_SHIFT[] = 0.0
+    # The boundary preparation is a **function barrier dispatched on the
+    # concrete geometry** (see `_semquad_velocity_boundary`): the box method is
+    # the cut-2 boundary block verbatim and the mapped method builds the general
+    # curved-wall rows (`stokes/wall_constraints.jl`: the free-slip `n.u = g`
+    # lines, the wall-frame Dirichlet data, the corner order, the rigid-mode
+    # analysis and the rotation gauge).  Keeping the geometry branches behind a
+    # typed method boundary keeps the box path's codegen and allocation at the
+    # cut-2 values (the A/B measured +208 B per assembly when the branches were
+    # in the core body).
+    fixed, cons2, u0, Cu, wd = _semquad_velocity_boundary(
+        ss, geom, su, qt, bmask, resolved_wall_bc, wall_u, wall_un, uDx, uDz,
+        fd, n, nu, Nu2)
+    # BC stage 3: is there an `:open` wall?  It decides the pressure gauge (pin
+    # only when *no* wall is open; the net-flux/well-posedness checks ran in the
+    # boundary preparation above).
     any_open = any(w -> w === :open, resolved_wall_bc)
-    if any_open
-        # BC stage 3 well-posedness: with an `:open` wall the Dirichlet set can
-        # shrink enough to leave a rigid-body mode admissible.  `fixed` is final
-        # here, so the numeric 3x3 rigid-mode Gram test runs on exactly the dofs
-        # the solve will impose (docs/dev/BC_DESIGN.md §3.5; the all-`:open`
-        # pure-traction case was refused before the assembly).  With every wall
-        # closed the historical normal Dirichlet data always remove the three
-        # modes, so the default path does not run this check.
-        _semquad_check_rigid_modes(ss, fixed, resolved_wall_bc)
-    else
-        # Net-flux compatibility of the prescribed normal data (docs/dev/
-        # BC_DESIGN.md §3.5 eq. 8).  When the normal component is Dirichlet on
-        # *every* wall (i.e. no wall is `:open`), the constant pressure is in the
-        # null space of the reduced gradient and the pinned pressure gauge is
-        # exact only when the boundary data satisfy ∫∂Ω u·n dS = 0.  The default
-        # card (driver closures `(x,y)->0.0`, every `wall_un` nothing) integrates
-        # to zero exactly, so the `umax == 0` shortcut keeps the default path
-        # free of extra arithmetic.  BC stage 3: with an `:open` wall the free
-        # normal velocity absorbs any imbalance by construction, so the check is
-        # skipped above -- the free normal component is the compatibility.
-        netflux, wumax = _semquad_wall_normal_flux(ss, geom, fixed, fd, n, nu,
-                                                   bmask)
-        if wumax > 0.0
-            # Cut 2: the box keeps the historical analytic `2*(Lx+1)`
-            # (GEOM_DESIGN E12, bit for bit); a mapped geometry integrates its
-            # mapped boundary.
-            perimeter = _semquad_perimeter(su, bmask)
-            # The relative threshold is the design's `1e-12 * u_scale *
-            # perimeter`, with one necessary correction: an **absolute floor** of
-            # `1e-12` (in the solver's nondimensional velocity unit).  A
-            # manufactured-solution gate (G33/G44/G150/G151/G154) prescribes the
-            # exact field as its Dirichlet data; the *mathematical* net flux of
-            # that data is zero, but its floating-point evaluation at the
-            # boundary nodes is not (e.g. `sin(pi) = 1.2e-16`), so a strictly
-            # data-scaled test would reject legitimate reference gates whose
-            # imbalance is a round-off artefact and physically irrelevant.  The
-            # floor only decides cases whose flux inconsistency is below 1e-12
-            # of a unit velocity -- far below any accuracy gate in the suite --
-            # and it does not weaken the user-facing check (a card's wall_un
-            # values are O(1..1e3)).
-            tol = 1.0e-12 * max(wumax * perimeter, 1.0)
-            if abs(netflux) > tol
-                throw(ArgumentError("the prescribed normal wall velocities have a " *
-                    "net outward boundary flux of $(netflux) (threshold $(tol) = " *
-                    "1e-12 * max(umax * perimeter, 1), umax = $(wumax)).  Every wall " *
-                    "keeps a Dirichlet normal component, and the discrete continuity " *
-                    "equations are consistent only when ∫∂Ω u·n dS = 0.  " *
-                    "`wall_un[i]` (and the legacy `uDx`/`uDz` closures) is the wall's " *
-                    "normal *component* in the positive coordinate direction, so the " *
-                    "outward flux is its face integral with the sign -1 on " *
-                    "xminus/yminus and +1 on xplus/yplus; balance the inflow and the " *
-                    "outflow (e.g. `wall_un = (U, U, 0, 0)` for a uniform " *
-                    "through-flow)."))
-            end
-        end
-    end
-    cons_u = semquad_constraints(su, qt)
-    cons2 = Dict{Int,Tuple{Vector{Int},Vector{Float64}}}()
-    for (c, (ms, ws)) in cons_u
-        cons2[c] = (ms, ws)
-        cons2[nu + c] = (nu .+ ms, ws)
-    end
-    u0, Cu, _ = _affine_constraint(Nu2, cons2, fixed)
     cons_p = semquad_constraints(sp, qt)
     # BC stage 3: the pressure gauge is **derived**, not unconditional.  The nodal
     # pin (one pressure dof fixed to zero, its continuity equation dropped) is
@@ -1066,6 +1073,22 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
         end
     else
         fr = Cu' * (fv - K * u0 + Bm' * p0)
+    end
+    # Stage 0.5b2: a rotation-gauge configuration pins one free velocity dof to
+    # remove the solid-body rotation from the linear system, but the pinned
+    # saddle is still unsolvable for a load with a net torque: no wall of a
+    # free-slip curved wall with an `:open` wall can exert one, and the
+    # projected velocity would not satisfy the momentum equation.  Refuse the
+    # card with the measured torque instead of returning a wrong field.
+# Stage 0.5b2 rotation-gauge load solvability (see the file header)
+    # Stage 0.5b2: a rotation-gauge configuration pins one free velocity dof to
+    # remove the solid-body rotation from the linear system, but the pinned
+    # saddle is still unsolvable for a load with a net torque: no wall of a
+    # free-slip curved wall with an `:open` wall can exert one, and the
+    # projected velocity would not satisfy the momentum equation.  Refuse the
+    # card with the measured torque instead of returning a wrong field.
+    if wd.gauge === :rotation
+        _semquad_check_rotation_load(su, fv, wd.gauge)
     end
     Kred = mf_path ? nothing :
            Kgeo === nothing ? Cu' * K * Cu : Cu' * (K + Kgeo) * Cu
@@ -1360,6 +1383,17 @@ function _solve_semquad_stokes_var_core(ss::SemStokes, qt::Quadtree,
     pv = p0 + Cp * pfree
     if return_system
         return u, pv, fixed, cons2, cons_p, K, Bref, Cu, Cp, u0, p0, fv
+    end
+    # Stage 0.5b2 rotation gauge: the solve used a pinned free dof to remove the
+    # solid-body-rotation nullspace; the returned field is the canonical
+    # zero-net-angular-momentum representative (`int r x u dA = 0`), i.e. the L2
+    # projection onto the rotation mode has been removed.  The pressure is
+    # unchanged (a rigid rotation has zero strain rate and zero divergence) and
+    # the momentum residual is unchanged provided the load had no net torque,
+    # which `_semquad_check_rotation_load` verified above.
+    if wd.gauge === :rotation
+        LAST_SEMSTOKES_ROTATION_SHIFT[] =
+            _semquad_project_rotation!(u, geom, su)
     end
     return u, pv, fixed, cons2, cons_p
 end

@@ -2,13 +2,13 @@
 
 One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
-test script that starts with `using`; most wrap one `@testset`. The 192 files
-hold the suite's 136 662 assertions (136 660 passed, 2
-broken, 0 failed) — the count of the stage-0.5a tree, recorded with its
+test script that starts with `using`; most wrap one `@testset`. The 194 files
+hold the suite's 136 980 assertions (136 978 passed, 2
+broken, 0 failed) — the count of the stage-0.5b2 tree, recorded with its
 evidence in `docs/dev/GEOM_PROGRESS.md`. (Cut 1 recorded 134 086 / 134 084 / 0 / 2
 on 185 files; cut 2 adds G267 and G268; cut 3 adds G269, +151 assertions; cut 4
 adds G270, +302 assertions; cut 5 adds G271, +136 assertions; cut 6 adds G272,
-+245 assertions; stage 0.5a adds G273, +1 565 assertions.) The top-level README
++245 assertions; stage 0.5a adds G273, +1 565 assertions; stage 0.5b1 adds G274, +158 assertions; stage 0.5b2 adds G275, +160 assertions.) The top-level README
 still quotes the pre-cut-1 total
 (133 716); the top-level markdown was outside the cut write scopes.
 

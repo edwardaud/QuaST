@@ -151,7 +151,17 @@ balanced AMR cycles on `theta0` *before* the first time step;
 when `theta_ic(x,y)` is given, the analytic initial condition is re-sampled on
 each refined tree instead of transferring the coarse initial field.  This is
 the clean-protocol path for high-Ra runs: the boundary layer/plume is resolved
-at t=0, rather than being inherited from a coarse static spin-up (default 0).  With `maxpic>1` the flow and energy are Picard-iterated;
+at t=0, rather than being inherited from a coarse static spin-up (default 0).
+**Stage 0.5b2:** for the annulus the documented benchmark initial conditions are
+selectable directly with `annulus_ic = :firedrake` (Davies et al. 2022 Eq. (41):
+`T = (R1-r) + 0.02 cos(4 atan2(y,x)) sin(pi (r-R0))`) or `annulus_ic = :aspect`
+(the ASPECT `spherical hexagonal perturbation`, angular mode 4:
+`T = s + 0.2 s(1-s) cos(4 atan2(y,x))`, `s = (R1-r)/d`).  Both are *total*
+temperatures; the driver converts them to the solver's perturbation
+`theta = T - Tbar(r)` through the annulus radial base state and re-samples the
+same closure after every AMR cycle.  The knob needs `geom=:annulus`, cannot be
+combined with a user `theta_ic` or with `restart_from`, and defaults to `:none`
+(the caller's `theta0`).  With `maxpic>1` the flow and energy are Picard-iterated;
 `pic_relax` in (0,1] under-relaxes the theta update (`pic_relax=1` is the
 original unrelaxed iteration).  With `cfl>0`
 the step is updated from the current velocity and mesh (5% growth per step,
@@ -402,6 +412,16 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 transfer_mode::Symbol=:nodal,
                                 initial_refine::Int=0,
                                 theta_ic::Union{Nothing,Function}=nothing,
+                                # Stage 0.5b2: the documented annular initial
+                                # condition (:none = the caller's theta0).
+                                # `:firedrake` is the published paper's Eq. (41)
+                                # (linear in r + a 4-fold perturbation), `:aspect`
+                                # the ASPECT `spherical hexagonal perturbation`
+                                # at angular mode 4.  Both are *total*
+                                # temperatures; the driver converts them to the
+                                # perturbation `T - Tbar(r)` of the annulus base
+                                # state (see `_annulus_ic_theta`).
+                                annulus_ic::Symbol=:none,
                                 maxsteps::Int=10000,
                                 advection::Symbol=:galerkin,
                                 ev::Float64=0.0, ev_cmax::Float64=0.052,
@@ -780,23 +800,16 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 "condition, not Cartesian side walls with a " *
                                 "prescribed temperature.  Keep " *
                                 "side_thermal=:insulating."))
-        # * Stage 0.5b1 runs rigid circles (and rigid wedge cuts): the mapped
-        #   solver's Dirichlet rows fix both Cartesian components, i.e. u = 0.
-        #   Free slip on a circle is u.n = 0 + zero tangential traction, a
-        #   position-dependent linear combination of the two components whose
-        #   constraint rows are stage 0.5b2's work.  An :open wall changes the
-        #   pressure gauge and is not wired for the annulus either.
-        (pr.bc === :rigid &&
-         all(w -> w === :same || w === :rigid, pr.wall_bc)) ||
-            throw(ArgumentError("the annulus runs rigid walls in stage 0.5b1: " *
-                                "pass bc=:rigid with the default per-wall " *
-                                "wall_bc = (:same, :same, :same, :same) (or " *
-                                "explicit :rigid entries).  A :free curved wall " *
-                                "needs the general normal-velocity constraint " *
-                                "rows of stage 0.5b2, and :open walls change the " *
-                                "pressure gauge (they are not wired for the " *
-                                "annulus).  Got bc=:$(pr.bc), wall_bc=" *
-                                "$(pr.wall_bc)."))
+        # * Stage 0.5b2: every wall kind is wired on the curved annulus walls.
+        #   `:free` is the general `n.u = g` line row (free slip: zero normal
+        #   velocity, natural zero tangential traction), `:rigid` is the
+        #   wall-frame Dirichlet data `u = un*n + ut*tau` (`wall_u`/`wall_un` are
+        #   `u.tau`/`u.n` on a mapped geometry), and `:open` is the natural
+        #   traction condition with the derived (unpinned) pressure gauge and the
+        #   `wall_t`/`wall_tn` data in the `(n,tau)` frame.  The periodic ring is
+        #   still out of scope: `seam = :periodic` is refused by the
+        #   `PolarAnnulus` constructor, so every `geom = :annulus` card builds a
+        #   walled wedge (the published full-ring benchmark is stage 0.5c).
         # * `nu_cbf` and `extdiag` sum the residual on the box's logical y wall
         #   rows and normalise by `total_area`; on the annulus the thermal walls
         #   are the circles (`nu_wall_sides = (:xminus, :xplus)`), so those
@@ -893,6 +906,34 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     sq = ss.su
     length(theta0) == sq.N ||
         throw(ArgumentError("theta0 has $(length(theta0)) entries, mesh needs $(sq.N)"))
+    # Stage 0.5b2: the documented annular initial condition.  Both benchmark
+    # initial conditions are **total** temperatures (linear in r plus a 4-fold
+    # perturbation vanishing on both circles); the solver's variable is the
+    # perturbation `theta = T - Tbar(r)`, so the IC is resampled through the
+    # geometry's base state and exposed through the same `theta_ic` hook the AMR
+    # re-sampling uses (a refined tree gets the analytic IC again, not a
+    # transferred coarse field).  A resumed run carries theta in the checkpoint,
+    # so the startup knob is refused with `restart_from`.
+    if annulus_ic !== :none
+        geom isa PolarAnnulus ||
+            throw(ArgumentError("annulus_ic=$(annulus_ic) needs the annulus " *
+                                "geometry: pass geom=:annulus with " *
+                                "annulus_R0/annulus_R1/annulus_Phi (or a " *
+                                "PolarAnnulus object).  Got $(geometry_name(geom))."))
+        theta_ic === nothing ||
+            throw(ArgumentError("annulus_ic=$(annulus_ic) builds theta0 from " *
+                                "the documented total temperature, so it cannot " *
+                                "be combined with a theta_ic(x,y) perturbation " *
+                                "closure.  Pass exactly one initial condition."))
+        restart === nothing ||
+            throw(ArgumentError("annulus_ic=$(annulus_ic) is a startup initial " *
+                                "condition and cannot be combined with " *
+                                "restart_from: the resumed checkpoint carries " *
+                                "theta.  Drop annulus_ic, or restart without it."))
+        icfun = (x, y) -> _annulus_ic_theta(annulus_ic, geom, pr, x, y)
+        theta0 = [Float64(icfun(x, y)) for (x, y) in sq.coords]
+        theta_ic = icfun
+    end
     # theta0 is the perturbation T-Tbar, so its wall value is Twall - Tbar(wall).
     # For the Boussinesq base (Twall_top=0, Twall_bot=1, Tbar(1)=0, Tbar(0)=1)
     # this is zero, and a nonzero theta0 at a wall is a mistake (it creates a

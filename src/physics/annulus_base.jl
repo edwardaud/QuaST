@@ -163,6 +163,72 @@ end
     return 0.0
 end
 
+# ---------------------------------------------------------------------------
+# Stage 0.5b2: the documented annular initial conditions
+# ---------------------------------------------------------------------------
+# The benchmarks' initial conditions are **total temperatures** `T_ic(x,y)`
+# (ANNULUS_REFS §4.6), linear in `r` plus a 4-fold angular perturbation that
+# vanishes on both circles.  The solver's variable is the perturbation
+# `theta = T - Tbar(r)`, so the driver converts `T_ic` through the annulus base
+# state (identical zero at the walls because both ICs are `s = (R1-r)/d` at
+# leading order):
+#
+#   :firedrake  Davies et al. (2022) Eq. (41), the published paper's IC:
+#                 T = (R1 - r) + A cos(4 atan2(y,x)) sin(pi (r - R0)),  A = 0.02.
+#               (r - R0) is the nondimensional height (gap = 1), so the linear
+#               part is the published `r_max - r`.
+#   :aspect     the ASPECT `spherical hexagonal perturbation`, angular mode 4,
+#               rotation offset 0 (the Davies/ASPECT cases' IC):
+#                 s = (R1 - r)/d,  phi_A = atan2(x, y)  [ASPECT's argument order]
+#                 T = s + 0.2 s (1-s) sin(4 phi_A + pi/2)
+#                   = s + 0.2 s (1-s) cos(4 atan2(y, x))
+#               (sin(4 phi_A + pi/2) = cos(4 phi_A) and cos(4(pi/2 - theta)) =
+#               cos(4 theta); the paper's and ASPECT's angular dependences agree,
+#               the radial envelopes differ — both are documented and both are
+#               exposed, the published *targets* are steady-state scalars.)
+#
+# Both fields are benchmarks' *linear-in-r* initial conditions, not the log
+# conduction state used for the Nusselt normalisation (ANNULUS_REFS §4.6/§5.4
+# spells that difference out); `theta_ic` is the difference, so it would be a
+# nonzero smooth field if the base were used as the total.
+"""
+    _annulus_ic_total(kind, g, x, y) -> Float64
+
+Documented benchmark initial *total* temperature at `(x,y)` (`kind` is
+`:firedrake` or `:aspect`, see the section header).  Relative accuracy only: the
+values are smooth functions of the position and both vanish at `r = R0`/`R1`.
+"""
+function _annulus_ic_total(kind::Symbol, g::PolarAnnulus, x::Float64,
+                           y::Float64)
+    r = hypot(x, y)
+    th = atan(y, x)                      # the paper's angle atan2(y, x)
+    if kind === :firedrake
+        A = 0.02
+        return (g.R1 - r) + A * cos(4.0 * th) * sinpi(r - g.R0)
+    elseif kind === :aspect
+        d = g.R1 - g.R0
+        s = (g.R1 - r) / d
+        return s + 0.2 * s * (1.0 - s) * cos(4.0 * th)
+    end
+    throw(ArgumentError("unknown annular initial condition :$kind; use " *
+                        ":firedrake (the published paper's Eq. (41)) or " *
+                        ":aspect (the ASPECT spherical hexagonal perturbation)."))
+end
+
+"""
+    _annulus_ic_theta(kind, g, pr, x, y) -> Float64
+
+The annular initial condition as the solver's perturbation:
+`_annulus_ic_total(kind, g, x, y) - Tbar(r)` with the geometry's radial log/H
+base state.  This is the function the driver samples for `annulus_ic=...` and
+re-samples after every AMR cycle (`theta_ic`).
+"""
+function _annulus_ic_theta(kind::Symbol, g::PolarAnnulus, pr::Params,
+                           x::Float64, y::Float64)
+    return _annulus_ic_total(kind, g, x, y) -
+           semquad_base_T(pr, g, x, y)
+end
+
 # The geometry dispatch costs inference budget exactly like the stage-0.5a
 # geometry API: `SemQuad.geom` is a non-parametric `AbstractGeometry` field, so
 # a call site that only knows the abstract type resolves one method per concrete

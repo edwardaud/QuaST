@@ -22,6 +22,7 @@ from `physics/`, and the hierarchy and Krylov machinery are in `mg/`.
 | `solve_var_core.jl` | The core variable-viscosity Stokes solve (every linear path). |
 | `solve_var_fallback.jl` | The `linear = :auto` safety net that redoes an unacceptable MG solve. |
 | `state.jl` | `SemStokes`: Q_p velocity, Q_{p-1} pressure, constraints and residual records. |
+| `wall_constraints.jl` | Stage 0.5b2: the general curved-wall rows (`n.u = g` on `:free` walls, wall-frame Dirichlet data on `:rigid` walls, the corner rule, the rigid-mode analysis and the rotation gauge). |
 
 ## The operator/multigrid cycle is deliberate
 
@@ -101,6 +102,48 @@ apply (≤1e-12), mapped `:mg` vs mapped `:direct` (≤1e-6), two geometries on 
 tree giving two operators/caches/hierarchies and a zero-allocation warm apply,
 the geometry-forgotten-key collision and its measured silent failure, the
 logical coarse levels, and the driver's mapped linear paths.
+
+## Stage 0.5b2: curved walls, the wall-frame data and the gauges
+
+The box applies boundary data as **Cartesian components**: on an axis-aligned
+wall the normal velocity is one global dof, so free slip is one fixed component
+and a moving rigid wall is two fixed components.  On a mapped geometry the wall
+normal turns along the wall, so stage 0.5b2 (`docs/dev/GEOM_PROGRESS.md`,
+`wall_constraints.jl`) expresses the boundary conditions as **general linear
+relations between the two Cartesian components** at every wall GLL node:
+
+* `:free` -- the free-slip row `n.u = g` (`g` = `wall_un` or 0; the tangential
+  traction is natural), eliminated in the affine machinery
+  (`_affine_constraint`'s `cons`/optional `offsets`): the larger-|n| component
+  becomes `u_p = -(n_q/n_p) u_q + g/n_p`.  The wall frame `(n, tau)` is the
+  mapped outward unit normal / positive logical tangent of `face_metric` at the
+  wall GLL parameter (on the annulus circles `n = +-e_r`, `tau = +e_phi`);
+* `:rigid` -- the wall-frame Dirichlet data `u = un n + ut tau` with
+  `un = wall_un` (or `uD.n`) and `ut = wall_u` (or `uD.tau`).  On a mapped
+  geometry `wall_un`/`wall_u` therefore mean `u.n`/`u.tau`; on the box they keep
+  the historical global positive-component meaning;
+* `:open` -- no velocity row; the natural traction with the cut-2
+  `wall_t`/`wall_tn` data in the same `(n, tau)` frame and the derived
+  (unpinned) pressure gauge.
+
+The corner rule is the box's write order: walls are processed
+`(xminus, xplus, yminus, yplus)`, a `:rigid` wall writes both components, a
+`:free` wall overwrites the dominant component of its normal when both are
+already Dirichlet, two `:free` walls give a 2x2 (both components Dirichlet), and
+an `:open` wall writes nothing.  The net-flux check integrates the prescribed
+*outward normal* data of the mapped node table (the box body keeps its
+historical Cartesian sign table).
+
+A mapped geometry also runs a **rigid-mode analysis** of those rows: the three
+2-D rigid modes must be excluded for a unique velocity.  A free-slip curved wall
+admits the solid-body rotation (the full ring; a wedge with open radial cuts
+here), which the solver removes with one pinned free dof plus the design's
+**zero-net-angular-momentum projection**: `u <- u - omega (-y, x)` with `omega`
+normalised so the reported discrete angular momentum `int (x u_y - y u_x) dA`
+is zero.  A load with a net torque cannot be balanced by such a configuration
+(no wall can exert a torque) and is refused; a translation nullspace is refused
+with the motion named.  The box path does not run any of this: its `fixed` dict,
+constraint matrix and nine hashes are unchanged.
 
 ## Diagnostics are published through module state
 

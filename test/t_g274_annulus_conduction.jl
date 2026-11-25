@@ -33,9 +33,11 @@
 #   (d) an end-to-end `geom=:annulus` driver run: finite, writes 18-column
 #       history rows, reproduces the diagnostics of its own final state, keeps
 #       `Ra*W = U` and `int div u = 0`, checkpoints/restarts bitwise, and the
-#       driver keeps every documented restriction (gap = 1, rigid walls,
-#       insulation on the wedge cuts, no box-only diagnostics, no
-#       reference-state/density hook, no `:periodic` seam);
+#       driver keeps every documented restriction (gap = 1, insulation on the
+#       wedge cuts, no box-only diagnostics, no reference-state/density hook,
+#       no `:periodic` seam).  The stage-0.5b1 rigid-wall restriction itself is
+#       lifted by stage 0.5b2 (G275); this gate keeps the rigid configuration
+#       as its end-to-end reference;
 #
 #   (e) the closure wiring: the viscosity law's depth argument is `r - R0`, the
 #       phase-transition depth/`z0` and phase buoyancy use the same height, the
@@ -515,16 +517,36 @@ end
         @test e isa ArgumentError && occursin("nu_cbf", sprint(showerror, e))
         e = g274_refusal(pr; extdiag=true)
         @test e isa ArgumentError && occursin("extdiag", sprint(showerror, e))
-        # (v) rigid walls only in stage 0.5b1: the free-slip curved wall needs
-        # the general normal-velocity rows of stage 0.5b2, and an :open wall
-        # changes the pressure gauge.  The default Params is bc = :free, so a
-        # plain annulus card is refused until the caller passes a rigid one.
-        e = g274_refusal(Params(Ra=100.0, H=0.0, eta_law=:expT, eta_b=0.0))
-        @test e isa ArgumentError && occursin("rigid", sprint(showerror, e))
-        e = g274_refusal(Params(Ra=100.0, H=0.0, eta_law=:expT, eta_b=0.0,
-                                bc=:rigid,
-                                wall_bc=(:same, :same, :same, :open)))
-        @test e isa ArgumentError && occursin("rigid", sprint(showerror, e))
+        # (v) the stage-0.5b1 rigid-only restriction is LIFTED by stage 0.5b2
+        # (G275 owns the curved-wall rows): the default `bc = :free` annulus
+        # card is now accepted, and so is a per-wall `:open` card (the derived
+        # pressure gauge).  What is still refused is the pure-traction card (all
+        # four walls :open), by the solver's well-posedness rule.  The 0.5b1
+        # rigid-wall configuration itself stays covered by (d) above.
+        ss0 = make_semstokes(qt0, 2; geom=g274_geom())
+        free_res = try
+            run_semquad_simulation(qt0,
+                                   Params(Ra=100.0, H=0.0, eta_law=:expT,
+                                          eta_b=0.0), zeros(ss0.su.N);
+                                   ann..., p=2, tstop=0.0, dt0=1.0e-3,
+                                   maxsteps=0, linear=:direct, verbose=false)
+        catch e2
+            e2
+        end
+        @test !(free_res isa Exception)
+        open_res = try
+            run_semquad_simulation(qt0,
+                                   Params(Ra=100.0, H=0.0, eta_law=:expT,
+                                          eta_b=0.0, bc=:rigid,
+                                          wall_bc=(:open, :open, :open, :open)),
+                                   zeros(ss0.su.N); ann..., p=2, tstop=1.0e-3,
+                                   dt0=1.0e-3, maxsteps=1, linear=:direct,
+                                   amr_every=0, verbose=false)
+        catch e2
+            e2
+        end
+        @test open_res isa ArgumentError &&
+              occursin("open", sprint(showerror, open_res))
         # (vi) the reference state / density hook stay refused on a mapped
         # geometry in this stage (the annulus base state is the Boussinesq
         # radial conduction state; a TALA/ALA annulus is a later stage)

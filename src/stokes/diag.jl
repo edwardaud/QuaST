@@ -381,10 +381,41 @@ function _semquad_dense_operator!(A::Matrix{Float64}, op::AbstractSemQuadKOp,
     end
     return A
 end
-"""Affine constraint u = u0 + C u_free from hanging constraints and fixed dofs."""
+"""
+    _affine_constraint(N, cons, fixed, offset=nothing) -> (u0, C, free)
+
+Affine constraint `u = u0 + C u_free` from the (homogeneous) linear relations
+`cons` and the Dirichlet values `fixed`.
+
+`offset` (stage 0.5b2, default `nothing`) is an optional per-dof *constant* term
+added to `u0` for constrained dofs whose relation is **affine** rather than
+homogeneous: a curved free-slip wall's normal-velocity data
+`n . u = g` with `g != 0` eliminates one Cartesian component with the constant
+`g/n_p` (see `stokes/wall_constraints.jl`).  The box path and every historical
+call site pass no offsets, so `u0` is initialised to zeros exactly as before and
+the arithmetic is bit-identical; offsets are folded *before* the fixed-master
+resolution below, so a constraint whose master is fixed accumulates its constant
+and its folded data in the same `u0` entry.
+"""
+# Two positional methods rather than a default argument: the 3-argument box call
+# (the hot path, used twice per solve) then dispatches statically to the
+# 4-argument body without the default-argument forwarder's extra call frame,
+# which the stage-0.5b2 allocation A/B measured at +2 small allocations per
+# solve.
+@inline _affine_constraint(N::Int,
+                           cons::Dict{Int,Tuple{Vector{Int},Vector{Float64}}},
+                           fixed::Dict{Int,Float64}) =
+    _affine_constraint(N, cons, fixed, nothing)
+
 function _affine_constraint(N::Int, cons::Dict{Int,Tuple{Vector{Int},Vector{Float64}}},
-                            fixed::Dict{Int,Float64})
+                            fixed::Dict{Int,Float64},
+                            offset::Union{Nothing,Dict{Int,Float64}})
     u0 = zeros(Float64, N)
+    if offset !== nothing
+        for (i, v) in offset
+            u0[i] = v
+        end
+    end
     for (i, v) in fixed
         u0[i] = v
     end
