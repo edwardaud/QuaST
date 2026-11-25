@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+# This file is part of the QuaST ASPECT plugin; the licence text and the reason
+# for the GPL are in LICENSE beside this file and in the top-level NOTICE.
 # Build the `realistic composite` material model plugin for the ASPECT image
 # gassmoeller/aspect:latest (ASPECT 2.5.0-pre, deal.II 9.4.0).
 #

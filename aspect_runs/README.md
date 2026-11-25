@@ -23,3 +23,14 @@ beside it and must not be edited.
 | `make_noav.py` -> `realistic_noav.prm` | Generated card with artificial viscosity switched off. |
 | `realistic_composite.cc`, `CMakeLists.txt` | The ASPECT plugin and its build. |
 | `*.py` (not `make_*`) | Analysis: cross-code Nu/Vrms profiles, VTU extraction and cost projections. |
+
+## Licence
+
+The ASPECT plugin is **GPL-2.0-or-later**, not MIT, because it is linked against
+ASPECT: `realistic/realistic_composite.cc` and `realistic/CMakeLists.txt` are
+derived from ASPECT, which is GPL-2.0-or-later, and are distributed under that
+licence with the text in `realistic/LICENSE`. Each of the two files carries the
+SPDX identifier `GPL-2.0-or-later` in its header. The `*.prm` input cards, the
+`blankenbach_templates/` and the Python analysis scripts are original work and
+stay under the repository's MIT licence (see `../LICENSE`). The per-directory
+split is also recorded in the top-level `../NOTICE`.

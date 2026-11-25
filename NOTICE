@@ -1,0 +1,67 @@
+QuaST -- licensing notice
+=========================
+
+QuaST is distributed under the MIT licence.  The MIT text is in LICENSE and is
+not modified by this notice.  A few files are the work of other projects, or
+carry a licence that differs from MIT; they are listed here, with the reason.
+
+1. ASPECT material-model plugin: GPL-2.0-or-later
+   ---------------------------------------------
+   Files:
+     aspect_runs/realistic/realistic_composite.cc
+     aspect_runs/realistic/CMakeLists.txt
+
+   Why: these two files build the `realistic composite` material model as a
+   shared-library plugin for ASPECT.  The ASPECT library is distributed under
+   the GNU General Public License, version 2 or any later version, and the plugin
+   includes ASPECT headers and links against ASPECT, so it is a work derived from
+   ASPECT and is distributed under the same licence.
+
+   Licence text: aspect_runs/realistic/LICENSE (the GNU GPL version 2 text from
+   https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt).  The "or any later
+   version" option is declared with the SPDX identifier GPL-2.0-or-later in the
+   header of each of the two files, and is the option the files are distributed
+   under (GPL-2.0-or-later, SPDX: https://spdx.org/licenses/GPL-2.0-or-later.html).
+   ASPECT itself is NOT distributed with QuaST; the plugin is only useful
+   against an ASPECT installation, obtained separately under the GPL.
+
+   Nothing else in aspect_runs/ is derived from ASPECT: the `*.prm` input cards,
+   the Python analysis scripts and the Blankenbach templates are original work
+   and stay under the MIT licence.
+
+2. Data: CC0-1.0
+   -------------
+   Files:
+     examples/data/initial_temperature_case1a.txt
+     examples/data/initial_temperature_case1b.txt
+     examples/data/initial_temperature_case1c.txt
+     examples/data/initial_temperature_case2a.txt
+     examples/data/initial_temperature_case2b.txt
+     benchmarks/results/*   (the benchmark provenance records, when committed)
+
+   Why CC0-1.0: the five initial-condition files are small machine-generated
+   numeric fields (a few tens of kB of ASCII x-y-T samples) for the Blankenbach
+   (1989) benchmark initial condition, and the provenance records under
+   benchmarks/results/ are measured numeric data (commands, settings, wall
+   clock, logs).  There is no creative expression to license in either; they are
+   published as CC0 1.0 Universal so that the data can be reused without an
+   attribution burden and without a licence-compatibility question beside the
+   MIT code.  The scientific credit for the benchmark setup is carried by the
+   citation of Blankenbach et al. (1989) that the benchmark cards and the
+   validation page already give.
+
+   Licence text: examples/data/LICENSE (CC0 1.0 Universal legal code from
+   https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt).  SPDX:
+   CC0-1.0 (https://spdx.org/licenses/CC0-1.0.html).
+
+3. Everything else: MIT
+   --------------------
+   The Julia package (src/, test/, Project.toml, Manifest.toml), the
+   documentation, the scripts, the benchmarks, the examples other than the data
+   files above, and the ASPECT cards and analysis scripts under aspect_runs/ are
+   distributed under the MIT licence in LICENSE.
+
+Third-party dependencies are not vendored here.  The Julia packages listed in
+Project.toml and Manifest.toml carry their own licences (all permissive at the
+time of writing); the ASPECT installation needed for aspect_runs/ is obtained
+separately under GPL-2.0-or-later.

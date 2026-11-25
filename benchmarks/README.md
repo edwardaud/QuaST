@@ -16,6 +16,7 @@ below. Every script copies its checkpoint to a temporary directory and opens it 
 
 | Script | What it measures |
 |---|---|
+| `results/` | Provenance records behind published numbers, one file per number; the convention is in `results/README.md`. |
 | `bench_auto_crossover.jl` | Same-session A/B of `linear=:direct` with `stokes_scaling=:equilibrated` and `linear=:mg` with the shipped defaults, on the state classes the old selector table names: uniform `L2` to `L6`, the blob frame-19 trees, the 25-frame blob trajectory, the `mid` contrast-50 trees, `L<k>p2` and the `F` and `P1` states. Takes one or more state names. |
 | `bench_bfbt_leafdiag.jl` | Builds the BFBT weight both ways (the lumped restriction and the exact leaf-local diagonal), times the pressure block and one FGMRES solve with each, and compares both against the equilibrated direct solve. Takes `F` or `P1`. |
 | `bench_card_mg_tol.jl` | Runs the card's solver at `mg_tol` = 1e-10, 1e-8, 1e-6 and 1e-5 on one state and reports iterations, true residual, warm solve time, the auto decision, and the difference against the 1e-10 run and the direct solve. Takes `F`, `P1` or `C`. |

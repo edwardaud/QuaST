@@ -9,6 +9,7 @@ Run output is written under `out_julia/`, which git ignores.
 
 | Script | What it does |
 |---|---|
+| `data/` | The tracked Blankenbach initial-condition fields; CC0-1.0, see `data/README.md`. |
 | `case_realistic_2d.jl` | The production case: 2.5 x 1 box, composite rheology, two phase transitions with latent heat, adaptive mesh. Modes `smoke`, `short`, `spinup`, `resume`, `freeze`, `wallrefine`, `symseed`. |
 | `channel_flow_2d.jl` | The regional channel demonstration: a prescribed normal-velocity inflow, no-slip channel walls and an `:open` outflow carrying the exact traction, compared against plane Poiseuille. |
 | `subduction_2d.jl` | The regional subduction-style case: a 2 x 1 kinematic channel with the three per-wall mechanisms, the exact Couette-Poiseuille validation, and modes `validate`, `rheology`, `phases`, `full`, `converge`. |

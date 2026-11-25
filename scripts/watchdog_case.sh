@@ -55,7 +55,10 @@
 # frame step is treated as stale (a later run got further) and ignored.
 #
 # Configuration (environment; all optional)
-#   JULIA, JULIA_PROJECT, CASE_SCRIPT, PY   julia / project / script / h5 python
+#   QUAST_ROOT, QUAST_JULIA, QUAST_PY
+#                       repository root, julia executable, h5 python; the older
+#                       names JULIA, JULIA_PROJECT, CASE_SCRIPT and PY still work
+#                       and are the same values under their old names
 #   INTERVAL=120        seconds between checks
 #   CASE_STEPS=20000    step budget passed to the resumed run
 #   CASE_MAXLEAVES=8192 CASE_COARSEN=0.05
@@ -87,11 +90,15 @@
 set -u
 
 # ------------------------------- configuration ------------------------------
-PROJECT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
-JULIA=${JULIA:-/home/szh/opt/julia-1.12.7/bin/julia}
-JULIA_PROJECT=${JULIA_PROJECT:-julia}
+# Paths are machine-independent: QUAST_ROOT is the repository root, QUAST_JULIA
+# the Julia executable and QUAST_PY the Python with h5py.  The old names
+# JULIA/PY keep working and fall back to these.  scripts/README.md documents the
+# QUAST_* variables.
+PROJECT_DIR=${QUAST_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)}
+JULIA=${JULIA:-${QUAST_JULIA:-julia}}
+JULIA_PROJECT=${JULIA_PROJECT:-.}
 CASE_SCRIPT=${CASE_SCRIPT:-examples/case_realistic_2d.jl}
-PY=${PY:-/home/szh/dedalus-env/bin/python}
+PY=${PY:-${QUAST_PY:-python3}}
 
 INTERVAL=${INTERVAL:-120}
 CASE_STEPS=${CASE_STEPS:-20000}
@@ -115,7 +122,7 @@ ONCE=${ONCE:-0}
 
 usage() {
     # the header block above (the sed range must be its last line)
-    sed -n '2,83p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,86p' "$0" | sed 's/^# \{0,1\}//'
     exit "${1:-0}"
 }
 
@@ -140,7 +147,9 @@ esac
 CASE_BASE=$(basename -- "$CASE_DIR")
 
 [ -d "$CASE_DIR" ] || { echo "no such case directory: $CASE_DIR" >&2; exit 2; }
-[ -x "$JULIA" ] || { echo "julia not executable: $JULIA" >&2; exit 2; }
+if ! command -v "$JULIA" >/dev/null 2>&1 && [ ! -x "$JULIA" ]; then
+    echo "julia not executable and not on PATH: $JULIA" >&2; exit 2
+fi
 [ -f "$CASE_SCRIPT" ] || { echo "no case script: $CASE_SCRIPT" >&2; exit 2; }
 [ -f "$JULIA_PROJECT/Project.toml" ] || { echo "not a julia project: $JULIA_PROJECT" >&2; exit 2; }
 
@@ -150,7 +159,7 @@ if ! "$PY" -c 'import h5py' >/dev/null 2>&1; then
     if command -v python3 >/dev/null 2>&1 && python3 -c 'import h5py' >/dev/null 2>&1; then
         PY=python3
     else
-        echo "no python with h5py (tried $PY and python3); set PY=..." >&2
+        echo "no python with h5py (tried $PY); set PY=... or QUAST_PY=..." >&2
         exit 2
     fi
 fi

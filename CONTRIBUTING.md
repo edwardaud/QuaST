@@ -42,13 +42,33 @@ The full suite:
 julia --project=. test/runtests.jl
 ```
 
-It takes about 25 minutes on eight threads; the engineering record prices the same run at
-40 to 75 minutes on a loaded machine. The suite has 184 gate files, and the last recorded
-full-suite run reported 133 714 passed, 0 failed and 2 broken.
+It takes 30 m 54 s on eight threads; the engineering record prices the same run at
+40 to 75 minutes on a loaded machine. The suite has 207 gate files, and the last
+recorded full-suite run reported 142 225 passed, 0 failed and 2 broken
+(2026-11-26, the recorded totals live in `test/README.md`).
 
-The suite currently reports no failures; the two `broken` entries are `@test_skip`
-calls in G209 and G214 that wait for checkpoints the repository does not ship.
+The suite currently reports no failures; the two `broken` entries are explicit,
+documented `@test_skip` environment gates in G209 and G214 that wait for
+data-dependent realistic-state checkpoints the repository does not ship (the
+decision and the alternatives are recorded in `docs/dev/BUG_FIX_LOG.md` §14.11).
 Any failure is a regression.
+
+## Check the documentation counts
+
+```bash
+julia --project=. scripts/check_docs.jl
+julia --project=. scripts/check_counts.jl
+```
+
+`check_docs.jl` validates the Markdown layout (display-math blocks, code fences,
+language switchers) and prints `docs: ok`. `check_counts.jl` (run by hand, not
+part of the gate suite) checks the gate-file count quoted by `test/README.md`
+and this file against the tree and `test/runtests.jl`, the structural sanity of
+the committed full-suite totals in `test/README.md`, and every other documented
+surface against that record; the top-level `README.md` is a warning-only surface
+because the documentation batch owns it. Its limits (the assertion total is a
+runtime count and cannot be derived from the tree, so only agreement with the
+committed record is checked) are stated in the script header.
 
 ## House rules
 
@@ -73,6 +93,43 @@ Any failure is a regression.
 5. **A commit names its pathspec.** Use `git add -- path` and `git commit -- path`, one
    file or one directory per commit. Shared checkouts carry untracked data, and `git add -A`
    sweeps whatever another process had staged.
+
+## Scripts and paths
+
+The launchers in `scripts/`, and `examples/verify100_case.sh`, take the
+repository root, the Julia executable and the run-output root from the
+environment instead of a hard-coded machine path. All three are optional:
+
+- `QUAST_ROOT` — the checkout to run from; default: the repository the script
+  lives in;
+- `QUAST_JULIA` — the Julia executable; default: `julia` from `PATH`;
+- `QUAST_OUT` — where run outputs land; default: `$QUAST_ROOT/out_julia`.
+
+`scripts/watchdog_case.sh` also reads `QUAST_PY` (Python with `h5py`; default
+`python3`) and `scripts/three_row_video.py` reads `QUAST_FFMPEG` (default
+`ffmpeg` from `PATH`). `scripts/README.md` has the table. Nothing else in a
+tracked script depends on where the checkout is:
+
+```bash
+QUAST_JULIA=$HOME/opt/julia-1.12.7/bin/julia bash scripts/run_one.sh 1a 3 0.2 4
+```
+
+## Versioning and deprecation
+
+The project follows semantic versioning and is in the 0.x series: a minor
+release may change the public surface — the exported names of `QuaST` and the
+`CASE_*` knobs of the driver — and a change that moves a bitwise-pinned
+trajectory is a minor release even when it is a fix. `CHANGELOG.md` is the
+record: every user-visible change of the next release is written there before
+the release, under `Added`, `Changed`, `Deprecated`, `Removed` or `Fixed`, with
+the replacement named for anything removed.
+
+From v0.1.0 onward the deprecation pattern is: keep the old name working and
+note it under `Deprecated` with the replacement for at least one minor release
+before removing it; a change that cannot be kept working (a changed default
+that a checkpoint guard compares, for example) is recorded under `Changed` and
+is called out in the release notes. The gate suite pins the current behaviour,
+so a planned break comes with the gate re-baselines in the same commit.
 
 ## Report a bug
 

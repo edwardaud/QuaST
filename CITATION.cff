@@ -9,14 +9,30 @@ abstract: >-
   time stepping. The Stokes saddle is solved either by a sparse direct factorisation or
   by matrix-free geometric multigrid, chosen from the problem size and the viscosity
   contrast, and the mesh adapts with a policy that trades error against a fixed leaf
-  budget.
+  budget. The main package is MIT-licensed; the ASPECT material-model plugin in
+  aspect_runs/realistic/ is GPL-2.0-or-later and the example data are CC0-1.0, as the
+  NOTICE file records.
 authors:
-  - family-names: edwardaud
+  # The only public identity of the author is the GitHub handle edwardaud; no real
+  # name or ORCID is published, so the handle is carried as the CFF 1.2.0 alias and
+  # no family-names are invented. Replace with given-names/family-names and add an
+  # orcid when the owner publishes them.
+  - alias: edwardaud
 version: 0.1.0
+# release date of the version recorded in CHANGELOG.md; move it to the tag date if
+# the annotated tag v0.1.0 is cut on a later day.
 date-released: "2026-11-13"
 url: "https://github.com/edwardaud/QuaST"
 repository-code: "https://github.com/edwardaud/QuaST"
 license: MIT
+# DOI placeholder: it stays commented out because a YAML comment is not metadata.
+# When the v0.1.0 tag is published as a GitHub release and Zenodo mints the DOI,
+# uncomment this block and put the version DOI in value (docs/paper/availability.md
+# carries the same placeholder and the steps that mint it).
+# identifiers:
+#   - type: doi
+#     value: 10.5281/zenodo.XXXXXXX
+# commit: <SHA of the tagged release commit, added with the DOI at release time>
 keywords:
   - geodynamics
   - mantle convection

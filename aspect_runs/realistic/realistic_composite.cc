@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// This file is part of the QuaST ASPECT plugin; the licence text and the reason
+// for the GPL are in LICENSE beside this file and in the top-level NOTICE.
 /*
   Copyright (C) 2026 by the authors of the MantleSEM project.
 

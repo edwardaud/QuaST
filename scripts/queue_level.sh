@@ -12,11 +12,17 @@ wait_level=${3:?wait level}
 tstop=${4:-0.2}
 threads=${5:-4}
 
-cd /mnt/e/研究生资料/project/QuaST || exit 1
-wait_log="out_julia/benchmarks/${case}_L${wait_level}.log"
+# QUAST_ROOT / QUAST_JULIA / QUAST_OUT: repository root, Julia executable, run
+# output root (defaults: this script's repository, `julia` from PATH,
+# out_julia/ under the root). scripts/README.md documents them.
+QUAST_ROOT=${QUAST_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)}
+QUAST_JULIA=${QUAST_JULIA:-julia}
+QUAST_OUT=${QUAST_OUT:-$QUAST_ROOT/out_julia}
+cd -- "$QUAST_ROOT" || exit 1
+wait_log="$QUAST_OUT/benchmarks/${case}_L${wait_level}.log"
 
 while ! grep -q "^\[${case}\] steps=" "$wait_log" 2>/dev/null; do
   sleep 30
 done
 
-bash /mnt/e/研究生资料/project/QuaST/scripts/run_one.sh "$case" "$level" "$tstop" "$threads"
+bash "$QUAST_ROOT/scripts/run_one.sh" "$case" "$level" "$tstop" "$threads"

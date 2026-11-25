@@ -7,6 +7,7 @@ renderers. None of it is solver code, and none of it is a case input.
 |---|---|
 | `check_docs.jl` | Documentation checks, run in CI: display-math layout, formulas against Chinese punctuation, escaped underscores inside inline math, language switchers, code-fence languages. |
 | `list_files.jl` | Regenerate `docs/dev/FILES.md`: every file with its one-line header. Do not hand-edit that table. |
+| `check_counts.jl` | Documentation-count consistency, run by hand: the gate-file count in `test/README.md`/`CONTRIBUTING.md` against the tree and `test/runtests.jl`, the committed full-suite totals' structural sanity, and the other surfaces against that record (`README.md` is warning-only; see the script header for the limits). Not part of the gate suite. |
 | `benchmark_table.jl` | Turn the benchmark logs into the rows of the validation table. It checks that a run is steady before quoting it, and labels aborted logs. |
 | `run_benchmarks.sh` | Reproduce the validation campaign: every benchmark row, with the settings the published cards use. |
 | `run_one.sh` | Run one benchmark case in its own process. The primitive the other launchers call. |
@@ -16,6 +17,30 @@ renderers. None of it is solver code, and none of it is a case input.
 | `live_render.py` | Render new frames to PNG, a panel with Nu/Vrms, and a self-refreshing page. |
 | `three_row_video.py` | Stack runs of one case into a labelled comparison video. |
 | `watchdog_case.sh` | Restart the realistic-case spin-up after a crash, with a log. |
+
+## Portability: environment variables
+
+The batch launchers are portable: no file in `scripts/` hard-codes a machine
+path, a user name or an absolute Julia installation. Three optional environment
+variables are read by the launchers; the defaults reproduce the documented
+behaviour on any machine that has `julia` on `PATH`.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `QUAST_ROOT` | the repository the script lives in | the checkout to run from; every launcher changes to it |
+| `QUAST_JULIA` | `julia` from `PATH` | the Julia executable the launchers call |
+| `QUAST_OUT` | `$QUAST_ROOT/out_julia` | the run-output root: benchmark logs, checkpoints, rendered frames |
+
+Two more are read by one script each: `QUAST_PY` (the Python with `h5py` that
+`watchdog_case.sh` uses to read checkpoint steps; default `python3`) and
+`QUAST_FFMPEG` (the ffmpeg binary `three_row_video.py` uses; default `ffmpeg`
+from `PATH`, then the `imageio_ffmpeg` binary, and `--ffmpeg PATH` still
+wins). The solver's own `CASE_*` knobs are separate and unchanged.
+
+```bash
+QUAST_JULIA=$HOME/opt/julia-1.12.7/bin/julia bash scripts/run_benchmarks.sh 4
+QUAST_OUT=/scratch/quast bash scripts/run_one.sh 1a 3 0.2 4
+```
 
 ## Reproducing the validation campaign
 

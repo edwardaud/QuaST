@@ -55,4 +55,6 @@ Start at the [documentation map](docs/README.md), which lists every page and the
 
 MIT, see [LICENSE](LICENSE).
 
+The release archive with its DOI, the data, the benchmark provenance records and the per-directory licence split (MIT package, GPL-2.0-or-later ASPECT plugin, CC0-1.0 data) are stated in [docs/paper/availability.md](docs/paper/availability.md).
+
 **Next:** the [documentation map](docs/README.md) gives the reading order; start with the [quick start](docs/en/quickstart.md).

@@ -26,12 +26,17 @@ case "$ARM" in
     *) echo "verify100_case.sh: unknown arm '$ARM' (mg|direct|auto)" >&2; exit 2 ;;
 esac
 
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
-cd "$ROOT"
-JL=${JL:-/home/szh/opt/julia-1.12.7/bin/julia}
+# QUAST_ROOT / QUAST_JULIA / QUAST_OUT: repository root, Julia executable, run
+# output root (defaults: this script's repository, `julia` from PATH,
+# out_julia/ under the root); scripts/README.md documents them.
+QUAST_ROOT=${QUAST_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
+cd "$QUAST_ROOT"
+QUAST_JULIA=${QUAST_JULIA:-julia}
+QUAST_OUT=${QUAST_OUT:-$QUAST_ROOT/out_julia}
+JL=${JL:-$QUAST_JULIA}
 RUN_ID=${RUN_ID:-verify100}
-OUT="out_julia/${RUN_ID}_$ARM"
-LOG="out_julia/${RUN_ID}_$ARM.log"
+OUT="$QUAST_OUT/${RUN_ID}_$ARM"
+LOG="$QUAST_OUT/${RUN_ID}_$ARM.log"
 
 if [ -e "$OUT" ]; then
     echo "verify100_case.sh: refusing, $OUT already exists" >&2

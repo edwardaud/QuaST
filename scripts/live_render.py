@@ -18,7 +18,7 @@ The renderer only ever *reads* the solver's files and writes into its own
 subdirectories, so it cannot slow the run down; a frame whose binary is not yet
 completely written is skipped and picked up on the next poll.
 
-    /home/szh/dedalus-env/bin/python scripts/live_render.py \
+    python3 scripts/live_render.py \
         --dir out_julia/case_realistic --interval 2 --gif-every 10
 
 No third-party dependency beyond numpy/matplotlib/Pillow.

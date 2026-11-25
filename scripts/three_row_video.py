@@ -732,24 +732,22 @@ def find_ffmpeg(explicit=None):
     cands = []
     if explicit:
         cands.append(explicit)
+    env = os.environ.get("QUAST_FFMPEG")
+    if env:
+        cands.append(env)
     cands.append(shutil.which("ffmpeg") or "")
     try:
         import imageio_ffmpeg
         cands.append(imageio_ffmpeg.get_ffmpeg_exe())
     except Exception:
         pass
-    cands += [
-        "/home/szh/dedalus-env/lib/python3.12/site-packages/imageio_ffmpeg/"
-        "binaries/ffmpeg-linux-x86_64-v7.0.2",
-        r"E:\ffmpeg-2023-06-08-git-024c30aa3b-essentials_build\bin\ffmpeg.exe",
-    ]
     for c in cands:
         if c and os.path.isfile(c) and os.access(c, os.X_OK):
             return c
     for c in cands:
         if c and os.path.isfile(c):
             return c
-    raise SystemExit("no ffmpeg found; pass --ffmpeg PATH")
+    raise SystemExit("no ffmpeg found; put it on PATH, set QUAST_FFMPEG, or pass --ffmpeg PATH")
 
 
 def sibling_1080_vf(px_h, pad="0x0d0d0d"):

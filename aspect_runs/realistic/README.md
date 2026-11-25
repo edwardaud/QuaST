@@ -28,6 +28,15 @@ is part of this repository. The comparison is written up in
 dislocation creep, the yield stress, and the isostress blend. `CMakeLists.txt`
 builds it against the ASPECT installation.
 
+## Licence
+
+The plugin source `realistic_composite.cc` and its build file `CMakeLists.txt`
+are **GPL-2.0-or-later** (SPDX identifier in each file header; full text in
+`LICENSE` beside this page), because they are built against and derived from
+ASPECT, which is GPL-2.0-or-later. The `*.prm` input cards and the `*.py`
+analysis scripts in this directory are original work under the repository's
+MIT licence. The top-level `../../NOTICE` records the same split.
+
 ## Scripts
 
 | Script | What it does |
