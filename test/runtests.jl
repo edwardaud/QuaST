@@ -198,5 +198,5 @@ using QuaST
     include("t_g274_annulus_conduction.jl")
     include("t_g275_annulus_walls.jl")
     include("t_g276_annulus_ring.jl")
+    include("t_g277_annulus_benchmark.jl")
 end
-

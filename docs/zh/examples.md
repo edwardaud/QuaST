@@ -2,7 +2,7 @@
 
 # 算例
 
-六个可以直接跑的例子：真实算例的几种模式、Blankenbach 2b、blob 回归、区域通道、区域俯冲型算例，以及程序化调用。每个都给出命令、八线程实测墙钟和一个用来核对的数。命令都在仓库根目录执行，第一条只需跑一次：
+七个可以直接跑的例子：真实算例的几种模式、Blankenbach 2b、blob 回归、区域通道、区域俯冲型算例、二维圆环基准，以及程序化调用。每个都给出命令、八线程实测墙钟和一个用来核对的数。命令都在仓库根目录执行，第一条只需跑一次：
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
@@ -17,6 +17,7 @@ julia --project=. -e 'using Pkg; Pkg.instantiate()'
 | blob 回归 | `run_blob_kelly_1024.jl` | 141 s | `Tmax25 = 1.264329738` |
 | 区域通道 | `channel_flow_2d.jl` | 仿真 0.04 s；首次约 1 分钟（编译） | 剖面误差 1.8e-14 |
 | 区域俯冲型算例 | `subduction_2d.jl validate` | 15 s | 13 项检查全部 PASS |
+| 二维圆环基准，`Ra = 1e5` | `ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_TMIN=0 ANN_WINDOW=3 ANN_TSTOP=1e12 examples/annulus_benchmark.jl 32x384` | 驱动 193 s，端到端约 4 分钟 | `steady=1` 且 `Nu_T = 9.89994` |
 | 程序化调用 | `build_and_run.jl` | 首次约 84 s | `Nu_top = Nu_bot = 1.000783` |
 
 ## 真实算例（`case_realistic_2d.jl`）
@@ -125,6 +126,27 @@ CASE_WALLMIN=5 CASE_INITREF=1 julia --project=. --threads=8 examples/benchmark_c
 ```
 
 `CASE_WALLMIN` 设置壁面条带内与壁面行的最小层级，`CASE_INITREF=1` 在初值上先做一轮自适应；两者都是 `benchmark_cases.jl` 的旋钮，不是真实算例的。壁面规则带来的实测变化（均匀 level 4 停在 +5.31%，壁面加密后 +0.90%，以及更细状态上三种 `Nu` 定义的散布）见[验证](validation.md)的稳态基准与「2b 的三种热流族」两节。
+
+## 二维圆环基准
+
+`examples/annulus_benchmark.jl` 是 Davies 等（2022）与 ASPECT 文档的二维圆柱壳对流基准：等黏度 Boussinesq，`Ra = 1e5`，两圆面自由滑移，`R0 = 1.22`、`R1 = 2.22`（间隙是长度单位），无内部加热，论文 Eq. 41 初值，闭合周期圆环。[验证](validation.md)给出发表值、容差与分辨率记录，本节是命令。
+
+已发表分辨率是 `128x1536`（ASPECT 级）与 `512x2048`（Firedrake 级），本机最大能跑前者（后者按实测每叶内存需要约 66–72 GB）。稳态用基准脚本文档化的松弛模式达到：取很大的固定步长，时间导数可忽略，于是每次能量求解都是稳态对流–扩散问题，步序列成为耦合稳态的阻尼 Picard 迭代。`32x384` 这一级实测驱动墙钟 193 s（连同启动与编译约四分钟）：
+
+```bash
+ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_PIC_RELAX=0.5 ANN_TMIN=0 \
+ANN_WINDOW=3 ANN_TSTOP=1e12 ANN_CKPT_DIR=out_julia/ann_ckpt \
+julia --project=. --threads=8 examples/annulus_benchmark.jl 32x384
+```
+
+要核对的是最后两行，结果行与它相对发表值的偏差：
+
+```text
+ANNULUS_RESULT L5 nx=32 ny=384 ... steps=6 ... NuT=9.899941 NuB=9.943853 Vrms=193.25842 meanT=0.382464 ... steady=1 ...
+ANNULUS_DEV NuT_vs_aspect=3.6860% ... Vrms_vs_aspect=-0.0582% ... dNu_rel=-0.4426%
+```
+
+`steady=1` 表示写明的停止判据触发（相对 `theta`、`Nu_T` 与 `V_RMS` 的变化连续三步低于 `1e-6`）；要对照的数是 `Nu_T = 9.89994`、`Nu_B = 9.94385`、`V_RMS = 193.258`、`<T> = 0.382464`。再往上是 `64x768`（实测驱动墙钟 424 s）与 `128x1536`（1 391 s、峰值内存 13.7 GB、`Nu_T = 9.56743`，相对 ASPECT +0.20%）；被中断的运行会从 `out_julia/ann_ckpt/` 续跑，重跑同一条命令即可。不加 `ANN_*` 设置时脚本走时间精确的 `CFL = 1` 模式，那是物理瞬态，在这个分辨率下需要数千步；脚本头部文档化了每个旋钮与稳态判据。
 
 ## blob 回归
 

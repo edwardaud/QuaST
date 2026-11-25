@@ -120,6 +120,40 @@ function _semquad_buoyancy_load(pr::Params, geom::G, Tfun::F,
 end
 
 """
+    semquad_steady_step(change_t, dnu, dvr, nu, vr, tol; include_vrms=false) -> Bool
+
+One step of the driver's steady-state criterion, as arithmetic that can be
+tested without a run (gate G277).  A step is *settled* when all of
+
+    change_t  < tol                          (relative theta change of the step)
+    |dnu|     < tol * max(1, |Nu|)           (absolute Nu change per step)
+    |dvr|     < tol * max(1, |Vrms|)         (absolute Vrms change per step,
+                                              only when `include_vrms`)
+
+hold.  The driver counts consecutive settled steps after `t > tmin` and stops
+after `steady_window` of them; this is the criterion every run through
+`run_semquad_simulation(...; steady_tol=..., steady_window=...)` uses, with
+`include_vrms = false` by default (the historical behaviour, bit for bit:
+`dvr` is ignored and every pre-0.5c2 card is unchanged).  The annulus
+benchmark card sets `steady_vrms = true`, so its stop condition is the one the
+validation page states: **both Nu_T and V_RMS stop moving, per step, for a
+window of steps**.
+
+The `max(1, |·|)` normalisation is the historical one: for a quantity of order
+one it is a relative test, and for one that decays to zero it stays an absolute
+test instead of dividing by zero.  The comparisons are strict (`<`).
+"""
+function semquad_steady_step(change_t::Float64, dnu::Float64, dvr::Float64,
+                             nu::Float64, vr::Float64, tol::Float64;
+                             include_vrms::Bool=false)
+    change_t < tol || return false
+    dnu < tol * max(1.0, abs(nu)) || return false
+    include_vrms || return true
+    return dvr < tol * max(1.0, abs(vr))
+end
+
+"""
+
     run_semquad_simulation(qt, pr, theta0; p=2, tstop, dt0, amr_every=0,
                            refine_frac=0.2, coarsen_frac=0.0, maxsteps=10000,
                            advection=:galerkin, cfl=0.0, verbose=false)
@@ -335,6 +369,15 @@ driver owns it for the whole run, restores it from a checkpoint on a resume and
 writes it back through `save_semquad_state`, so a caller can inspect the state the
 last AMR cycle left without reading a module global.
 
+**Steady-state stop (stage 0.5c2).**  `steady_tol`/`steady_window`/`tmin`
+select the documented stop criterion: after `t > tmin`, stop once the relative
+theta change, the Nu change and (with `steady_vrms = true`) the V_RMS change per
+step all stay below `steady_tol` for `steady_window` consecutive steps.  The
+arithmetic is `semquad_steady_step`; `steady_vrms` defaults to `false`, which is
+the historical criterion bit for bit.  The annulus benchmark card
+(`examples/annulus_benchmark.jl`) sets it to `true`, so its published comparison
+is taken at a state where both Nu_T and V_RMS have stopped moving.
+
 **Geometry (stage 0.5b1, ring at 0.5c1).**  `geom` selects the geometry:
 `geom=:annulus` with `annulus_R0`/`annulus_R1`/`annulus_Phi`/`annulus_seam`
 builds the 2-D polar annulus (`PolarAnnulus(R0, R1, Phi; seam=annulus_seam)`;
@@ -513,6 +556,15 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 tavg_start::Float64=Inf,
                                 steady_tol::Float64=Inf,
                                 steady_window::Int=5,
+                                # Stage 0.5c2: include the V_RMS change per
+                                # step in the steady criterion (the annulus
+                                # benchmark's documented stop condition: both
+                                # Nu_T and V_RMS settled for `steady_window`
+                                # consecutive steps).  Default false keeps every
+                                # pre-0.5c2 card's stopping arithmetic bit for
+                                # bit; a run that sets it gets the criterion of
+                                # `semquad_steady_step`.
+                                steady_vrms::Bool=false,
                                 tmin::Float64=0.0,
                                 restart_from::String="",
                                 checkpoint_path::String="",
@@ -1162,6 +1214,9 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     avg_sut2 = 0.0; avg_sub2 = 0.0; avg_sv2 = 0.0; avg_st2 = 0.0
     steady_count = 0
     Nu_prev = NaN
+    # Stage 0.5c2: the V_RMS history of the steady criterion
+    # (`steady_vrms = true`); unused on the default path.
+    Vr_prev = NaN
 
     tosi = pr.eta_law === :tosi
     composite = pr.eta_law === :composite
@@ -2126,18 +2181,24 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
 
         # Steady-state detection, same criterion as the uniform driver: the
         # relative theta change and |dNu| must both stay below steady_tol for
-        # `steady_window` consecutive steps (only after t > tmin).
+        # `steady_window` consecutive steps (only after t > tmin).  Stage 0.5c2
+        # adds the opt-in V_RMS condition (`steady_vrms`); the default path
+        # evaluates the same arithmetic through `semquad_steady_step` with
+        # `include_vrms=false`, so a pre-0.5c2 card is unchanged bit for bit.
         if isfinite(steady_tol)
             change_t = norm(theta - theta_prev) / max(norm(theta), 1.0e-30)
             dnu = isfinite(Nu_prev) ? abs(Nut - Nu_prev) : Inf
-            if t > tmin && change_t < steady_tol &&
-               dnu < steady_tol * max(1.0, abs(Nut))
+            dvr = isfinite(Vr_prev) ? abs(Vr - Vr_prev) : Inf
+            if t > tmin &&
+               semquad_steady_step(change_t, dnu, dvr, Nut, Vr, steady_tol;
+                                   include_vrms=steady_vrms)
                 steady_count += 1
                 steady_count >= steady_window && break
             else
                 steady_count = 0
             end
             Nu_prev = Nut
+            Vr_prev = Vr
         end
 
         if tprof !== nothing

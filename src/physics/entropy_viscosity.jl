@@ -238,9 +238,12 @@ end
 #     different float from `sqrt(2*hx*hy)` in general) and the box path keeps
 #     the physical `(2/h)^2` Laplacian; both are documented differences of the
 #     historical box code, not of the mapped one;
-#   * the wall-row switch `lf[3] == 0 || lf[3] == ny0*(1<<l)-1` is already a
-#     **logical** side test (it reads the leaf index, not a physical row), so it
-#     is the same statement on the mapped path and is kept verbatim;
+#   * the wall-row switch is the geometry's **physical** Dirichlet-wall test
+#     (`_amr_wall_leaf`, the `nu_wall_sides` of the geometry: the thermal
+#     circles on the annulus, the top/bottom rows on the box-in-height
+#     validation maps).  Stage 0.5c2 fixed the wedge, which still used the
+#     logical `y` rows (its insulating radial cuts) after stage 0.5c1;
+#     see the comment at the switch.
 #   * the velocity scale `umax` is `hypot(uxq, uzq)` on both paths (the physical
 #     velocity magnitude; it does not change under the map).
 # ---------------------------------------------------------------------------
@@ -398,19 +401,22 @@ function semquad_ev_nu(g::AbstractGeometry, sq::SemQuad, pr::Params,
                ev * he * Rmax / evg.field_variation
         nu = min(nu_max, nu_e)
     end
-    # the wall-row switch is the logical side test (leaf index, not a physical
-    # coordinate), so it is the same statement as on the box path.  Stage 0.5c1:
-    # on a **ring** the logical y rows are the periodic seam, not a wall, so the
-    # switch is the geometry's physical Dirichlet-wall test instead (the
-    # circles).  The wedge keeps the historical logical-y statement (its
-    # mapped-EV wall rows are a stage-0.5b1 latent defect recorded for 0.5c2,
-    # measured at `ev = 0` by every existing gate), so the wedge path is
-    # bit-identical.
-    if _geom_periodic(g)
-        _amr_wall_leaf(g, sq, lf) && (nu = 0.0)
-    elseif lf[3] == 0 || lf[3] == sq.ny0 * (1 << lf[1]) - 1
-        nu = 0.0
-    end
+    # The wall-row switch zeroes the entropy viscosity on the rows that touch the
+    # geometry's **physical Dirichlet (thermal) walls**, exactly as the box path
+    # zeroes it on the top/bottom logical rows.  The sides are named by the
+    # geometry (`nu_wall_sides`), not by the logical `y` index: on a mapped
+    # geometry the logical `y` rows are the annulus's angular direction, i.e. the
+    # periodic seam on the ring and the *insulating* radial cuts on the wedge.
+    #
+    # Stage 0.5c1 wrote the ring branch this way and left the wedge on the
+    # historical logical-`y` test, recording the wedge as a latent stage-0.5b1
+    # defect for 0.5c2: the wedge zeroed EV on its radial cuts instead of at the
+    # thermal circles.  Stage 0.5c2 fixes it in both cases (same statement); the
+    # box path (`semquad_ev_nu(sq::SemQuad, ...)` above) keeps its historical
+    # logical-`y` test verbatim, whose `y` *is* the physical wall direction.
+    # No existing gate or published setup is affected: `ev = 0` in every annulus
+    # card through stage 0.5c1, so the field was identically zero.
+    _amr_wall_leaf(g, sq, lf) && (nu = 0.0)
     return nu
 end
 

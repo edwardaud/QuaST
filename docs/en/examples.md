@@ -2,7 +2,7 @@
 
 # Examples
 
-Six runs you can start immediately. Each comes with its command and a number to check against. Run everything from the repository root, and run the first command once:
+Seven runs you can start immediately. Each comes with its command and a number to check against. Run everything from the repository root, and run the first command once:
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'
@@ -17,6 +17,7 @@ The timings are wall clock on eight Julia threads, not CPU time. The direct solv
 | Blob regression | `julia --project=. --threads=8 examples/run_blob_kelly_1024.jl` | `Tmax25 = 1.264329738` and the two digests |
 | Regional channel | `julia --project=. --threads=8 examples/channel_flow_2d.jl` | `err_u` below `1e-10` |
 | Regional subduction-style case | `julia --project=. --threads=8 examples/subduction_2d.jl rheology` | `Nu_top = 31.383` and `delta(0.8) = 0.0522` |
+| 2-D annulus benchmark, `Ra = 1e5` | `ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_TMIN=0 ANN_WINDOW=3 ANN_TSTOP=1e12 julia --project=. --threads=8 examples/annulus_benchmark.jl 32x384` | `steady=1` and `Nu_T = 9.89994` |
 | Programmatic run | `julia --project=. --threads=8 build_and_run.jl` | `Nu_top = Nu_bot = 1.000783` |
 
 ## The realistic card's modes
@@ -107,6 +108,27 @@ CASE_WALLMIN=5 CASE_INITREF=1 julia --project=. --threads=8 examples/benchmark_c
 ```
 
 `CASE_WALLMIN` and `CASE_INITREF` are knobs of `benchmark_cases.jl`, not of the realistic case. `CASE_WALLMIN` sets the minimum level for the wall strip and the wall rows, and `CASE_INITREF=1` runs one adaptation pass on the initial condition. The measured effect of the wall rule is part of the convergence table in [validation](validation.md).
+
+## The 2-D annulus benchmark
+
+`examples/annulus_benchmark.jl` is the 2-D cylindrical-annulus convection benchmark of Davies et al. (2022) and the ASPECT documentation: isoviscous Boussinesq at `Ra = 1e5`, free slip on both circles, `R0 = 1.22` and `R1 = 2.22` (the gap is the length unit), no internal heating, the paper's Eq. 41 initial condition, and the closed periodic ring. [validation](validation.md) carries the published values, the tolerances and the resolution record; this section is the command.
+
+The published resolutions are `128x1536` (ASPECT-like) and `512x2048` (Firedrake-like), and the first is the largest this machine can run (the second needs about 66–72 GB at the measured memory per leaf). Reaching a steady state is done with the harness's documented relaxation mode: a large fixed step makes the time derivative negligible, so every energy solve is the steady advection-diffusion problem and the step sequence is a damped Picard iteration for the coupled steady state. The `32x384` rung, whose measured driver wall clock is 193 s (about four minutes end to end with start-up and compilation):
+
+```bash
+ANN_CFL=0 ANN_DT0=1e3 ANN_MAXPIC=25 ANN_PIC_RELAX=0.5 ANN_TMIN=0 \
+ANN_WINDOW=3 ANN_TSTOP=1e12 ANN_CKPT_DIR=out_julia/ann_ckpt \
+julia --project=. --threads=8 examples/annulus_benchmark.jl 32x384
+```
+
+The two lines to check are the result and its deviation from the published numbers:
+
+```text
+ANNULUS_RESULT L5 nx=32 ny=384 ... steps=6 ... NuT=9.899941 NuB=9.943853 Vrms=193.25842 meanT=0.382464 ... steady=1 ...
+ANNULUS_DEV NuT_vs_aspect=3.6860% ... Vrms_vs_aspect=-0.0582% ... dNu_rel=-0.4426%
+```
+
+`steady=1` means the stated criterion fired (relative `theta`, `Nu_T` and `V_RMS` changes below `1e-6` for three consecutive outer steps), and the numbers to compare are `Nu_T = 9.89994`, `Nu_B = 9.94385`, `V_RMS = 193.258`, `<T> = 0.382464`. The next rungs are `64x768` (measured driver wall clock 424 s) and `128x1536` (1 391 s, 13.7 GB peak RSS, `Nu_T = 9.56743`, +0.20 % from ASPECT); a killed run resumes from `out_julia/ann_ckpt/` by rerunning the same command. Without the `ANN_*` settings the script runs the time-accurate `CFL = 1` mode, which is the physical transient and needs thousands of steps at these resolutions; the header of the script documents every knob and the steady-state criterion.
 
 ## The blob regression
 

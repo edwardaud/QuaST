@@ -13,6 +13,7 @@ Run output is written under `out_julia/`, which git ignores.
 | `channel_flow_2d.jl` | The regional channel demonstration: a prescribed normal-velocity inflow, no-slip channel walls and an `:open` outflow carrying the exact traction, compared against plane Poiseuille. |
 | `subduction_2d.jl` | The regional subduction-style case: a 2 x 1 kinematic channel with the three per-wall mechanisms, the exact Couette-Poiseuille validation, and modes `validate`, `rheology`, `phases`, `full`, `converge`. |
 | `benchmark_cases.jl` | Every published benchmark in one entry point: Blankenbach 1a, 1b, 1c, 2a, 2b and Tosi cases 1 and 5a, each at a chosen level. |
+| `annulus_benchmark.jl` | The published 2-D cylindrical-annulus benchmark (Davies et al. 2022 / ASPECT `Ra = 1e5` free-slip ring): the paper card and initial condition, the stated steady-state criterion, the diagnostics (`Nu_T`, `Nu_B`, `V_RMS`, `<T>`, the wall-flux split), checkpoint/resume, the steady-relaxation mode used at the published resolutions, and the comparison line against the published values. Usage and the measured rungs are in `docs/en/examples.md`. |
 | `run_blob_kelly_1024.jl` | The 25-frame `Ra = 1e8` blob baseline, with per-frame SHA-256 rows. |
 | `calib_realistic_2d.jl` | Derivation of the composite rheology prefactors that `case_realistic_2d.jl` carries as literals. |
 | `import_aspect_state.jl` | Build a QuaST checkpoint from an ASPECT state, for the same-state comparison. |
