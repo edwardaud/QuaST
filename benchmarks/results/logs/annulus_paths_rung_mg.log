@@ -1,0 +1,8 @@
+# annulus benchmark nx=16 ny=192 level=4 cells_y=12 leaves=3072 dofs=28608 (u=25344 p=3264 T=12672)
+# card: Ra=1e5 isoviscous H=0 free-slip ring R0=1.22 R1=2.22 phi=2pi; advection=galerkin ev=0.0 ic=firedrake
+# criterion: t > 0.02, change_t/|dNu_T|/|dV_RMS| < 0.0 for 2 consecutive steps (steady_vrms=true); tstop=0.002 maxsteps=2 ckpt=off
+# mode: time-accurate cfl=1.0 dt0=1.0e-5 dtmax=0.01 maxpic=1 pic_relax=1.0
+  step      1 t=1.000000e-05 dt=1.000e-05 Nu_T=1.328902 Nu_B=0.731207 dNu=5.98e-01 Vrms=38.98707 meanT=0.451545 rss=1714MB
+  step      2 t=2.050000e-05 dt=1.050e-05 Nu_T=1.328648 Nu_B=0.731659 dNu=5.97e-01 Vrms=39.88487 meanT=0.451539 rss=1765MB
+ANNULUS_RESULT - nx=16 ny=192 level=4 leaves=3072 u_dofs=25344 p_dofs=3264 T_dofs=12672 saddle_dofs=28608 steps=2 t=2.050000e-05 dt=1.050e-05 wall=84.7 s_per_step=36.6078 s_step_warm=36.6078 stokes=32.1762 stokes_warm=32.1762 NuT=1.328648 NuB=0.731659 dNu=5.970e-01 Vrms=39.88487 meanT=0.451539 Umax=68.120 div_vol=-2.659e-14 div_rel=3.61e-17 Ibase=3.283e-06 rss=1765 peak=1909 steady=0 window=2 nut_drift=2.54e-04 vr_drift=8.98e-01 adv=galerkin ev=0 ic=firedrake gauge=rotation pgauge=pin
+ANNULUS_DEV NuT_vs_aspect=-86.0845% NuT_vs_firedrake=-86.0743% NuB_vs_aspect=-92.3658% Vrms_vs_aspect=-79.3739% Vrms_vs_firedrake=-79.3621% meanT_vs_aspect=18.2038% dNu_rel=57.9515%

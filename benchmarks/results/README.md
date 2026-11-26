@@ -104,6 +104,7 @@ lists every one with its byte size and SHA-256.
 
 | Date | Record | Quantity | Status |
 |---|---|---|---|
+| 2026-11-26 | `annulus_linear-paths_8x96-16x192.md` | same periodic-annulus state solved with `linear=:direct`, `:mg` and `:auto` at 8 x 96 and 16 x 192; equal printed scalars, `:auto` resolves to matrix-free MG | verified |
 | 2026-11-26 | `blankenbach2b_nu-L3toL4_steady.md` | QuaST Blankenbach 2b rows (L3, L3+walls4, L4+walls5) re-traced to their runs; the finest has no closing summary (OOM) | recorded (archived from the 2026-11-14/15 campaign) |
 | 2026-11-26 | `aspc-davies-case23_nu-vrms_ref4-unverified.md` | ASPECT run of the shipped Davies case 2.3 card (variable viscosity) at refinement 4: reached the card's end time but the state is not steady | **UNVERIFIED-in-full** — not a completed comparison |
 | 2026-11-26 | `aspc-davies-case22_nu-vrms_ref4.md` | ASPECT run of the shipped Davies case 2.2 card at refinement 4 (Ra = 1e5); same-resolution cross-code comparison with the `16 x 192` ladder rung | verified (OPTIMIZED); published ref-7 mesh not run |

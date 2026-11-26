@@ -1,0 +1,30 @@
+# annulus benchmark nx=8 ny=96 level=3 cells_y=12 leaves=768 dofs=7392 (u=6528 p=864 T=3264)
+# card: Ra=1e5 isoviscous H=0 free-slip ring R0=1.22 R1=2.22 phi=2pi; advection=galerkin ev=0.0 ic=firedrake
+# criterion: t > 0.02, change_t/|dNu_T|/|dV_RMS| < 0.0 for 2 consecutive steps (steady_vrms=true); tstop=0.02 maxsteps=24 ckpt=off
+# mode: time-accurate cfl=1.0 dt0=1.0e-5 dtmax=0.01 maxpic=1 pic_relax=1.0
+  step      1 t=1.000000e-05 dt=1.000e-05 Nu_T=1.329496 Nu_B=0.732198 dNu=5.97e-01 Vrms=38.98422 meanT=0.451545 rss=1672MB
+  step      2 t=2.050000e-05 dt=1.050e-05 Nu_T=1.329411 Nu_B=0.732485 dNu=5.97e-01 Vrms=39.88190 meanT=0.451539 rss=1673MB
+  step      3 t=3.152500e-05 dt=1.103e-05 Nu_T=1.329329 Nu_B=0.732791 dNu=5.97e-01 Vrms=40.83882 meanT=0.451533 rss=1673MB
+  step      4 t=4.310125e-05 dt=1.158e-05 Nu_T=1.329249 Nu_B=0.733116 dNu=5.96e-01 Vrms=41.86475 meanT=0.451526 rss=1674MB
+  step      5 t=5.525631e-05 dt=1.216e-05 Nu_T=1.329175 Nu_B=0.733464 dNu=5.96e-01 Vrms=42.96759 meanT=0.451519 rss=1674MB
+  step      6 t=6.801913e-05 dt=1.276e-05 Nu_T=1.329108 Nu_B=0.733835 dNu=5.95e-01 Vrms=44.15506 meanT=0.451512 rss=1674MB
+  step      7 t=8.142008e-05 dt=1.340e-05 Nu_T=1.329048 Nu_B=0.734234 dNu=5.95e-01 Vrms=45.43546 meanT=0.451505 rss=1674MB
+  step      8 t=9.549109e-05 dt=1.407e-05 Nu_T=1.329000 Nu_B=0.734662 dNu=5.94e-01 Vrms=46.81791 meanT=0.451497 rss=1674MB
+  step      9 t=1.102656e-04 dt=1.477e-05 Nu_T=1.328964 Nu_B=0.735123 dNu=5.94e-01 Vrms=48.31258 meanT=0.451488 rss=1676MB
+  step     10 t=1.257789e-04 dt=1.551e-05 Nu_T=1.328944 Nu_B=0.735622 dNu=5.93e-01 Vrms=49.93087 meanT=0.451480 rss=1676MB
+  step     11 t=1.420679e-04 dt=1.629e-05 Nu_T=1.328944 Nu_B=0.736163 dNu=5.93e-01 Vrms=51.68561 meanT=0.451471 rss=1676MB
+  step     12 t=1.591713e-04 dt=1.710e-05 Nu_T=1.328968 Nu_B=0.736751 dNu=5.92e-01 Vrms=53.59125 meanT=0.451461 rss=1676MB
+  step     13 t=1.771298e-04 dt=1.796e-05 Nu_T=1.329021 Nu_B=0.737394 dNu=5.92e-01 Vrms=55.66410 meanT=0.451451 rss=1676MB
+  step     14 t=1.959863e-04 dt=1.886e-05 Nu_T=1.329110 Nu_B=0.738099 dNu=5.91e-01 Vrms=57.92266 meanT=0.451440 rss=1672MB
+  step     15 t=2.157856e-04 dt=1.980e-05 Nu_T=1.329242 Nu_B=0.738876 dNu=5.90e-01 Vrms=60.38790 meanT=0.451429 rss=1672MB
+  step     16 t=2.365749e-04 dt=2.079e-05 Nu_T=1.329425 Nu_B=0.739736 dNu=5.90e-01 Vrms=63.08371 meanT=0.451418 rss=1672MB
+  step     17 t=2.584037e-04 dt=2.183e-05 Nu_T=1.329672 Nu_B=0.740695 dNu=5.89e-01 Vrms=66.03733 meanT=0.451406 rss=1672MB
+  step     18 t=2.813238e-04 dt=2.292e-05 Nu_T=1.329995 Nu_B=0.741768 dNu=5.88e-01 Vrms=69.27990 meanT=0.451393 rss=1672MB
+  step     19 t=3.053900e-04 dt=2.407e-05 Nu_T=1.330412 Nu_B=0.742978 dNu=5.87e-01 Vrms=72.84715 meanT=0.451380 rss=1672MB
+  step     20 t=3.306595e-04 dt=2.527e-05 Nu_T=1.330942 Nu_B=0.744351 dNu=5.87e-01 Vrms=76.78015 meanT=0.451366 rss=1672MB
+  step     21 t=3.571925e-04 dt=2.653e-05 Nu_T=1.331612 Nu_B=0.745918 dNu=5.86e-01 Vrms=81.12623 meanT=0.451351 rss=1672MB
+  step     22 t=3.850521e-04 dt=2.786e-05 Nu_T=1.332453 Nu_B=0.747722 dNu=5.85e-01 Vrms=85.94012 meanT=0.451336 rss=1672MB
+  step     23 t=4.143048e-04 dt=2.925e-05 Nu_T=1.333503 Nu_B=0.749813 dNu=5.84e-01 Vrms=91.28521 meanT=0.451319 rss=1672MB
+  step     24 t=4.450200e-04 dt=3.072e-05 Nu_T=1.334815 Nu_B=0.752257 dNu=5.83e-01 Vrms=97.23519 meanT=0.451303 rss=1672MB
+ANNULUS_RESULT - nx=8 ny=96 level=3 leaves=768 u_dofs=6528 p_dofs=864 T_dofs=3264 saddle_dofs=7392 steps=24 t=4.450200e-04 dt=3.072e-05 wall=86.3 s_per_step=3.1281 s_step_warm=0.1455 stokes=2.7333 stokes_warm=0.1132 NuT=1.334815 NuB=0.752257 dNu=5.826e-01 Vrms=97.23519 meanT=0.451303 Umax=164.559 div_vol=-8.934e-15 div_rel=5.02e-18 Ibase=1.917e-04 rss=1672 peak=2084 steady=0 window=2 nut_drift=1.31e-03 vr_drift=5.95e+00 adv=galerkin ev=0 ic=firedrake gauge=rotation pgauge=pin
+ANNULUS_DEV NuT_vs_aspect=-86.0200% NuT_vs_firedrake=-86.0097% NuB_vs_aspect=-92.1509% Vrms_vs_aspect=-49.7157% Vrms_vs_firedrake=-49.6869% meanT_vs_aspect=18.1420% dNu_rel=55.8253%
