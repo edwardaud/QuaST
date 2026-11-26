@@ -43,8 +43,8 @@ julia --project=. test/runtests.jl
 ```
 
 It takes 30 m 54 s on eight threads; the engineering record prices the same run at
-40 to 75 minutes on a loaded machine. The suite has 210 gate files, and the last
-recorded full-suite run reported 142 367 passed, 0 failed and 2 broken
+40 to 75 minutes on a loaded machine. The suite has 211 gate files, and the last
+recorded full-suite run reported 142 425 passed, 0 failed and 2 broken
 (2026-11-26, the recorded totals live in `test/README.md`).
 
 The suite currently reports no failures; the two `broken` entries are explicit,

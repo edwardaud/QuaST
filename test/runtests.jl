@@ -217,4 +217,6 @@ using QuaST
     # physics-aware continuation protocol (G290/G291)
     include("t_g290_annulus_restart.jl")
     include("t_g291_restart_physics.jl")
+    # ASPECT -> QuaST annulus state import (the annulus twin of the box path)
+    include("t_g292_annulus_import.jl")
 end
