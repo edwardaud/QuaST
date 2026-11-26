@@ -17,6 +17,9 @@ renderers. None of it is solver code, and none of it is a case input.
 | `queue_after_session.sh` | Start a case once an unrelated tmux session has finished, for cases that share a memory budget. |
 | `live_render.py` | Render new frames to PNG, a panel with Nu/Vrms, and a self-refreshing page. |
 | `three_row_video.py` | Stack runs of one case into a labelled comparison video. |
+| `annulus_video.py` | The 2-row annulus QuaST-vs-ASPECT renderer (mp4/GIF/poster/JSON). `--amr` switches it to the AMR demonstration layout: `log10 eta = -3T` in place of `log10|u|` and each row's adaptive mesh coloured by tree level (`docs/assets/quast_vs_aspect_annulus_demo.gif`). The default mode reproduces the benchmark videos byte for byte. |
+| `run_annulus_demo.sh` | Run the QuaST side of the annulus AMR demonstration (`examples/annulus_benchmark.jl demo`) and render the figure; the ASPECT side is `aspect_runs/annulus_demo/`. |
+| `annulus_demo_sidecar.py` | Read the QuaST log, the QuaST frame stream and the ASPECT log/statistics and write the demonstration figure's `--sidecar-extra` JSON (card, caption, caveats, measured runs, AMR statistics). |
 | `watchdog_case.sh` | Restart the realistic-case spin-up after a crash, with a log. |
 
 ## Portability: environment variables

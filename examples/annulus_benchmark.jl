@@ -96,6 +96,45 @@ const ANN_MS = QuaST
 # (8), ANN_TAG (""), ANN_RA (1.0e5; the published card is Ra = 1e5, the
 # ASPECT/Davies case 2.1 cross-code comparison runs the same card at Ra = 1e4).
 #
+# DEMO PRESET (`julia --project=. examples/annulus_benchmark.jl demo [tstop]`):
+# a purpose-configured QuaST-vs-ASPECT **demonstration** of the adaptive path --
+# not a benchmark and not an accuracy claim.  The token `demo` (instead of
+# `<nx>x<ny>`) sets the defaults below; every ENV knob still overrides its own
+# default one by one, so the preset is only a default set:
+#
+#   physics   Ra = 1e3 at the reference viscosity 1 (`ANN_RA`), H = 0
+#             (`ANN_H`), eta = 1000^(-T) (`ANN_DETA_T`), free-slip periodic
+#             ring, inner T = 1 / outer T = 0, ASPECT's hexagonal mode-4
+#             initial condition (`ANN_IC=aspect`).  With eta = 1000^(-T) the
+#             hot inner material has local Ra = 1e3 / 1e-3 = 1e6.  These are
+#             the shipped figure's values: the first proposed card (Ra = 1e6
+#             at the reference, H = 10) was measured to be infeasible and
+#             H = 10 is refused by the annulus wall-flux normalisation
+#             (see the campaign record docs/dev/BUG_FIX_LOG.md section 22 and
+#             aspect_runs/annulus_demo/README.md);
+#   time      t = 0 -> 0.2, CFL 10, BDF2 (`ANN_CFL`), frames every 0.005
+#             into `out_julia/annulus_demo/quast_frames` (`ANN_FRAMES`,
+#             `ANN_FRAME_DT`), never stops on the benchmark criterion
+#             (`ANN_TMIN=1e9`, `ANN_TOL=0`);
+#   AMR       start from the 4x48 = 192-leaf ring tree (level 2, from the
+#             `ANN_DEMO_NX`/`ANN_DEMO_NY` defaults), `ANN_INITIAL_REFINE=2`
+#             cycles on the IC, then one balanced cycle every `ANN_AMR_EVERY=5`
+#             steps: `ANN_REFINE_FRAC=0.2`, `ANN_COARSEN_FRAC=0.05`,
+#             `ANN_MAX_LEAVES=12000`, `ANN_MAX_LEVEL=7`, `ANN_WALL_MIN_LEVEL=3`,
+#             `ANN_WALL_STRIP=0.1`, `ANN_INDICATOR=theta`, `ANN_AMR_PASSES=1`;
+#   linear    `ANN_LINEAR=mg` with `ANN_MG_THREADS=8` (matrix-free multigrid);
+#   frames    the per-frame mesh dump is on (`ANN_MESH_DUMP=1`) and
+#             `frame_meta.csv` is v2, so the renderer draws the adaptive mesh.
+#
+# The preset builds its tree with `maxlevel = ANN_MAX_LEVEL`: a tree created at
+# level 2 has a refinement cap of 2 and `refine!` refuses there, so without it
+# the "AMR" run would silently keep a frozen 192-leaf mesh.
+#
+# The demo prints `# demo:` card lines and, after every mesh change, an
+# `  AMR step ...` line, plus one `ANNULUS_AMR` summary line at the end; none of
+# those lines is printed without the `demo` token or the knobs, so the
+# benchmark log is byte-identical.
+#
 # Continuation knobs (G291; a physics-aware restart of a checkpoint):
 #
 #   ANN_RESTART          checkpoint file to resume from ("" = no explicit
@@ -128,6 +167,24 @@ const ANN_MS = QuaST
 #                   renderer evaluates both codes on this same grid for the
 #                   angular-mean anomaly theta = T - <T>_phi(r), so the two rows
 #                   share one definition.  No field is evaluated on it here.
+#   ANN_MESH_DUMP   (0; the demo preset sets 1) write one `frame_%05d_mesh.csv`
+#                   beside every frame: the leaves of the tree the frame state
+#                   lives on, in **logical** coordinates.  Requires ANN_FRAMES.
+#                   Format: a '#' header line, then one row per leaf
+#
+#                       level,x0,y0,hx,hy
+#
+#                   where x is the radial logical coordinate S (r = R0 +
+#                   (R1-R0) S) and y the angular T (phi = Phi T); hx, hy are
+#                   the leaf sizes in those two directions (the map is
+#                   (x,y) = (r cos(Phi T), r sin(Phi T)), so the renderer
+#                   evaluates the cell in physical space).  With the dump on,
+#                   `frame_meta.csv` is version `annulus_frames_v2` and its
+#                   rows carry four extra columns after `nnodes`:
+#                   `leaves,level_min,level_max,dt` (the leaf count and both
+#                   level extremes of the same tree, and the step's dt).
+#                   Without ANN_MESH_DUMP the frame stream is the historical
+#                   v1 (benchmark videos are unchanged).
 #
 # Frame format (one small binary per frame, atomic temp+rename):
 #
@@ -143,6 +200,8 @@ const ANN_MS = QuaST
 #       frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes
 #       where the diagnostics are the harness definitions above
 #       (`semquad_nu_walls` family A, `semquad_vrms`, `semquad_mean_T`).
+#       A v2 stream (ANN_MESH_DUMP=1) appends leaves,level_min,level_max,dt;
+#       the first ten columns are the same in both versions.
 #
 # The frame writer is a pure diagnostic: it changes nothing in the solve, and a
 # run without ANN_FRAMES prints exactly the pre-frame-dump log.
@@ -164,14 +223,45 @@ env_s(k, d) = get(ENV, k, string(d))
 `ANN_RA` overrides the Rayleigh number (the published cards are Ra = 1e5 for
 case 2.2; the same-resolution ASPECT cross-code case 2.1 runs at Ra = 1e4).
 Without the environment variable this returns the historical card unchanged.
+
+The keyword Ra defaults to ANN_RA (1e5) so a no-argument call is the historical card; the demo preset passes Ra = 1e3.  The keywords `H` and `deta_T` default to the historical isoviscous, cold card
+(`H = 0`, `deta_T = 1`); the `demo` preset passes `H = 0` and `deta_T = 1000`
+(`eta = 1000^(-T)`) through `ANN_H`/`ANN_DETA_T`.  A call with no keyword is
+therefore bit-identical to the pre-demo function.
 """
-function annulus_benchmark_params()
-    return Params(Ra=env_f("ANN_RA", 1.0e5), H=0.0,
+function annulus_benchmark_params(; Ra::Union{Nothing,Float64}=nothing,
+                                  H::Float64=0.0, deta_T::Float64=1.0)
+    ra = Ra === nothing ? env_f("ANN_RA", 1.0e5) : Ra
+    return Params(Ra=ra, H=H,
                   # :expT with deta_T = 1 is constant viscosity eta = 1
                   # (eta = exp(-log(deta_T) T)); the benchmark's eta_ref = 1.
-                  eta_law=:expT, deta_T=1.0,
+                  eta_law=:expT, deta_T=deta_T,
                   Twall_top=0.0, Twall_bot=1.0,
                   bc=:free, wall_bc=(:free, :free, :free, :free))
+end
+
+"""The card's viscosity-law label: the historical `isoviscous` at `deta_T = 1`."""
+function annulus_eta_label(deta_T::Float64)
+    deta_T == 1.0 && return "isoviscous eta=1"
+    if isfinite(deta_T) && deta_T > 0.0
+        e = round(Int, log10(deta_T))
+        if 10.0^e == deta_T
+            return "eta=" * string(Int(round(10.0^e))) * "^(-T)"
+        end
+    end
+    return @sprintf("eta=%g^(-T)", deta_T)
+end
+
+"""The level extremes of a tree's leaves; `(0, 0)` for an empty tree."""
+function annulus_level_range(qt)
+    isempty(qt.leaves) && return (0, 0)
+    lmin, lmax = typemax(Int), 0
+    for lf in qt.leaves
+        l = lf[1]
+        lmin = min(lmin, l)
+        lmax = max(lmax, l)
+    end
+    return (lmin, lmax)
 end
 
 """The benchmark geometry: the closed 2-D annulus (periodic ring)."""
@@ -179,14 +269,21 @@ annulus_benchmark_geometry() = PolarAnnulus(ANN_R0, ANN_R1, ANN_PHI;
                                             seam=:periodic)
 
 """
-    annulus_benchmark_tree(nx, ny) -> Quadtree
+    annulus_benchmark_tree(nx, ny; maxlevel=nothing) -> Quadtree
 
 Uniform ring tree with `nx` radial and `ny` angular cells.  `nx` must be a
 power of two (radial base cells = 1) and `ny` a multiple of `nx`; the angular
 base-cell count is `ny/nx`.  The published meshes are `128x1536` and
 `512x2048`, i.e. `(cells_y, level) = (12, 7)` and `(4, 9)`.
+
+`maxlevel` is the tree's refinement cap: by default it is the tree's own level
+(the historical behaviour, and the only tree a uniform benchmark run needs).
+The `demo` preset passes `maxlevel = ANN_MAX_LEVEL` so the AMR cycle can refine
+the initial `level`-2 tree; without it `refine!` would refuse at the tree's
+construction level and the "AMR" run would silently keep a frozen mesh.
 """
-function annulus_benchmark_tree(nx::Int, ny::Int)
+function annulus_benchmark_tree(nx::Int, ny::Int;
+                                maxlevel::Union{Nothing,Int}=nothing)
     nx >= 1 && ispow2(nx) ||
         throw(ArgumentError("annulus_benchmark_tree: nx=$nx must be a power " *
                             "of two (the quadtree's radial base is one cell)"))
@@ -198,7 +295,10 @@ function annulus_benchmark_tree(nx::Int, ny::Int)
     cells_y >= 2 ||
         throw(ArgumentError("annulus_benchmark_tree: cells_y=$cells_y must be " *
                             ">= 2 for a periodic seam"))
-    qt = Quadtree(level; cells_x=1, cells_y=cells_y, seam=:periodic)
+    # `Quadtree(maxlevel; ...)` takes the refinement cap, the leaves then start
+    # at level 0 and are refined `level` times below.
+    ml = maxlevel === nothing ? level : max(level, maxlevel)
+    qt = Quadtree(ml; cells_x=1, cells_y=cells_y, seam=:periodic)
     for _ in 1:level, lf in collect(qt.leaves)
         refine!(qt, lf)
     end
@@ -248,39 +348,56 @@ mutable struct AnnulusFrameWriter
     nphi::Int
     next_t::Float64
     t0::Float64
+    mesh_dump::Bool
+    defer_stale::Bool
 end
 
 """
-    AnnulusFrameWriter(root, nx, ny, g, pr; dt=0.05, nr=200, nphi=1024)
+    AnnulusFrameWriter(root, nx, ny, g, pr; dt=0.05, nr=200, nphi=1024,
+                       mesh_dump=false)
 
-Open the frame stream in `root` (recreated: stale `frame_*.bin` and
-`frame_meta.csv` are removed so two runs can never be mixed).  The `'#'` header
-lines carry the uniform benchmark mesh `(nx, ny, R0, R1, Phi)` and the analysis
-polar grid `(nr, nphi)`, so the renderer can reconstruct the element boundaries
-and use one interpolation/theta grid for both codes.
+Open the frame stream in `root` (recreated: stale `frame_*.bin`,
+`frame_*_mesh.csv` and `frame_meta.csv` are removed so two runs can never be
+mixed).  The `'#'` header lines carry the uniform benchmark mesh
+`(nx, ny, R0, R1, Phi)` and the analysis polar grid `(nr, nphi)`, so the
+renderer can reconstruct the element boundaries and use one
+interpolation/theta grid for both codes.  `mesh_dump = true` writes the
+per-frame adaptive-mesh CSV (format in the file header) and upgrades the meta
+table to v2 with the `leaves,level_min,level_max,dt` columns.
 """
 function AnnulusFrameWriter(root::String, nx::Int, ny::Int, g::PolarAnnulus,
                             pr::Params; dt::Float64=0.05, nr::Int=200,
-                            nphi::Int=1024)
+                            nphi::Int=1024, mesh_dump::Bool=false,
+                            defer_stale::Bool=false)
     dt > 0.0 || throw(ArgumentError("ANN_FRAME_DT must be > 0 (got $dt)"))
     nr >= 2 && nphi >= 4 ||
         throw(ArgumentError("ANN_FRAME_NR/NPHI must be >= 2/4 (got $nr/$nphi)"))
     mkpath(root)
     for old in readdir(root)
         (occursin(r"^frame_\d{5}\.bin$", old) ||
+         occursin(r"^frame_\d{5}_mesh\.csv$", old) ||
          old == "frame_meta.csv") && rm(joinpath(root, old); force=true)
     end
     metapath = joinpath(root, "frame_meta.csv")
     io = open(metapath, "w")
-    println(io, "# annulus_frames_v1")
+    println(io, mesh_dump ? "# annulus_frames_v2" : "# annulus_frames_v1")
     println(io, "# mesh nx=$(nx) ny=$(ny) R0=$(repr(g.R0)) R1=$(repr(g.R1)) ",
             "Phi=$(repr(g.Φ))")
     println(io, "# polar_grid nr=$nr nphi=$nphi")
     println(io, "# arrays x,y,theta,T,speed float64; file frame_%05d.bin = ",
             "int64 nnodes then the five arrays, each nnodes long")
-    println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes")
+    if mesh_dump
+        println(io, "# mesh_dump per-frame frame_%05d_mesh.csv = '#' header ",
+                "then level,x0,y0,hx,hy per leaf in logical coordinates ",
+                "(x = radial S in [0,1], y = angular T in [0,1])")
+        println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes,",
+                "leaves,level_min,level_max,dt")
+    else
+        println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes")
+    end
     flush(io)
-    return AnnulusFrameWriter(root, io, 0, dt, nr, nphi, 0.0, time())
+    return AnnulusFrameWriter(root, io, 0, dt, nr, nphi, 0.0, time(), mesh_dump,
+                              defer_stale)
 end
 
 """
@@ -331,9 +448,40 @@ function write_annulus_frame!(fw::AnnulusFrameWriter, st, pr::Params,
         write(io, sp)
     end
     mv(tmppath, binpath; force=true)
-    @printf(fw.meta,
-            "%d,%d,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%d\n",
-            fw.frame, st.step, st.t, nut, nub, vr, tm, tmin, tmax, n)
+    if fw.mesh_dump
+        # The tree the frame state actually lives on (the callback runs after
+        # the AMR pass of the step, so `st.qt` is the post-AMR mesh and the
+        # fields are the transferred ones).  Sorted leaf order makes the dump
+        # byte-reproducible for the same tree.
+        qt = st.qt
+        nleaves = length(qt.leaves)
+        lmin, lmax = annulus_level_range(qt)
+        meshpath = joinpath(fw.dir, tag * "_mesh.csv")
+        meshtmp = meshpath * ".tmp"
+        open(meshtmp, "w") do io
+            println(io, "# annulus_mesh_v1 logical coords: level,x0,y0,hx,hy; ",
+                    "x = radial S in [0,1], y = angular T in [0,1]; ",
+                    "r = R0+(R1-R0)x, phi = Phi*y")
+            for lf in sort(collect(qt.leaves))
+                l = lf[1]
+                nsx = qt.nx0 * (1 << l)
+                nsy = qt.ny0 * (1 << l)
+                @printf(io, "%d,%.17g,%.17g,%.17g,%.17g\n",
+                        l, lf[2] / nsx, lf[3] / nsy, 1.0 / nsx, 1.0 / nsy)
+            end
+        end
+        mv(meshtmp, meshpath; force=true)
+    end
+    if fw.mesh_dump
+        @printf(fw.meta,
+                "%d,%d,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%d,%d,%d,%d,%.9e\n",
+                fw.frame, st.step, st.t, nut, nub, vr, tm, tmin, tmax, n,
+                nleaves, lmin, lmax, st.dt)
+    else
+        @printf(fw.meta,
+                "%d,%d,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%d\n",
+                fw.frame, st.step, st.t, nut, nub, vr, tm, tmin, tmax, n)
+    end
     flush(fw.meta)
     fw.frame += 1
     return nothing
@@ -345,10 +493,22 @@ end
 Write one frame if the state is the first state the driver exposes (`frame ==
 0`) or if `st.t` has reached the next multiple of the frame cadence.  Returns
 `true` when a frame was written.
+
+**Adaptive runs defer one callback after an AMR step.**  The driver's AMR block
+runs before the callback and, after a mesh change, resets the flow fields
+(`ux = uz = 0`, `velocity_stale = true`) for the next step's Stokes solve.  The
+temperature field of that callback is the real transferred state, but writing
+it would report `speed = |u| = 0` and `V_rms = 0` for a state that has a flow.
+With `defer_stale = true` (set by the demo whenever `amr_every > 0`) such a
+frame is deferred to the next callback instead; the frame's own time is what
+the meta records, and the deferral is at most `amr_every - 1` steps.  The
+benchmark videos (no AMR) never defer, so their frame stream is unchanged.
 """
 function annulus_frame_due!(fw::AnnulusFrameWriter, st, pr::Params,
                             g::PolarAnnulus)
+    stale = fw.defer_stale && all(iszero, st.ux) && all(iszero, st.uz)
     if fw.frame == 0
+        stale && return false
         write_annulus_frame!(fw, st, pr, g)
         fw.next_t = fw.dt
         while st.t >= fw.next_t - 1.0e-12
@@ -357,6 +517,7 @@ function annulus_frame_due!(fw::AnnulusFrameWriter, st, pr::Params,
         return true
     end
     st.t >= fw.next_t - 1.0e-12 || return false
+    stale && return false
     write_annulus_frame!(fw, st, pr, g)
     while st.t >= fw.next_t - 1.0e-12
         fw.next_t += fw.dt
@@ -449,14 +610,40 @@ function annulus_ra_label(ra::Float64)
 end
 
 function main(args)
-    isempty(args) && error("usage: annulus_benchmark.jl <nx>x<ny> [tstop]")
-    nx, ny = parse_resolution(args[1])
-    tstop = length(args) >= 2 ? parse(Float64, args[2]) : env_f("ANN_TSTOP", 3.0)
+    isempty(args) && error("usage: annulus_benchmark.jl <nx>x<ny>|<demo> [tstop]")
+    # `demo` is the purpose-configured AMR demonstration, not a benchmark: it
+    # is a *default set* for the knobs below, each of which ENV still overrides
+    # one by one.  Any other token is the historical `<nx>x<ny>` resolution and
+    # takes the historical path byte for byte.
+    demo = args[1] == "demo"
+    nx, ny = demo ? (env_i("ANN_DEMO_NX", 4), env_i("ANN_DEMO_NY", 48)) :
+                    parse_resolution(args[1])
+    tstop = length(args) >= 2 ? parse(Float64, args[2]) :
+            env_f("ANN_TSTOP", demo ? 0.2 : 3.0)
+    # The AMR card is resolved before the tree: the tree must carry a
+    # refinement cap at least as large as the run's `max_level`, otherwise
+    # `refine!` refuses at the tree's construction level and the run silently
+    # keeps a frozen mesh (the demo's initial 4x48 tree is built at level 2).
+    amr_every = env_i("ANN_AMR_EVERY", demo ? 5 : 0)
+    initial_refine = env_i("ANN_INITIAL_REFINE", demo ? 2 : 0)
+    max_level = env_i("ANN_MAX_LEVEL", demo ? 7 : typemax(Int))
+    if amr_every > 0 || initial_refine > 0
+        1 <= max_level <= 20 ||
+            error("AMR is on ($(amr_every) > 0 or initial_refine=$(initial_refine) " *
+                  "> 0) but ANN_MAX_LEVEL=$(max_level); set a refinement cap in " *
+                  "[1, 20] (the demo preset uses 7)")
+    end
     dofs = annulus_benchmark_dofs(nx, ny)
     g = annulus_benchmark_geometry()
-    qt = annulus_benchmark_tree(nx, ny)
+    qt = annulus_benchmark_tree(nx, ny;
+                                maxlevel = (amr_every > 0 ||
+                                            initial_refine > 0) ? max_level :
+                                           nothing)
     ss = make_semstokes(qt, 2; geom=g)
-    pr = annulus_benchmark_params()
+    pr = annulus_benchmark_params(
+        ; Ra=demo ? env_f("ANN_RA", 1.0e3) : nothing,
+        H=env_f("ANN_H", 0.0),
+        deta_T=env_f("ANN_DETA_T", demo ? 1000.0 : 1.0))
     # DOF arithmetic against the space actually built.
     @assert length(qt.leaves) == dofs.leaves
     @assert ss.su.N == dofs.T
@@ -464,17 +651,28 @@ function main(args)
     @assert 2 * ss.su.N + ss.sp.N == dofs.saddle
     adv = Symbol(env_s("ANN_ADVECTION", "galerkin"))
     ev = env_f("ANN_EV", 0.0)
-    ic = Symbol(env_s("ANN_IC", "firedrake"))
-    tol = env_f("ANN_TOL", 1.0e-6)
+    ic = Symbol(env_s("ANN_IC", demo ? "aspect" : "firedrake"))
+    tol = env_f("ANN_TOL", demo ? 0.0 : 1.0e-6)
     window = env_i("ANN_WINDOW", 20)
-    tmin = env_f("ANN_TMIN", 0.02)
-    cfl = env_f("ANN_CFL", 1.0)
+    tmin = env_f("ANN_TMIN", demo ? 1.0e9 : 0.02)
+    cfl = env_f("ANN_CFL", demo ? 10.0 : 1.0)
     dt0 = env_f("ANN_DT0", 1.0e-5)
     maxpic = env_i("ANN_MAXPIC", 1)
     pic_relax = env_f("ANN_PIC_RELAX", 1.0)
-    report = env_i("ANN_REPORT", 25)
+    report = env_i("ANN_REPORT", demo ? 50 : 25)
     ckdir = env_s("ANN_CKPT_DIR", "")
     ckevery = env_i("ANN_CKPT_EVERY", 200)
+    # AMR knobs.  The historical benchmark runs no AMR (`amr_every = 0`); the
+    # demo preset turns the balanced cycle on.  `ANN_REFINE_FRAC` defaults to
+    # 0.2, the balanced cycle's own default.  `amr_every`, `max_level` and
+    # `initial_refine` were resolved before the tree was built.
+    refine_frac = env_f("ANN_REFINE_FRAC", 0.2)
+    coarsen_frac = env_f("ANN_COARSEN_FRAC", demo ? 0.05 : 0.0)
+    max_leaves = env_i("ANN_MAX_LEAVES", demo ? 12000 : typemax(Int))
+    wall_min_level = env_i("ANN_WALL_MIN_LEVEL", demo ? 3 : 0)
+    wall_strip = env_f("ANN_WALL_STRIP", 0.1)
+    amr_indicator = Symbol(env_s("ANN_INDICATOR", "theta"))
+    amr_passes = env_i("ANN_AMR_PASSES", 1)
     # G291 continuation knobs: an explicit checkpoint to resume from and the
     # driver's physics-change protocol for it.  `refuse` is the default and a
     # same-physics restart never triggers the guard; `allow` is the documented
@@ -484,11 +682,17 @@ function main(args)
     restart_physics in (:refuse, :allow) ||
         error("ANN_RESTART_PHYSICS must be refuse or allow (got " *
               "$(env_s("ANN_RESTART_PHYSICS", "")))")
-    frames_dir = env_s("ANN_FRAMES", "")
-    frame_dt = env_f("ANN_FRAME_DT", 0.05)
+    frames_dir = env_s("ANN_FRAMES",
+                       demo ? "out_julia/annulus_demo/quast_frames" : "")
+    frame_dt = env_f("ANN_FRAME_DT", demo ? 0.005 : 0.05)
     frame_nr = env_i("ANN_FRAME_NR", 200)
     frame_nphi = env_i("ANN_FRAME_NPHI", 1024)
+    mesh_dump = env_i("ANN_MESH_DUMP", demo ? 1 : 0) == 1
     frames_on = !isempty(frames_dir)
+    linear = Symbol(env_s("ANN_LINEAR", demo ? "mg" : "auto"))
+    mesh_dump && !frames_on &&
+        error("ANN_MESH_DUMP=1 writes one mesh CSV beside every frame, so it " *
+              "needs ANN_FRAMES; set ANN_MESH_DUMP=0 or ANN_FRAMES=<dir>")
     ckpt = isempty(ckdir) ? "" : joinpath(ckdir, "ann_$(nx)x$(ny).h5")
     # `ANN_RESTART` is an explicit restart file and wins over the automatic
     # resume of an existing `ANN_CKPT_DIR` checkpoint; both are mutual
@@ -511,8 +715,28 @@ function main(args)
     println("# annulus benchmark nx=$nx ny=$ny level=$(trailing_zeros(nx)) " *
             "cells_y=$(ny÷nx) leaves=$(dofs.leaves) dofs=$(dofs.saddle) " *
             "(u=$(dofs.u) p=$(dofs.p) T=$(dofs.T))")
-    println("# card: Ra=$(annulus_ra_label(pr.Ra)) isoviscous H=0 free-slip ring R0=$(ANN_R0) " *
-            "R1=$(ANN_R1) phi=2pi; advection=$adv ev=$ev ic=$ic")
+    if pr.H == 0.0 && pr.deta_T == 1.0
+        # the historical card line, byte for byte
+        println("# card: Ra=$(annulus_ra_label(pr.Ra)) isoviscous H=0 free-slip ring R0=$(ANN_R0) " *
+                "R1=$(ANN_R1) phi=2pi; advection=$adv ev=$ev ic=$ic")
+    else
+        println("# card: Ra=$(annulus_ra_label(pr.Ra)) $(annulus_eta_label(pr.deta_T)) " *
+                "H=$(@sprintf("%g", pr.H)) free-slip ring R0=$(ANN_R0) " *
+                "R1=$(ANN_R1) phi=2pi; advection=$adv ev=$ev ic=$ic")
+    end
+    if demo
+        println("# demo: purpose-configured AMR demonstration, NOT a benchmark " *
+                "(same physics on both codes, no accuracy claim); each code " *
+                "integrates its own adaptive mesh")
+        println("# demo: from $(nx)x$(ny) = $(dofs.leaves) leaves (level " *
+                "$(trailing_zeros(nx))), initial_refine=$initial_refine then " *
+                "AMR every=$amr_every steps indicator=$amr_indicator " *
+                "passes=$amr_passes refine_frac=$refine_frac " *
+                "coarsen_frac=$coarsen_frac max_leaves=$max_leaves " *
+                "max_level=$max_level wall_min_level=$wall_min_level " *
+                "wall_strip=$wall_strip; linear=$linear mg_threads=" *
+                "$(linear === :mg ? env_i("ANN_MG_THREADS", 8) : 0)")
+    end
     println("# criterion: t > $tmin, change_t/|dNu_T|/|dV_RMS| < $tol for " *
             "$window consecutive steps (steady_vrms=true); tstop=$tstop " *
             "maxsteps=$(env_i("ANN_MAXSTEPS", 200000)) ckpt=$(resume ? "resume" : isempty(ckpt) ? "off" : "new")")
@@ -529,16 +753,30 @@ function main(args)
     if frames_on
         println("# frames: dir=$frames_dir every=$frame_dt analysis_grid=" *
                 "$(frame_nr)x$(frame_nphi) (node-cloud states; the renderer " *
-                "computes theta = T - <T>_phi(r) on the analysis grid)")
+                "computes theta = T - <T>_phi(r) on the analysis grid)" *
+                (mesh_dump ? " mesh_dump=on" : ""))
     end
     flush(stdout)
     t_run = time()
     n_report = 0
+    # demo-only AMR bookkeeping: the tree size/level range the run visits, and
+    # one log line per mesh change (a demo AMR run is audited from the log).
+    leaves_last = length(qt.leaves)
+    leaves_seen_max = leaves_last
+    level_seen_min, level_seen_max = annulus_level_range(qt)
     fw = frames_on ?
          AnnulusFrameWriter(frames_dir, nx, ny, g, pr; dt=frame_dt,
-                            nr=frame_nr, nphi=frame_nphi) : nothing
+                            nr=frame_nr, nphi=frame_nphi,
+                            mesh_dump=mesh_dump,
+                            defer_stale=amr_every > 0) : nothing
     cb = (st) -> begin
-        if st.step % report == 0
+        # The callback runs after the driver's AMR block, which resets the flow
+        # fields after a mesh change: on those steps Nu/mean T are the real
+        # transferred state but the velocity diagnostics read a not-yet-solved
+        # zero (see `annulus_frame_due!`, which defers the frame for the same
+        # reason).  Skip the report line then instead of printing V_rms = 0.
+        stale = amr_every > 0 && all(iszero, st.ux) && all(iszero, st.uz)
+        if st.step % report == 0 && !stale
             nt, nb = semquad_nu_walls(st.sq, st.qt, st.theta, pr)
             @printf("  step %6d t=%.6e dt=%.3e Nu_T=%.6f Nu_B=%.6f dNu=%.2e Vrms=%.5f meanT=%.6f rss=%.0fMB\n",
                     st.step, st.t, st.dt, nt, nb, nt - nb,
@@ -547,6 +785,17 @@ function main(args)
             flush(stdout)
         end
         n_report += 1
+        nl = length(st.qt.leaves)
+        if demo && nl != leaves_last
+            lm, lM = annulus_level_range(st.qt)
+            level_seen_min = min(level_seen_min, lm)
+            level_seen_max = max(level_seen_max, lM)
+            leaves_seen_max = max(leaves_seen_max, nl)
+            @printf("  AMR  step %6d t=%.6e leaves=%d level=%d-%d dt=%.3e\n",
+                    st.step, st.t, nl, lm, lM, st.dt)
+            flush(stdout)
+        end
+        leaves_last = nl
         frames_on && annulus_frame_due!(fw, st, pr, g)
         return nothing
     end
@@ -557,14 +806,21 @@ function main(args)
         :dtmax => (cfl > 0 ? env_f("ANN_DTMAX", 1.0e-2) : dt0),
         :dtmin => 1.0e-16,
         :cfl => cfl, :maxsteps => env_i("ANN_MAXSTEPS", 200000),
-        :linear => Symbol(env_s("ANN_LINEAR", "auto")),
+        :linear => linear,
         :advection => adv, :ev => ev, :maxpic => maxpic,
         :pic_relax => pic_relax, :pic_tol => env_f("ANN_PIC_TOL", 1.0e-6),
         :steady_tol => tol, :steady_window => window, :steady_vrms => true,
         :tmin => tmin, :annulus_ic => ic, :profile_steps => true,
         :verbose => false, :callback => cb,
+        # AMR card (the values are the driver defaults unless the demo preset or
+        # an ANN_* knob changes them; a default run is therefore unchanged).
+        :amr_every => amr_every, :refine_frac => refine_frac,
+        :coarsen_frac => coarsen_frac, :amr_passes => amr_passes,
+        :max_leaves => max_leaves, :max_level => max_level,
+        :wall_min_level => wall_min_level, :wall_strip => wall_strip,
+        :amr_indicator => amr_indicator, :initial_refine => initial_refine,
         :checkpoint_path => ckpt, :checkpoint_every => ckevery)
-    if Symbol(env_s("ANN_LINEAR", "auto")) === :mg
+    if linear === :mg
         kw[:mg_operator] = :matrixfree
         kw[:mg_threads] = env_i("ANN_MG_THREADS", 8)
     end
@@ -625,8 +881,16 @@ function main(args)
             100 * (nut - nub) / ((nut + nub) / 2))
     if frames_on
         close(fw.meta)
-        @printf("ANNULUS_FRAMES n=%d dir=%s every=%.6g analysis_grid=%dx%d wall=%.1f\n",
-                fw.frame, frames_dir, frame_dt, frame_nr, frame_nphi, wall)
+        @printf("ANNULUS_FRAMES n=%d dir=%s every=%.6g analysis_grid=%dx%d wall=%.1f%s\n",
+                fw.frame, frames_dir, frame_dt, frame_nr, frame_nphi, wall,
+                mesh_dump ? " mesh_dump=on" : "")
+    end
+    if demo
+        lfin_min, lfin_max = annulus_level_range(st.qt)
+        @printf("ANNULUS_AMR preset=demo frames=%d leaves_final=%d leaves_max=%d level_final=%d-%d level_seen=%d-%d amr_every=%d indicator=%s linear=%s\n",
+                frames_on ? fw.frame : 0, length(st.qt.leaves), leaves_seen_max,
+                lfin_min, lfin_max, level_seen_min, level_seen_max, amr_every,
+                amr_indicator, linear)
     end
     flush(stdout)
     return st

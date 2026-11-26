@@ -219,4 +219,7 @@ using QuaST
     include("t_g291_restart_physics.jl")
     # ASPECT -> QuaST annulus state import (the annulus twin of the box path)
     include("t_g292_annulus_import.jl")
+    # annulus AMR demonstration figure: demo preset, frame/mesh stream, and the
+    # benchmark default path (G293)
+    include("t_g293_annulus_demo_frames.jl")
 end

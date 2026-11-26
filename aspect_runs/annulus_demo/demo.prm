@@ -1,0 +1,190 @@
+# The annulus AMR demonstration card: the ASPECT side of
+# docs/assets/quast_vs_aspect_annulus_demo.gif.
+#
+# This is a purpose-configured DEMONSTRATION of the adaptive path, not a
+# validation and not a published benchmark.  The same physics runs on both
+# codes, each with its own adaptive mesh:
+#
+#   geometry    full periodic ring (spherical shell, Opening angle = 360),
+#               R0 = 1.22, R1 = 2.22, so the gap d = 1 is the length unit;
+#   physics     Boussinesq, free slip on both circles (Tangential velocity
+#               boundary indicators = 0,1), fixed temperatures T = 1 inner /
+#               T = 0 outer, radial constant gravity 1e9 with
+#               alpha = 1e-6, rho = cp = k = 1 and reference viscosity 1, so
+#               Ra = rho g alpha dT d^3 / (kappa eta0) = 1e3 at the reference
+#               viscosity (the local Rayleigh number of the hot inner material
+#               is Ra/eta(T=1) = 1e6); the `VoT` material model (image plugin,
+#               eta = 1000^(-T)); no internal heating (H = 0);
+#   IC          ASPECT `spherical hexagonal perturbation`, angular mode 4,
+#               rotation offset 0 (the same total T = s + 0.2 s (1-s) cos(4 phi)
+#               the QuaST example uses through `ANN_IC=aspect`);
+#   time        t = 0 -> 0.2, CFL 10, BDF2, VTU every 0.005 (41 frames);
+#   AMR         Strategy = temperature, initial global refinement 3, initial
+#               adaptive refinement 2 (two adaptive passes on the initial
+#               state), refinement fraction 0.2, coarsening fraction 0.05.
+#               The mesh is held fixed during the time loop: this pinned
+#               ASPECT 2.5.0-pre (main, 340c0d018) image was measured to drive
+#               an unbounded velocity spike (u_max 5.4e6 at t = 0.016) and a
+#               temperature-solver failure on the first in-loop refinement
+#               cycle (every 5 steps), so `Time steps between mesh refinement`
+#               is large.  The mesh panel still shows ASPECT's adaptive
+#               startup mesh (levels 3-4); only QuaST's mesh evolves in time.
+#
+# The two codes' meshes differ (QuaST's gradient-jump indicator, wall minimum
+# level and in-loop cycle are not ASPECT's temperature strategy), so the figure
+# compares the two integrations and their adaptive meshes, not two meshes.
+# This is a demonstration, not an accuracy claim.
+#
+# Run (from a Windows PowerShell with the pinned image; ASCII host mount):
+#
+#   docker run --rm --entrypoint /bin/bash \
+#     -v C:/temp/quast_aspect/annulus_demo:/work -w /work \
+#     gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac \
+#     -c "mpirun --allow-run-as-root -n 4 /home/dealii/aspect/aspect-release demo.prm"
+#
+# `Additional shared libraries` points at the plugin the image already ships
+# (the tracked VoT.cc + CMakeLists.txt rebuild it; see README.md).
+#
+# SPDX-License-Identifier: MIT (this input card; the plugin it loads is
+# GPL-2.0-or-later, see LICENSE and ../NOTICE).
+
+set Additional shared libraries            = /home/dealii/aspect/benchmarks/davies_et_al/case-2.3-plugin/libVoT.release.so
+
+############### Global parameters
+
+set Dimension                              = 2
+set Use years in output instead of seconds = false
+
+set CFL number                             = 10
+set End time                               = 0.2
+set Start time                             = 0
+set Output directory                       = output-annulus-demo
+
+subsection Checkpointing
+  # The demo writes VTU frames only; a checkpoint is not needed for the figure.
+  set Steps between checkpoint = 1000000
+end
+
+
+############### Parameters describing the model
+
+subsection Geometry model
+  set Model name = spherical shell
+  subsection Spherical shell
+    set Inner radius  = 1.22
+    set Opening angle = 360
+    set Outer radius  = 2.22
+  end
+end
+
+
+subsection Nullspace removal
+  set Remove nullspace = net rotation
+end
+
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = 0,1
+end
+
+
+subsection Gravity model
+  set Model name = radial constant
+  subsection Radial constant
+    set Magnitude = 1e9
+  end
+end
+
+
+subsection Material model
+  set Model name = VoT
+
+  subsection VoT model
+    set Reference density             = 1
+    set Reference specific heat       = 1
+    set Reference temperature         = 0
+    set Thermal conductivity          = 1
+    set Thermal expansion coefficient = 1e-6
+    set Viscosity                     = 1
+  end
+end
+
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = 0,1
+  set List of model names = spherical constant
+
+  subsection Spherical constant
+    set Inner temperature = 1
+    set Outer temperature = 0
+  end
+end
+
+
+############### Parameters describing the temperature field
+
+subsection Initial temperature model
+  set Model name = spherical hexagonal perturbation
+
+  subsection Spherical hexagonal perturbation
+    set Angular mode    = 4
+    set Rotation offset = 0
+  end
+end
+
+
+############### Parameters describing the discretization
+
+subsection Discretization
+  set Stokes velocity polynomial degree       = 2
+  set Temperature polynomial degree           = 2
+  set Use locally conservative discretization = false
+
+  subsection Stabilization parameters
+    set alpha = 2
+    set beta  = 0.078
+    set cR    = 0.11
+  end
+end
+
+
+############### Solver parameters (robustified for the 1000x viscosity contrast)
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Number of cheap Stokes solver steps             = 0
+    set Linear solver tolerance                         = 1e-6
+    set GMRES solver restart length                     = 100
+    set Use full A block as preconditioner              = true
+    set Maximum number of expensive Stokes solver steps = 2000
+  end
+end
+
+
+############### Parameters describing the adaptive mesh
+
+subsection Mesh refinement
+  set Strategy                           = temperature
+  set Initial global refinement          = 3
+  set Initial adaptive refinement        = 2
+  set Refinement fraction                = 0.2
+  set Coarsening fraction                = 0.05
+  # Measured: an in-loop cycle every 5 steps is unstable in this pinned
+  # pre-release image (unbounded velocity spike, temperature solve failure);
+  # the adaptive startup mesh is held fixed during the run.  See README.md.
+  set Time steps between mesh refinement = 100000
+  set Additional refinement times        =
+end
+
+
+############### Parameters describing what to do with the solution
+
+subsection Postprocess
+  set List of postprocessors = visualization, velocity statistics, temperature statistics, heat flux statistics
+
+  subsection Visualization
+    set Number of grouped files       = 0
+    set Output format                 = vtu
+    set Time between graphical output = 0.005
+  end
+end

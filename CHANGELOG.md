@@ -6,7 +6,7 @@ public release: earlier development happened in a private repository.
 
 ## [Unreleased]
 
-Nothing yet.
+- The annulus AMR demonstration (`examples/annulus_benchmark.jl demo`, `scripts/run_annulus_demo.sh`, `aspect_runs/annulus_demo/`, `scripts/annulus_video.py --amr`): a purpose-configured two-code demonstration of the adaptive path, rendered as `docs/assets/quast_vs_aspect_annulus_demo.gif`.
 
 ## [0.2.0] - 2026-11-26
 

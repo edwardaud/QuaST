@@ -36,15 +36,18 @@ the commit tagged `v0.2.0` (2026-11-26); `git rev-list -n1 v0.2.0`, package vers
   `<ZENODO-DOI>`; `<CONCEPT-DOI>` always resolves to the newest release. GitHub
   alone is a development site and is not the archival record (GMD policy).
 - **Licences.** The main package (Julia source, tests, documentation, scripts,
-  benchmark instruments) is MIT. The ASPECT material-model plugin
-  (`aspect_runs/realistic/realistic_composite.cc` and its `CMakeLists.txt`) is
-  **GPL-2.0-or-later**, because it is derived from and linked against ASPECT,
-  which is GPL-2.0-or-later. The example initial-condition data in
+  benchmark instruments) is MIT. The ASPECT material-model plugins are
+  **GPL-2.0-or-later**, because they are derived from and linked against ASPECT,
+  which is GPL-2.0-or-later: `aspect_runs/realistic/realistic_composite.cc` and
+  its `CMakeLists.txt`, and `aspect_runs/annulus_demo/VoT.cc` and its
+  `CMakeLists.txt` (the benchmark plugin tracked for the annulus AMR
+  demonstration). The example initial-condition data in
   `examples/data/` and the benchmark provenance records in `benchmarks/results/`
   are **CC0-1.0**. The full split is in [`NOTICE`](../../NOTICE), the MIT text in
   [`LICENSE`](../../LICENSE), the GPL text in
-  [`aspect_runs/realistic/LICENSE`](../../aspect_runs/realistic/LICENSE) and the
-  CC0 text in [`examples/data/LICENSE`](../../examples/data/LICENSE).
+  [`aspect_runs/realistic/LICENSE`](../../aspect_runs/realistic/LICENSE) and
+  [`aspect_runs/annulus_demo/LICENSE`](../../aspect_runs/annulus_demo/LICENSE),
+  and the CC0 text in [`examples/data/LICENSE`](../../examples/data/LICENSE).
 - **Environment.** Ubuntu 24.04 (WSL2), Julia 1.12.7, 8 Julia threads, 25 GB of
   shared memory, HDF5.jl 0.17.4; the committed `Manifest.toml` pins the Julia
   package set. The production 10 000-leaf state peaks at about 1.3 GB resident on
@@ -81,8 +84,8 @@ Code availability. QuaST v0.1.0 (commit <RELEASE-COMMIT>), an open-source
 spectral-element solver for two-dimensional mantle convection, is available at
 https://github.com/edwardaud/QuaST and the exact version used for all results
 in this paper is archived in Zenodo under DOI <ZENODO-DOI>. The main package is
-released under the MIT licence; the ASPECT material-model plugin in
-aspect_runs/realistic/ is released under GPL-2.0-or-later because it is derived
+released under the MIT licence; the ASPECT material-model plugins in
+aspect_runs/realistic/ and aspect_runs/annulus_demo/ are released under GPL-2.0-or-later because they are derived
 from ASPECT; the example initial-condition data and the benchmark provenance
 records are released under CC0-1.0. No registration, request or restriction is
 involved. The code was run with Julia 1.12.7, 8 threads and 25 GB of shared
@@ -106,7 +109,7 @@ available at https://github.com/edwardaud/QuaST. The exact version used for all
 results is QuaST v0.1.0 (commit <RELEASE-COMMIT>), archived under DOI <ZENODO-DOI>
 (<CONCEPT-DOI> resolves to the newest release), and this DOI is given in the
 reference list. The code is released under the MIT licence, except the ASPECT
-material-model plugin in aspect_runs/realistic/, which is GPL-2.0-or-later
+material-model plugins in aspect_runs/realistic/ and aspect_runs/annulus_demo/, which are GPL-2.0-or-later
 because it is derived from ASPECT; the example initial-condition data in
 examples/data/ and the benchmark provenance records are released under CC0-1.0.
 The read-me material is the repository README files and docs/en/guide.md, which
@@ -133,8 +136,8 @@ Code and data availability. The exact version of QuaST used to produce the
 results in this paper is v0.1.0 (commit <RELEASE-COMMIT>), archived on Zenodo under DOI
 <ZENODO-DOI>; <CONCEPT-DOI> resolves to the newest release. The model is
 developed at https://github.com/edwardaud/QuaST. The licence of the code is the
-MIT licence, except the ASPECT material-model plugin in aspect_runs/realistic/,
-which is GPL-2.0-or-later as a derivative work of ASPECT; the input data in
+MIT licence, except the ASPECT material-model plugins in aspect_runs/realistic/
+and aspect_runs/annulus_demo/, which are GPL-2.0-or-later as a derivative work of ASPECT; the input data in
 examples/data/ and the benchmark provenance records are released under CC0-1.0.
 The archive contains the complete model source, the documentation (docs/en and
 docs/zh), the configuration and boundary-condition cards, the input data, and
@@ -172,7 +175,7 @@ Software Availability Statement. QuaST v0.1.0 (commit <RELEASE-COMMIT>), the
 spectral-element solver used for all simulations, is available at
 https://github.com/edwardaud/QuaST and is archived in Zenodo under DOI
 <ZENODO-DOI>, cited in the reference list. The main package is MIT-licensed; the
-ASPECT material-model plugin in aspect_runs/realistic/ is GPL-2.0-or-later
+ASPECT material-model plugins in aspect_runs/realistic/ and aspect_runs/annulus_demo/ are GPL-2.0-or-later
 because it is derived from ASPECT. The simulations were run with Julia 1.12.7,
 8 threads and 25 GB of shared memory, with the environment pinned by the
 committed Manifest.toml. Per-number provenance records are in benchmarks/results/

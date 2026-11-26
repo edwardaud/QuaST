@@ -5,24 +5,30 @@ QuaST is distributed under the MIT licence.  The MIT text is in LICENSE and is
 not modified by this notice.  A few files are the work of other projects, or
 carry a licence that differs from MIT; they are listed here, with the reason.
 
-1. ASPECT material-model plugin: GPL-2.0-or-later
+1. ASPECT material-model plugins: GPL-2.0-or-later
    ---------------------------------------------
    Files:
      aspect_runs/realistic/realistic_composite.cc
      aspect_runs/realistic/CMakeLists.txt
+     aspect_runs/annulus_demo/VoT.cc
+     aspect_runs/annulus_demo/CMakeLists.txt
 
-   Why: these two files build the `realistic composite` material model as a
-   shared-library plugin for ASPECT.  The ASPECT library is distributed under
-   the GNU General Public License, version 2 or any later version, and the plugin
-   includes ASPECT headers and links against ASPECT, so it is a work derived from
-   ASPECT and is distributed under the same licence.
+   Why: these files build the `realistic composite` and `VoT` material models
+   as shared-library plugins for ASPECT.  The ASPECT library is distributed
+   under the GNU General Public License, version 2 or any later version, and
+   the plugins include ASPECT headers and link against ASPECT, so they are
+   works derived from ASPECT and are distributed under the same licence.
+   `aspect_runs/annulus_demo/VoT.cc` and its `CMakeLists.txt` are the plugin
+   files shipped with the pinned ASPECT image (benchmarks/davies_et_al/
+   case-2.3-plugin/), tracked with an added provenance note.
 
-   Licence text: aspect_runs/realistic/LICENSE (the GNU GPL version 2 text from
+   Licence text: aspect_runs/realistic/LICENSE and
+   aspect_runs/annulus_demo/LICENSE (the GNU GPL version 2 text from
    https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt).  The "or any later
    version" option is declared with the SPDX identifier GPL-2.0-or-later in the
-   header of each of the two files, and is the option the files are distributed
+   header of each of these files, and is the option the files are distributed
    under (GPL-2.0-or-later, SPDX: https://spdx.org/licenses/GPL-2.0-or-later.html).
-   ASPECT itself is NOT distributed with QuaST; the plugin is only useful
+   ASPECT itself is NOT distributed with QuaST; the plugins are only useful
    against an ASPECT installation, obtained separately under the GPL.
 
    Nothing else in aspect_runs/ is derived from ASPECT: the `*.prm` input cards,

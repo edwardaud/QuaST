@@ -13,6 +13,10 @@ QuaST 在二维直角盒子里求解地幔对流：不可压 Boussinesq 或滞�
 
 图：同一个真实算例，上排 QuaST，下排 ASPECT，从同一初值出发。四列依次为温度、相对水平平均的温度异常、对数色标下的黏度，以及按加密层级着色的网格。
 
+![一个专门配置的圆环 AMR 演示，分别由 QuaST 与 ASPECT 求解](docs/assets/quast_vs_aspect_annulus_demo.gif)
+
+图：专门配置的圆环自适应网格演示，不是验证，也不是基准算例。QuaST（上排）与 ASPECT（下排）求解同一套物理：自由滑移周期环、参考黏度 1 下的 `Ra = 1e3`（热的内壁材料局部 `Ra = 1e6`）、温度依赖黏度 `eta = 1000^(-T)`、无内部加热、ASPECT 的六边形 mode-4 初值；两者各自使用自己的自适应网格，时间从 `t = 0` 到 `0.2`。四列依次为总温度、相对角向平均的温度异常、`log10 eta = -3T`，以及按树层级着色的自适应网格（QuaST 在时间循环内加密，ASPECT 的启动自适应网格保持固定，原因见图的 sidecar）。两张网格本来就不同，因此这是自适应路径的演示，不是精度声明，也不做 Nusselt 对比。
+
 ## 能做什么
 
 - 物性覆盖扩散–位错复合蠕变、随深度变化的 Drucker–Prager 屈服、应变弱化、带潜热的相变、内部加热与 Maxwell 黏弹性。
@@ -44,7 +48,7 @@ CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 | 二维圆环基准，ASPECT 级 128 x 1536 分辨率：`Nu_T` 对 ASPECT 的 9.548 | **+0.20%**，是该运行自身 0.462 % GCI 的 0.44 倍——在不确定度内一致，不是 0.20 % 的精度声明 | [验证](docs/zh/validation.md#二维圆环) · [记录](benchmarks/results/annulus_nu-t_128x1536_rung4.md) |
 | 同一状态由 ASPECT 导入、两程序各自推进：`Nu_bot` 对 ASPECT | **+0.003%** | [验证](docs/zh/validation.md#跨代码对照) |
 | 逐壁边界条件对精确解：切向牵引 Couette、开壁法向牵引、槽道 Poiseuille，以及区域算例的 `validate` | 牵引 Couette 速度误差 **7.6e-15**、压力 **2.6e-12**；槽道 Poiseuille 速度 **9.9e-15**；区域验证 **13 项全部通过** | [验证](docs/zh/validation.md#边界条件验证) |
-| 门禁套件，211 个文件 | 142 427 条断言：142 425 通过、0 失败、2 条 broken（等待本仓库未附带的检查点） | [test/README.md](test/README.md) |
+| 门禁套件，212 个文件 | 146 101 条断言：146 099 通过、0 失败、2 条 broken（等待本仓库未附带的检查点） | [test/README.md](test/README.md) |
 
 Blankenbach 与圆环数值背后的收敛过程、边界条件验证、Nusselt 数的三种约定、黏弹性检查，以及证据的边界，都在验证页。表中 Blankenbach 与圆环两行链到各自的逐数溯源记录，见 [benchmarks/results/](benchmarks/results/README.md)：命令、输入卡及其哈希、环境与日志。
 

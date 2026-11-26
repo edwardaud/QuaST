@@ -88,6 +88,30 @@ case-2.1 card and reproduce the original output byte for byte):
 `--sidecar-extra FILE` merges a JSON object into the `.json` sidecar (top-level
 keys replace the defaults) so a continuation video can state its card,
 protocol and caveats.  `--case` already overrides the case name in the sidecar.
+
+AMR demonstration mode (`--amr`, the figure
+`docs/assets/quast_vs_aspect_annulus_demo.gif`)
+---------------------------------------------------------------
+`--amr` switches the last two columns and the mesh handling:
+
+  3. `log10 eta = -3 T` (the material law is eta = 1000^(-T) = 10^(-3T), so the
+     viscosity field is the total temperature field; no eta samples are written
+     to the frame stream and none is needed), shared `magma_r` scale;
+  4. each row's **adaptive mesh**, redrawn every frame from that frame's own
+     tree and coloured by tree level on one shared discrete scale: QuaST's
+     leaves are read from `frame_%05d_mesh.csv` (logical coordinates, mapped
+     with the card's own map), ASPECT's parent cells are rebuilt from the VTU
+     Q2 groups and each cell's level is inferred from its area and radius as
+     `L = 0.5 log2((2 pi/12)/(A/r_mid))` (verified against `Initial global
+     refinement`).  Both codes are 12-angular x 1-radial coarse annulus
+     quadtrees, so a level means the same refinement scale on both, but the
+     meshes themselves are independent.
+
+The AMR mode needs a v2 QuaST frame stream (`ANN_MESH_DUMP=1`: per-frame mesh
+CSV and the leaves/level_min/level_max/dt columns) and any ASPECT VTU output.
+The row insets (Nu_top, Nu_bot, V_rms, mean T), the nearest-frame time matching,
+the common polar grid and the shared field scales are the same code as the
+benchmark videos; without `--amr` nothing in this mode runs.
 """
 import argparse
 import bisect
@@ -108,7 +132,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt                              # noqa: E402
 from matplotlib.collections import LineCollection            # noqa: E402
 from matplotlib.cm import ScalarMappable                     # noqa: E402
-from matplotlib.colors import Normalize                      # noqa: E402
+from matplotlib.colors import (BoundaryNorm, ListedColormap, Normalize,  # noqa: E402
+                               to_rgba)
 
 # --- the case geometry (the card; the frame metadata repeats it) ------------
 R0 = 1.22
@@ -130,6 +155,15 @@ MESH_COL = "#1f4e79"
 T_CMAP = "inferno"
 THETA_CMAP = "RdBu_r"
 SPEED_CMAP = "viridis"
+# AMR demonstration mode (`--amr`): the third column is log10 eta = -3 T, drawn
+# with the viscosity colormap of the realistic box video; the fourth column is
+# the adaptive mesh coloured by tree level.
+ETA_CMAP = "magma_r"
+LEVEL_CMAP = "turbo"       # fallback sampling when more levels than colours
+# Discrete, high-contrast level colours (the 'colour = level' legend has to stay
+# readable when 5 000+ cells are drawn as thin lines in a 261 px panel).
+LEVEL_COLORS = ["#2166ac", "#00b0d8", "#39a83c", "#f3d000", "#f07c00",
+                "#b2182b", "#7a0177", "#4d004b"]
 SPEED_FLOOR = 1.0e-8       # |u| below this is drawn at the bottom of the scale
 # The theta anomaly is defined on this grid when the QuaST metadata does not
 # declare one (the harness records its own ANN_FRAME_NR/NPHI, default 200/1024).
@@ -203,6 +237,36 @@ def read_csv_rows(path):
         return []
 
 
+def aspect_cell_level(corners):
+    """Tree level of an ASPECT annular cell from its four corner points.
+
+    A cell of tree level `L` on the 360-degree spherical shell spans
+    `dr = d/2^L` radially and `dphi = 2 pi/(12*2^L)` angularly (the coarse
+    shell is 12 cells around and one radial cell, which is what
+    `Initial global refinement = 3` reports as 96 x 8).  Its physical area is
+    `A = r_mid dr dphi` with `r_mid = (r_min + r_max)/2`, so
+
+        A / r_mid = dr dphi = (2 pi/12) / 4^L,
+        L = 0.5 * log2((2 pi / 12) / (A / r_mid)).
+
+    The inference is per cell and needs no knowledge of the card's refinement
+    settings; `--aspect-level-base` is only used to check it (the script reports
+    the inferred level of the coarsest cell and compares it with the initial
+    global refinement).  Returns None for a degenerate cell.
+    """
+    x = np.asarray(corners[:, 0], dtype="float64")
+    y = np.asarray(corners[:, 1], dtype="float64")
+    a = 0.5 * abs(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+    r = np.hypot(x, y)
+    r_mid = 0.5 * (float(r.min()) + float(r.max()))
+    if not (a > 0.0) or not (r_mid > 0.0):
+        return None
+    a_norm = a / r_mid
+    ref = 2.0 * math.pi / 12.0
+    lv = 0.5 * math.log2(ref / a_norm)
+    return int(round(lv))
+
+
 # ---------------------------------------------------------------- QuaST frames
 class QuastSource:
     """A frame directory written by examples/annulus_benchmark.jl (ANN_FRAMES)."""
@@ -230,6 +294,10 @@ class QuastSource:
                 if not s:
                     continue
                 rows.append(s)
+        # The v2 stream (ANN_MESH_DUMP=1, the demo preset) writes one
+        # frame_%05d_mesh.csv per frame and appends leaves/level_min/level_max/dt
+        # to the meta rows; v1 streams (the benchmark videos) are unchanged.
+        self.mesh_dump = any("mesh_dump" in h for h in header)
         for s in header:
             m = re.match(r"#\s*annulus_frames_v(\d+)", s)
             if m:
@@ -253,8 +321,19 @@ class QuastSource:
                              % metapath)
         fieldnames = ["frame", "step", "t", "Nu_T", "Nu_B", "Vrms", "meanT",
                       "Tmin", "Tmax", "nnodes"]
+        # column names from the CSV header row (v1 and v2 have the same first
+        # ten columns; v2 appends four)
+        if rows and rows[0].startswith("frame,"):
+            cols = rows[0].split(",")
+            data_rows = rows[1:]
+        else:
+            cols = fieldnames
+            data_rows = rows
+        idx = {name: i for i, name in enumerate(cols)}
+        has_extras = all(k in idx for k in
+                         ("leaves", "level_min", "level_max", "dt"))
         self.frames = []
-        for line in rows:
+        for line in data_rows:
             v = line.split(",")
             if len(v) < len(fieldnames):
                 continue
@@ -264,11 +343,24 @@ class QuastSource:
                          Vrms=float(v[5]), meanT=float(v[6]),
                          Tmin=float(v[7]), Tmax=float(v[8]),
                          nnodes=int(v[9]))
-            except ValueError:
+                if has_extras:
+                    f.update(leaves=int(v[idx["leaves"]]),
+                             level_min=int(v[idx["level_min"]]),
+                             level_max=int(v[idx["level_max"]]),
+                             dt=float(v[idx["dt"]]))
+            except (ValueError, KeyError):
                 continue
             binp = os.path.join(self.dir, "frame_%05d.bin" % f["frame"])
-            if os.path.isfile(binp) and os.path.getsize(binp) == 8 + 5 * 8 * f["nnodes"]:
-                self.frames.append(f)
+            if not (os.path.isfile(binp) and
+                    os.path.getsize(binp) == 8 + 5 * 8 * f["nnodes"]):
+                continue
+            if self.mesh_dump:
+                meshp = os.path.join(self.dir,
+                                     "frame_%05d_mesh.csv" % f["frame"])
+                if not os.path.isfile(meshp):
+                    continue
+                f["mesh_path"] = meshp
+            self.frames.append(f)
         self.frames.sort(key=lambda f: f["t"])
         self.times = [f["t"] for f in self.frames]
         self._cache = {}
@@ -346,6 +438,74 @@ class QuastSource:
             int(self.meta["nx"]), int(self.meta["ny"]),
             "{:,}".format(int(self.meta["nx"]) * int(self.meta["ny"])))
 
+    # -- the per-frame adaptive mesh (ANN_MESH_DUMP=1 / v2 stream) -----------
+    def mesh_frame(self, i):
+        """The adaptive mesh of frame i, coloured by tree level.
+
+        Returns dict(segments (n,2,2), levels (n,), leaves, level_min,
+        level_max, note).  The dump is in logical coordinates (x = radial S,
+        y = angular T); `segments` are the four logical edges of every leaf
+        mapped to physical space with the card's own map
+        (x,y) = (r cos(Phi T), r sin(Phi T)), r = R0 + (R1-R0) S.  A curved
+        cell edge is therefore a chord on the ring (the logical cell is a
+        quad); the binary node cloud and the panels use the interpolation, so
+        only the overlay is chorded.
+        """
+        f = self.frames[i]
+        path = f.get("mesh_path")
+        if path is None:
+            raise SystemExit("row %r: frame %d has no per-frame mesh dump "
+                             "(run the example with ANN_MESH_DUMP=1)"
+                             % (self.kind, f["frame"]))
+        lev, x0, y0, hx, hy = [], [], [], [], []
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                v = s.split(",")
+                if len(v) != 5:
+                    continue
+                lev.append(int(v[0]))
+                x0.append(float(v[1]))
+                y0.append(float(v[2]))
+                hx.append(float(v[3]))
+                hy.append(float(v[4]))
+        if not lev:
+            raise SystemExit("%s: empty mesh dump" % path)
+        lev = np.asarray(lev, dtype="int64")
+        x0 = np.asarray(x0, dtype="float64")
+        y0 = np.asarray(y0, dtype="float64")
+        hx = np.asarray(hx, dtype="float64")
+        hy = np.asarray(hy, dtype="float64")
+        if f.get("leaves") is not None and int(f["leaves"]) != len(lev):
+            raise SystemExit("%s: %d leaves on disk, meta row says %d"
+                             % (path, len(lev), int(f["leaves"])))
+        if f.get("level_min") is not None and (
+                int(lev.min()) != int(f["level_min"]) or
+                int(lev.max()) != int(f["level_max"])):
+            raise SystemExit("%s: levels %d..%d on disk, meta row says %d..%d"
+                             % (path, int(lev.min()), int(lev.max()),
+                                int(f["level_min"]), int(f["level_max"])))
+        r0 = float(self.meta["R0"])
+        r1 = float(self.meta["R1"])
+        phi_max = float(self.meta["Phi"])
+        S = np.stack([x0, x0 + hx, x0 + hx, x0, x0], axis=1)
+        T = np.stack([y0, y0, y0 + hy, y0 + hy, y0], axis=1)
+        R = r0 + (r1 - r0) * S
+        P = phi_max * T
+        X = R * np.cos(P)
+        Y = R * np.sin(P)
+        pts = np.stack([X, Y], axis=2)                     # (n, 5, 2)
+        segs = np.stack([pts[:, :-1, :], pts[:, 1:, :]],
+                        axis=2).reshape(-1, 2, 2)
+        levels = np.repeat(lev, 4)
+        lmin, lmax = int(lev.min()), int(lev.max())
+        return dict(segments=segs, levels=levels, leaves=len(lev),
+                    level_min=lmin, level_max=lmax,
+                    note="%s leaves, level %d-%d"
+                         % ("{:,}".format(len(lev)), lmin, lmax))
+
     def inset(self, i):
         f = self.frames[i]
         return dict(Nu_top=f["Nu_T"], Nu_bot=f["Nu_B"], Vrms=f["Vrms"],
@@ -387,6 +547,7 @@ class AspectSource:
         self._interp = None
         self._interp_xy = None
         self._mesh = None
+        self._mesh_cache = {}
 
     # -- time pass: the TIME field only -------------------------------------
     def _read_time(self, path):
@@ -590,6 +751,54 @@ class AspectSource:
             return np.zeros((0, 2, 2)), 0
         return np.concatenate(segs), n_bad
 
+    def mesh_frame(self, i):
+        """Parent-cell boundaries of frame i, coloured by inferred tree level.
+
+        The level of each parent cell is inferred from its area and its radius
+        (`aspect_cell_level`); the reconstruction follows the Q2 mid-edge nodes
+        exactly like `mesh_segments`.  The result is cached: the AMR demo reads
+        every shown frame once for the level legend and once more for the
+        fields, and the VTU piece loading is the expensive part.
+        """
+        if i in self._mesh_cache:
+            return self._mesh_cache[i]
+        fr = self.read(i)
+        q = fr["quads"]
+        Porig = fr["Porig"]
+        if len(q) == 0 or len(q) % 4 != 0:
+            raise SystemExit("row %r: %d VTU quads is not a multiple of 4"
+                             % (self.kind, len(q)))
+        groups = q.reshape(-1, 4, 4)
+        segs, levels = [], []
+        n_bad = 0
+        for g in groups:
+            ids = np.unique(g.ravel())
+            if len(ids) != 9:
+                n_bad += 1
+                continue
+            base = int(ids.min())
+            ring = np.array([base + 0, base + 1, base + 2, base + 5,
+                             base + 8, base + 7, base + 6, base + 3, base + 0])
+            segs.append(np.stack([Porig[ring[:-1]], Porig[ring[1:]]], axis=1))
+            lv = aspect_cell_level(
+                Porig[[base + 0, base + 2, base + 8, base + 6]])
+            levels.append(0 if lv is None else int(lv))
+        if not segs:
+            raise SystemExit("row %r: no parent cells rebuilt from the VTU"
+                             % self.kind)
+        lev = np.asarray(levels, dtype="int64")
+        out = dict(segments=np.concatenate(segs),
+                   levels=np.repeat(lev, 8), cells=len(lev),
+                   level_min=int(lev.min()), level_max=int(lev.max()),
+                   bad=int(n_bad),
+                   note="%s cells, level %d-%d"
+                        % ("{:,}".format(len(lev)), int(lev.min()),
+                           int(lev.max())))
+        if len(self._mesh_cache) > 90:
+            self._mesh_cache.clear()
+        self._mesh_cache[i] = out
+        return out
+
     def mesh_note(self):
         s = self.stat_at(self.times[0]) if self.stats else {}
         cells = s.get("cells") if s else None
@@ -777,6 +986,10 @@ class Row:
         top = geo["panel_top"][band]
         self.norms = norms
         self.cmaps = cmaps
+        # AMR mode (--amr): the third column is log10 eta = -3 T and the mesh
+        # panel is redrawn every frame, coloured by tree level.  The default
+        # mode (the benchmark videos) is untouched.
+        self.amr = bool(geo.get("amr", False))
         self.axes = []
         for k in range(N_COLS):
             ax = fig.add_axes(rect_px(geo["x0"][k], top, w, w, px_h))
@@ -821,9 +1034,22 @@ class Row:
             zorder=3)
         self.ax_m.add_collection(self.mesh_line)
 
-    def update(self, target, pick, src, fg, ins):
+    def set_mesh_colored(self, mesh, cmap, norm, lw=0.22, alpha=0.95):
+        """Replace the mesh overlay with the adaptive cells coloured by level."""
+        if self.mesh_line is not None:
+            self.mesh_line.remove()
+            self.mesh_line = None
+        colors = cmap(norm(mesh["levels"]))
+        self.mesh_line = LineCollection(
+            np.asarray(mesh["segments"]), colors=colors, linewidths=lw,
+            alpha=alpha, zorder=3)
+        self.ax_m.add_collection(self.mesh_line)
+
+    def update(self, target, pick, src, fg, ins, mesh=None,
+               level_cmap=None, level_norm=None):
         """Draw the frame of row `pick['row']` at its actual time."""
-        fields = (fg["T"], fg["theta"], fg["logspeed"])
+        third = fg["logeta"] if self.amr else fg["logspeed"]
+        fields = (fg["T"], fg["theta"], third)
         for k, (ax, cmap, norm, C) in enumerate(zip(
                 self.axes[:3], self.cmaps, self.norms, fields)):
             img = self.sampler.rgba(C, cmap, norm)
@@ -833,6 +1059,8 @@ class Row:
                     interpolation="bilinear", zorder=1)
             else:
                 self.ims[k].set_data(img)
+        if mesh is not None and level_cmap is not None:
+            self.set_mesh_colored(mesh, level_cmap, level_norm)
         # time: the frame actually shown; the target as its offset
         self.time_text.set_text(r"$t = %.4f$" % fg["t"])
         d = fg["t"] - target
@@ -854,12 +1082,20 @@ class Row:
         self.th_text.set_text(
             r"$\theta_{\min} = %+.3f$  $\theta_{\max} = %+.3f$"
             % (thmin, thmax))
-        self.u_text.set_text(
-            r"$\log_{10}|u|_{\min} = %.2f$  "
-            r"$\log_{10}|u|_{\max} = %.2f$"
-            % (float(np.nanmin(fg["logspeed"])),
-               float(np.nanmax(fg["logspeed"]))))
-        self.mesh_text.set_text(src.mesh_note())
+        if self.amr:
+            self.u_text.set_text(
+                r"$\log_{10}\eta_{\min} = %.2f$  "
+                r"$\log_{10}\eta_{\max} = %.2f$"
+                % (float(np.nanmin(fg["logeta"])),
+                   float(np.nanmax(fg["logeta"]))))
+        else:
+            self.u_text.set_text(
+                r"$\log_{10}|u|_{\min} = %.2f$  "
+                r"$\log_{10}|u|_{\max} = %.2f$"
+                % (float(np.nanmin(fg["logspeed"])),
+                   float(np.nanmax(fg["logspeed"]))))
+        self.mesh_text.set_text(mesh["note"] if mesh is not None
+                                else src.mesh_note())
 
 
 def layout(px_w, n_rows):
@@ -878,15 +1114,19 @@ def layout(px_w, n_rows):
                 cbar_top=cbar_top, cbar_h=cbar_h, title_y=title_y)
 
 
-def build_figure(labels, norms, cmaps, geo, header, header2):
+def build_figure(labels, norms, cmaps, geo, header, header2, titles=None,
+                 mesh_title=None, level_legend=None):
     fig = plt.figure(figsize=(geo["px_w"] / DPI, geo["px_h"] / DPI), dpi=DPI)
     fig.patch.set_facecolor(BG)
     rows = [Row(fig, geo, b, lab, norms, cmaps)
             for b, lab in enumerate(labels)]
     # one horizontal colour bar per field column, on a shared baseline
-    titles = [r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
-              r"$\log_{10}|u|$, $|u|$ floor $10^{%d}$"
-              % int(round(math.log10(SPEED_FLOOR)))]
+    if titles is None:
+        titles = [r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
+                  r"$\log_{10}|u|$, $|u|$ floor $10^{%d}$"
+                  % int(round(math.log10(SPEED_FLOOR)))]
+    if mesh_title is None:
+        mesh_title = "uniform 3 072-cell mesh\n(element boundaries)"
     for k in range(3):
         cax = fig.add_axes(rect_px(geo["x0"][k], geo["cbar_top"],
                                    geo["panel_w"], geo["cbar_h"],
@@ -902,12 +1142,36 @@ def build_figure(labels, norms, cmaps, geo, header, header2):
         text_px(fig, geo["x0"][k] + geo["panel_w"] / 2.0, geo["title_y"],
                 geo["px_h"], s=titles[k], color=FG, fontsize=11.5,
                 va="center", ha="center")
-    text_px(fig, geo["x0"][3] + geo["panel_w"] / 2.0, geo["title_y"] - 6,
-            geo["px_h"], s="uniform 3 072-cell mesh\n(element boundaries)",
-            color=DIM, fontsize=8.0, va="center", ha="center",
-            linespacing=1.2)
-    # two header lines: the case, then the field/functional definitions
-    text_px(fig, PAD_X, 12, geo["px_h"], s=header, color=FG, fontsize=11.5,
+    if level_legend is not None:
+        # AMR mode: the fourth column's colour bar is the discrete level scale,
+        # shared by both rows (the level of a cell is the same tree-level scale
+        # on both codes: 12 angular x 1 radial coarse cells).
+        cax = fig.add_axes(rect_px(geo["x0"][3], geo["cbar_top"],
+                                   geo["panel_w"], geo["cbar_h"],
+                                   geo["px_h"]))
+        cb = fig.colorbar(
+            ScalarMappable(norm=level_legend["norm"],
+                           cmap=level_legend["cmap"]),
+            cax=cax, orientation="horizontal", spacing="uniform")
+        cb.ax.tick_params(colors=DIM, labelsize=9, length=2.5, pad=2)
+        cb.outline.set_edgecolor(SPINE)
+        cb.outline.set_linewidth(0.7)
+        cb.set_ticks(level_legend["ticks"])
+        cb.set_ticklabels([str(t) for t in level_legend["ticks"]])
+        text_px(fig, geo["x0"][3] + geo["panel_w"] / 2.0, geo["title_y"],
+                geo["px_h"], s=level_legend["title"], color=FG,
+                fontsize=11.5, va="center", ha="center")
+    else:
+        text_px(fig, geo["x0"][3] + geo["panel_w"] / 2.0,
+                geo["title_y"] - 6, geo["px_h"], s=mesh_title,
+                color=DIM, fontsize=8.0, va="center", ha="center",
+                linespacing=1.2)
+    # two header lines: the case, then the field/functional definitions.  The
+    # AMR demo's first header is longer than the benchmark card's, so it is
+    # drawn one point smaller to stay inside the 1200 px master (the default
+    # path keeps 11.5).
+    text_px(fig, PAD_X, 12, geo["px_h"], s=header,
+            color=FG, fontsize=(10.0 if level_legend is not None else 11.5),
             va="center", ha="left")
     text_px(fig, PAD_X, 28, geo["px_h"], s=header2, color=HEADER,
             fontsize=8.5, va="center", ha="left")
@@ -1067,6 +1331,16 @@ def main(argv=None):
     ap.add_argument("--gif-colors", type=int, default=256)
     ap.add_argument("--gif-max-mb", type=float, default=8.0)
     ap.add_argument("--no-gif", action="store_true")
+    ap.add_argument("--amr", action="store_true",
+                    help="AMR demonstration layout: the third column is "
+                         "log10 eta = -3 T (eta = 1000^(-T)) and the fourth is "
+                         "the adaptive mesh coloured by tree level, redrawn "
+                         "every frame.  Needs QuaST frames written with "
+                         "ANN_MESH_DUMP=1 and ASPECT VTU frames.")
+    ap.add_argument("--aspect-level-base", type=int, default=3,
+                    help="the initial global refinement of the ASPECT card "
+                         "(default 3); used only to check the level inferred "
+                         "per cell by aspect_cell_level")
     ap.add_argument("--still", default=None, metavar="PATH",
                     help="write one PNG at --still-index instead of the video")
     ap.add_argument("--still-index", type=int, default=-1)
@@ -1108,6 +1382,18 @@ def main(argv=None):
             for i, f in enumerate(s.frames):
                 print("   %4d  t=%14.9f  %s" % (i, f["t"], s.describe(i)))
         return 0
+    if args.amr:
+        for lab, s in zip(labels, sources):
+            if isinstance(s, QuastSource) and not s.mesh_dump:
+                raise SystemExit(
+                    "row %r: --amr needs QuaST frames written with "
+                    "ANN_MESH_DUMP=1 (frame_meta.csv v2 + one "
+                    "frame_NNNNN_mesh.csv per frame); this directory is a v1 "
+                    "frame stream" % lab)
+            if isinstance(s, QuastSource) and \
+                    "level_min" not in s.frames[0]:
+                raise SystemExit("row %r: the v2 frame_meta table has no "
+                                 "level_min column" % lab)
 
     # ---- sanity: every row's node cloud sits on the card's ring, and the
     # QuaST metadata's geometry agrees with the radii the renderer was given
@@ -1149,6 +1435,11 @@ def main(argv=None):
         T = fg["T"]
         fg["theta"] = T - T.mean(axis=0, keepdims=True)
         fg["logspeed"] = np.log10(np.maximum(fg["speed"], SPEED_FLOOR))
+        if args.amr:
+            # eta = 1000^(-T) = 10^(-3 T), so log10 eta = -3 T exactly from the
+            # total temperature the panels already show.  No eta samples are
+            # needed in the frame stream (and none is written).
+            fg["logeta"] = -3.0 * T
         return fg
 
     t0, t1, plan = build_plan(sources, labels, args.frame_dt,
@@ -1195,17 +1486,89 @@ def main(argv=None):
                else ceil2(th_abs))
     u_vmin = args.umin if args.umin is not None else floor2(min(u_lo))
     u_vmax = args.umax if args.umax is not None else ceil2(max(u_hi))
-    norms = [Normalize(vmin=vmin, vmax=vmax),
-             Normalize(vmin=-th_peak, vmax=th_peak),
-             Normalize(vmin=u_vmin, vmax=u_vmax)]
-    cmaps = [plt.get_cmap(T_CMAP), plt.get_cmap(THETA_CMAP),
-             plt.get_cmap(SPEED_CMAP)]
-    print("[annulus_video] shared scales: T = [%s, %s], theta = +-[%s], "
-          "log10|u| = [%s, %s] (|u| floor %g)"
-          % (sigfig(vmin), sigfig(vmax), sigfig(th_peak), sigfig(u_vmin),
-             sigfig(u_vmax), SPEED_FLOOR), flush=True)
+    # AMR mode: the third column is log10 eta = -3 T (eta = 1000^(-T)) instead
+    # of log10|u|; its scale is the same shared scan, mapped through -3T.  eta
+    # is at most 1 (T >= 0), so the top of the scale never goes above 0.
+    eta_vmin = floor2(-3.0 * max(t_hi))
+    eta_vmax = min(0.0, ceil2(-3.0 * min(t_lo)))
+    if args.amr:
+        norms = [Normalize(vmin=vmin, vmax=vmax),
+                 Normalize(vmin=-th_peak, vmax=th_peak),
+                 Normalize(vmin=eta_vmin, vmax=eta_vmax)]
+        cmaps = [plt.get_cmap(T_CMAP), plt.get_cmap(THETA_CMAP),
+                 plt.get_cmap(ETA_CMAP)]
+    else:
+        norms = [Normalize(vmin=vmin, vmax=vmax),
+                 Normalize(vmin=-th_peak, vmax=th_peak),
+                 Normalize(vmin=u_vmin, vmax=u_vmax)]
+        cmaps = [plt.get_cmap(T_CMAP), plt.get_cmap(THETA_CMAP),
+                 plt.get_cmap(SPEED_CMAP)]
+    if args.amr:
+        print("[annulus_video] shared scales: T = [%s, %s], theta = +-[%s], "
+              "log10 eta = [%s, %s] (eta = 1000^(-T) = 10^(-3T), evaluated "
+              "from the total temperature)"
+              % (sigfig(vmin), sigfig(vmax), sigfig(th_peak), sigfig(eta_vmin),
+                 sigfig(eta_vmax)), flush=True)
+    else:
+        print("[annulus_video] shared scales: T = [%s, %s], theta = +-[%s], "
+              "log10|u| = [%s, %s] (|u| floor %g)"
+              % (sigfig(vmin), sigfig(vmax), sigfig(th_peak), sigfig(u_vmin),
+                 sigfig(u_vmax), SPEED_FLOOR), flush=True)
     print("[annulus_video] scale scan took %.1f s" % (time.time() - t_scan),
           flush=True)
+
+    # ---- AMR mode: the shared level legend and the per-row cell counts
+    level_cmap = None
+    level_norm = None
+    level_legend = None
+    cells_by_row = {}
+    if args.amr:
+        level_seen = set()
+        for j, (lab, s) in enumerate(zip(labels, sources)):
+            cells = []
+            cmin, cmax = None, None
+            for fr in plan:
+                i = fr["picks"][j]["index"]
+                if isinstance(s, QuastSource):
+                    f = s.frames[i]
+                    lo, hi = int(f["level_min"]), int(f["level_max"])
+                    cells.append(int(f["leaves"]))
+                else:
+                    m = s.mesh_frame(i)
+                    lo, hi = m["level_min"], m["level_max"]
+                    cells.append(int(m["cells"]))
+                level_seen.update(range(lo, hi + 1))
+                cmin = lo if cmin is None else min(cmin, lo)
+                cmax = hi if cmax is None else max(cmax, hi)
+            cells_by_row[lab] = dict(cells_min=min(cells),
+                                     cells_max=max(cells),
+                                     level_min=int(cmin),
+                                     level_max=int(cmax))
+            print("[annulus_video] %-8s adaptive mesh over the shown frames: "
+                  "%d .. %d cells, level %d-%d"
+                  % (lab, min(cells), max(cells), cmin, cmax), flush=True)
+            if isinstance(s, AspectSource) and cmin != args.aspect_level_base:
+                print("[annulus_video] WARNING: %-8s coarsest inferred level "
+                      "%d != Initial global refinement %d"
+                      % (lab, cmin, args.aspect_level_base), flush=True)
+        lev_min, lev_max = min(level_seen), max(level_seen)
+        nlev = lev_max - lev_min + 1
+        # discrete level colours, shared by both rows (the level of a cell is
+        # the same tree-level scale on both codes: a 12-angular x 1-radial
+        # coarse annulus refined to level L)
+        if nlev <= len(LEVEL_COLORS):
+            base = [to_rgba(c) for c in LEVEL_COLORS[:nlev]]
+        else:
+            base = plt.get_cmap(LEVEL_CMAP)(np.linspace(0.08, 0.92, nlev))
+        level_cmap = ListedColormap(base)
+        level_norm = BoundaryNorm(np.arange(lev_min - 0.5, lev_max + 1.5, 1.0),
+                                  nlev)
+        level_legend = dict(
+            cmap=level_cmap, norm=level_norm,
+            ticks=list(range(lev_min, lev_max + 1)),
+            title="AMR mesh, colour = level (%d-%d)" % (lev_min, lev_max))
+        print("[annulus_video] shared level legend: %d..%d (%d levels)"
+              % (lev_min, lev_max, nlev), flush=True)
 
     # ---- geometry of the master
     geo = layout(PX_W, len(sources))
@@ -1213,18 +1576,30 @@ def main(argv=None):
     geo["r_box"] = r_box
     geo["sampler"] = PanelSampler(geo["panel_w"], r_box, nr, nphi, r0=R0,
                                   r1=R1, factor=2)
+    geo["amr"] = bool(args.amr)
     geo["ticks"] = [
         [vmin, (vmin + vmax) / 2.0, vmax],
         [-th_peak, 0.0, th_peak],
-        [u_vmin, (u_vmin + u_vmax) / 2.0, u_vmax],
+        ([eta_vmin, (eta_vmin + eta_vmax) / 2.0, eta_vmax] if args.amr
+         else [u_vmin, (u_vmin + u_vmax) / 2.0, u_vmax]),
     ]
-    header = ("%s  |  isoviscous Ra = 1e4 annulus (R0 = %g, R1 = %g)  |  "
-              "matched 3 072-cell mesh  |  QuaST (top) vs ASPECT (bottom)"
-              % (args.case, R0, R1))
-    header2 = ("t = 0 .. 2, %d frames @ %g fps  |  theta = T - angular mean at "
-               "r on a common %d x %d polar grid  |  Nu = each code's own "
-               "wall-flux family (QuaST GLL gradient vs ASPECT flux statistics)"
-               % (len(plan), args.fps, nr, nphi))
+    if args.amr:
+        header = ("%s  |  annulus Ra = 1e3 at the reference viscosity 1 "
+                  "(local hot-boundary Ra = 1e6), eta = 1000^(-T)  |  AMR on "
+                  "both codes  |  QuaST (top) vs ASPECT (bottom)" % args.case)
+        header2 = ("t = %s .. %s, %d frames @ %g fps  |  theta = T - angular "
+                   "mean at r on a common %d x %d polar grid  |  log10 eta = "
+                   "-3 T (from the same total T)  |  mesh colour = tree level"
+                   % (sigfig(t0), sigfig(t1), len(plan), args.fps, nr, nphi))
+    else:
+        header = ("%s  |  isoviscous Ra = 1e4 annulus (R0 = %g, R1 = %g)  |  "
+                  "matched 3 072-cell mesh  |  QuaST (top) vs ASPECT (bottom)"
+                  % (args.case, R0, R1))
+        header2 = ("t = 0 .. 2, %d frames @ %g fps  |  theta = T - angular mean "
+                   "at r on a common %d x %d polar grid  |  Nu = each code's own "
+                   "wall-flux family (QuaST GLL gradient vs ASPECT flux "
+                   "statistics)"
+                   % (len(plan), args.fps, nr, nphi))
     # Case-2.2 / continuation videos reuse the renderer with their own one-line
     # header overrides (the default strings are the case-2.1 card's).
     if args.header is not None:
@@ -1233,33 +1608,51 @@ def main(argv=None):
         header2 = args.header2
     print("[annulus_video] master %d x %d px, panels %d px"
           % (geo["px_w"], geo["px_h"], geo["panel_w"]), flush=True)
-    fig, rows = build_figure(labels, norms, cmaps, geo, header, header2)
+    if args.amr:
+        amr_titles = [r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
+                      r"$\log_{10}\eta = -3T$  ($\eta = 1000^{-T}$)"]
+    else:
+        amr_titles = None
+    fig, rows = build_figure(labels, norms, cmaps, geo, header, header2,
+                             titles=amr_titles,
+                             level_legend=level_legend if args.amr else None)
 
-    # ---- the fixed meshes (one per row, this card has no AMR)
+    # ---- the meshes.  The benchmark videos draw one fixed mesh per row; the
+    # AMR demo redraws each row's mesh every frame from the frame's own tree.
     mesh_info = {}
-    for j, (lab, s) in enumerate(zip(labels, sources)):
-        t_mesh = time.time()
-        if isinstance(s, QuastSource):
-            segs = s.mesh_segments()
-            if len(segs) == 0:
-                raise SystemExit("row %r: no mesh segments" % lab)
-            rows[j].set_mesh(segs, MESH_COL, lw=0.20, alpha=0.70)
-            mesh_info[lab] = dict(kind="uniform ring, element boundaries "
-                                       "reconstructed from nx x ny",
-                                  nx=int(s.meta["nx"]), ny=int(s.meta["ny"]),
-                                  cells=int(s.meta["nx"]) * int(s.meta["ny"]),
-                                  segments=int(len(segs)))
-        else:
-            segs, n_bad = s.mesh_segments()
-            if len(segs) == 0:
-                raise SystemExit("row %r: no mesh segments" % lab)
-            rows[j].set_mesh(segs, MESH_COL, lw=0.20, alpha=0.70)
-            mesh_info[lab] = dict(kind="parent 3 072 cells rebuilt from the "
-                                       "VTU 2x2 Q2 groups",
-                                  cells=3072, segments=int(len(segs)),
-                                  ungrouped=int(n_bad))
-        print("[annulus_video] %s mesh: %s (%.1f s)"
-              % (lab, mesh_info[lab], time.time() - t_mesh), flush=True)
+    if args.amr:
+        for lab in labels:
+            c = cells_by_row[lab]
+            mesh_info[lab] = dict(
+                kind="adaptive quadtree, coloured by tree level per frame",
+                cells_min=c["cells_min"], cells_max=c["cells_max"],
+                level_min=c["level_min"], level_max=c["level_max"])
+            print("[annulus_video] %s mesh: %s" % (lab, mesh_info[lab]),
+                  flush=True)
+    else:
+        for j, (lab, s) in enumerate(zip(labels, sources)):
+            t_mesh = time.time()
+            if isinstance(s, QuastSource):
+                segs = s.mesh_segments()
+                if len(segs) == 0:
+                    raise SystemExit("row %r: no mesh segments" % lab)
+                rows[j].set_mesh(segs, MESH_COL, lw=0.20, alpha=0.70)
+                mesh_info[lab] = dict(kind="uniform ring, element boundaries "
+                                           "reconstructed from nx x ny",
+                                      nx=int(s.meta["nx"]), ny=int(s.meta["ny"]),
+                                      cells=int(s.meta["nx"]) * int(s.meta["ny"]),
+                                      segments=int(len(segs)))
+            else:
+                segs, n_bad = s.mesh_segments()
+                if len(segs) == 0:
+                    raise SystemExit("row %r: no mesh segments" % lab)
+                rows[j].set_mesh(segs, MESH_COL, lw=0.20, alpha=0.70)
+                mesh_info[lab] = dict(kind="parent 3 072 cells rebuilt from the "
+                                           "VTU 2x2 Q2 groups",
+                                      cells=3072, segments=int(len(segs)),
+                                      ungrouped=int(n_bad))
+            print("[annulus_video] %s mesh: %s (%.1f s)"
+                  % (lab, mesh_info[lab], time.time() - t_mesh), flush=True)
 
     # ---- render
     out = os.path.abspath(args.out)
@@ -1281,7 +1674,12 @@ def main(argv=None):
                     fgs.clear()
                 fgs[key] = grid_for(src, pick["index"])
             fg = fgs[key]
-            row.update(fr["target"], pick, src, fg, src.inset(pick["index"]))
+            mesh = None
+            if args.amr:
+                mesh = src.mesh_frame(pick["index"])
+            row.update(fr["target"], pick, src, fg, src.inset(pick["index"]),
+                       mesh=mesh, level_cmap=level_cmap,
+                       level_norm=level_norm)
         if args.still:
             if k == still_index:
                 fig.savefig(args.still, dpi=DPI, facecolor=fig.get_facecolor())
@@ -1458,6 +1856,72 @@ def main(argv=None):
                  matplotlib=matplotlib.__version__,
                  python=sys.version.split()[0]),
     )
+    # AMR demonstration mode records its own column/scale/mesh provenance.  The
+    # card, caption and caveats are supplied from the tracked JSON
+    # (`--sidecar-extra`) so the numbers in them stay traceable to the run logs;
+    # the keys below are the measured facts the renderer itself knows.
+    if args.amr:
+        sidecar["layout"]["columns"] = ["T", "theta_ang", "log10_eta",
+                                        "mesh(level)"]
+        sidecar.pop("speed_definition", None)
+        sidecar["scales"] = dict(
+            T=dict(vmin=vmin, vmax=vmax, cmap=T_CMAP),
+            theta=dict(vmin=-th_peak, vmax=th_peak, cmap=THETA_CMAP),
+            log10_eta=dict(vmin=eta_vmin, vmax=eta_vmax, cmap=ETA_CMAP,
+                           definition="log10 eta = -3 T exactly (eta = "
+                                      "1000^(-T) = 10^(-3T)), evaluated from "
+                                      "the same total temperature field"),
+            level=dict(vmin=lev_min, vmax=lev_max,
+                       colors="discrete %s, one colour per tree level"
+                              % LEVEL_CMAP))
+        sidecar["eta_definition"] = dict(
+            law="eta = 1000^(-T) = 10^(-3 T); ASPECT `VoT` material model "
+                "(image plugin), QuaST eta_law = :expT with deta_T = 1000",
+            panel="log10 eta = -3 T on the common polar grid, computed from "
+                  "the same total temperature T as the first column; the frame "
+                  "stream writes no viscosity samples",
+            note="the panel displays the material law's viscosity, it is not "
+                 "an independent measurement")
+        sidecar["mesh_definition"] = dict(
+            quast="per-frame leaves of the balanced AMR tree, read from "
+                  "frame_%05d_mesh.csv (logical coordinates level,x0,y0,hx,hy; "
+                  "r = R0 + (R1-R0) x, phi = Phi y), drawn as quads",
+            aspect="per-frame parent cells rebuilt from the VTU's 2x2 groups of "
+                   "linear quads (one Q2 cell on nine nodes); each cell's tree "
+                   "level is inferred from its area and radius, "
+                   "L = 0.5 log2((2 pi/12)/(A/r_mid))",
+            levels="both codes are 12-angular x 1-radial coarse annulus "
+                   "quadtrees, so a level means the same physical refinement "
+                   "scale on both; the two codes still run independent adaptive "
+                   "meshes with different cell counts and level ranges",
+            common="the mesh panel is redrawn from that frame's own tree; the "
+                   "mesh is not interpolated in time (nearest frame, like the "
+                   "fields)")
+        sidecar["levels"] = dict(
+            shared_min=lev_min, shared_max=lev_max,
+            ticks=list(range(lev_min, lev_max + 1)),
+            rule="QuaST: tree level of the leaf (from the mesh dump).  ASPECT: "
+                 "inferred per parent cell from A/r_mid; the coarsest inferred "
+                 "level is checked against Initial global refinement = %d."
+                 % args.aspect_level_base,
+            by_row=cells_by_row,
+            legend="one discrete colour per level on a shared scale")
+        sidecar["cells_by_row"] = cells_by_row
+        sidecar["caption"] = (
+            "A purpose-configured annulus demonstration of the adaptive path "
+            "(Ra = 1e3 at the reference viscosity 1, eta = 1000^(-T), AMR on "
+            "both codes), run by QuaST (top) and ASPECT (bottom): total "
+            "temperature, its angular-mean anomaly, log10 eta = -3 T, and each "
+            "code's own adaptive mesh coloured by tree level.  This is a "
+            "demonstration, not a validation; the two meshes are independent.")
+        sidecar["notes"] = [
+            "The two codes' meshes are different (QuaST's gradient-jump "
+            "indicator + wall minimum level; ASPECT's temperature strategy), so "
+            "the mesh panels compare two independent adaptive discretizations, "
+            "not one mesh.",
+            "This is a demonstration of the AMR path, not an accuracy claim and "
+            "not the published VoT benchmark case.",
+        ]
     # A continuation video reuses the renderer but records its own card, window,
     # provenance and caveats: `--sidecar-extra` merges top-level keys into the
     # sidecar (a key it contains replaces the default; keys it does not contain
