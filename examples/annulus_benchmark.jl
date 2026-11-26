@@ -93,7 +93,41 @@ const ANN_MS = QuaST
 # ANN_ADVECTION (galerkin; `skew` is the conservative variant), ANN_EV (0.0),
 # ANN_IC (firedrake; `aspect` is the ASPECT initial condition), ANN_REPORT (25),
 # ANN_CKPT_DIR (""), ANN_CKPT_EVERY (200), ANN_LINEAR (auto), ANN_MG_THREADS
-# (8), ANN_TAG ("").
+# (8), ANN_TAG (""), ANN_RA (1.0e5; the published card is Ra = 1e5, the
+# ASPECT/Davies case 2.1 cross-code comparison runs the same card at Ra = 1e4).
+#
+# Frame dumping (off unless ANN_FRAMES names a directory):
+#
+#   ANN_FRAMES      directory for the per-frame state ("" = off).  The directory
+#                   is recreated: a stale frame_*.bin / frame_meta.csv from an
+#                   earlier run is removed, so a renderer can never mix runs.
+#   ANN_FRAME_DT    dump cadence in time units (0.05).  The first state the
+#                   driver exposes is written as frame 0 (after step 1), then one
+#                   frame at the first step whose t crosses every multiple of
+#                   ANN_FRAME_DT, plus the final state if it crosses one more.
+#   ANN_FRAME_NR    / ANN_FRAME_NPHI  (200 / 1024) the *analysis* polar grid
+#                   (r x phi cell centres) recorded in the meta header; the
+#                   renderer evaluates both codes on this same grid for the
+#                   angular-mean anomaly theta = T - <T>_phi(r), so the two rows
+#                   share one definition.  No field is evaluated on it here.
+#
+# Frame format (one small binary per frame, atomic temp+rename):
+#
+#   <ANN_FRAMES>/frame_%05d.bin
+#       int64 nnodes, then five Float64 arrays of length nnodes, in this order:
+#       x, y, theta, T, speed = |u|.  The node cloud is the Q2 velocity /
+#       temperature space itself (unique nodes, `sq.coords`), T = Tbar(r) +
+#       theta is the *total* temperature on those nodes.
+#   <ANN_FRAMES>/frame_meta.csv
+#       '#' header lines: format version, the uniform benchmark mesh
+#       (nx, ny, R0, R1, Phi), the analysis polar grid and the array layout;
+#       then a CSV table with one row per frame:
+#       frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes
+#       where the diagnostics are the harness definitions above
+#       (`semquad_nu_walls` family A, `semquad_vrms`, `semquad_mean_T`).
+#
+# The frame writer is a pure diagnostic: it changes nothing in the solve, and a
+# run without ANN_FRAMES prints exactly the pre-frame-dump log.
 
 const ANN_R0 = 1.22
 const ANN_R1 = 2.22
@@ -107,9 +141,14 @@ env_f(k, d) = parse(Float64, get(ENV, k, string(d)))
 env_i(k, d) = parse(Int, get(ENV, k, string(d)))
 env_s(k, d) = get(ENV, k, string(d))
 
-"""The benchmark's material/physics card (isoviscous Boussinesq, Ra = 1e5)."""
+"""The benchmark's material/physics card (isoviscous Boussinesq, Ra = 1e5).
+
+`ANN_RA` overrides the Rayleigh number (the published cards are Ra = 1e5 for
+case 2.2; the same-resolution ASPECT cross-code case 2.1 runs at Ra = 1e4).
+Without the environment variable this returns the historical card unchanged.
+"""
 function annulus_benchmark_params()
-    return Params(Ra=1.0e5, H=0.0,
+    return Params(Ra=env_f("ANN_RA", 1.0e5), H=0.0,
                   # :expT with deta_T = 1 is constant viscosity eta = 1
                   # (eta = exp(-log(deta_T) T)); the benchmark's eta_ref = 1.
                   eta_law=:expT, deta_T=1.0,
@@ -173,6 +212,138 @@ peak_mb(path="/proc/self/status") = begin
     s = read(path, String)
     m = match(r"VmHWM:\s+(\d+) kB", s)
     m === nothing ? NaN : parse(Float64, m.captures[1]) / 1024.0
+end
+
+# ------------------------------------------------------------- frame writer ---
+# The renderer's input: one binary per frame with the state on the solver's own
+# node cloud, plus a CSV row of the harness diagnostics.  The frames are written
+# from the driver callback, so they are the states the trajectory actually
+# visits -- nothing is interpolated in time and no field is re-evaluated on a
+# grid (the theta anomaly is computed by the renderer on a common polar grid so
+# both codes share one definition; ANN_FRAME_NR/NPHI record that grid here).
+mutable struct AnnulusFrameWriter
+    dir::String
+    meta::IO
+    frame::Int
+    dt::Float64
+    nr::Int
+    nphi::Int
+    next_t::Float64
+    t0::Float64
+end
+
+"""
+    AnnulusFrameWriter(root, nx, ny, g, pr; dt=0.05, nr=200, nphi=1024)
+
+Open the frame stream in `root` (recreated: stale `frame_*.bin` and
+`frame_meta.csv` are removed so two runs can never be mixed).  The `'#'` header
+lines carry the uniform benchmark mesh `(nx, ny, R0, R1, Phi)` and the analysis
+polar grid `(nr, nphi)`, so the renderer can reconstruct the element boundaries
+and use one interpolation/theta grid for both codes.
+"""
+function AnnulusFrameWriter(root::String, nx::Int, ny::Int, g::PolarAnnulus,
+                            pr::Params; dt::Float64=0.05, nr::Int=200,
+                            nphi::Int=1024)
+    dt > 0.0 || throw(ArgumentError("ANN_FRAME_DT must be > 0 (got $dt)"))
+    nr >= 2 && nphi >= 4 ||
+        throw(ArgumentError("ANN_FRAME_NR/NPHI must be >= 2/4 (got $nr/$nphi)"))
+    mkpath(root)
+    for old in readdir(root)
+        (occursin(r"^frame_\d{5}\.bin$", old) ||
+         old == "frame_meta.csv") && rm(joinpath(root, old); force=true)
+    end
+    metapath = joinpath(root, "frame_meta.csv")
+    io = open(metapath, "w")
+    println(io, "# annulus_frames_v1")
+    println(io, "# mesh nx=$(nx) ny=$(ny) R0=$(repr(g.R0)) R1=$(repr(g.R1)) ",
+            "Phi=$(repr(g.Φ))")
+    println(io, "# polar_grid nr=$nr nphi=$nphi")
+    println(io, "# arrays x,y,theta,T,speed float64; file frame_%05d.bin = ",
+            "int64 nnodes then the five arrays, each nnodes long")
+    println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes")
+    flush(io)
+    return AnnulusFrameWriter(root, io, 0, dt, nr, nphi, 0.0, time())
+end
+
+"""
+    write_annulus_frame!(fw, st, pr, g)
+
+Write the current callback state (`st.theta`, `st.ux`, `st.uz` on `st.sq`) as
+the next frame, atomically: the binary is written to a temporary name in the
+same directory and renamed, then the meta row is appended and flushed.  A live
+renderer therefore sees a frame only once its file and its meta row are both
+complete.
+"""
+function write_annulus_frame!(fw::AnnulusFrameWriter, st, pr::Params,
+                              g::PolarAnnulus)
+    s = st.sq
+    n = s.N
+    # the diagnostics on exactly the state the frame shows (the harness
+    # definitions: family-A wall gradient, volume RMS, area mean of T)
+    nut, nub = semquad_nu_walls(s, st.qt, st.theta, pr)
+    vr = semquad_vrms(s, st.qt, st.ux, st.uz)
+    tm = semquad_mean_T(s, st.qt, st.theta, pr)
+    x = Vector{Float64}(undef, n)
+    y = Vector{Float64}(undef, n)
+    th = Vector{Float64}(undef, n)
+    T = Vector{Float64}(undef, n)
+    sp = Vector{Float64}(undef, n)
+    tmin = Inf
+    tmax = -Inf
+    @inbounds for i in 1:n
+        xi, yi = s.coords[i]
+        x[i] = xi
+        y[i] = yi
+        th[i] = st.theta[i]
+        Ti = semquad_base_T(pr, g, xi, yi) + st.theta[i]
+        T[i] = Ti
+        tmin = min(tmin, Ti)
+        tmax = max(tmax, Ti)
+        sp[i] = hypot(st.ux[i], st.uz[i])
+    end
+    tag = @sprintf("frame_%05d", fw.frame)
+    binpath = joinpath(fw.dir, tag * ".bin")
+    tmppath = binpath * ".tmp"
+    open(tmppath, "w") do io
+        write(io, Int64(n))
+        write(io, x)
+        write(io, y)
+        write(io, th)
+        write(io, T)
+        write(io, sp)
+    end
+    mv(tmppath, binpath; force=true)
+    @printf(fw.meta,
+            "%d,%d,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%.9e,%d\n",
+            fw.frame, st.step, st.t, nut, nub, vr, tm, tmin, tmax, n)
+    flush(fw.meta)
+    fw.frame += 1
+    return nothing
+end
+
+"""
+    annulus_frame_due!(fw, st, pr, g) -> Bool
+
+Write one frame if the state is the first state the driver exposes (`frame ==
+0`) or if `st.t` has reached the next multiple of the frame cadence.  Returns
+`true` when a frame was written.
+"""
+function annulus_frame_due!(fw::AnnulusFrameWriter, st, pr::Params,
+                            g::PolarAnnulus)
+    if fw.frame == 0
+        write_annulus_frame!(fw, st, pr, g)
+        fw.next_t = fw.dt
+        while st.t >= fw.next_t - 1.0e-12
+            fw.next_t += fw.dt
+        end
+        return true
+    end
+    st.t >= fw.next_t - 1.0e-12 || return false
+    write_annulus_frame!(fw, st, pr, g)
+    while st.t >= fw.next_t - 1.0e-12
+        fw.next_t += fw.dt
+    end
+    return true
 end
 
 """
@@ -244,6 +415,21 @@ function parse_resolution(spec::AbstractString)
     return nx, 12 * nx
 end
 
+"""The card line's Rayleigh-number label: the historical literal at the default.
+
+The published cards are Ra = 1e5 and the log has always said `Ra=1e5`; a run
+with `ANN_RA` set prints the actual value in the same short scientific form, so
+the default log stays byte-identical.
+"""
+function annulus_ra_label(ra::Float64)
+    ra == 1.0e5 && return "1e5"
+    if isfinite(ra) && ra > 0.0
+        e = round(Int, log10(ra))
+        10.0^e == ra && return "1e$e"
+    end
+    return @sprintf("%g", ra)
+end
+
 function main(args)
     isempty(args) && error("usage: annulus_benchmark.jl <nx>x<ny> [tstop]")
     nx, ny = parse_resolution(args[1])
@@ -271,13 +457,18 @@ function main(args)
     report = env_i("ANN_REPORT", 25)
     ckdir = env_s("ANN_CKPT_DIR", "")
     ckevery = env_i("ANN_CKPT_EVERY", 200)
+    frames_dir = env_s("ANN_FRAMES", "")
+    frame_dt = env_f("ANN_FRAME_DT", 0.05)
+    frame_nr = env_i("ANN_FRAME_NR", 200)
+    frame_nphi = env_i("ANN_FRAME_NPHI", 1024)
+    frames_on = !isempty(frames_dir)
     ckpt = isempty(ckdir) ? "" : joinpath(ckdir, "ann_$(nx)x$(ny).h5")
     resume = isempty(ckpt) ? false : isfile(ckpt)
     !isempty(ckdir) && !isnothing(mkpath(ckdir))
     println("# annulus benchmark nx=$nx ny=$ny level=$(trailing_zeros(nx)) " *
             "cells_y=$(ny÷nx) leaves=$(dofs.leaves) dofs=$(dofs.saddle) " *
             "(u=$(dofs.u) p=$(dofs.p) T=$(dofs.T))")
-    println("# card: Ra=1e5 isoviscous H=0 free-slip ring R0=$(ANN_R0) " *
+    println("# card: Ra=$(annulus_ra_label(pr.Ra)) isoviscous H=0 free-slip ring R0=$(ANN_R0) " *
             "R1=$(ANN_R1) phi=2pi; advection=$adv ev=$ev ic=$ic")
     println("# criterion: t > $tmin, change_t/|dNu_T|/|dV_RMS| < $tol for " *
             "$window consecutive steps (steady_vrms=true); tstop=$tstop " *
@@ -286,9 +477,17 @@ function main(args)
             (cfl > 0 ? "time-accurate cfl=$cfl dt0=$dt0 dtmax=$(env_f("ANN_DTMAX", 1.0e-2))" :
                        "steady relaxation dt=$dt0 (CFL off; each step is a steady energy solve)") *
             " maxpic=$maxpic pic_relax=$pic_relax")
+    if frames_on
+        println("# frames: dir=$frames_dir every=$frame_dt analysis_grid=" *
+                "$(frame_nr)x$(frame_nphi) (node-cloud states; the renderer " *
+                "computes theta = T - <T>_phi(r) on the analysis grid)")
+    end
     flush(stdout)
     t_run = time()
     n_report = 0
+    fw = frames_on ?
+         AnnulusFrameWriter(frames_dir, nx, ny, g, pr; dt=frame_dt,
+                            nr=frame_nr, nphi=frame_nphi) : nothing
     cb = (st) -> begin
         if st.step % report == 0
             nt, nb = semquad_nu_walls(st.sq, st.qt, st.theta, pr)
@@ -299,6 +498,7 @@ function main(args)
             flush(stdout)
         end
         n_report += 1
+        frames_on && annulus_frame_due!(fw, st, pr, g)
         return nothing
     end
     kw = Dict{Symbol,Any}(
@@ -373,6 +573,11 @@ function main(args)
             100 * (vr - ANN_REF.Firedrake_Vrms) / ANN_REF.Firedrake_Vrms,
             100 * (tm - ANN_REF.Aspect_meanT) / ANN_REF.Aspect_meanT,
             100 * (nut - nub) / ((nut + nub) / 2))
+    if frames_on
+        close(fw.meta)
+        @printf("ANNULUS_FRAMES n=%d dir=%s every=%.6g analysis_grid=%dx%d wall=%.1f\n",
+                fw.frame, frames_dir, frame_dt, frame_nr, frame_nphi, wall)
+    end
     flush(stdout)
     return st
 end
