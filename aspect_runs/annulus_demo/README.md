@@ -1,8 +1,9 @@
 # Annulus AMR demonstration (QuaST vs ASPECT)
 
-The ASPECT side of `docs/assets/quast_vs_aspect_annulus_demo.gif`: a
-purpose-configured **demonstration** of the adaptive path on the closed 2-D
-annulus, run by QuaST and by ASPECT with their own adaptive meshes. It is not a
+The ASPECT side of the earlier isoviscous annulus clip (the tracked figure is
+now the realistic card, `../annulus_realistic_demo/`): a purpose-configured
+**demonstration** of the adaptive path on the closed 2-D annulus, run by QuaST
+and by ASPECT with their own adaptive meshes. It is not a
 validation and not a published benchmark; no accuracy claim is made.
 
 ## The card

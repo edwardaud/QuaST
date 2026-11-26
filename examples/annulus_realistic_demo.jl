@@ -2,7 +2,7 @@
 # =============================================================================
 # annulus_realistic_demo.jl -- the "realistic 2-D mantle convection" card
 # (examples/case_realistic_2d.jl) ported to the closed 2-D ring, for the
-# QuaST-vs-ASPECT AMR demonstration clip (pilot stage).
+# QuaST-vs-ASPECT annulus demonstration clip.
 #
 #   julia --project=. --threads=8 examples/annulus_realistic_demo.jl
 #
@@ -76,7 +76,7 @@
 # interior band 0.25 <= h <= 0.75; the final summary prints the volume-weighted
 # band mean (the guide's section 1.9 convention) as well.
 #
-# ## ENV knobs (pilot)
+# ## ENV knobs (pilot and production)
 #
 #   ANN_REAL_OUT      output root (default out_julia/annulus_realistic/quast_pilot)
 #   ANN_REAL_STEPS    step budget (default 200)
@@ -86,6 +86,19 @@
 #   ANN_REAL_MAXLEAVES  leaf budget override (default 10000, the card's value)
 #   ANN_REAL_MG_THREADS  MG threads (default 8)
 #   ANN_REAL_REPORT   progress interval in steps (default 25)
+#   ANN_REAL_CHECKPOINT        HDF5 checkpoint path (empty = no checkpoint)
+#   ANN_REAL_CHECKPOINT_EVERY  steps between checkpoints (default 100)
+#   ANN_REAL_RESTART           checkpoint to resume from (empty = from scratch;
+#                              the frame stream then appends, frames already written
+#                              before the resume step are not rewritten)
+#
+# The tracked figure's QuaST command (direct solve, ~3.3 h on 8 threads):
+#
+#   ANN_REAL_OUT=out_julia/annulus_realistic/quast_prod \
+#   ANN_REAL_STEPS=60000 ANN_REAL_TSTOP=3.2e-4 ANN_REAL_FRAME=5 \
+#   ANN_REAL_LINEAR=direct ANN_REAL_CHECKPOINT=out_julia/annulus_realistic/quast_prod.h5 \
+#   ANN_REAL_CHECKPOINT_EVERY=100 \
+#   julia --project=. --threads=8 examples/annulus_realistic_demo.jl
 #
 # The default benchmark path of examples/annulus_benchmark.jl is untouched
 # (G277/G293): this file only includes it for the tree helper and the frame
@@ -162,6 +175,15 @@ const MG_THREADS = parse(Int, get(ENV, "ANN_REAL_MG_THREADS", "8"))
 # (measured in the pilot), so the MG probe needs an explicit, reported value.
 const STOKES_TOL = parse(Float64, get(ENV, "ANN_REAL_STOKES_TOL", "1.0e-3"))
 const MG_TOL = parse(Float64, get(ENV, "ANN_REAL_MG_TOL", "1.0e-8"))
+# Production safety net: the full clip is O(5-7 h), so the run writes an HDF5
+# checkpoint every `ANN_REAL_CHECKPOINT_EVERY` steps (and at the end) and can be
+# resumed with `ANN_REAL_RESTART=<file>`: the driver restores the tree, theta,
+# theta_prev, t, dt, step and pressure, the frame stream continues its numbering
+# (the writer appends) and frames already written before the resume step are not
+# rewritten.  Empty values keep the historical no-checkpoint pilot path.
+const CHECKPOINT = get(ENV, "ANN_REAL_CHECKPOINT", "")
+const CHECKPOINT_EVERY = parse(Int, get(ENV, "ANN_REAL_CHECKPOINT_EVERY", "100"))
+const RESTART = get(ENV, "ANN_REAL_RESTART", "")
 
 # --------------------------------------------------------------- physics ----
 """
@@ -245,9 +267,11 @@ function main()
     end
     all(isfinite, theta0) ||
         error("the card's seed is not finite on the 640-leaf ring")
+    resuming = !isempty(RESTART)
+    resuming && (theta0 = zeros(ss.su.N))   # the driver replaces it
 
     mkpath(OUT)
-    println("# annulus realistic card (pilot): ring R0=$R0 R1=$R1 phi=2pi ",
+    println("# annulus realistic card: ring R0=$R0 R1=$R1 phi=2pi ",
             "d=$D free-slip; Ra=$RA H=$HHEAT composite isostress; ",
             "phases z0=0.87/0.78 slope=+$SLOPE410/$SLOPE660 B=$B410/$B660; ",
             "latent per_phase ring-consistent")
@@ -267,13 +291,37 @@ function main()
             "linear=$LINEAR mg_tol=$MG_TOL stokes_tol=$STOKES_TOL ",
             "nu_undefined=:nan (the H=10 ring's Nusselt pair is undefined ",
             "by construction)")
-    println("# pilot window: maxsteps=$STEPS tstop=$TSTOP frames every ",
+    println("# run window: maxsteps=$STEPS tstop=$TSTOP frames every ",
             "$FRAME_STRIDE steps -> $OUT")
+    if !isempty(CHECKPOINT)
+        println("# checkpoint: $CHECKPOINT every $CHECKPOINT_EVERY steps")
+    end
+    if resuming
+        println("# resume: $RESTART (frames append to $OUT, none rewritten)")
+    end
     flush(stdout)
 
-    fw = AnnulusFrameWriter(OUT, NX, NG, g, pr; profile=:state,
-                            mesh_dump=true, defer_stale=true)
+    resume_step = 0
     leaves_last = length(qt.leaves)
+    if resuming
+        metapath = joinpath(OUT, "frame_meta.csv")
+        if isfile(metapath)
+            rows = [l for l in readlines(metapath) if !startswith(l, "#") &&
+                    !startswith(l, "frame,") && !isempty(strip(l))]
+            if !isempty(rows)
+                fields = split(rows[end], ',')
+                resume_step = parse(Int, fields[2])
+                leaves_last = parse(Int, fields[9])
+            end
+        end
+        println("# resume: last written frame is step $resume_step ",
+                "(tree leaves $leaves_last); later frames are appended")
+        flush(stdout)
+    end
+    fw = AnnulusFrameWriter(OUT, NX, NG, g, pr; profile=:state,
+                            mesh_dump=true, defer_stale=true,
+                            resume=resuming && isfile(joinpath(OUT,
+                                                             "frame_meta.csv")))
     leaves_max = leaves_last
     level_seen_min, level_seen_max = annulus_level_range(qt)
     amr_cycles = 0
@@ -298,8 +346,9 @@ function main()
         end
         # frames go one step past every AMR cycle (the AMR block zeroes the
         # flow fields for the next solve, so a frame on the AMR step would
-        # report a zero velocity)
-        if st.step % FRAME_STRIDE == 1
+        # report a zero velocity); a resumed run never rewrites a frame that
+        # was already written before the checkpoint
+        if st.step % FRAME_STRIDE == 1 && st.step > resume_step
             write_annulus_frame!(fw, st, pr, g)
         end
         if st.step % REPORT == 0
@@ -316,6 +365,27 @@ function main()
         end
         return nothing
     end
+
+    ckpt_meta = Dict{String,Any}(
+        "demo" => "annulus_realistic", "R0" => R0, "R1" => R1,
+        "Phi" => PHI, "Ra" => RA, "H" => HHEAT,
+        "comp_Ad" => COMP_AD, "comp_As" => COMP_AS, "comp_Ed" => COMP_ED,
+        "comp_Es" => COMP_ES, "comp_n" => COMP_N, "comp_Tcut" => 0.0,
+        "comp_eps_min" => COMP_EPS_MIN, "comp_rule" => "isostress",
+        "eta_T0" => ETA_T0, "eta_min" => ETA_MIN, "eta_max" => ETA_MAX,
+        "eta_ref" => ETA_REF, "latent_mode" => "per_phase",
+        "latent410" => ph[1].latent, "latent660" => ph[2].latent,
+        "B410" => B410, "B660" => B660, "slope410" => SLOPE410,
+        "slope660" => SLOPE660, "width_pt" => WIDTH_PT, "L" => LATENT_L,
+        "p" => 2, "max_level" => MAXLEV, "max_leaves" => MAXLEAVES,
+        "amr_policy" => "balanced", "amr_every" => AMR_EVERY,
+        "refine_frac" => REFINE_FRAC, "coarsen_frac" => COARSEN_FRAC,
+        "wall_min_level" => WALL_MIN, "wall_strip" => WALL_STRIP,
+        "amr_hysteresis" => AMR_HYST, "amr_coarsen_gate" => AMR_GATE,
+        "symmetry" => "none", "indicator" => "theta",
+        "linear" => string(LINEAR), "cfl" => CFL, "ev" => EV,
+        "nu_undefined" => "nan",
+        "seed" => "0.05 sin(pi h) cos(2 phi) + 0.02 sin(2 pi h) cos(4 phi)")
 
     wall0 = time()
     res = run_semquad_simulation(qt, pr, theta0;
@@ -334,15 +404,20 @@ function main()
         mass_form=:boussinesq, phases=ph, latent_scheme=:implicit,
         nu_undefined=:nan,
         eta_ref_scale=SCALE_SET,
+        restart_from=RESTART, checkpoint_path=CHECKPOINT,
+        checkpoint_every=CHECKPOINT_EVERY, checkpoint_meta=ckpt_meta,
         profile_steps=true, verbose=true, callback=cb)
     wall = time() - wall0
     isempty(res.history) && error("the run did no step; nothing to report")
 
-    # final frame (the run's last state, on its final tree)
-    write_annulus_frame!(fw, (step=res.steps, t=res.t,
-                              dt=res.history[end][2], theta=res.theta,
-                              ux=res.ux, uz=res.uz, sq=res.ss.su,
-                              qt=res.qt), pr, g)
+    # final frame (the run's last state, on its final tree); a resumed run whose
+    # last written frame already shows this step does not duplicate it
+    if res.steps > resume_step
+        write_annulus_frame!(fw, (step=res.steps, t=res.t,
+                                  dt=res.history[end][2], theta=res.theta,
+                                  ux=res.ux, uz=res.uz, sq=res.ss.su,
+                                  qt=res.qt), pr, g)
+    end
     close(fw.meta)
 
     # final measurements

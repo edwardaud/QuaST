@@ -1,10 +1,11 @@
-# The realistic card on the closed ring (ASPECT pilot)
+# The realistic card on the closed ring (ASPECT arm)
 
-The ASPECT side of the realistic-card-on-the-annulus demonstration: the card of
+The ASPECT side of `docs/assets/quast_vs_aspect_annulus_demo.gif`: the card of
 `aspect_runs/realistic/verify7000.prm` (the ASPECT arm of
-`docs/assets/quast_vs_aspect_realistic.gif`) ported to the closed 2-D ring.  This
-directory is the **pilot** record; the final clip card (end time, frame cadence,
-output directory) is decided after the pilot.
+`docs/assets/quast_vs_aspect_realistic.gif`) ported to the closed 2-D annulus.
+`annulus_realistic_prod.prm` is the production card of the clip; the pilot and
+probe cards beside it are the record of the two pilot runs that measured the
+stability and the cost before the production run.
 
 ## The card
 
@@ -16,73 +17,110 @@ output directory) is decided after the pilot.
 | Buoyancy / heating | Boussinesq, `H_r = 1.189061e-12 W/kg`, the two phase transitions with latent heat — verbatim from `verify7000.prm` |
 | Material model | the tracked `realistic composite` plugin (`../realistic/realistic_composite.cc`): ASPECT's `diffusion dislocation` + the two phase transitions |
 | Initial temperature | a `function` expression in dimensional units implementing the annular H-inclusive conductive base plus `0.05 sin(pi h) cos(2 phi) + 0.02 sin(2 pi h) cos(4 phi)`, `h = r/d - 1.22`, `phi = atan2(z,x)` (the same total temperature the QuaST card's perturbation is defined against) |
-| AMR | **the original GIF card's block verbatim**: `Initial global refinement = 5`, `Initial adaptive refinement = 2`, `Time steps between mesh refinement = 5`, `Strategy = temperature`, `Refinement fraction = 0.2`, `Coarsening fraction = 0.005`, `Minimum refinement level = 5`.  Not edited; the pilot measures what it does on the shell |
+| AMR | **the original GIF card's block verbatim**: `Initial global refinement = 5`, `Initial adaptive refinement = 2`, `Time steps between mesh refinement = 5`, `Strategy = temperature`, `Refinement fraction = 0.2`, `Coarsening fraction = 0.005`, `Minimum refinement level = 5`.  Not edited |
 | Time | CFL `0.5`, `Maximum time step = 4.2e14 s`, solver tolerances `1e-7` (Stokes) / `1e-9` (temperature) — verbatim from `verify7000.prm` |
-| Pilot window | `End time = 8.41e13 s` = `t_nd = 1e-5`, VTU every `2.6912e12 s` (the original fine cadence, `t_nd = 3.2e-7`) |
+| Production window | `End time = 2.6912e15 s` = `t_nd = 3.2e-4` (the box clip's window, starting from the card's own t = 0 state) |
+| Output | VTU every `1.682e13 s` (161 graphical outputs over the window), ASPECT checkpoint every 100 steps |
 
 The only changes from `verify7000.prm` are the six allowed ones: geometry,
 gravity, the two velocity/temperature boundary cards, the initial temperature,
 the output/cadence, and the `Nullspace removal` subsection the shell needs.
 Everything else (material, heating, phases, formulation, solver tolerances,
-CFL, maximum time step) is verbatim.
+CFL, maximum time step) is verbatim, and the AMR block is the original GIF's.
 
 ## Plugin build (measured)
 
 The pinned image is `gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac`
 (ASPECT 2.5.0-pre, deal.II 9.4.0).  Its build tree `CMAKE_BUILD_TYPE` is
-`DebugRelease`, so `ASPECT_SETUP_PLUGIN` builds **both** variants from the same
-`cmake` configure — there is no debug/release mismatch to work around:
+`DebugRelease`, so `ASPECT_SETUP_PLUGIN` builds **both** variants from one
+`cmake` configure — there is no debug/release mismatch:
 
 ```powershell
 $img = "gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac"
-# stage the two tracked files at an ASCII host path (the CJK repo path cannot be a docker mount):
-#   copy ..\realistic\realistic_composite.cc and ..\realistic\CMakeLists.txt to C:/temp/quast_aspect/realistic_annulus
 docker run --rm --entrypoint /bin/bash -v C:/temp/quast_aspect/realistic_annulus:/work -w /work $img `
   -c "mkdir -p build && cd build && cmake -DAspect_DIR=/home/dealii/aspect/build .. && make -j8"
 ```
 
 Result: `build/librealistic_composite.debug.so` and
-`build/librealistic_composite.release.so`; the cards load the **release** one
-and run with `/home/dealii/aspect/aspect-release`.  (The DEBUG binary was not
-used; the repository's measured DEBUG/OPTIMIZED factor on the Blankenbach card
-is 17.3x, `benchmarks/results/aspc-blankenbach2b_nu-vrms_ref3.md`.)  This
-pilot's plugin build is archived in `out_julia/annulus_realistic/plugin_build/`.
+`build/librealistic_composite.release.so`; the production card loads the
+**release** one and runs with `/home/dealii/aspect/aspect-release`.  (The DEBUG
+binary was not used; the repository's measured DEBUG/OPTIMIZED factor on the
+Blankenbach card is 17.3x, `benchmarks/results/aspc-blankenbach2b_nu-vrms_ref3.md`.)
 
-## Run it (Windows PowerShell, ASCII mount)
+## Run the production card (Windows PowerShell, ASCII mounts)
+
+Docker is on the Windows host and the repository path contains non-ASCII
+characters, so both the work tree and the output are mounted from ASCII host
+paths.  The output (~3 GB including the checkpoints) goes to the E: drive
+because the C: drive does not hold it:
 
 ```powershell
 $img = "gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac"
-docker run --rm --entrypoint /bin/bash -v C:/temp/quast_aspect/realistic_annulus:/work -w /work $img `
-  -c "mpirun --allow-run-as-root -n 4 /home/dealii/aspect/aspect-release annulus_realistic_pilot.prm > logs/pilot.log 2>&1"
+docker run -d --name quast_aspect_prod --entrypoint /bin/bash `
+  -v C:/temp/quast_aspect/realistic_annulus:/work `
+  -v E:/temp/quast_aspect_prod:/out -w /out $img `
+  -c 'start=$(date +%s); mpirun --allow-run-as-root -n 8 /home/dealii/aspect/aspect-release /work/annulus_realistic_prod.prm > /out/logs/prod.log 2>&1; rc=$?; end=$(date +%s); echo "exit=$rc wall=$((end-start))s" >> /out/logs/prod.log'
 ```
 
-`annulus_realistic_probe.prm` is the one-step parameter/mesh probe used before
-the pilot.  Output: `output-annulus-realistic-pilot/{statistics,solution/}`;
-the archived log/statistics/derived trajectory are under
-`out_julia/annulus_realistic/aspect_pilot/`.
+Follow it with `docker ps`, `docker wait quast_aspect_prod` and the log under
+`E:/temp/quast_aspect_prod/logs/prod.log`.  The rendered clip reads the output
+from `/mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod` in WSL (see
+`scripts/run_annulus_realistic_demo.sh`).  A run with the ASPECT checkpoint
+files in that directory resumes when the card is restarted in that directory
+(ASPECT rotates `restart.mesh_fixed.data` and its `.old` copy).
 
-## Measured pilot (2026-11-26)
+`annulus_realistic_probe.prm` is the one-step parameter/mesh probe used before
+the pilots.  The pilot cards and their archived logs are the smaller
+`End time` runs (pilot: `8.41e13 s`; the second pilot: `2.523e14 s`) that
+measured the in-loop AMR stability and the per-step cost before the production
+window was chosen.
+
+## Measured production run (2026-11-27)
 
 | Item | Measured |
 |---|---|
-| **Probe** | Image parses the function IC (`atan2`, `ln` are muparser built-ins), loads the plugin, builds the shell: `12,288` cells after `Initial global refinement = 5`, `15,480` and `16,236` after the two initial adaptive refinements (levels 0-7); one Stokes solve `18 s` total |
-| **Initial condition check** | outward heat flux through the two circle boundaries sums to `3.56753e5 W` = `H_r rho0` x area (internal heat production), i.e. the function IC is the exact H-inclusive annular conduction state; `T` ranges `500..2323.9 K`, area mean `1740.78 K`, `u_rms = 1.839e-9 m/s` at t = 0 |
-| **Pilot run** | 4 MPI ranks, `aspect-release`, `End time = 8.41e13 s` (`t_nd = 1e-5`): **69 time steps**, **353 s** wall (5.04 s/step average; Stokes 157 s, postprocessing 48.5 s, temperature 43.5 s, Stokes preconditioner 39.4 s, Stokes assembly 35.4 s) |
-| **In-loop AMR** | **15 refinement calls** = 2 initial + **13 in-loop** cycles (every 5 steps); the mesh grew monotonically `16,236 -> 101,994` cells (6.3x), all on 8 levels (max level 7) |
-| **Stability** | **stable**: no spike, no solver failure, no warning; `u_rms` decays `5.333e3 -> 3.365e3` (nondim `u*d/kappa`), `u_max` `1.394e4 -> 8.48e3`, `T` min/avg/max stays `500 / 1740.78 / 2323.9 K`, Stokes cheap iterations 114 (t=0) then 30-47 |
-| **Net rotation** | the measured angular-momentum integral of a sampled frame is `-3.14e6 m^3/s`, i.e. `omega = 1.3e-21 1/s` against a strain rate of order `1e-16 1/s`: the `net rotation` removal is active and the flow carries no visible rigid rotation, including across the in-loop cycles |
-| **Cells cap** | ASPECT's `max_refinement_level` is `initial_global + initial_adaptive = 7` (it grows only through `Additional refinement times`, which the card leaves empty), so the temperature strategy's 20%-refine / 0.5%-coarsen ratchet approaches the **uniform level-7 shell mesh = 12*4^7 = 196,608 cells**, not an unbounded mesh.  The first pilot ended at 101,994 cells, still growing |
-| **Second pilot (projection)** | `End time = 2.523e14 s` (`t_nd = 3e-5`), VTU every `2.6912e13 s`: **166 steps, 1428 s at 4 ranks (8.6 s/step), 16,236 -> 167,160 cells, 35 in-loop refinement calls**, same stable behaviour (the flow decays to `u_rms_nd = 2.94e3` near `t_nd ~ 2e-5` and starts to spin up again, reaching `3.50e3` at the end; cheap Stokes iterations 40-50).  Timer: Stokes solve 45%, temperature assembly 15%, Stokes assembly 13%, preconditioner 13%, **postprocessing 5.7%** at this cadence (vs 14% at the GIF's fine cadence); the cost proxy drops `1.007e-4 -> 8.07e-5 s per cell-step` |
-| **Cost projection** | the saturated level-7 mesh costs ~15.8 s/step at 4 ranks (coarse output).  The two pilots bracket the step count: 166 steps reached `t_nd = 3e-5` with the spin-up only starting, and the box GIF's ASPECT arm needed 2362 steps for the whole window, so the window `t_nd = 1e-6..3.2e-4` projects to **O(1800-2200) steps and ~6-9 h at 4 ranks**.  The output cadence is the free lever: write VTU every ~`2.6912e13 s` (~200 outputs for 120 rendered frames), not every step.  This is the pilot's main cost finding and the reason the clip window/ranks are a lead decision |
+| Steps / end | 2 666 time steps, `t = 2.6912e15 s` = `t_nd = 3.2e-4`, termination by the end-time criterion |
+| Wall / ranks | **14 288 s = 3.97 h at 8 MPI ranks**, `aspect-release` (OPTIMIZED) |
+| Mesh | `16 239` cells after the startup refinement (level 5 global + 2 adaptive passes); max **`77 229` cells**; **`67 866` cells at the end** (the temperature strategy ran the 0.5 % coarsening back down after the spin-up peak), levels 5-7 |
+| In-loop AMR | `535` refine-mesh operations = 2 startup passes + 533 in-loop cycles at every 5 steps; the mesh is stable throughout (no spike, no solver failure, no warning) |
+| Output | 161 graphical outputs (1 288 VTU files over 8 ranks), 2.94 GB total including 26 rotating checkpoint snapshots |
+| Final state | RMS / max velocity `1.69e-10` / `1.19e-9 m/s` (`u_rms = 490` nondimensional); `T` min/avg/max `500 / 1 739 / 2 285 K` (`T_max = 1.785` nondimensional); boundary heat fluxes `9.738e4 W` / `2.477e5 W` |
+| Net rotation | the shell has a rigid-rotation nullspace; `Remove nullspace = net rotation` is active for the whole run and the flow shows no visible rotation. The pilot measured the angular-momentum integral `-3.14e6 m^3/s`, i.e. `omega ~ 1e-21 1/s` against strain rates of order `1e-16 1/s` |
+| Stability rule | the refinement ratchet is capped by `initial_global + initial_adaptive = 7` (the card leaves `Additional refinement times` empty), so the maximum mesh is the uniform level-7 shell (`12*4^7 = 196 608` cells); the run stayed below it |
 
-## What is NOT done here
+Nothing in the AMR block, the solver tolerances or the formulation was changed:
+the pilot measured this exact card stable on the shell, and so did the
+production run.
 
-- The full production clip (window `t_nd = 1e-6..3.2e-4`, ~2000 steps) was not
-  run: the pilot's job was to measure the per-step cost, the AMR behaviour and
-  the stability.
-- No timing optimisations, no AMR-block edits, no solver workarounds: the one
-  pilot ran with the card as specified.  (The only solver choices reported are
-  the ones `verify7000.prm` itself has.)
+## QuaST arm
+
+The QuaST side is `examples/annulus_realistic_demo.jl` (direct solve, production
+AMR settings, `nu_undefined = :nan` because the H = 10 ring's per-wall Nusselt
+pair is undefined by construction).  The recorded run: 1 396 steps to
+`t_nd = 3.200977e-4`, 3.26 h on 8 Julia threads, 10 000 leaves over levels 3-7,
+218 adaptive cycles, measured `Ra_interior = 4.4218e7` (nominal `Ra = 1e5` at
+the composite calibration point).  The frame stream is
+`profile = :state` (total `T`, the six node arrays including `ux, uy`, the
+composite `log10(eta/eta_ref)`, the mesh dump and the v3 meta table).
+
+## Render
+
+```bash
+PY=/home/szh/dedalus-env/bin/python
+python scripts/annulus_realistic_video.py \
+    --quast out_julia/annulus_realistic/quast_prod \
+    --aspect /mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod \
+    --quast-log out_julia/annulus_realistic/quast_prod.log \
+    --t0 1e-6 --t1 3.2e-4 --frames 120 --fps 10 \
+    --out out_julia/annulus_realistic/render/realistic.gif \
+    --also-poster --also-mp4 \
+    --sidecar out_julia/annulus_realistic/render/realistic.json
+```
+
+`--check` prints the input tables before rendering (counts, time alignment,
+level inference against the statistics, the ASPECT saved-viscosity cross-check,
+and the shown-frame colour ranges).  The GIF is 1200 x 616 px, 120 frames,
+7.94 MB with `--gif-dither none` (the default for this clip).
 
 ## Licence and provenance
 

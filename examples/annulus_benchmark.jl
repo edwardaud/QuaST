@@ -388,7 +388,7 @@ function AnnulusFrameWriter(root::String, nx::Int, ny::Int, g::PolarAnnulus,
                             pr::Params; dt::Float64=0.05, nr::Int=200,
                             nphi::Int=1024, mesh_dump::Bool=false,
                             defer_stale::Bool=false,
-                            profile::Symbol=:benchmark)
+                            profile::Symbol=:benchmark, resume::Bool=false)
     profile in (:benchmark, :state) ||
         throw(ArgumentError("AnnulusFrameWriter profile must be :benchmark or " *
                             ":state (got :$profile)"))
@@ -396,6 +396,31 @@ function AnnulusFrameWriter(root::String, nx::Int, ny::Int, g::PolarAnnulus,
     nr >= 2 && nphi >= 4 ||
         throw(ArgumentError("ANN_FRAME_NR/NPHI must be >= 2/4 (got $nr/$nphi)"))
     mkpath(root)
+    if resume
+        # Append to an existing stream (a checkpoint resume): keep the files
+        # already written, open the meta table in append mode and continue the
+        # frame numbering after the last contiguous frame file.  The default
+        # (`resume=false`) is the historical truncate-and-restart path, so the
+        # benchmark bytes above are unchanged.
+        metapath = joinpath(root, "frame_meta.csv")
+        isfile(metapath) ||
+            throw(ArgumentError("AnnulusFrameWriter(resume=true) needs an " *
+                                "existing frame_meta.csv in $root"))
+        firstline = readline(metapath)
+        want = profile === :state ? "# annulus_frames_v3" :
+               (mesh_dump ? "# annulus_frames_v2" : "# annulus_frames_v1")
+        firstline == want ||
+            throw(ArgumentError("AnnulusFrameWriter(resume=true): $metapath " *
+                                "starts with '$firstline', expected '$want'"))
+        k = 0
+        while isfile(joinpath(root, @sprintf("frame_%05d.bin", k)))
+            k += 1
+        end
+        io = open(metapath, "a")
+        flush(io)
+        return AnnulusFrameWriter(root, io, k, dt, nr, nphi, 0.0, time(),
+                                  mesh_dump, defer_stale, profile)
+    end
     for old in readdir(root)
         (occursin(r"^frame_\d{5}(_[a-z]+)?\.(bin|csv)$", old) ||
          old == "frame_meta.csv") && rm(joinpath(root, old); force=true)

@@ -1389,12 +1389,16 @@ class ReferenceRow:
     """
 
     def __init__(self, fig, geo, band, label, norms, cmaps,
-                 level_cmap, level_norm):
+                 level_cmap, level_norm, plate_inset=None):
         self.geo = geo
         self.norms = norms
         self.cmaps = cmaps
         self.level_cmap = level_cmap
         self.level_norm = level_norm
+        # The temperature panel's plate text: the benchmark/AMR cards show the
+        # Nu_top/Nu_bot, V_rms, mean T inset (the default); a card without a
+        # Nusselt pair (the realistic annulus, H = 10) passes its own callable.
+        self.plate_inset = plate_inset or ref_plate_text_inset
         px_h = geo["px_h"]
         w = geo["panel_w"]
         top = geo["panel_top"][band]
@@ -1413,6 +1417,7 @@ class ReferenceRow:
         self.ax_t, self.ax_th, self.ax_u, self.ax_m = self.axes
         self.ims = [None] * 3
         self.mesh_poly = None
+        self.mesh_img = None
         self.sampler = geo["sampler"]
         # the solver name sits in the upper left of the temperature panel, bold
         # white, with no plate: the reference's position, moved inside the disk
@@ -1442,7 +1447,7 @@ class ReferenceRow:
             bbox=dict(facecolor="white", alpha=REF_PLATE_ALPHA,
                       edgecolor="none", boxstyle="square,pad=0.20"))
 
-    def update(self, target, pick, src, fg, ins, mesh=None):
+    def update(self, target, pick, src, fg, ins, mesh=None, mesh_image=None):
         fields = (fg["T"], fg["theta"], fg["logeta"])
         for k, (ax, cmap, norm, C) in enumerate(zip(
                 self.axes[:3], self.cmaps, self.norms, fields)):
@@ -1453,7 +1458,17 @@ class ReferenceRow:
                     interpolation="nearest", zorder=1)
             else:
                 self.ims[k].set_data(img)
-        if mesh is not None:
+        if mesh_image is not None:
+            # a pre-rasterised RGBA mesh panel (used when the per-frame cell
+            # count is large enough that one polygon per cell is slow); it is
+            # drawn exactly like a field image so the panel geometry is shared
+            if self.mesh_img is None:
+                self.mesh_img = self.ax_m.imshow(
+                    mesh_image, extent=self.sampler.extent, origin="lower",
+                    interpolation="nearest", zorder=3)
+            else:
+                self.mesh_img.set_data(mesh_image)
+        elif mesh is not None:
             colors = self.level_cmap(self.level_norm(mesh["cell_levels"]))
             if self.mesh_poly is None:
                 self.mesh_poly = PolyCollection(
@@ -1463,32 +1478,46 @@ class ReferenceRow:
             else:
                 self.mesh_poly.set_verts(mesh["verts"])
                 self.mesh_poly.set_facecolors(colors)
-        self.nu_text.set_text(ref_plate_text_inset(ins))
+        self.nu_text.set_text(self.plate_inset(ins))
         self.th_text.set_text(ref_plate_text_theta(
             float(np.nanmin(fg["theta"])), float(np.nanmax(fg["theta"]))))
         self.u_text.set_text(ref_plate_text_eta(
             float(np.nanmin(fg["logeta"])), float(np.nanmax(fg["logeta"]))))
         if mesh is not None:
-            word = "leaves" if isinstance(src, QuastSource) else "cells"
-            count = mesh["leaves"] if isinstance(src, QuastSource) else mesh["cells"]
+            # the word is what the row counts: QuaST leaves, ASPECT cells.  A
+            # source of either known kind is recognised by its `kind` string, so
+            # a card with its own source classes can use this layout unchanged.
+            is_quast = isinstance(src, QuastSource) or \
+                getattr(src, "kind", "") == "quast"
+            word = "leaves" if is_quast else "cells"
+            count = mesh["leaves"] if is_quast else mesh["cells"]
             self.mesh_text.set_text(ref_plate_text_mesh(
                 word, count, mesh["level_min"], mesh["level_max"]))
         else:
             self.mesh_text.set_text(src.mesh_note())
 
 
-def build_reference_figure(labels, norms, cmaps, geo, level_legend):
-    """The reference-style canvas: no header, no time text, nothing on top."""
+def build_reference_figure(labels, norms, cmaps, geo, level_legend,
+                           plate_inset=None, bar_titles=None):
+    """The reference-style canvas: no header, no time text, nothing on top.
+
+    `plate_inset` replaces the temperature panel's plate text (default: the
+    benchmark card's Nu_top/Nu_bot/V_rms/mean T inset) and `bar_titles` the
+    three colour-bar labels (default: T, theta, log10 eta); both are for cards
+    whose diagnostics differ from the benchmark/AMR cards.  The drawn layout is
+    otherwise identical, so the default path is unchanged.
+    """
     plt.rcParams.update({"mathtext.fontset": "cm", "font.family": "serif"})
     fig = plt.figure(figsize=(geo["px_w"] / DPI, geo["px_h"] / DPI), dpi=DPI)
     fig.patch.set_facecolor(BG)
     level_cmap = level_legend["cmap"]
     level_norm = level_legend["norm"]
-    rows = [ReferenceRow(fig, geo, b, lab, norms, cmaps, level_cmap, level_norm)
+    rows = [ReferenceRow(fig, geo, b, lab, norms, cmaps, level_cmap, level_norm,
+                         plate_inset=plate_inset)
             for b, lab in enumerate(labels)]
     # shared colour bars under columns 1-3 (9 px tall in the reference)
-    titles = [r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
-              r"$\log_{10}\eta$"]
+    titles = bar_titles if bar_titles is not None else [
+        r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$", r"$\log_{10}\eta$"]
     for k in range(3):
         cax = fig.add_axes(rect_px(geo["x0"][k], geo["cbar_top"],
                                    geo["panel_w"], geo["cbar_h"],
@@ -1626,7 +1655,7 @@ def encode(ffmpeg, frames_dir, pattern, fps, out, crf=18, preset="slow",
 
 
 def write_gif(pngs, out, fps, width_cap=None, colors=256, max_bytes=8.0e6,
-              downsample_to=None, blank_top=0):
+              downsample_to=None, blank_top=0, dither="floyd"):
     """Pillow GIF with one adaptive palette from a sample of the frames.
 
     The palette is shared by every frame (built from a montage of evenly spaced
@@ -1637,7 +1666,11 @@ def write_gif(pngs, out, fps, width_cap=None, colors=256, max_bytes=8.0e6,
     width with Lanczos first (the reference style renders at 2x and downsamples
     to 1200 px); without it the inputs are encoded at their own size.
     `blank_top` keeps that many top rows at the page background (the reference
-    style's blank top margin).
+    style's blank top margin).  `dither` is `"floyd"` (Floyd-Steinberg, the
+    historical default) or `"none"`: the realistic-card clip uses `"none"`
+    because dithering the dense adaptive-mesh panels doubles the GIF entropy
+    (the 2026-11-27 production render: 13.9 MB with Floyd, 7.94 MB with none at
+    160 colours, 6.3 MB at 128) without a visible gain at 1200 px.
     """
     from PIL import Image
     frames = [Image.open(p).convert("RGB") for p in pngs]
@@ -1668,8 +1701,9 @@ def write_gif(pngs, out, fps, width_cap=None, colors=256, max_bytes=8.0e6,
         for k, fr in enumerate(small[::montage_step]):
             mont.paste(fr, (0, k * h))
         pal = mont.quantize(colors=c, method=Image.MEDIANCUT)
-        qf = [fr.quantize(palette=pal, dither=Image.FLOYDSTEINBERG)
-              for fr in small]
+        dither_mode = {"floyd": Image.FLOYDSTEINBERG,
+                       "none": Image.Dither.NONE}[dither]
+        qf = [fr.quantize(palette=pal, dither=dither_mode) for fr in small]
         qf[0].save(out, save_all=True, append_images=qf[1:],
                    duration=int(round(1000.0 / fps)), loop=0, optimize=True)
         size = os.path.getsize(out)

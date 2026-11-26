@@ -1,0 +1,214 @@
+# The realistic-card-on-the-annulus ASPECT PRODUCTION card (the clip arm).
+#
+# The port of `aspect_runs/realistic/verify7000.prm` (the ASPECT arm of
+# docs/assets/quast_vs_aspect_realistic.gif) to the closed 2-D annulus, at the
+# full clip window.  The physics is verbatim: same dimensional scale set,
+# material model, heating, phase transitions, solver tolerances, CFL and
+# maximum time step.  The only differences from that card are the six allowed
+# ones:
+#
+#   1. geometry   spherical shell (2-D annulus), inner = 1.22*d, outer = 2.22*d,
+#                 opening angle 360 (d = 2.9e6 m is the gap and the length unit);
+#   2. gravity    radial constant 9.81 m/s^2 (was vertical);
+#   3. velocity   free slip on the two circles (Tangential velocity boundary
+#                 indicators = 0,1), plus `Remove nullspace = net rotation`
+#                 because the closed ring has a rigid-rotation nullspace;
+#   4. temperature  spherical constant, inner 1500 K / outer 500 K;
+#   5. initial condition  the function expression below: the annular H-inclusive
+#                 conductive base plus the card's perturbation
+#                 theta0 = 0.05 sin(pi h) cos(2 phi) + 0.02 sin(2 pi h) cos(4 phi),
+#                 h = (r/R - 1.22), phi = atan2(z,x), in dimensional units;
+#   6. output/cadence  this production output directory, VTU every 1.682e13 s
+#                 (about 160 outputs over the 2.6912e15 s window for the
+#                 120-frame render) and an ASPECT checkpoint every 100 steps.
+#
+# The window is t_nd = 1e-6 .. 3.2e-4, i.e. End time = 3.2e-4 * d^2/kappa =
+# 2.6912e15 s (the same window as the box clip).  The AMR block is the original
+# GIF's block VERBATIM (the pilot measured it stable on the shell: 13/35
+# in-loop cycles, no spike, net rotation well below the strain rate; the
+# refinement ratchet caps at the uniform level-7 shell, 196 608 cells, because
+# the card leaves `Additional refinement times` empty).
+#
+# Run it from Windows PowerShell with the pinned image and ASCII mounts (docker
+# is on the Windows host; see README.md in this directory).  The work tree holds
+# the plugin build and the card; the output is mounted separately because the
+# production output is ~3 GB:
+#
+#   docker run -d --name quast_aspect_prod --entrypoint /bin/bash \
+#     -v C:/temp/quast_aspect/realistic_annulus:/work \
+#     -v E:/temp/quast_aspect_prod:/out -w /out \
+#     gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac \
+#     -c 'start=$(date +%s); mpirun --allow-run-as-root -n 8 \
+#         /home/dealii/aspect/aspect-release /work/annulus_realistic_prod.prm \
+#         > /out/logs/prod.log 2>&1; rc=$?; end=$(date +%s); \
+#         echo "exit=$rc wall=$((end-start))s" >> /out/logs/prod.log'
+#
+# The output directory is created under /out (the mount), i.e. on the Windows
+# E: drive; the card's Output directory is the relative name below.
+#
+# Syntax: SPDX-License-Identifier: MIT (this input card).
+
+set Dimension                              = 2
+set Use years in output instead of seconds = false
+set End time                               = 2.6912e15
+set CFL number                             = 0.5
+set Maximum time step                      = 4.2e14
+set Output directory                       = output-annulus-realistic-prod
+set Pressure normalization                 = surface
+set Surface pressure                       = 0
+set Additional shared libraries            = /work/build/librealistic_composite.release.so
+set Nonlinear solver scheme                = single Advection, single Stokes
+
+subsection Geometry model
+  set Model name = spherical shell
+  subsection Spherical shell
+    set Inner radius  = 3538000
+    set Outer radius  = 6438000
+    set Opening angle = 360
+  end
+end
+
+subsection Nullspace removal
+  # The closed ring has a rigid-body-rotation nullspace; keep it removed.  The
+  # pilot must report how this behaves with the in-loop adaptive cycle.
+  set Remove nullspace = net rotation
+end
+
+subsection Initial temperature model
+  set Model name = function
+  subsection Function
+    set Variable names      = x,z
+    set Function constants  = d=2.9e6, dT=1000, pi=3.141592653589793, H=10, A1=0.05, A2=0.02, R0=1.22, R1=2.22
+    # rn = r/d (d = the gap), h = rn - R0, phi = atan2(z,x);
+    # Tbar_nd = (1 - H (R1^2-R0^2)/4) ln(R1/rn)/ln(R1/R0) + H (R1^2-rn^2)/4.
+    set Function expression = 500 + dT*((1 - 0.25*H*(R1^2-R0^2))*ln(R1/sqrt((x/d)^2+(z/d)^2))/ln(R1/R0) + 0.25*H*(R1^2 - ((x/d)^2+(z/d)^2)) + A1*sin(pi*(sqrt((x/d)^2+(z/d)^2)-R0))*cos(2*atan2(z,x)) + A2*sin(2*pi*(sqrt((x/d)^2+(z/d)^2)-R0))*cos(4*atan2(z,x)))
+  end
+end
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = 0,1
+  set List of model names = spherical constant
+  subsection Spherical constant
+    set Inner temperature = 1500
+    set Outer temperature = 500
+  end
+end
+
+subsection Boundary velocity model
+  set Tangential velocity boundary indicators = 0,1
+end
+
+subsection Gravity model
+  set Model name = radial constant
+  subsection Radial constant
+    set Magnitude = 9.81
+  end
+end
+
+# Constant adiabatic temperature (the Boussinesq reference), hydrostatic
+# pressure of the constant reference density, and the constant reference
+# density itself -- verbatim from the box card (the depth-based phase
+# transitions read depth/d, which is the same height coordinate as the box's).
+set Adiabatic surface temperature = 500
+subsection Adiabatic conditions model
+  set Model name = function
+  subsection Function
+    set Variable names      = depth
+    set Function constants  = rho=3300, g=9.81, T0=500
+    set Function expression = T0; rho*g*depth; rho
+  end
+end
+
+subsection Material model
+  set Model name = realistic composite
+  subsection Diffusion dislocation
+    # --- equation of state (Boussinesq) ---
+    set Reference temperature         = 500
+    set Thermal diffusivity           = 1e-6
+    set Heat capacity                 = 1000
+    set Densities                     = 3300
+    set Thermal expansivities         = 3e-5
+
+    # --- composite rheology, mapped from comp_* (CASE_REALISTIC 1.2) ---
+    set Prefactors for diffusion creep        = 3.428173e-28
+    set Stress exponents for diffusion creep  = 1
+    set Grain size exponents for diffusion creep = 3
+    set Activation energies for diffusion creep = 99773.5452
+    set Activation volumes for diffusion creep  = 0
+
+    set Prefactors for dislocation creep        = 1.280082e-35
+    set Stress exponents for dislocation creep  = 3
+    set Activation energies for dislocation creep = 141345.8557
+    set Activation volumes for dislocation creep  = 0
+
+    set Grain size = 1e-3
+
+    set Minimum strain rate = 1.4e-20
+    set Minimum viscosity   = 2.368635e19
+    set Maximum viscosity   = 2.368635e27
+
+    set Maximum strain rate ratio iterations = 400
+
+    # --- phase transitions (ASPECT `latent heat` parameter names) ---
+    # depth = radial distance from the outer circle, so the card's z0 = 0.87 /
+    # 0.78 (height above the inner circle in gap units) are depth/d = 0.13 /
+    # 0.22, i.e. 377 km / 638 km, the same numbers the box card uses.
+    set Define transition by depth instead of pressure = true
+    set Phase transition depths              = background: 377000|638000
+    set Phase transition widths              = background: 72500|72500
+    set Phase transition temperatures        = background: 1000|1000
+    set Phase transition Clapeyron slopes    = background: 3.004214e6|-3.004214e6
+    set Phase transition density jumps       = 180.0018, 299.9997
+  end
+end
+
+subsection Heating model
+  set List of model names = constant heating, latent heat
+  subsection Constant heating
+    set Radiogenic heating rate = 1.189061e-12
+  end
+end
+
+subsection Formulation
+  set Formulation = Boussinesq approximation
+end
+
+subsection Mesh refinement
+  # VERBATIM from aspect_runs/realistic/verify7000.prm lines 149-157.  Do not
+  # change these seven lines in the pilot: the in-loop adaptive behaviour on the
+  # shell is the thing being measured.
+  set Initial global refinement          = 5
+  set Initial adaptive refinement        = 2
+  set Time steps between mesh refinement = 5
+  set Strategy                           = temperature
+  set Refinement fraction                = 0.2
+  set Coarsening fraction                = 0.005
+  set Minimum refinement level           = 5
+end
+
+subsection Postprocess
+  set List of postprocessors = velocity statistics, temperature statistics, heat flux statistics, visualization
+  subsection Visualization
+    set Number of grouped files       = 0
+    set Output format                 = vtu
+    set Time between graphical output = 1.682e13
+    set List of output variables = material properties
+    subsection Material properties
+      set List of material properties = viscosity, density
+    end
+  end
+end
+
+subsection Checkpointing
+  # Production safety net: ~100-step checkpoints (about 20 files over the
+  # window) let a crashed or interrupted run resume with --resume.
+  set Steps between checkpoint = 100
+  set Time between checkpoint  = 0
+end
+
+subsection Solver parameters
+  subsection Stokes solver parameters
+    set Linear solver tolerance = 1e-7
+  end
+  set Temperature solver tolerance = 1e-9
+end
