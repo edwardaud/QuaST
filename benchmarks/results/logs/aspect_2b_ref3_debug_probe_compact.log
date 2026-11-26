@@ -1,0 +1,135 @@
+﻿-----------------------------------------------------------------------------
+-- This is ASPECT, the Advanced Solver for Problems in Earth's ConvecTion.
+--     . version 2.5.0-pre (main, 340c0d018)
+--     . using deal.II 9.4.0
+--     .       with 32 bit indices and vectorization level 0 (64 bits)
+--     . using Trilinos 13.2.0
+--     . using p4est 2.2.0
+--     . running in DEBUG mode
+--     . running with 1 MPI process
+-----------------------------------------------------------------------------
+
+Loading shared library <./plugin/libblankenbach.debug.so>
+
+
+-----------------------------------------------------------------------------
+The output directory <output-2b-debug-probe/> provided in the input file appears not to exist.
+ASPECT will create it for you.
+-----------------------------------------------------------------------------
+
+
+
+   Loading Ascii data initial file initial_temperature_case2b.txt.
+
+-----------------------------------------------------------------------------
+-- For information on how to cite ASPECT, see:
+--   https://aspect.geodynamics.org/citing.html?ver=2.5.0-pre&sha=340c0d018&src=code
+-----------------------------------------------------------------------------
+Number of active cells: 640 (on 4 levels)
+Number of degrees of freedom: 8,716 (5,346+697+2,673)
+
+# [quast archive] compact excerpt: preamble + every 100th timestep block + last 5 blocks; per-step lines removed.
+*** Timestep 0:  t=0 seconds, dt=0 seconds
+   Solving temperature system... 0 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 194+0 iterations.
+
+   Postprocessing:
+     Writing graphical output:           output-2b-debug-probe/solution/solution-00000
+     RMS, max velocity:                  192 m/s, 743 m/s
+     Temperature min/avg/max:            0 K, 0.4787 K, 1 K
+     Heat fluxes through boundary parts: 0 W, 0 W, -14.68 W, 19.89 W
+     Heating rate (average/total):       0 W/kg, 0 W
+     Heat flux densities for boundaries: 0 W/m, 0 W/m, -5.872 W/m, 7.957 W/m
+     Writing TemperatureAsciiOut:        output-2b-debug-probe/temperature_ascii_data.txt
+
+*** Timestep 100:  t=0.0241281 seconds, dt=5.76732e-05 seconds
+   Solving temperature system... 24 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 85+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                  288 m/s, 2.25e+03 m/s
+     Temperature min/avg/max:            0 K, 0.4684 K, 1 K
+     Heat fluxes through boundary parts: 0 W, 0 W, -17.5 W, 17.18 W
+     Heating rate (average/total):       0 W/kg, 0 W
+     Heat flux densities for boundaries: 0 W/m, 0 W/m, -7.001 W/m, 6.871 W/m
+     Writing TemperatureAsciiOut:        output-2b-debug-probe/temperature_ascii_data.txt
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       148s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       101 |      32.8s |        22% |
+| Assemble temperature system      |       101 |      29.6s |        20% |
+| Build Stokes preconditioner      |       101 |      18.1s |        12% |
+| Build temperature preconditioner |       101 |     0.171s |      0.12% |
+| Initialization                   |         1 |     0.583s |      0.39% |
+| Postprocessing                   |       101 |      33.2s |        22% |
+| Setup dof systems                |         1 |    0.0536s |         0% |
+| Setup initial conditions         |         1 |      0.14s |         0% |
+| Setup matrices                   |         1 |    0.0785s |         0% |
+| Solve Stokes system              |       101 |      23.9s |        16% |
+| Solve temperature system         |       101 |     0.555s |      0.37% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 148s
+*** Timestep 160:  t=0.0357785 seconds, dt=3.69393e-05 seconds
+   Solving temperature system... 27 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 91+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                  434 m/s, 3.62e+03 m/s
+     Temperature min/avg/max:            0 K, 0.4637 K, 1 K
+     Heat fluxes through boundary parts: 0 W, 0 W, -19.22 W, 18.03 W
+     Heating rate (average/total):       0 W/kg, 0 W
+     Heat flux densities for boundaries: 0 W/m, 0 W/m, -7.686 W/m, 7.214 W/m
+     Writing TemperatureAsciiOut:        output-2b-debug-probe/temperature_ascii_data.txt
+
+*** Timestep 161:  t=0.0358182 seconds, dt=3.96751e-05 seconds
+   Solving temperature system... 25 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 91+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                  389 m/s, 3.17e+03 m/s
+     Temperature min/avg/max:            0 K, 0.4636 K, 1 K
+     Heat fluxes through boundary parts: 0 W, 0 W, -19.1 W, 18.08 W
+     Heating rate (average/total):       0 W/kg, 0 W
+     Heat flux densities for boundaries: 0 W/m, 0 W/m, -7.639 W/m, 7.233 W/m
+     Writing TemperatureAsciiOut:        output-2b-debug-probe/temperature_ascii_data.txt
+
+*** Timestep 162:  t=0.0358632 seconds, dt=4.50483e-05 seconds
+   Solving temperature system... 24 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 89+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                  345 m/s, 2.69e+03 m/s
+     Temperature min/avg/max:            0 K, 0.4636 K, 1 K
+     Heat fluxes through boundary parts: 0 W, 0 W, -18.95 W, 18 W
+     Heating rate (average/total):       0 W/kg, 0 W
+     Heat flux densities for boundaries: 0 W/m, 0 W/m, -7.581 W/m, 7.199 W/m
+     Writing TemperatureAsciiOut:        output-2b-debug-probe/temperature_ascii_data.txt
+
+*** Timestep 163:  t=0.035916 seconds, dt=5.28391e-05 seconds
+   Solving temperature system... 23 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 89+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                  305 m/s, 2.25e+03 m/s
+     Temperature min/avg/max:            0 K, 0.4635 K, 1 K
+     Heat fluxes through boundary parts: 0 W, 0 W, -18.79 W, 17.89 W
+     Heating rate (average/total):       0 W/kg, 0 W
+     Heat flux densities for boundaries: 0 W/m, 0 W/m, -7.516 W/m, 7.157 W/m
+     Writing TemperatureAsciiOut:        output-2b-debug-probe/temperature_ascii_data.txt
+
+*** Timestep 164:  t=0.0359794 seconds, dt=6.3394e-05 seconds
+   Solving temperature system... 21 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system...

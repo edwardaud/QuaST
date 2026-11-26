@@ -1,0 +1,203 @@
+﻿-----------------------------------------------------------------------------
+-- This is ASPECT, the Advanced Solver for Problems in Earth's ConvecTion.
+--     . version 2.5.0-pre (main, 340c0d018)
+--     . using deal.II 9.4.0
+--     .       with 32 bit indices and vectorization level 0 (64 bits)
+--     . using Trilinos 13.2.0
+--     . using p4est 2.2.0
+--     . running in OPTIMIZED mode
+--     . running with 4 MPI processes
+-----------------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------
+The output directory <output-case21-ref5-release/> provided in the input file appears not to exist.
+ASPECT will create it for you.
+-----------------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------
+-- For information on how to cite ASPECT, see:
+--   https://aspect.geodynamics.org/citing.html?ver=2.5.0-pre&sha=340c0d018&src=code
+-----------------------------------------------------------------------------
+Number of active cells: 12,288 (on 6 levels)
+Number of degrees of freedom: 162,432 (99,840+12,672+49,920)
+
+# [quast archive] compact excerpt: preamble + every 1th timestep block + last 5 blocks; per-step lines removed.
+*** Timestep 0:  t=0 seconds, dt=0 seconds
+   Solving temperature system... 0 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 50+0 iterations.
+
+   Postprocessing:
+     Writing graphical output:                        output-case21-ref5-release/solution/solution-00000
+     RMS, max velocity:                               10.1 m/s, 17.2 m/s
+     Temperature min/avg/max:                         0 K, 0.4516 K, 1 K
+     Heat fluxes through boundary parts:              -7.698 W, 13.92 W
+     Writing depth average:                           output-case21-ref5-release/depth_average
+     Max, min, and rms velocity along boundary parts: 14.66 m/s, 0.08903 m/s, 10.36 m/s, 17.24 m/s, 0.1203 m/s, 12.18 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  5.97 m/s, 8.09 m/s, 10.1 m/s
+
+*** Timestep 1:  t=0.00668623 seconds, dt=0.00668623 seconds
+   Solving temperature system... 109 iterations.
+   Solving Stokes system... 200+---------------------------------------------------------
+TimerOutput objects finalize timed values printed to the
+screen by communicating over MPI in their destructors.
+Since an exception is currently uncaught, this
+synchronization (and subsequent output) will be skipped
+to avoid a possible deadlock.
+---------------------------------------------------------
+
+
+----------------------------------------------------
+Exception 'ExcMessage (exception_message.str())' on rank 0 on processing: 
+
+--------------------------------------------------------
+An error occurred in line <2914> of file </home/dealii/aspect/source/utilities.cc> in function
+    void aspect::Utilities::linear_solver_failed(const string&, const string&, const std::vector<dealii::SolverControl>&, const std::exception&, ompi_communicator_t* const&, const string&)
+The violated condition was: 
+    false
+Additional information: 
+    The iterative Stokes solver in Simulator::solve_stokes did not
+    converge.
+    
+    The initial residual was: 1.812416e+01
+    The final residual is: 5.010496e-05
+    The required residual for convergence is: 2.387699e-06
+    See output-case21-ref5-release/solver_history.txt for the full
+    convergence history.
+    
+    The solver reported the following error:
+    
+    --------------------------------------------------------
+    An error occurred in line <2914> of file
+    </home/dealii/aspect/source/utilities.cc> in function
+    void aspect::Utilities::linear_solver_failed(const string&, const
+    string&, const std::vector<dealii::SolverControl>&, const
+    std::exception&, ompi_communicator_t* const&, const string&)
+    The violated condition was:
+    false
+    Additional information:
+    The iterative (top left) solver in BlockSchurPreconditioner::vmult did
+    not converge.
+    
+    The required residual for convergence is: 9.995318e-03
+    
+    The solver reported the following error:
+    
+    --------------------------------------------------------
+    An error occurred in line <502> of file
+    <./source/lac/trilinos_solver.cc> in function
+    void dealii::TrilinosWrappers::SolverBase::do_solve(const
+    Preconditioner&) [with Preconditioner =
+    dealii::TrilinosWrappers::PreconditionBase]
+    The violated condition was:
+    false
+    Additional information:
+    AztecOO::Iterate error code -3: loss of precision
+    
+    Stacktrace:
+    -----------
+    #0  /lib/x86_64-linux-gnu/libdeal.ii.so.9.4.0: void
+    dealii::TrilinosWrappers::SolverBase::do_solve<dealii::TrilinosWrappers::PreconditionBase>(dealii::TrilinosWrappers::PreconditionBase
+
+    const&)
+    #1  /home/dealii/aspect/aspect-release:
+    aspect::internal::BlockSchurPreconditioner<dealii::TrilinosWrappers::PreconditionAMG,
+
+    dealii::TrilinosWrappers::PreconditionBase>::vmult(dealii::TrilinosWrappers::MPI::BlockVector&,
+
+    dealii::TrilinosWrappers::MPI::BlockVector const&) const
+    #2  /home/dealii/aspect/aspect-release: void
+    dealii::SolverFGMRES<dealii::TrilinosWrappers::MPI::BlockVector>::solve<aspect::internal::StokesBlock,
+
+    aspect::internal::BlockSchurPreconditioner<dealii::TrilinosWrappers::PreconditionAMG,
+
+    dealii::TrilinosWrappers::PreconditionBase>
+    >(aspect::internal::StokesBlock const&,
+    dealii::TrilinosWrappers::MPI::BlockVector&,
+    dealii::TrilinosWrappers::MPI::BlockVector const&,
+    aspect::internal::BlockSchurPreconditioner<dealii::TrilinosWrappers::PreconditionAMG,
+
+    dealii::TrilinosWrappers::PreconditionBase> const&)
+    #3  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::solve_stokes()
+    #4  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::assemble_and_solve_stokes(bool, double*)
+    #5  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::solve_single_advection_single_stokes()
+    #6  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::solve_timestep()
+    #7  /home/dealii/aspect/aspect-release: aspect::Simulator<2>::run()
+    #8  /home/dealii/aspect/aspect-release: void
+    run_simulator<2>(std::__cxx11::basic_string<char,
+    std::char_traits<char>, std::allocator<char> > const&,
+    std::__cxx11::basic_string<char, std::char_traits<char>,
+    std::allocator<char> > const&, bool, bool, bool)
+    #9  /home/dealii/aspect/aspect-release: main
+    --------------------------------------------------------
+    
+    
+    Stacktrace:
+    -----------
+    #0  /home/dealii/aspect/aspect-release:
+    aspect::Utilities::linear_solver_failed(std::__cxx11::basic_string<char,
+    std::char_traits<char>, std::allocator<char> > const&,
+    std::__cxx11::basic_string<char--------------------------------------------------------------------------
+MPI_ABORT was invoked on rank 0 in communicator MPI_COMM_WORLD
+with errorcode 1.
+
+NOTE: invoking MPI_ABORT causes Open MPI to kill all MPI processes.
+You may or may not see output from other processes, depending on
+exactly when Open MPI kills them.
+--------------------------------------------------------------------------
+, std::char_traits<char>,
+    std::allocator<char> > const&, std::vector<dealii::SolverControl,
+    std::allocator<dealii::SolverControl> > const&, std::exception const&,
+    ompi_communicator_t* const&, std::__cxx11::basic_string<char,
+    std::char_traits<char>, std::allocator<char> > const&)
+    #1  /home/dealii/aspect/aspect-release:
+    aspect::internal::BlockSchurPreconditioner<dealii::TrilinosWrappers::PreconditionAMG,
+    dealii::TrilinosWrappers::PreconditionBase>::vmult(dealii::TrilinosWrappers::MPI::BlockVector&,
+    dealii::TrilinosWrappers::MPI::BlockVector const&) const
+    #2  /home/dealii/aspect/aspect-release: void
+    dealii::SolverFGMRES<dealii::TrilinosWrappers::MPI::BlockVector>::solve<aspect::internal::StokesBlock,
+    aspect::internal::BlockSchurPreconditioner<dealii::TrilinosWrappers::PreconditionAMG,
+    dealii::TrilinosWrappers::PreconditionBase>
+    >(aspect::internal::StokesBlock const&,
+    dealii::TrilinosWrappers::MPI::BlockVector&,
+    dealii::TrilinosWrappers::MPI::BlockVector const&,
+    aspect::internal::BlockSchurPreconditioner<dealii::TrilinosWrappers::PreconditionAMG,
+    dealii::TrilinosWrappers::PreconditionBase> const&)
+    #3  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::solve_stokes()
+    #4  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::assemble_and_solve_stokes(bool, double*)
+    #5  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::solve_single_advection_single_stokes()
+    #6  /home/dealii/aspect/aspect-release:
+    aspect::Simulator<2>::solve_timestep()
+    #7  /home/dealii/aspect/aspect-release: aspect::Simulator<2>::run()
+    #8  /home/dealii/aspect/aspect-release: void
+    run_simulator<2>(std::__cxx11::basic_string<char,
+    std::char_traits<char>, std::allocator<char> > const&,
+    std::__cxx11::basic_string<char, std::char_traits<char>,
+    std::allocator<char> > const&, bool, bool, bool)
+    #9  /home/dealii/aspect/aspect-release: main
+    --------------------------------------------------------
+    
+
+Stacktrace:
+-----------
+#0  /home/dealii/aspect/aspect-release: aspect::Utilities::linear_solver_failed(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<dealii::SolverControl, std::allocator<dealii::SolverControl> > const&, std::exception const&, ompi_communicator_t* const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+#1  /home/dealii/aspect/aspect-release: aspect::Simulator<2>::solve_stokes()
+#2  /home/dealii/aspect/aspect-release: aspect::Simulator<2>::assemble_and_solve_stokes(bool, double*)
+#3  /home/dealii/aspect/aspect-release: aspect::Simulator<2>::solve_single_advection_single_stokes()
+#4  /home/dealii/aspect/aspect-release: aspect::Simulator<2>::solve_timestep()
+#5  /home/dealii/aspect/aspect-release: aspect::Simulator<2>::run()
+#6  /home/dealii/aspect/aspect-release: void run_simulator<2>(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, bool, bool, bool)
+#7  /home/dealii/aspect/aspect-release: main
+--------------------------------------------------------
+
+Aborting!
+----------------------------------------------------

@@ -5,8 +5,10 @@
 #   source/material_model/diffusion_dislocation.cc
 #   source/material_model/rheology/{diffusion,dislocation}_creep.cc
 #   include/aspect/global.h (gas_constant)
-# as shipped in the image gassmoeller/aspect:latest (ASPECT 2.5.0-pre, commit
-# 340c0d018d9f2dbb71deda800f038229e7653f00, deal.II 9.4.0).  The equations are
+# as shipped in the pinned image
+# gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac
+# (ASPECT 2.5.0-pre, commit 340c0d018d9f2dbb71deda800f038229e7653f00, deal.II 9.4.0;
+# the tag gassmoeller/aspect:latest currently resolves to this digest).  The equations are
 # Nothing here calls the solver; our
 # side calls `eta_composite_at` only.
 #

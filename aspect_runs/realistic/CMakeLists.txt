@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 # This file is part of the QuaST ASPECT plugin; the licence text and the reason
 # for the GPL are in LICENSE beside this file and in the top-level NOTICE.
-# Build the `realistic composite` material model plugin for the ASPECT image
-# gassmoeller/aspect:latest (ASPECT 2.5.0-pre, deal.II 9.4.0).
+# Build the `realistic composite` material model plugin for the pinned ASPECT
+# image gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac
+# (ASPECT 2.5.0-pre (main, 340c0d018), deal.II 9.4.0, image created 2023-04-19;
+# the tag gassmoeller/aspect:latest currently resolves to this digest).
 #
 #   docker run --rm -v <this dir>:/work -w /work \
-#       gassmoeller/aspect:latest bash -lc \
+#       gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac \
+#       bash -lc \
 #       "mkdir -p build && cd build && cmake -DAspect_DIR=/home/dealii/aspect/build .. && make -j4"
 #
 # The resulting build/librealistic_composite.so is loaded by realistic.prm

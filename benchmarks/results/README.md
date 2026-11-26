@@ -42,8 +42,9 @@ segments:
 
 - case: `blankenbach1a`, `blankenbach1b`, `blankenbach1c`, `blankenbach2a`,
   `blankenbach2b`, `tosi1`, `tosi5a`, `annulus`, `blob`, `realistic`,
-  `aspc-realistic` (the ASPECT arm of the cross-code comparison), `channel`,
-  `subduction`, `gates` (suite totals), `dump` (the nine state hashes);
+  `aspc-realistic` (the ASPECT arm of the cross-code comparison), `aspc-blankenbach2b`,
+  `aspc-davies-case11` ... `aspc-davies-case23` (the 2026-11-26 ASPECT campaign),
+  `channel`, `subduction`, `gates` (suite totals), `dump` (the nine state hashes);
 - quantity: `nu-top`, `nu-bot`, `nu`, `vrms`, `tmax`, `nusselt-convention`,
   `suite-total`, `state-hashes`;
 - resolution: `L3`/`L4`/`L5` for a quadtree level, `walls5` for a wall-refined
@@ -55,6 +56,22 @@ Examples: `blankenbach1a_nu-L5_steady.md`,
 `tosi5a_nu-top-max-L3_limit-cycle.md`,
 `annulus_nu-t_128x1536_rung3.md`, `realistic_nu-bot_window1.md`,
 `gates_suite-total_main.md`, `dump_state-hashes_main.md`.
+
+### The ASPECT cross-code records
+
+The `aspc-*` records answer the same fields as every other record, with four differences that
+matter for reproducing them. The **Command** is a `docker run` line, and it names the image by
+digest (`gassmoeller/aspect@sha256:e91937...`), not by the mutable tag. The **Input card** is a
+path inside the image — the image carries the ASPECT source tree and its benchmark directories
+plus prebuilt plugins — and the variant overlay card used for the run is reproduced inline in the
+record. The **Environment** states which of the two binaries shipped in the image was used:
+`aspect` is a DEBUG build (the default on `PATH`), `aspect-release` is the OPTIMIZED build of the
+same commit. The records report the measured DEBUG cost next to the run they describe, because
+that cost is what decides whether a card fits in a batch's time box. Raw ASPECT logs and
+statistics are multi-MB and are not shipped: each record archives a compact excerpt (banner,
+terminator and a sampled subset of the timestep/statistics rows) with its SHA-256, and records the
+SHA-256 and size of the full file. The pinned image's digest and both version banners are
+`logs/aspect_environment.txt`.
 
 ## Template
 
@@ -87,6 +104,12 @@ lists every one with its byte size and SHA-256.
 
 | Date | Record | Quantity | Status |
 |---|---|---|---|
+| 2026-11-26 | `blankenbach2b_nu-L3toL4_steady.md` | QuaST Blankenbach 2b rows (L3, L3+walls4, L4+walls5) re-traced to their runs; the finest has no closing summary (OOM) | recorded (archived from the 2026-11-14/15 campaign) |
+| 2026-11-26 | `aspc-davies-case23_nu-vrms_ref4-unverified.md` | ASPECT run of the shipped Davies case 2.3 card (variable viscosity) at refinement 4: reached the card's end time but the state is not steady | **UNVERIFIED-in-full** — not a completed comparison |
+| 2026-11-26 | `aspc-davies-case22_nu-vrms_ref4.md` | ASPECT run of the shipped Davies case 2.2 card at refinement 4 (Ra = 1e5); same-resolution cross-code comparison with the `16 x 192` ladder rung | verified (OPTIMIZED); published ref-7 mesh not run |
+| 2026-11-26 | `aspc-davies-case21_nu-vrms_ref4.md` | ASPECT run of the shipped Davies case 2.1 card at refinement 4; reproduced the published ASPECT ref-7 row to 0.15 %; shipped ref-5 card aborts in this image (documented) | verified at ref 4; shipped ref-5 card UNVERIFIED-in-full |
+| 2026-11-26 | `aspc-davies-case11_nu-vrms_ref5.md` | ASPECT run of the shipped Davies case 1.1 card at its shipped 5 refinements; reproduced the published ASPECT ref-7 row to 0.14 % | verified |
+| 2026-11-26 | `aspc-blankenbach2b_nu-vrms_ref3.md` | ASPECT run of the shipped Blankenbach 2b card at refinement 3; reproduces the image's shipped ASPECT ref-3 record to 6 figures, same-mesh cross-code difference recorded | verified (OPTIMIZED); DEBUG cost measured |
 | 2026-11-26 | `gates_suite-total_p2.md` | full-suite totals on the final tree | verified |
 | 2026-11-26 | `dump_state-hashes_p2.md` | nine box state hashes (bitwise invariant) | verified |
 | 2026-11-26 | `annulus_steady-dt_L4_relaxation.md` | relaxation dt / damping fixed point and steady-state residual (F9) | verified |

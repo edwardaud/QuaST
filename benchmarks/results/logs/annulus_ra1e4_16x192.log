@@ -1,0 +1,6 @@
+# annulus benchmark nx=16 ny=192 level=4 cells_y=12 leaves=3072 dofs=28608 (u=25344 p=3264 T=12672)
+# card: Ra=1e5 isoviscous H=0 free-slip ring R0=1.22 R1=2.22 phi=2pi; advection=galerkin ev=0.0 ic=firedrake
+# criterion: t > 0.02, change_t/|dNu_T|/|dV_RMS| < 1.0e-6 for 20 consecutive steps (steady_vrms=true); tstop=1.0e9 maxsteps=200 ckpt=off
+# mode: steady relaxation dt=1000.0 (CFL off; each step is a steady energy solve) maxpic=25 pic_relax=0.5
+ANNULUS_RESULT ra1e4_16x192_steady nx=16 ny=192 level=4 leaves=3072 u_dofs=25344 p_dofs=3264 T_dofs=12672 saddle_dofs=28608 steps=23 t=2.300000e+04 dt=1.000e+03 wall=241.7 s_per_step=10.1201 s_step_warm=2.4417 stokes=9.2724 stokes_warm=2.2693 NuT=4.862962 NuB=4.874556 dNu=-1.159e-02 Vrms=46.24225 meanT=0.382056 Umax=77.599 div_vol=-2.551e-14 div_rel=3.04e-17 Ibase=-3.756e-06 rss=1729 peak=1852 steady=1 window=20 nut_drift=6.75e-07 vr_drift=1.54e-07 adv=galerkin ev=0 ic=firedrake gauge=rotation pgauge=pin
+ANNULUS_DEV NuT_vs_aspect=-49.0683% NuT_vs_firedrake=-49.0309% NuB_vs_aspect=-49.1386% Vrms_vs_aspect=-76.0863% Vrms_vs_firedrake=-76.0725% meanT_vs_aspect=0.0147% dNu_rel=-0.2381%

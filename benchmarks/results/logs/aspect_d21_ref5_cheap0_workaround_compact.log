@@ -1,0 +1,135 @@
+﻿-----------------------------------------------------------------------------
+-- This is ASPECT, the Advanced Solver for Problems in Earth's ConvecTion.
+--     . version 2.5.0-pre (main, 340c0d018)
+--     . using deal.II 9.4.0
+--     .       with 32 bit indices and vectorization level 0 (64 bits)
+--     . using Trilinos 13.2.0
+--     . using p4est 2.2.0
+--     . running in OPTIMIZED mode
+--     . running with 1 MPI process
+-----------------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------
+The output directory <output-diag-cheap0/> provided in the input file appears not to exist.
+ASPECT will create it for you.
+-----------------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------
+-- For information on how to cite ASPECT, see:
+--   https://aspect.geodynamics.org/citing.html?ver=2.5.0-pre&sha=340c0d018&src=code
+-----------------------------------------------------------------------------
+Number of active cells: 12,288 (on 6 levels)
+Number of degrees of freedom: 162,432 (99,840+12,672+49,920)
+
+# [quast archive] compact excerpt: preamble + every 5th timestep block + last 5 blocks; per-step lines removed.
+*** Timestep 0:  t=0 seconds, dt=0 seconds
+   Solving temperature system... 0 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 0+10 iterations.
+
+   Postprocessing:
+     Writing graphical output:                        output-diag-cheap0/solution/solution-00000
+     RMS, max velocity:                               10.1 m/s, 17.2 m/s
+     Temperature min/avg/max:                         0 K, 0.4516 K, 1 K
+     Heat fluxes through boundary parts:              -7.698 W, 13.92 W
+     Writing depth average:                           output-diag-cheap0/depth_average
+     Max, min, and rms velocity along boundary parts: 14.66 m/s, 0.1065 m/s, 10.36 m/s, 17.23 m/s, 0.1212 m/s, 12.18 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  5.97 m/s, 8.09 m/s, 10.1 m/s
+
+*** Timestep 5:  t=0.0139391 seconds, dt=0.00111448 seconds
+   Solving temperature system... 57 iterations.
+   Solving Stokes system... 0+9 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               68.8 m/s, 117 m/s
+     Temperature min/avg/max:                         0 K, 0.4453 K, 1 K
+     Heat fluxes through boundary parts:              -19.93 W, 23.51 W
+     Max, min, and rms velocity along boundary parts: 101.6 m/s, 0.7027 m/s, 72.08 m/s, 117.3 m/s, 0.8359 m/s, 83.22 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  40.9 m/s, 55.3 m/s, 68.8 m/s
+
+*** Timestep 9:  t=0.0173829 seconds, dt=0.000786245 seconds
+   Solving temperature system... 50 iterations.
+   Solving Stokes system... 0+9 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               87.4 m/s, 150 m/s
+     Temperature min/avg/max:                         0 K, 0.4441 K, 1 K
+     Heat fluxes through boundary parts:              -39.51 W, 43.92 W
+     Max, min, and rms velocity along boundary parts: 127 m/s, 0.877 m/s, 91.14 m/s, 149.9 m/s, 1.163 m/s, 107.8 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  51.9 m/s, 70.3 m/s, 87.4 m/s
+
+*** Timestep 10:  t=0.018156 seconds, dt=0.000773067 seconds
+   Solving temperature system... 50 iterations.
+   Solving Stokes system... 0+9 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               87.7 m/s, 150 m/s
+     Temperature min/avg/max:                         0 K, 0.4437 K, 1 K
+     Heat fluxes through boundary parts:              -44.64 W, 50.34 W
+     Max, min, and rms velocity along boundary parts: 126.7 m/s, 0.8833 m/s, 91.33 m/s, 150.4 m/s, 1.173 m/s, 108.7 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  52.1 m/s, 70.5 m/s, 87.7 m/s
+
+*** Timestep 11:  t=0.0189309 seconds, dt=0.000774982 seconds
+   Solving temperature system... 50 iterations.
+   Solving Stokes system... 0+9 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               86.5 m/s, 148 m/s
+     Temperature min/avg/max:                         0 K, 0.4433 K, 1 K
+     Heat fluxes through boundary parts:              -49.45 W, 56.9 W
+     Max, min, and rms velocity along boundary parts: 124.2 m/s, 0.8781 m/s, 90.04 m/s, 148.1 m/s, 1.164 m/s, 107.8 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  51.4 m/s, 69.6 m/s, 86.5 m/s
+
+*** Timestep 12:  t=0.0197213 seconds, dt=0.00079033 seconds
+   Solving temperature system... 50 iterations.
+   Solving Stokes system... 0+9 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               84.1 m/s, 143 m/s
+     Temperature min/avg/max:                         0 K, 0.4426 K, 1 K
+     Heat fluxes through boundary parts:              -53.73 W, 63.3 W
+     Max, min, and rms velocity along boundary parts: 120 m/s, 0.8629 m/s, 87.47 m/s, 143.5 m/s, 1.137 m/s, 105.2 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  50.1 m/s, 67.6 m/s, 84.1 m/s
+
+*** Timestep 13:  t=0.02 seconds, dt=0.000278736 seconds
+   Solving temperature system... 28 iterations.
+   Solving Stokes system... 0+8 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               83 m/s, 141 m/s
+     Temperature min/avg/max:                         0 K, 0.4424 K, 1 K
+     Heat fluxes through boundary parts:              -55.02 W, 65.4 W
+     Max, min, and rms velocity along boundary parts: 118.2 m/s, 0.8555 m/s, 86.31 m/s, 141.5 m/s, 1.124 m/s, 103.9 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  49.4 m/s, 66.7 m/s, 83 m/s
+
+Termination requested by criterion: end time
+*** Snapshot created!
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |      65.8s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |        14 |      1.67s |       2.5% |
+| Assemble temperature system      |        14 |      3.98s |       6.1% |
+| Build Stokes preconditioner      |         1 |     0.305s |      0.46% |
+| Build temperature preconditioner |        14 |     0.448s |      0.68% |
+| Create snapshot                  |         1 |      0.13s |       0.2% |
+| Initialization                   |         1 |     0.276s |      0.42% |
+| Postprocessing                   |        14 |      2.61s |         4% |
+| Setup dof systems                |         1 |      0.04s |         0% |
+| Setup initial conditions         |         1 |     0.122s |      0.19% |
+| Setup matrices                   |         1 |       0.3s |      0.46% |
+| Solve Stokes system              |        14 |      53.3s |        81% |
+| Solve temperature system         |        14 |      2.26s |       3.4% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 66s
+-----------------------------------------------------------------------------
+-- For information on how to cite ASPECT, see:
+--   https://aspect.geodynamics.org/citing.html?ver=2.5.0-pre&sha=340c0d018&src=code
+-----------------------------------------------------------------------------

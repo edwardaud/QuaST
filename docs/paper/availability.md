@@ -50,7 +50,14 @@ the commit tagged `v0.2.0` (2026-11-26); `git rev-list -n1 v0.2.0`, package vers
   package set. The production 10 000-leaf state peaks at about 1.3 GB resident on
   the matrix-free multigrid path and about 2.4 GB on the sparse-direct path. No
   container image is shipped: the environment is the Julia version, the manifest
-  and the thread count.
+  and the thread count. The ASPECT side of the cross-code comparison is run from
+  the pinned image
+  `gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac`
+  (created 2023-04-19), which reports ASPECT 2.5.0-pre (main, 340c0d018) and
+  deal.II 9.4.0 and which the tag `gassmoeller/aspect:latest` currently resolves
+  to; the digest, not the tag, is the identifier. The image is not redistributed
+  here; the pinned digest and the archived statistics/log excerpts in
+  `benchmarks/results/` are what make those runs reproducible.
 - **Where the benchmark records are.** `benchmarks/results/` holds the
   provenance record for each number quoted in a paper or in
   `docs/en/validation.md`: the command, the input card, the resolution, the wall

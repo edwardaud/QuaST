@@ -1,0 +1,619 @@
+﻿-----------------------------------------------------------------------------
+-- This is ASPECT, the Advanced Solver for Problems in Earth's ConvecTion.
+--     . version 2.5.0-pre (main, 340c0d018)
+--     . using deal.II 9.4.0
+--     .       with 32 bit indices and vectorization level 0 (64 bits)
+--     . using Trilinos 13.2.0
+--     . using p4est 2.2.0
+--     . running in OPTIMIZED mode
+--     . running with 4 MPI processes
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+-- For information on how to cite ASPECT, see:
+--   https://aspect.geodynamics.org/citing.html?ver=2.5.0-pre&sha=340c0d018&src=code
+-----------------------------------------------------------------------------
+*** Resuming from snapshot!
+
+Number of active cells: 3,072 (on 5 levels)
+Number of degrees of freedom: 41,280 (25,344+3,264+12,672)
+
+# [quast archive] compact excerpt: preamble + every 100th timestep block + last 5 blocks; per-step lines removed.
+*** Timestep 700:  t=2.02139 seconds, dt=0.000545978 seconds
+   Solving temperature system... 65 iterations.
+   Solving Stokes system... 44+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               240 m/s, 488 m/s
+     Temperature min/avg/max:                         0 K, 0.3779 K, 1 K
+     Heat fluxes through boundary parts:              -108 W, 114.4 W
+     Max, min, and rms velocity along boundary parts: 323.6 m/s, 5.402 m/s, 257.7 m/s, 356.2 m/s, 9.572 m/s, 296.3 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  154 m/s, 184 m/s, 240 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |      20.6s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |        28 |     0.507s |       2.5% |
+| Assemble temperature system      |        28 |         1s |       4.9% |
+| Build Stokes preconditioner      |         3 |     0.141s |      0.69% |
+| Build temperature preconditioner |        28 |     0.149s |      0.72% |
+| Create snapshot                  |         2 |     0.286s |       1.4% |
+| Initialization                   |         1 |     0.545s |       2.6% |
+| Postprocessing                   |        28 |     0.811s |       3.9% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |      0.25% |
+| Solve Stokes system              |        28 |      15.3s |        74% |
+| Solve temperature system         |        28 |      1.36s |       6.6% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 887s
+*** Timestep 800:  t=2.08538 seconds, dt=0.00063754 seconds
+   Solving temperature system... 44 iterations.
+   Solving Stokes system... 35+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 398 m/s
+     Temperature min/avg/max:                         0 K, 0.381 K, 1 K
+     Heat fluxes through boundary parts:              -100 W, 99.67 W
+     Max, min, and rms velocity along boundary parts: 263.1 m/s, 4.741 m/s, 215.6 m/s, 276.4 m/s, 7.123 m/s, 238.3 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |      60.9s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       128 |      2.36s |       3.9% |
+| Assemble temperature system      |       128 |      4.84s |       7.9% |
+| Build Stokes preconditioner      |        10 |     0.635s |         1% |
+| Build temperature preconditioner |       128 |     0.687s |       1.1% |
+| Create snapshot                  |         9 |      1.38s |       2.3% |
+| Initialization                   |         1 |     0.545s |      0.89% |
+| Postprocessing                   |       128 |      3.88s |       6.4% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       128 |      38.6s |        63% |
+| Solve temperature system         |       128 |      6.27s |        10% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 927s
+*** Timestep 900:  t=2.14944 seconds, dt=0.00064116 seconds
+   Solving temperature system... 39 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 26+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.382 K, 1 K
+     Heat fluxes through boundary parts:              -99.73 W, 99.77 W
+     Max, min, and rms velocity along boundary parts: 261.9 m/s, 4.531 m/s, 214.9 m/s, 275 m/s, 7.41 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |      94.9s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       228 |      4.21s |       4.4% |
+| Assemble temperature system      |       228 |      8.36s |       8.8% |
+| Build Stokes preconditioner      |        17 |      1.05s |       1.1% |
+| Build temperature preconditioner |       228 |      1.22s |       1.3% |
+| Create snapshot                  |        16 |      2.57s |       2.7% |
+| Initialization                   |         1 |     0.545s |      0.57% |
+| Postprocessing                   |       228 |      6.88s |       7.3% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       228 |      56.9s |        60% |
+| Solve temperature system         |       228 |      10.4s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 961s
+*** Timestep 1000:  t=2.21358 seconds, dt=0.000641492 seconds
+   Solving temperature system... 35 iterations.
+   Solving Stokes system... 20+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3823 K, 1 K
+     Heat fluxes through boundary parts:              -99.72 W, 99.81 W
+     Max, min, and rms velocity along boundary parts: 261.9 m/s, 4.519 m/s, 215 m/s, 274.9 m/s, 7.38 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       123s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       328 |      5.88s |       4.8% |
+| Assemble temperature system      |       328 |        12s |       9.8% |
+| Build Stokes preconditioner      |        23 |      1.37s |       1.1% |
+| Build temperature preconditioner |       328 |      1.75s |       1.4% |
+| Create snapshot                  |        22 |      3.46s |       2.8% |
+| Initialization                   |         1 |     0.545s |      0.44% |
+| Postprocessing                   |       328 |      10.1s |       8.2% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       328 |        70s |        57% |
+| Solve temperature system         |       328 |      13.7s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 989s
+*** Timestep 1100:  t=2.27773 seconds, dt=0.000641594 seconds
+   Solving temperature system... 30 iterations.
+   Solving Stokes system... 14+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.526 m/s, 215 m/s, 274.8 m/s, 7.416 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       146s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       428 |      7.54s |       5.2% |
+| Assemble temperature system      |       428 |      15.6s |        11% |
+| Build Stokes preconditioner      |        30 |      1.76s |       1.2% |
+| Build temperature preconditioner |       428 |      2.27s |       1.6% |
+| Create snapshot                  |        29 |      4.64s |       3.2% |
+| Initialization                   |         1 |     0.545s |      0.37% |
+| Postprocessing                   |       428 |      13.1s |         9% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       428 |        79s |        54% |
+| Solve temperature system         |       428 |      16.5s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1012s
+*** Timestep 1200:  t=2.34189 seconds, dt=0.000641623 seconds
+   Solving temperature system... 26 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 11+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.543 m/s, 215 m/s, 274.8 m/s, 7.437 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       166s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       528 |      9.22s |       5.5% |
+| Assemble temperature system      |       528 |      19.1s |        11% |
+| Build Stokes preconditioner      |        37 |      2.12s |       1.3% |
+| Build temperature preconditioner |       528 |       2.8s |       1.7% |
+| Create snapshot                  |        36 |      5.79s |       3.5% |
+| Initialization                   |         1 |     0.545s |      0.33% |
+| Postprocessing                   |       528 |      15.9s |       9.5% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       528 |        86s |        52% |
+| Solve temperature system         |       528 |      18.9s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1033s
+*** Timestep 1300:  t=2.40606 seconds, dt=0.000641631 seconds
+   Solving temperature system... 23 iterations.
+   Solving Stokes system... 8+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.561 m/s, 215 m/s, 274.8 m/s, 7.458 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       185s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       628 |      10.9s |       5.9% |
+| Assemble temperature system      |       628 |      22.6s |        12% |
+| Build Stokes preconditioner      |        43 |      2.44s |       1.3% |
+| Build temperature preconditioner |       628 |      3.31s |       1.8% |
+| Create snapshot                  |        42 |      6.76s |       3.6% |
+| Initialization                   |         1 |     0.545s |      0.29% |
+| Postprocessing                   |       628 |      18.7s |        10% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       628 |      91.8s |        50% |
+| Solve temperature system         |       628 |      21.2s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1052s
+*** Timestep 1400:  t=2.47022 seconds, dt=0.000641632 seconds
+   Solving temperature system... 21 iterations.
+   Solving Stokes system... 5+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.579 m/s, 215 m/s, 274.8 m/s, 7.476 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       202s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       728 |      12.5s |       6.2% |
+| Assemble temperature system      |       728 |      26.1s |        13% |
+| Build Stokes preconditioner      |        50 |      2.78s |       1.4% |
+| Build temperature preconditioner |       728 |      3.83s |       1.9% |
+| Create snapshot                  |        49 |      7.88s |       3.9% |
+| Initialization                   |         1 |     0.545s |      0.27% |
+| Postprocessing                   |       728 |      21.5s |        11% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       728 |      96.3s |        48% |
+| Solve temperature system         |       728 |        23s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1069s
+*** Timestep 1500:  t=2.53438 seconds, dt=0.000641631 seconds
+   Solving temperature system... 19 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.595 m/s, 215 m/s, 274.8 m/s, 7.493 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       219s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       828 |      14.1s |       6.5% |
+| Assemble temperature system      |       828 |      29.6s |        14% |
+| Build Stokes preconditioner      |        57 |      3.15s |       1.4% |
+| Build temperature preconditioner |       828 |      4.33s |         2% |
+| Create snapshot                  |        56 |      9.05s |       4.1% |
+| Initialization                   |         1 |     0.545s |      0.25% |
+| Postprocessing                   |       828 |      24.3s |        11% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       828 |       100s |        46% |
+| Solve temperature system         |       828 |      24.6s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1085s
+*** Timestep 1600:  t=2.59855 seconds, dt=0.00064163 seconds
+   Solving temperature system... 19 iterations.
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.609 m/s, 215 m/s, 274.8 m/s, 7.508 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       236s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |       928 |      15.9s |       6.7% |
+| Assemble temperature system      |       928 |      33.2s |        14% |
+| Build Stokes preconditioner      |        63 |       3.5s |       1.5% |
+| Build temperature preconditioner |       928 |      4.88s |       2.1% |
+| Create snapshot                  |        62 |      10.2s |       4.3% |
+| Initialization                   |         1 |     0.545s |      0.23% |
+| Postprocessing                   |       928 |      27.3s |        12% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |       928 |       104s |        44% |
+| Solve temperature system         |       928 |      26.4s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1102s
+*** Timestep 1700:  t=2.66271 seconds, dt=0.000641628 seconds
+   Solving temperature system... 20 iterations.
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.621 m/s, 215 m/s, 274.8 m/s, 7.521 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       251s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |      1028 |      17.5s |         7% |
+| Assemble temperature system      |      1028 |      36.6s |        15% |
+| Build Stokes preconditioner      |        70 |      3.85s |       1.5% |
+| Build temperature preconditioner |      1028 |      5.37s |       2.1% |
+| Create snapshot                  |        69 |      11.3s |       4.5% |
+| Initialization                   |         1 |     0.545s |      0.22% |
+| Postprocessing                   |      1028 |      30.1s |        12% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |      1028 |       108s |        43% |
+| Solve temperature system         |      1028 |      27.8s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1118s
+*** Timestep 1800:  t=2.72687 seconds, dt=0.000641627 seconds
+   Solving temperature system... 19 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.631 m/s, 215 m/s, 274.8 m/s, 7.534 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       268s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |      1128 |      19.1s |       7.2% |
+| Assemble temperature system      |      1128 |      40.1s |        15% |
+| Build Stokes preconditioner      |        77 |       4.2s |       1.6% |
+| Build temperature preconditioner |      1128 |      5.88s |       2.2% |
+| Create snapshot                  |        76 |      12.5s |       4.7% |
+| Initialization                   |         1 |     0.545s |       0.2% |
+| Postprocessing                   |      1128 |      32.8s |        12% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |      1128 |       111s |        42% |
+| Solve temperature system         |      1128 |      29.3s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1134s
+*** Timestep 1900:  t=2.79104 seconds, dt=0.000641626 seconds
+   Solving temperature system... 20 iterations.
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.639 m/s, 215 m/s, 274.8 m/s, 7.546 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       283s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |      1228 |      20.7s |       7.3% |
+| Assemble temperature system      |      1228 |      43.5s |        15% |
+| Build Stokes preconditioner      |        83 |       4.5s |       1.6% |
+| Build temperature preconditioner |      1228 |       6.4s |       2.3% |
+| Create snapshot                  |        82 |      13.5s |       4.8% |
+| Initialization                   |         1 |     0.545s |      0.19% |
+| Postprocessing                   |      1228 |      35.7s |        13% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |      1228 |       115s |        41% |
+| Solve temperature system         |      1228 |      30.9s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1150s
+*** Timestep 2000:  t=2.8552 seconds, dt=0.000641625 seconds
+   Solving temperature system... 20 iterations.
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.646 m/s, 215 m/s, 274.8 m/s, 7.556 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       300s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |      1328 |      22.5s |       7.5% |
+| Assemble temperature system      |      1328 |        47s |        16% |
+| Build Stokes preconditioner      |        90 |      4.91s |       1.6% |
+| Build temperature preconditioner |      1328 |      6.91s |       2.3% |
+| Create snapshot                  |        89 |      14.8s |       4.9% |
+| Initialization                   |         1 |     0.545s |      0.18% |
+| Postprocessing                   |      1328 |      38.4s |        13% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |      1328 |       119s |        40% |
+| Solve temperature system         |      1328 |      32.5s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1166s
+*** Timestep 2100:  t=2.91936 seconds, dt=0.000641625 seconds
+   Solving temperature system... 20 iterations.
+   Rebuilding Stokes preconditioner...
+   Solving Stokes system... 5+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.652 m/s, 215 m/s, 274.8 m/s, 7.567 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       316s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |      1428 |      24.1s |       7.6% |
+| Assemble temperature system      |      1428 |      50.4s |        16% |
+| Build Stokes preconditioner      |        97 |      5.42s |       1.7% |
+| Build temperature preconditioner |      1428 |      7.42s |       2.3% |
+| Create snapshot                  |        96 |      16.1s |       5.1% |
+| Initialization                   |         1 |     0.545s |      0.17% |
+| Postprocessing                   |      1428 |      41.2s |        13% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |      1428 |       122s |        39% |
+| Solve temperature system         |      1428 |      34.1s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1183s
+*** Timestep 2200:  t=2.98352 seconds, dt=0.000641624 seconds
+   Solving temperature system... 21 iterations.
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.657 m/s, 215 m/s, 274.8 m/s, 7.576 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       337s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |      1528 |        26s |       7.7% |
+| Assemble temperature system      |      1528 |      54.4s |        16% |
+| Build Stokes preconditioner      |       103 |      5.84s |       1.7% |
+| Build temperature preconditioner |      1528 |      7.99s |       2.4% |
+| Create snapshot                  |       102 |      17.4s |       5.2% |
+| Initialization                   |         1 |     0.545s |      0.16% |
+| Postprocessing                   |      1528 |      44.5s |        13% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |      1528 |       128s |        38% |
+| Solve temperature system         |      1528 |      36.3s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1203s
+*** Timestep 2222:  t=2.99764 seconds, dt=0.000641624 seconds
+   Solving temperature system... 21 iterations.
+   Solving Stokes system... 5+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.658 m/s, 215 m/s, 274.8 m/s, 7.578 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+*** Timestep 2223:  t=2.99828 seconds, dt=0.000641624 seconds
+   Solving temperature system... 20 iterations.
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.658 m/s, 215 m/s, 274.8 m/s, 7.578 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+*** Timestep 2224:  t=2.99892 seconds, dt=0.000641624 seconds
+   Solving temperature system... 20 iterations.
+   Solving Stokes system... 5+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.658 m/s, 215 m/s, 274.8 m/s, 7.578 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+*** Timestep 2225:  t=2.99956 seconds, dt=0.000641624 seconds
+   Solving temperature system... 21 iterations.
+   Solving Stokes system... 5+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.658 m/s, 215 m/s, 274.8 m/s, 7.578 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+*** Timestep 2226:  t=3 seconds, dt=0.000436661 seconds
+   Solving temperature system... 16 iterations.
+   Solving Stokes system... 4+0 iterations.
+
+   Postprocessing:
+     RMS, max velocity:                               193 m/s, 395 m/s
+     Temperature min/avg/max:                         0 K, 0.3824 K, 1 K
+     Heat fluxes through boundary parts:              -99.71 W, 99.83 W
+     Max, min, and rms velocity along boundary parts: 261.8 m/s, 4.658 m/s, 215 m/s, 274.8 m/s, 7.579 m/s, 238.1 m/s
+     Radial RMS, tangential RMS, total RMS velocity:  123 m/s, 149 m/s, 193 m/s
+
+Termination requested by criterion: end time
+
+
++----------------------------------------------+------------+------------+
+| Total wallclock time elapsed since start     |       344s |            |
+|                                              |            |            |
+| Section                          | no. calls |  wall time | % of total |
++----------------------------------+-----------+------------+------------+
+| Assemble Stokes system           |      1554 |      26.7s |       7.8% |
+| Assemble temperature system      |      1554 |      55.7s |        16% |
+| Build Stokes preconditioner      |       105 |      6.01s |       1.7% |
+| Build temperature preconditioner |      1554 |      8.19s |       2.4% |
+| Create snapshot                  |       104 |      18.2s |       5.3% |
+| Initialization                   |         1 |     0.545s |      0.16% |
+| Postprocessing                   |      1554 |      45.6s |        13% |
+| Setup dof systems                |         1 |    0.0143s |         0% |
+| Setup matrices                   |         1 |     0.051s |         0% |
+| Solve Stokes system              |      1554 |       130s |        38% |
+| Solve temperature system         |      1554 |      37.2s |        11% |
++----------------------------------+-----------+------------+------------+
+
+-- Total wallclock time elapsed including restarts: 1211s
+-----------------------------------------------------------------------------
+-- For information on how to cite ASPECT, see:
+--   https://aspect.geodynamics.org/citing.html?ver=2.5.0-pre&sha=340c0d018&src=code
+-----------------------------------------------------------------------------

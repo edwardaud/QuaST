@@ -1,0 +1,46 @@
+﻿# ASPECT cross-code campaign: pinned image, binaries and commands
+# Captured 2026-11-26 on the Windows host; docker is the Docker Desktop engine
+# reached from Windows PowerShell (WSL integration off, so the runs are launched
+# with docker run from PowerShell and inputs/outputs live under C:\temp\quast_aspect).
+
+RepoDigests: ["gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac"]
+ImageId: sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac
+Created: 2023-04-19T22:26:47.074755758Z
+Os/Arch: linux/amd64
+
+
+=== aspect (default, DEBUG build) --version ===
+-----------------------------------------------------------------------------
+-- This is ASPECT, the Advanced Solver for Problems in Earth's ConvecTion.
+--     . version 2.5.0-pre (main, 340c0d018)
+--     . using deal.II 9.4.0
+--     .       with 32 bit indices and vectorization level 0 (64 bits)
+--     . using Trilinos 13.2.0
+--     . using p4est 2.2.0
+--     . running in DEBUG mode
+--     . running with 1 MPI process
+-----------------------------------------------------------------------------
+
+
+=== aspect-release (OPTIMIZED build) --version ===
+-----------------------------------------------------------------------------
+-- This is ASPECT, the Advanced Solver for Problems in Earth's ConvecTion.
+--     . version 2.5.0-pre (main, 340c0d018)
+--     . using deal.II 9.4.0
+--     .       with 32 bit indices and vectorization level 0 (64 bits)
+--     . using Trilinos 13.2.0
+--     . using p4est 2.2.0
+--     . running in OPTIMIZED mode
+--     . running with 1 MPI process
+-----------------------------------------------------------------------------
+
+
+
+# Run commands (image name is the pinned digest in the record files):
+#   docker run --rm -v C:/temp/quast_aspect:/work -w /work/blankenbach <image> aspect-release run2b_ref3_release.prm
+#   docker run --rm -v C:/temp/quast_aspect:/work -w /work/blankenbach <image> aspect       run2b_debug_probe.prm
+#   docker run --rm -v C:/temp/quast_aspect:/work -w /work/davies_et_al <image> aspect-release d11_ref5_run.prm
+#   docker run --rm -v C:/temp/quast_aspect:/work -w /work/davies_et_al <image> aspect-release d21_ref4_full.prm
+#   docker run --rm -v C:/temp/quast_aspect:/work -w /work/davies_et_al <image> aspect-release d22_ref4_resume.prm
+# where <image> = gassmoeller/aspect@sha256:e91937f39770efbc478699a62f41a1390644d40aec5d81b347cacbc4dae98cac
+# (the tag currently resolving to it is gassmoeller/aspect:latest).
