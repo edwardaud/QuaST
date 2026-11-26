@@ -174,7 +174,7 @@ def quast_frame_stream(path):
 
 
 def aspect_log(path):
-    out = dict(steps=0, wallclock_s=None, cells=None)
+    out = dict(steps=0, wallclock_s=None, cells=None, cell_levels=[])
     if not os.path.isfile(path):
         return out
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
@@ -194,7 +194,25 @@ def aspect_log(path):
     m = re.findall(r"Number of active cells:\s*([0-9,]+)", text)
     if m:
         out["cells_list"] = sorted({int(s.replace(",", "")) for s in m})
+    # the refinement level count ASPECT reports with each cell count: "on M
+    # levels" means levels 0..M-1, so the tree's maximum level is M-1.  The
+    # startup mesh prints 768 (on 4 levels) -> 996 (on 5) -> 1 176 (on 5):
+    # the two initial adaptive passes end at tree levels 3-4, not 3-5.
+    out["cell_levels"] = [
+        dict(cells=int(c.replace(",", "")), levels=int(l),
+             max_level=int(l) - 1)
+        for c, l in re.findall(
+            r"Number of active cells:\s*([0-9,]+)\s*\(on (\d+) levels\)", text)]
     return out
+
+
+def aspect_level_trace(alog):
+    """Readable 'cells (on M levels)' trace of the ASPECT startup refinement."""
+    trace = alog.get("cell_levels") or []
+    if not trace:
+        return "cell counts not recorded in this log"
+    return " -> ".join("%s cells on %d levels" % (format(t["cells"], ","),
+                                                  t["levels"]) for t in trace)
 
 
 def aspect_statistics(path):
@@ -320,6 +338,13 @@ def main(argv=None):
                         "(pinned image, aspect-release)",
                 steps=alog["steps"], wall_s=alog.get("wallclock_s"),
                 cells=astats["cells"],
+                startup_refinement=[
+                    dict(cells=t["cells"], reported_levels=t["levels"],
+                         max_tree_level=t["max_level"])
+                    for t in (alog.get("cell_levels") or [])],
+                startup_level_range=([3, max(t["max_level"] for t in
+                                             alog["cell_levels"])]
+                                     if alog.get("cell_levels") else None),
                 t_last=astats["t_last"],
                 vrms_range=[astats["vrms_min"], astats["vrms_max"]],
                 meanT_range=[astats["meanT_first"], astats["meanT_last"]],
@@ -350,9 +375,13 @@ def main(argv=None):
             "has local Ra = 1e6; eta = 1000^(-T); AMR on both codes), run by "
             "QuaST (top) and ASPECT (bottom): total temperature, its "
             "angular-mean anomaly, log10 eta = -3 T, and each code's own "
-            "adaptive mesh coloured by tree level.  This is a demonstration, "
-            "not a validation: the two codes run independent adaptive meshes "
-            "and no accuracy claim is made."),
+            "adaptive mesh filled in its tree-level colour.  The solver names "
+            "are inside the temperature panels and each panel's numbers are on "
+            "its lower-right plate; the image carries no header, no time text "
+            "and nothing above the panels -- the card, the run evidence and the "
+            "caveats are in this sidecar and in the README caption.  This is a "
+            "demonstration, not a validation: the two codes run independent "
+            "adaptive meshes and no accuracy claim is made."),
         notes=[
             "This is a DEMONSTRATION of the AMR path, not the published "
             "Davies et al. (2022) VoT benchmark case and not an accuracy "
@@ -382,9 +411,14 @@ def main(argv=None):
             "unbounded velocity spike (u_max 5.4e6 at t = 0.016) and a "
             "temperature-solver failure, reproducibly, with several solver "
             "and AMR settings.  ASPECT's mesh is therefore its adaptive "
-            "startup mesh (initial global 3 + 2 adaptive passes, levels 3-5), "
-            "shown in the mesh panel but held fixed; QuaST's mesh evolves "
-            "in-loop.  This asymmetry is stated, not hidden.",
+            "startup mesh, shown in the mesh panel but held fixed; QuaST's "
+            "mesh evolves in-loop.  This asymmetry is stated, not hidden.  "
+            "The startup mesh is on levels 3-4: the ASPECT log records the "
+            "two initial adaptive passes as %s, i.e. five refinement levels "
+            "(0-4) in ASPECT's counting = tree levels 3-4, which the renderer "
+            "also infers per cell from the VTU (it agrees; the earlier 'levels "
+            "3-5' reading of '5 levels' was wrong)."
+            % aspect_level_trace(alog),
             "The two rows' window is t = 0 -> %g (41 frames at the 0.005 "
             "cadence) rather than 0.3 so the figure fits the measurement "
             "budget; the flow is evolving over it (QuaST: %s; ASPECT V_rms "
@@ -417,7 +451,7 @@ def main(argv=None):
             aspect_statistics=args.aspect_stats,
             aspect_card="aspect_runs/annulus_demo/demo.prm",
             scene="scripts/run_annulus_demo.sh",
-            renderer="scripts/annulus_video.py --amr",
+            renderer="scripts/annulus_video.py --amr --style reference",
         ),
     )
     with open(args.out, "w", encoding="utf-8") as fh:

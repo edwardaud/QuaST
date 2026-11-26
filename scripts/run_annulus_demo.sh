@@ -26,6 +26,17 @@
 #     dt ~2.5e-6, i.e. ~1e5 steps for t = 0.3);
 #   * t = 0.2 with a 0.005 frame cadence keeps 41 frames inside the time box.
 #
+# The figure is drawn in the canvas style of
+# docs/assets/quast_vs_aspect_realistic.gif (`annulus_video.py --style
+# reference`): 1200 px wide, 7 blank px on top, four panels per band with the
+# solver names in the temperature panels and each panel's numbers on a
+# lower-right plate, the three 9 px colour bars and the discrete level legend
+# in the bottom band, and no header or card text in the image -- the card and
+# the caveats are in the README caption and in the JSON sidecar.  The annulus
+# panels are square (279 x 279) because the domain is a disk, so the canvas is
+# 1200 x 616 px; the master is rendered at 2x (2400 px) and downsampled with
+# Lanczos for the GIF and poster, and the mp4 is written at 1200 px and at 2x.
+#
 # The ASPECT side is aspect_runs/annulus_demo/demo.prm and is run from Windows
 # PowerShell with the pinned image (docker is not available inside WSL):
 #
@@ -78,14 +89,20 @@ if [ "${RENDER:-1}" = "1" ]; then
     --tstop "$TSTOP" --frame-dt "$FDT" \
     --out "$LOG/demo_sidecar_extra.json"
   echo "=== render (the ASPECT frames must already be in $OUT/aspect_frames)"
+  # `--style reference` is the canvas of docs/assets/quast_vs_aspect_realistic.gif:
+  # 1200 px wide, 7 blank px on top, four panels per band with the solver names
+  # inside the temperature panels and the numbers on in-panel plates, 9 px
+  # colour bars and the discrete level legend at the bottom -- no header and no
+  # card text in the image (the card is in the README caption and the sidecar).
+  # The annulus panels are square, so the canvas is 1200 x 616 px.  The master
+  # is rendered at 2x (2400 px) and downsampled with Lanczos for the GIF and
+  # poster; the mp4 is written at 1200 px and at the 2x master.
   ${QUAST_PY:-python3} "$QUAST_ROOT/scripts/annulus_video.py" \
     --row "QuaST=quast:$OUT/quast_frames" \
     --row "ASPECT=aspect:$OUT/aspect_frames" \
     --aspect-stats "$OUT/aspect_frames/statistics" \
-    --amr --frame-dt "$FDT" --fps 10 \
+    --amr --style reference --frame-dt "$FDT" --fps 10 \
     --case "annulus AMR demonstration" \
-    --header "annulus AMR demonstration (not a benchmark)  |  Ra = 1e3 (eta_ref = 1, inner local 1e6), eta = 1000^(-T), H = 0  |  QuaST vs ASPECT" \
-    --header2 "t = 0 .. $TSTOP, 41 frames @ 10 fps  |  theta = T - angular mean at r on a common 200 x 1024 polar grid  |  log10 eta = -3T from the same total T  |  mesh colour = tree level" \
     --sidecar-extra "$LOG/demo_sidecar_extra.json" \
     --out "$OUT/quast_vs_aspect_annulus_demo.mp4" \
     ${QUAST_FFMPEG:+--ffmpeg "$QUAST_FFMPEG"}

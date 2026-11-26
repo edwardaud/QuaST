@@ -44,10 +44,12 @@ its `heat flux statistics` consistent boundary flux -- so a several-per-cent
 difference in Nu between the rows at this mesh is a measurement definition, not
 a different state; the velocity and mean temperature columns agree closely.
 
-The disk fills a square panel, so the master is ~1200 x 630 px (two bands of
-square panels), not the wide 2.5:1 box shape of
-`docs/assets/quast_vs_aspect_realistic.gif`; the difference is the geometry, not
-a layout change.
+The classic layout's disk fills a square panel, so its master is 1200 x 654 px
+(two bands of square 261 px panels), not the wide 2.5:1 box shape of
+`docs/assets/quast_vs_aspect_realistic.gif`.  That layout is what the benchmark
+videos use; the README's annulus AMR demonstration figure uses the reference
+style documented further down (`--style reference`), which reproduces the
+reference GIF's 1200 px canvas exactly, with the square annulus panels.
 
 Frame sources
 -------------
@@ -107,6 +109,44 @@ AMR demonstration mode (`--amr`, the figure
      quadtrees, so a level means the same refinement scale on both, but the
      meshes themselves are independent.
 
+Reference style (`--style reference`, the README figure's canvas)
+-----------------------------------------------------------------
+The demo figure `docs/assets/quast_vs_aspect_annulus_demo.gif` is drawn on the
+canvas of `docs/assets/quast_vs_aspect_realistic.gif`, measured from its frame
+70: a 1200 px wide canvas with 7 blank px above the first band; four panels per
+band with left edges at x = 22, 314, 606 and 898 and panel width 279 px (the
+last panel ends at x = 1176, so 23 blank columns on the right); 6 blank rows
+between the two bands; the solver name inside the temperature panel, the
+numbers of each panel on a 60 % white plate in its lower right; 7 blank rows
+below the bands; one 9 px colour bar under each of the first three columns with
+its small tick labels and its axis label (`T`, `theta = T - <T>_phi(r)`,
+`log10 eta`) below the bar; and under the fourth column the discrete level
+legend (rounded 14 x 8 px swatches with `L<n>` labels).  Nothing is drawn above
+the panels and there is no header and no time text anywhere: the card, the
+window and the caveats belong to the README caption and the JSON sidecar.
+
+The annulus panels are square 279 x 279 px because the domain is a disk, so the
+canvas is 1200 x 616 px instead of the reference's 281.  That square panel and
+the annulus-specific labels (Nu_top AND Nu_bot, `log10 eta = -3T`, leaves/cells)
+are the only intentional deviations; the reference's white background,
+colormaps (`inferno`, `RdBu_r`, `magma_r`), Computer Modern mathtext and label
+conventions are kept.  Two smaller ones follow from the disk: the solver name
+sits in the upper left of the visible disk (the panel's corner is outside the
+domain and white) and it carries a thin dark outline so the bold white text
+stays readable on the warm interior field.
+
+The master is rendered at 2x (2400 px wide) and downsampled with Lanczos to
+1200 px for the GIF and the poster; `--master-scale` changes the factor.  The
+top 7 rows are the page background by construction (after the Lanczos
+downsample they are set to pure white), so nothing can bleed above the panels.
+The fields are sampled on a 400 x 2048 polar grid (2x the frame stream's own
+200 x 1024 diagnostic grid; `--polar-nr/--polar-nphi` override) and drawn at
+the master's own panel resolution, and the mesh panel fills every cell with its
+level colour and outlines it in white, as the reference's mesh panel does.  The
+mp4 is written at 1200 px and at the 2400 px master.  The GIF uses one shared
+adaptive 256-colour palette, `optimize=True` and Floyd-Steinberg dithering and
+is held under 8 MB.  The default (classic) style below is untouched.
+
 The AMR mode needs a v2 QuaST frame stream (`ANN_MESH_DUMP=1`: per-frame mesh
 CSV and the leaves/level_min/level_max/dt columns) and any ASPECT VTU output.
 The row insets (Nu_top, Nu_bot, V_rms, mean T), the nearest-frame time matching,
@@ -130,10 +170,12 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt                              # noqa: E402
-from matplotlib.collections import LineCollection            # noqa: E402
+from matplotlib.collections import LineCollection, PolyCollection  # noqa: E402
 from matplotlib.cm import ScalarMappable                     # noqa: E402
 from matplotlib.colors import (BoundaryNorm, ListedColormap, Normalize,  # noqa: E402
                                to_rgba)
+from matplotlib.patches import FancyBboxPatch                # noqa: E402
+import matplotlib.patheffects as pe                          # noqa: E402
 
 # --- the case geometry (the card; the frame metadata repeats it) ------------
 R0 = 1.22
@@ -169,6 +211,40 @@ SPEED_FLOOR = 1.0e-8       # |u| below this is drawn at the bottom of the scale
 # declare one (the harness records its own ANN_FRAME_NR/NPHI, default 200/1024).
 NR_DEFAULT = 200
 NPHI_DEFAULT = 1024
+# --- reference style (`--style reference`) ----------------------------------
+# The layout of `docs/assets/quast_vs_aspect_realistic.gif`, measured from its
+# frame 70 (x positions are inclusive pixel ranges, so the panel left edges are
+# 22, 314, 606 and 898 and the 14 px of the visible size note is the 13 blank
+# columns between [22..300] and [314..592]): 1200 px wide canvas, 7 blank px at
+# the top, four 279 px panels per band, 6 px between the bands, 7 blank px
+# below the bands, then the three 9 px colour bars and the level legend, with
+# the bar labels under the bars.  The annulus panels are square (279 x 279)
+# instead of the reference's 279 x 112 because the domain is a disk; nothing
+# else about the bands changes.
+REF_W = 1200
+REF_TOP = 7
+REF_PANEL = 279
+REF_X0 = (22, 314, 606, 898)
+REF_ROW_GAP = 6
+REF_BAR_GAP = 7
+REF_BAR_H = 9
+REF_TITLE_DY = 16          # bar bottom -> colour-bar label centre
+REF_BOTTOM = 8             # blank rows below the bar label
+REF_LABEL_FS = 12.0        # solver name: 11 px tall bold Computer Modern caps
+REF_PLATE_FS = 7.2         # in-panel numbers (reference: 7 px cap on a plate)
+REF_TICK_FS = 5.6          # bar tick labels (reference: 5 px tall)
+REF_TITLE_FS = 8.5         # bar axis labels (reference: 7-8 px tall)
+REF_LEGEND_FS = 6.0        # level legend labels
+REF_INK = "#1a1a1a"        # in-panel text on the 60 % white plate
+REF_TICK = "#4a4a4a"       # bar ticks / labels / level legend labels
+REF_PLATE_ALPHA = 0.60     # the reference's "60 % white plate"
+REF_POLAR_NR = 400         # analysis grid for the reference style (2x the 200)
+REF_POLAR_NPHI = 2048      # analysis grid for the reference style (2x the 1024)
+# Discrete level colours of the reference style (the reference mesh panel fills
+# each cell with its level colour and draws the cell boundaries in white).
+# Taken from the reference's own level-legend swatches (frame 70, L0..L5).
+REF_LEVEL_COLORS = ["#2b4a78", "#2867a3", "#8f6c6f",
+                    "#d88e33", "#bd5538", "#b62740"]
 
 
 # --------------------------------------------------------------------- helpers
@@ -366,6 +442,7 @@ class QuastSource:
         self._cache = {}
         self._interp = None
         self._interp_xy = None
+        self._interp_targets = None
 
     def __len__(self):
         return len(self.frames)
@@ -403,13 +480,24 @@ class QuastSource:
         self._interp = PolarInterpolator(targets)
         self._interp.fit(f0["x"], f0["y"])
         self._interp_xy = (f0["x"], f0["y"])
+        self._interp_targets = (len(targets), float(np.asarray(targets)[0, 0]))
 
-    def field_grid(self, i, targets):
+    def field_grid(self, i, targets, grid=None):
+        """The T and speed fields of frame i on the polar `targets`.
+
+        `grid` is the (nr, nphi) shape the renderer wants the values reshaped
+        to; the default is this source's declared analysis grid.  The
+        interpolator is rebuilt whenever the node cloud *or the target grid*
+        changes: the AMR frames move the nodes, and the reference style asks
+        for a 400 x 2048 grid instead of the declared 200 x 1024 one.
+        """
         f = self.read(i)
-        nr, nphi = self.polar_grid()
+        nr, nphi = self.polar_grid() if grid is None else grid
+        key = (len(targets), float(np.asarray(targets)[0, 0]))
         if self._interp is None or not (
                 len(f["x"]) == len(self._interp_xy[0]) and
-                np.array_equal(f["x"], self._interp_xy[0])):
+                np.array_equal(f["x"], self._interp_xy[0]) and
+                key == self._interp_targets):
             self.build_interp(f, targets)
         T = self._interp.apply(f["T"]).reshape(nphi, nr)
         sp = self._interp.apply(f["speed"]).reshape(nphi, nr)
@@ -501,8 +589,13 @@ class QuastSource:
                         axis=2).reshape(-1, 2, 2)
         levels = np.repeat(lev, 4)
         lmin, lmax = int(lev.min()), int(lev.max())
+        # Reference style: the same leaves as filled quads (one polygon per
+        # leaf) so the mesh panel can be drawn the way the reference GIF draws
+        # its mesh panel (filled by level colour, white cell boundaries).
+        verts = pts[:, :-1, :]
         return dict(segments=segs, levels=levels, leaves=len(lev),
                     level_min=lmin, level_max=lmax,
+                    verts=verts, cell_levels=lev, cells=len(lev),
                     note="%s leaves, level %d-%d"
                          % ("{:,}".format(len(lev)), lmin, lmax))
 
@@ -546,6 +639,7 @@ class AspectSource:
         self._cache = {}
         self._interp = None
         self._interp_xy = None
+        self._interp_targets = None
         self._mesh = None
         self._mesh_cache = {}
 
@@ -702,13 +796,16 @@ class AspectSource:
         self._interp = PolarInterpolator(targets)
         self._interp.fit(f0["x"], f0["y"])
         self._interp_xy = (f0["x"], f0["y"])
+        self._interp_targets = (len(targets), float(np.asarray(targets)[0, 0]))
 
-    def field_grid(self, i, targets):
-        nr, nphi = self.polar_grid()
+    def field_grid(self, i, targets, grid=None):
+        nr, nphi = self.polar_grid() if grid is None else grid
         f = self.read(i)
+        key = (len(targets), float(np.asarray(targets)[0, 0]))
         if self._interp is None or not (
                 len(f["x"]) == len(self._interp_xy[0]) and
-                np.array_equal(f["x"], self._interp_xy[0])):
+                np.array_equal(f["x"], self._interp_xy[0]) and
+                key == self._interp_targets):
             self.build_interp(f, targets)
         T = self._interp.apply(f["T"]).reshape(nphi, nr)
         sp = self._interp.apply(f["speed"]).reshape(nphi, nr)
@@ -769,7 +866,7 @@ class AspectSource:
             raise SystemExit("row %r: %d VTU quads is not a multiple of 4"
                              % (self.kind, len(q)))
         groups = q.reshape(-1, 4, 4)
-        segs, levels = [], []
+        segs, levels, verts = [], [], []
         n_bad = 0
         for g in groups:
             ids = np.unique(g.ravel())
@@ -780,6 +877,9 @@ class AspectSource:
             ring = np.array([base + 0, base + 1, base + 2, base + 5,
                              base + 8, base + 7, base + 6, base + 3, base + 0])
             segs.append(np.stack([Porig[ring[:-1]], Porig[ring[1:]]], axis=1))
+            # the same ring without its repeated first point: one filled
+            # polygon per parent cell for the reference-style mesh panel
+            verts.append(Porig[ring[:-1]])
             lv = aspect_cell_level(
                 Porig[[base + 0, base + 2, base + 8, base + 6]])
             levels.append(0 if lv is None else int(lv))
@@ -789,6 +889,7 @@ class AspectSource:
         lev = np.asarray(levels, dtype="int64")
         out = dict(segments=np.concatenate(segs),
                    levels=np.repeat(lev, 8), cells=len(lev),
+                   verts=np.asarray(verts), cell_levels=lev,
                    level_min=int(lev.min()), level_max=int(lev.max()),
                    bad=int(n_bad),
                    note="%s cells, level %d-%d"
@@ -1178,6 +1279,289 @@ def build_figure(labels, norms, cmaps, geo, header, header2, titles=None,
     return fig, rows
 
 
+# =========================================================================
+# Reference style (`--style reference`): the layout of
+# docs/assets/quast_vs_aspect_realistic.gif, measured from its frame 70.
+# =========================================================================
+# The reference panel (279 x 112 px, a 2.5:1 box) has its solver name in the
+# upper left of the temperature panel, every panel's own numbers in the lower
+# right on a 60 % white plate, one 9 px bar under each of the first three
+# columns and the discrete level legend under the fourth; no header, no time
+# text, no axes frame and nothing above the bands.  The annulus keeps all of
+# that; the only intentional deviation is the square 279 x 279 panel (the
+# domain is a disk) and, as a consequence, a taller canvas.
+REF_LABEL_X = 56.0         # solver-name anchor: px from the panel's left edge
+REF_LABEL_Y = 42.0         # and from its top edge (inside the visible disk)
+REF_PLATE_X = 0.975        # in-panel numbers: lower-right anchor (axes fraction)
+REF_PLATE_Y = 0.022
+REF_MESH_LW = 0.42         # white cell boundaries, points (~0.56 px at 1200)
+REF_SW_W = 14.0            # level-legend swatch: the reference's 14 x 8 px
+REF_SW_H = 8.0
+REF_SW_PITCH = 36.5
+REF_SW_LABEL_GAP = 3.0
+REF_SW_LABEL_W = 9.0
+REF_SW_ROUND = 1.6
+
+
+def reference_layout(n_rows, scale=2):
+    """Pixel geometry of the reference-style master (the 1200-wide canvas).
+
+    Coordinates are top-left pixel coordinates at the 1x (1200 px) size, as
+    everywhere else in this renderer; the master is written at `scale` x that
+    size (2x by default) and downsampled with Lanczos for the GIF and poster.
+    """
+    panel_h = REF_PANEL
+    panel_top = [REF_TOP + r * (panel_h + REF_ROW_GAP) for r in range(n_rows)]
+    panels_end = panel_top[-1] + panel_h
+    cbar_top = panels_end + REF_BAR_GAP
+    title_y = cbar_top + REF_BAR_H + REF_TITLE_DY
+    px_h = title_y + 13                    # half the label + the blank bottom band
+    px_h += px_h % 2                       # even: H.264 wants even dimensions
+    return dict(px_w=REF_W, px_h=px_h, col_w=REF_PANEL, panel_w=REF_PANEL,
+                panel_top=panel_top, x0=[REF_X0[k] for k in range(N_COLS)],
+                cbar_top=cbar_top, cbar_h=REF_BAR_H, title_y=title_y,
+                scale=int(scale), style="reference", amr=True,
+                master_px_w=REF_W * int(scale),
+                master_px_h=px_h * int(scale))
+
+
+def ref_zero(x, nd):
+    """Fixed-point text of a value, without the "-0.00" of a round-off zero."""
+    if abs(x) < 0.5 * 10.0 ** (-nd):
+        x = 0.0
+    return ("%." + str(nd) + "f") % x
+
+
+def ref_group(n):
+    """Integer with the reference's thin space between thousands."""
+    return "{:,}".format(int(n)).replace(",", r"\, ")
+
+
+def ref_ticks(vmin, vmax, nbins=4):
+    """Nice ticks strictly inside [vmin, vmax] (the reference's small numbers)."""
+    from matplotlib.ticker import MaxNLocator
+    loc = MaxNLocator(nbins=nbins, steps=[1, 2, 2.5, 5, 10])
+    vals = [float(t) for t in loc.tick_values(vmin, vmax)
+            if vmin - 1e-12 <= t <= vmax + 1e-12]
+    return vals if len(vals) >= 2 else [vmin, vmax]
+
+
+def ref_tick_text(t):
+    if abs(t) < 1e-12:
+        return "0"
+    return "%.3g" % t
+
+
+def ref_plate_text_inset(ins):
+    def num(v, fmt):
+        return "n/a" if v is None else fmt % v
+    return (r"$\mathrm{Nu}_{\mathrm{top}} = %s$   $\mathrm{Nu}_{\mathrm{bot}} "
+            r"= %s$" % (num(ins.get("Nu_top"), "%.2f"),
+                        num(ins.get("Nu_bot"), "%.2f"))
+            + "\n" + r"$V_{\mathrm{rms}} = %s$   $\mathrm{mean}\,T = %s$"
+            % (num(ins.get("Vrms"), "%.4g"), num(ins.get("meanT"), "%.4f")))
+
+
+def ref_plate_text_theta(thmin, thmax):
+    return (r"$\theta_{\mathrm{min}} = %+.3f$   "
+            r"$\theta_{\mathrm{max}} = %+.3f$" % (thmin, thmax))
+
+
+def ref_plate_text_eta(lo, hi):
+    return (r"$\log_{10}\eta_{\mathrm{min}} = %s$   "
+            r"$\log_{10}\eta_{\mathrm{max}} = %s$"
+            % (ref_zero(lo, 2), ref_zero(hi, 2)))
+
+
+def ref_plate_text_mesh(note_word, count, level_min, level_max):
+    return (r"$\mathrm{%s} = %s$   $\mathrm{levels}\ %d$-$%d$"
+            % (note_word, ref_group(count), level_min, level_max))
+
+
+class ReferenceRow:
+    """One row of the reference-style figure: four panels and their texts.
+
+    The three fields are drawn as RGBA panel images from the common polar grid;
+    the mesh panel is a filled-cell drawing: every cell is the polygon that
+    `mesh_frame` returns (a leaf quad for QuaST, the eight-point Q2 cell ring
+    for ASPECT), filled with its level colour and outlined in white, exactly the
+    way the reference GIF draws its mesh panel.
+    """
+
+    def __init__(self, fig, geo, band, label, norms, cmaps,
+                 level_cmap, level_norm):
+        self.geo = geo
+        self.norms = norms
+        self.cmaps = cmaps
+        self.level_cmap = level_cmap
+        self.level_norm = level_norm
+        px_h = geo["px_h"]
+        w = geo["panel_w"]
+        top = geo["panel_top"][band]
+        self.axes = []
+        for k in range(N_COLS):
+            ax = fig.add_axes(rect_px(geo["x0"][k], top, w, w, px_h))
+            add_field_panel(fig, ax)
+            # the reference style draws the disk exactly to the square panel's
+            # edges (the reference's rectangular field fills its panel too), so
+            # the axes limits are the disk's bounding box -- not the classic
+            # layout's 3 % margin
+            ax.set_xlim(-geo["r_box"], geo["r_box"])
+            ax.set_ylim(-geo["r_box"], geo["r_box"])
+            ax.set_facecolor(BG)
+            self.axes.append(ax)
+        self.ax_t, self.ax_th, self.ax_u, self.ax_m = self.axes
+        self.ims = [None] * 3
+        self.mesh_poly = None
+        self.sampler = geo["sampler"]
+        # the solver name sits in the upper left of the temperature panel, bold
+        # white, with no plate: the reference's position, moved inside the disk
+        # (the panel's corner lies outside the annular domain and is white).
+        # The reference draws it in the Computer Modern bold face used for every
+        # symbol in that figure, so it goes through mathtext too.
+        self.label_text = self.ax_t.text(
+            REF_LABEL_X / w, 1.0 - REF_LABEL_Y / w,
+            r"$\mathbf{%s}$" % label.replace(" ", r"\ "),
+            transform=self.ax_t.transAxes, color="white",
+            fontsize=REF_LABEL_FS, fontweight="bold", family="serif",
+            va="top", ha="left", zorder=7,
+            path_effects=[pe.withStroke(linewidth=1.1, foreground="#1a1a1a",
+                                        alpha=0.85)])
+        # per-panel numbers: lower right, on the reference's 60 % white plate
+        self.nu_text = self._plate(self.ax_t)
+        self.th_text = self._plate(self.ax_th)
+        self.u_text = self._plate(self.ax_u)
+        self.mesh_text = self._plate(self.ax_m)
+
+    @staticmethod
+    def _plate(ax):
+        return ax.text(
+            REF_PLATE_X, REF_PLATE_Y, "", transform=ax.transAxes,
+            ha="right", va="bottom", fontsize=REF_PLATE_FS, color=REF_INK,
+            linespacing=1.30, zorder=7,
+            bbox=dict(facecolor="white", alpha=REF_PLATE_ALPHA,
+                      edgecolor="none", boxstyle="square,pad=0.20"))
+
+    def update(self, target, pick, src, fg, ins, mesh=None):
+        fields = (fg["T"], fg["theta"], fg["logeta"])
+        for k, (ax, cmap, norm, C) in enumerate(zip(
+                self.axes[:3], self.cmaps, self.norms, fields)):
+            img = self.sampler.rgba(C, cmap, norm)
+            if self.ims[k] is None:
+                self.ims[k] = ax.imshow(
+                    img, extent=self.sampler.extent, origin="lower",
+                    interpolation="nearest", zorder=1)
+            else:
+                self.ims[k].set_data(img)
+        if mesh is not None:
+            colors = self.level_cmap(self.level_norm(mesh["cell_levels"]))
+            if self.mesh_poly is None:
+                self.mesh_poly = PolyCollection(
+                    mesh["verts"], facecolors=colors, edgecolors="white",
+                    linewidths=REF_MESH_LW, antialiased=True, zorder=3)
+                self.ax_m.add_collection(self.mesh_poly)
+            else:
+                self.mesh_poly.set_verts(mesh["verts"])
+                self.mesh_poly.set_facecolors(colors)
+        self.nu_text.set_text(ref_plate_text_inset(ins))
+        self.th_text.set_text(ref_plate_text_theta(
+            float(np.nanmin(fg["theta"])), float(np.nanmax(fg["theta"]))))
+        self.u_text.set_text(ref_plate_text_eta(
+            float(np.nanmin(fg["logeta"])), float(np.nanmax(fg["logeta"]))))
+        if mesh is not None:
+            word = "leaves" if isinstance(src, QuastSource) else "cells"
+            count = mesh["leaves"] if isinstance(src, QuastSource) else mesh["cells"]
+            self.mesh_text.set_text(ref_plate_text_mesh(
+                word, count, mesh["level_min"], mesh["level_max"]))
+        else:
+            self.mesh_text.set_text(src.mesh_note())
+
+
+def build_reference_figure(labels, norms, cmaps, geo, level_legend):
+    """The reference-style canvas: no header, no time text, nothing on top."""
+    plt.rcParams.update({"mathtext.fontset": "cm", "font.family": "serif"})
+    fig = plt.figure(figsize=(geo["px_w"] / DPI, geo["px_h"] / DPI), dpi=DPI)
+    fig.patch.set_facecolor(BG)
+    level_cmap = level_legend["cmap"]
+    level_norm = level_legend["norm"]
+    rows = [ReferenceRow(fig, geo, b, lab, norms, cmaps, level_cmap, level_norm)
+            for b, lab in enumerate(labels)]
+    # shared colour bars under columns 1-3 (9 px tall in the reference)
+    titles = [r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
+              r"$\log_{10}\eta$"]
+    for k in range(3):
+        cax = fig.add_axes(rect_px(geo["x0"][k], geo["cbar_top"],
+                                   geo["panel_w"], geo["cbar_h"],
+                                   geo["px_h"]))
+        cb = fig.colorbar(ScalarMappable(norm=norms[k], cmap=cmaps[k]),
+                          cax=cax, orientation="horizontal")
+        ticks = ref_ticks(norms[k].vmin, norms[k].vmax)
+        cb.set_ticks(ticks)
+        cb.set_ticklabels([r"$%s$" % ref_tick_text(t) for t in ticks])
+        cb.ax.tick_params(colors=REF_TICK, labelsize=REF_TICK_FS, length=0.6,
+                          width=0.45, pad=0.5)
+        cb.outline.set_edgecolor(SPINE)
+        cb.outline.set_linewidth(0.5)
+        text_px(fig, geo["x0"][k] + geo["panel_w"] / 2.0, geo["title_y"],
+                geo["px_h"], s=titles[k], color=FG, fontsize=REF_TITLE_FS,
+                va="center", ha="center")
+    # discrete level legend under column 4: rounded swatches with L<n> labels,
+    # shared by both rows (both codes refine on the same 12 x 1 coarse ring)
+    lax = fig.add_axes(rect_px(geo["x0"][3], geo["cbar_top"],
+                               geo["panel_w"], geo["cbar_h"], geo["px_h"]))
+    lax.set_xlim(0.0, float(geo["panel_w"]))
+    lax.set_ylim(0.0, float(geo["cbar_h"]))
+    lax.set_axis_off()
+    levels = list(level_legend["ticks"])
+    n = len(levels)
+    total = ((n - 1) * REF_SW_PITCH + REF_SW_W + REF_SW_LABEL_GAP
+             + REF_SW_LABEL_W)
+    x_start = 0.5 * (geo["panel_w"] - total)
+    y0 = 0.5 * (geo["cbar_h"] - REF_SW_H)
+    for i, lev in enumerate(levels):
+        x = x_start + i * REF_SW_PITCH
+        lax.add_patch(FancyBboxPatch(
+            (x, y0), REF_SW_W, REF_SW_H,
+            boxstyle="round,pad=0,rounding_size=%g" % REF_SW_ROUND,
+            facecolor=level_cmap(level_norm(lev)), edgecolor="none",
+            mutation_aspect=1.0, zorder=2))
+        lax.text(x + REF_SW_W + REF_SW_LABEL_GAP, y0 + 0.5 * REF_SW_H,
+                 r"$L_{%d}$" % lev, fontsize=REF_LEGEND_FS, color=REF_TICK,
+                 va="center", ha="left", zorder=3)
+    return fig, rows
+
+
+def blank_top_rows(im, n):
+    """Force the top `n` rows to the page background.
+
+    The reference's contract is a blank top margin: nothing may be drawn above
+    the panels.  The master is 2x and the GIF/poster are Lanczos downsamples of
+    it, and a Lanczos kernel can bleed the disk's antialiased top rim one or
+    two rows above the panel band (measured: at most 5/255 in two rows).  The
+    margin is defined as blank, so it is set to the background colour instead
+    of leaving that invisible tint; the panels themselves are untouched.
+    """
+    if n <= 0:
+        return im
+    from PIL import ImageDraw
+    out = im.copy()
+    ImageDraw.Draw(out).rectangle([0, 0, out.width - 1, n - 1], fill=(255, 255, 255))
+    return out
+
+
+def downsample_png(src, dst, width, blank_top=0):
+    """Lanczos-downsample one rendered master frame (the reference's 2x -> 1x)."""
+    from PIL import Image
+    im = Image.open(src).convert("RGB")
+    h = int(round(im.height * width / float(im.width)))
+    if h % 2:
+        h += 1
+    im = im.resize((width, h), Image.LANCZOS)
+    im = blank_top_rows(im, blank_top)
+    im.save(dst)
+    return width, h
+
+
 # ------------------------------------------------------------------- encoder
 def find_ffmpeg(explicit=None):
     cands = []
@@ -1224,13 +1608,16 @@ def host_path_for_ffmpeg(ffmpeg, path):
     return path
 
 
-def encode(ffmpeg, frames_dir, pattern, fps, out, crf=18, preset="slow"):
+def encode(ffmpeg, frames_dir, pattern, fps, out, crf=18, preset="slow",
+           vf=None):
     inp = host_path_for_ffmpeg(ffmpeg, os.path.join(frames_dir, pattern))
     outp = host_path_for_ffmpeg(ffmpeg, out)
     cmd = [ffmpeg, "-y", "-loglevel", "error", "-framerate", str(fps),
-           "-i", inp,
-           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", str(crf),
-           "-preset", preset, "-r", str(fps), "-movflags", "+faststart", outp]
+           "-i", inp]
+    if vf:
+        cmd += ["-vf", vf]
+    cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", str(crf),
+            "-preset", preset, "-r", str(fps), "-movflags", "+faststart", outp]
     t = time.time()
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
@@ -1238,23 +1625,37 @@ def encode(ffmpeg, frames_dir, pattern, fps, out, crf=18, preset="slow"):
     return cmd, time.time() - t
 
 
-def write_gif(pngs, out, fps, width_cap=None, colors=256, max_bytes=8.0e6):
+def write_gif(pngs, out, fps, width_cap=None, colors=256, max_bytes=8.0e6,
+              downsample_to=None, blank_top=0):
     """Pillow GIF with one adaptive palette from a sample of the frames.
 
     The palette is shared by every frame (built from a montage of evenly spaced
     frames) so the colours do not flicker between frames; `optimize=True` then
     delta-compresses the frames.  If the result is over `max_bytes`, the width
     and the palette are stepped down and the GIF is rewritten, and the chosen
-    parameters are returned.
+    parameters are returned.  `downsample_to` resizes every input frame to that
+    width with Lanczos first (the reference style renders at 2x and downsamples
+    to 1200 px); without it the inputs are encoded at their own size.
+    `blank_top` keeps that many top rows at the page background (the reference
+    style's blank top margin).
     """
     from PIL import Image
     frames = [Image.open(p).convert("RGB") for p in pngs]
+    if downsample_to:
+        frames = [fr.resize(
+            (downsample_to,
+             int(round(fr.height * downsample_to / float(fr.width)))),
+            Image.LANCZOS) for fr in frames]
+    if blank_top:
+        frames = [blank_top_rows(fr, blank_top) for fr in frames]
     w0, h0 = frames[0].size
     montage_step = max(1, len(frames) // 8)
     attempts = []
     if width_cap:
         attempts.append((width_cap, colors))
     for w in (w0, int(w0 * 0.86), int(w0 * 0.72)):
+        if width_cap and w >= width_cap:
+            continue
         for c in (colors, 160, 128):
             if (w, c) not in attempts:
                 attempts.append((w, c))
@@ -1337,6 +1738,27 @@ def main(argv=None):
                          "the adaptive mesh coloured by tree level, redrawn "
                          "every frame.  Needs QuaST frames written with "
                          "ANN_MESH_DUMP=1 and ASPECT VTU frames.")
+    ap.add_argument("--style", choices=("classic", "reference"),
+                    default="classic",
+                    help="canvas style: 'classic' is this renderer's own "
+                         "benchmark-video layout (the default, unchanged "
+                         "byte for byte); 'reference' reproduces the layout of "
+                         "docs/assets/quast_vs_aspect_realistic.gif -- 1200 px "
+                         "wide, 7 blank px on top, four panels per band with no "
+                         "header, no time text and the numbers inside the "
+                         "panels, the three 9 px colour bars and the discrete "
+                         "level legend at the bottom.  Requires --amr.")
+    ap.add_argument("--master-scale", type=int, default=2,
+                    help="reference style only: render the master at this "
+                         "multiple of the 1200 px canvas and downsample with "
+                         "Lanczos for the GIF and poster (default 2 -> 2400 px)")
+    ap.add_argument("--polar-nr", type=int, default=None,
+                    help="reference style only: radial samples of the common "
+                         "analysis grid (default %d; classic uses the frame "
+                         "metadata's %d)" % (REF_POLAR_NR, NR_DEFAULT))
+    ap.add_argument("--polar-nphi", type=int, default=None,
+                    help="reference style only: angular samples of the common "
+                         "analysis grid (default %d)" % REF_POLAR_NPHI)
     ap.add_argument("--aspect-level-base", type=int, default=3,
                     help="the initial global refinement of the ASPECT card "
                          "(default 3); used only to check the level inferred "
@@ -1350,6 +1772,17 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     R0, R1 = args.r0, args.r1
+    ref_style = (args.style == "reference")
+    if ref_style:
+        if not args.amr:
+            raise SystemExit("--style reference is the layout of the annulus "
+                             "AMR demonstration figure; run it with --amr")
+        if args.master_scale < 1:
+            raise SystemExit("--master-scale must be >= 1")
+        if args.header is not None or args.header2 is not None:
+            print("[annulus_video] --style reference draws no header text; "
+                  "--header/--header2 are ignored (the card belongs to the "
+                  "README caption and the .json sidecar)", flush=True)
 
     # ---- rows
     labels, sources = [], []
@@ -1415,11 +1848,18 @@ def main(argv=None):
                 % (lab, float(rr.min()), float(rr.max()), R0, R1))
 
     # ---- the common analysis polar grid (one definition for both codes)
-    nr, nphi = NR_DEFAULT, NPHI_DEFAULT
-    for s in sources:
-        if isinstance(s, QuastSource):
-            nr, nphi = s.polar_grid()
-            break
+    if ref_style:
+        # The reference style samples the fields finer than the frame stream's
+        # own 200 x 1024 diagnostic grid; the interpolation weights are built
+        # once per node cloud (per frame for the AMR QuaST stream) and reused.
+        nr = args.polar_nr or REF_POLAR_NR
+        nphi = args.polar_nphi or REF_POLAR_NPHI
+    else:
+        nr, nphi = NR_DEFAULT, NPHI_DEFAULT
+        for s in sources:
+            if isinstance(s, QuastSource):
+                nr, nphi = s.polar_grid()
+                break
     r = R0 + (np.arange(nr) + 0.5) * (R1 - R0) / nr
     phi = (np.arange(nphi) + 0.5) * 2.0 * math.pi / nphi
     # target order is (phi, r): rows are angular, columns radial, matching the
@@ -1431,7 +1871,14 @@ def main(argv=None):
           "centres, r = [%g, %g]" % (nr, nphi, r[0], r[-1]), flush=True)
 
     def grid_for(src, i):
-        fg = src.field_grid(i, targets)
+        # In the reference style the renderer, not the frame stream, owns the
+        # analysis grid: pass it explicitly so both codes' fields land on the
+        # same (nr, nphi) grid (the declared 200 x 1024 grid is only the frame
+        # stream's own diagnostic grid).
+        if ref_style:
+            fg = src.field_grid(i, targets, grid=(nr, nphi))
+        else:
+            fg = src.field_grid(i, targets)
         T = fg["T"]
         fg["theta"] = T - T.mean(axis=0, keepdims=True)
         fg["logspeed"] = np.log10(np.maximum(fg["speed"], SPEED_FLOOR))
@@ -1555,9 +2002,12 @@ def main(argv=None):
         nlev = lev_max - lev_min + 1
         # discrete level colours, shared by both rows (the level of a cell is
         # the same tree-level scale on both codes: a 12-angular x 1-radial
-        # coarse annulus refined to level L)
-        if nlev <= len(LEVEL_COLORS):
-            base = [to_rgba(c) for c in LEVEL_COLORS[:nlev]]
+        # coarse annulus refined to level L).  The reference style uses the
+        # reference mesh panel's palette (six muted level colours); the classic
+        # benchmark videos keep their own high-contrast list.
+        palette = REF_LEVEL_COLORS if ref_style else LEVEL_COLORS
+        if nlev <= len(palette):
+            base = [to_rgba(c) for c in palette[:nlev]]
         else:
             base = plt.get_cmap(LEVEL_CMAP)(np.linspace(0.08, 0.92, nlev))
         level_cmap = ListedColormap(base)
@@ -1571,11 +2021,23 @@ def main(argv=None):
               % (lev_min, lev_max, nlev), flush=True)
 
     # ---- geometry of the master
-    geo = layout(PX_W, len(sources))
-    r_box = R1 * 1.03
+    if ref_style:
+        geo = reference_layout(len(sources), scale=args.master_scale)
+    else:
+        geo = layout(PX_W, len(sources))
+    # The disk fills the reference-style square panel (the reference's
+    # rectangular field fills its panel); 0.5 px are left on each side so the
+    # antialiased rim falls on the panel's first pixel row/column and the 7 px
+    # blank top margin of the reference stays exactly blank.  The classic
+    # layout keeps the 3 % bounding-box margin it has always drawn.
+    r_box = (R1 * REF_PANEL / float(REF_PANEL - 1)) if ref_style else R1 * 1.03
     geo["r_box"] = r_box
-    geo["sampler"] = PanelSampler(geo["panel_w"], r_box, nr, nphi, r0=R0,
-                                  r1=R1, factor=2)
+    # the panel image is sampled at the master's own panel resolution: the
+    # reference master is rendered at `scale` x the 1200 px canvas, so the
+    # sampler has `scale` x 279 samples per panel and imshow maps it 1:1
+    geo["sampler"] = PanelSampler(
+        geo["panel_w"], r_box, nr, nphi, r0=R0, r1=R1,
+        factor=(geo["scale"] if ref_style else 2))
     geo["amr"] = bool(args.amr)
     geo["ticks"] = [
         [vmin, (vmin + vmax) / 2.0, vmax],
@@ -1606,21 +2068,46 @@ def main(argv=None):
         header = args.header
     if args.header2 is not None:
         header2 = args.header2
-    print("[annulus_video] master %d x %d px, panels %d px"
-          % (geo["px_w"], geo["px_h"], geo["panel_w"]), flush=True)
-    if args.amr:
-        amr_titles = [r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
-                      r"$\log_{10}\eta = -3T$  ($\eta = 1000^{-T}$)"]
+    if ref_style:
+        print("[annulus_video] reference style: canvas %d x %d px, panels %d px, "
+              "master %d x %d px (%dx, downsampled with Lanczos for the GIF "
+              "and poster)"
+              % (geo["px_w"], geo["px_h"], geo["panel_w"], geo["master_px_w"],
+                 geo["master_px_h"], geo["scale"]), flush=True)
     else:
-        amr_titles = None
-    fig, rows = build_figure(labels, norms, cmaps, geo, header, header2,
-                             titles=amr_titles,
-                             level_legend=level_legend if args.amr else None)
+        print("[annulus_video] master %d x %d px, panels %d px"
+              % (geo["px_w"], geo["px_h"], geo["panel_w"]), flush=True)
+    if ref_style:
+        fig, rows = build_reference_figure(
+            labels, norms, cmaps, geo,
+            level_legend if level_legend is not None else {})
+    else:
+        if args.amr:
+            amr_titles = [r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
+                          r"$\log_{10}\eta = -3T$  ($\eta = 1000^{-T}$)"]
+        else:
+            amr_titles = None
+        fig, rows = build_figure(labels, norms, cmaps, geo, header, header2,
+                                 titles=amr_titles,
+                                 level_legend=level_legend if args.amr else None)
 
     # ---- the meshes.  The benchmark videos draw one fixed mesh per row; the
     # AMR demo redraws each row's mesh every frame from the frame's own tree.
+    # In the reference style the mesh is drawn as filled cells inside
+    # ReferenceRow.update (one filled polygon per cell, white boundaries), so
+    # only the measured bookkeeping happens here.
     mesh_info = {}
-    if args.amr:
+    if ref_style:
+        for lab in labels:
+            c = cells_by_row[lab]
+            mesh_info[lab] = dict(
+                kind="per-frame adaptive quadtree, filled cells coloured by "
+                     "tree level, white cell boundaries",
+                cells_min=c["cells_min"], cells_max=c["cells_max"],
+                level_min=c["level_min"], level_max=c["level_max"])
+            print("[annulus_video] %s mesh: %s" % (lab, mesh_info[lab]),
+                  flush=True)
+    elif args.amr:
         for lab in labels:
             c = cells_by_row[lab]
             mesh_info[lab] = dict(
@@ -1665,6 +2152,7 @@ def main(argv=None):
     t_render = time.time()
     still_index = args.still_index if args.still_index >= 0 else len(plan) // 2
     fgs = {}
+    save_dpi = DPI * geo["scale"] if ref_style else DPI
     for k, fr in enumerate(plan):
         for j, (row, pick) in enumerate(zip(rows, fr["picks"])):
             src = sources[j]
@@ -1677,18 +2165,23 @@ def main(argv=None):
             mesh = None
             if args.amr:
                 mesh = src.mesh_frame(pick["index"])
-            row.update(fr["target"], pick, src, fg, src.inset(pick["index"]),
-                       mesh=mesh, level_cmap=level_cmap,
-                       level_norm=level_norm)
+            if ref_style:
+                row.update(fr["target"], pick, src, fg,
+                           src.inset(pick["index"]), mesh=mesh)
+            else:
+                row.update(fr["target"], pick, src, fg,
+                           src.inset(pick["index"]), mesh=mesh,
+                           level_cmap=level_cmap, level_norm=level_norm)
         if args.still:
             if k == still_index:
-                fig.savefig(args.still, dpi=DPI, facecolor=fig.get_facecolor())
+                fig.savefig(args.still, dpi=save_dpi,
+                            facecolor=fig.get_facecolor())
                 print("[annulus_video] still -> %s" % args.still, flush=True)
                 plt.close(fig)
                 return 0
         else:
             path = os.path.join(frames_dir, "f_%05d.png" % k)
-            fig.savefig(path, dpi=DPI, facecolor=fig.get_facecolor())
+            fig.savefig(path, dpi=save_dpi, facecolor=fig.get_facecolor())
             if k % 5 == 0 or k == len(plan) - 1:
                 print("[annulus_video] frame %d/%d  %s  (%.1f s)"
                       % (k + 1, len(plan), os.path.basename(path),
@@ -1698,16 +2191,38 @@ def main(argv=None):
 
     # ---- poster
     poster = stem + "_poster.png"
-    shutil.copyfile(os.path.join(frames_dir, "f_%05d.png" % (len(plan) - 1)),
-                    poster)
+    last_png = os.path.join(frames_dir, "f_%05d.png" % (len(plan) - 1))
+    if ref_style:
+        # the required Lanczos downsample of the 2x master to the 1200 px canvas
+        downsample_png(last_png, poster, geo["px_w"],
+                       blank_top=REF_TOP)
+        print("[annulus_video] poster %d px (Lanczos from the %d px master)"
+              % (geo["px_w"], geo["master_px_w"]), flush=True)
+    else:
+        shutil.copyfile(last_png, poster)
 
     # ---- mp4
     ffmpeg = find_ffmpeg(args.ffmpeg)
     t_enc = time.time()
-    cmd, dt_enc = encode(ffmpeg, frames_dir, "f_%05d.png", args.fps, out,
-                         crf=args.crf, preset=args.preset)
-    print("[annulus_video] encoded %s (%.1f s) with %s"
-          % (out, dt_enc, ffmpeg), flush=True)
+    mp4_2x = None
+    if ref_style:
+        # the 1x clip of the deliverables (Lanczos downscale of the 2x master
+        # frames, the same filter the GIF and poster get) and the 2x master
+        # clip kept for detail
+        cmd, dt_enc = encode(
+            ffmpeg, frames_dir, "f_%05d.png", args.fps, out,
+            crf=args.crf, preset=args.preset,
+            vf="scale=%d:-2:flags=lanczos" % geo["px_w"])
+        mp4_2x = stem + "_2x.mp4"
+        cmd2, dt_enc2 = encode(ffmpeg, frames_dir, "f_%05d.png", args.fps,
+                               mp4_2x, crf=args.crf, preset=args.preset)
+        print("[annulus_video] encoded %s and %s (%.1f s) with %s"
+              % (out, mp4_2x, dt_enc + dt_enc2, ffmpeg), flush=True)
+    else:
+        cmd, dt_enc = encode(ffmpeg, frames_dir, "f_%05d.png", args.fps, out,
+                             crf=args.crf, preset=args.preset)
+        print("[annulus_video] encoded %s (%.1f s) with %s"
+              % (out, dt_enc, ffmpeg), flush=True)
 
     # ---- gif
     gif = None
@@ -1715,11 +2230,13 @@ def main(argv=None):
     if not args.no_gif:
         gif = stem + ".gif"
         t_gif = time.time()
-        gif_info = write_gif(sorted(glob.glob(os.path.join(frames_dir,
-                                                           "f_*.png"))),
-                             gif, args.fps, width_cap=args.gif_width,
-                             colors=args.gif_colors,
-                             max_bytes=args.gif_max_mb * 1e6)
+        gif_info = write_gif(
+            sorted(glob.glob(os.path.join(frames_dir, "f_*.png"))),
+            gif, args.fps, width_cap=args.gif_width,
+            colors=args.gif_colors,
+            max_bytes=args.gif_max_mb * 1e6,
+            downsample_to=(geo["px_w"] if ref_style else None),
+            blank_top=(REF_TOP if ref_style else 0))
         print("[annulus_video] gif %s  %d px  %d colours  %.2f MB (%.1f s)"
               % (gif, gif_info[0], gif_info[1], gif_info[2] / 1e6,
                  time.time() - t_gif), flush=True)
@@ -1740,6 +2257,80 @@ def main(argv=None):
                                    "boundary flux, family C)")
             d["points_per_vtu"] = s.read(0)["n_unique"]
         rows_meta.append(d)
+    if ref_style:
+        layout_meta = dict(
+            style="reference: the canvas layout of "
+                  "docs/assets/quast_vs_aspect_realistic.gif, measured from "
+                  "its frame 70 (scripts/annulus_video.py --style reference)",
+            width=geo["px_w"], height=geo["px_h"],
+            master_width=geo["master_px_w"],
+            master_height=geo["master_px_h"],
+            supersampling=(
+                "the master is rendered at %dx the 1200 px canvas (%d x %d px) "
+                "and downsampled to %d px with PIL Lanczos for the GIF and the "
+                "poster; the mp4 is written at both %d px and the %d px master"
+                % (geo["scale"], geo["master_px_w"], geo["master_px_h"],
+                   geo["px_w"], geo["px_w"], geo["master_px_w"])),
+            top_margin_px=REF_TOP,
+            panel_px=geo["panel_w"], rows=len(sources),
+            panel_x=[int(x) for x in geo["x0"]],
+            panel_top=[int(t) for t in geo["panel_top"]],
+            panel_gap_px=REF_X0[1] - (REF_X0[0] + REF_PANEL),
+            right_margin_px=REF_W - (REF_X0[3] + REF_PANEL),
+            row_gap_px=REF_ROW_GAP, bar_gap_px=REF_BAR_GAP,
+            bar_px=REF_BAR_H, bar_label_y=[int(geo["title_y"])],
+            columns=["T", "theta_ang", "log10_eta", "mesh(level)"],
+            panel_aspect="square (the disk bounding box)",
+            header=("none: no header, no time text and nothing above the "
+                    "panels; the solver names sit inside the temperature "
+                    "panels, every panel's numbers are on a 60 % white plate in "
+                    "its lower right, the three colour bars and the discrete "
+                    "level legend are under the bands.  The card, the run "
+                    "evidence and the caveats are in this sidecar and in the "
+                    "README figure caption."),
+            deviations=[
+                "the panels are square 279 x 279 px instead of the reference's "
+                "279 x 112: the domain is a disk, so the canvas is %d px tall, "
+                "not 281" % geo["px_h"],
+                "the solver name sits in the upper left of the visible disk, "
+                "not in the panel corner, because the corner of a square panel "
+                "is outside the annular domain and white",
+                "the temperature panel's plate carries both wall Nusselt "
+                "numbers (Nu_top and Nu_bot) as well as V_rms and mean T; the "
+                "reference box has one Nu, V_rms and T_mean",
+            ],
+            sampling=dict(
+                polar_grid=[int(nr), int(nphi)],
+                note="the fields are interpolated from each code's own Q2 node "
+                     "cloud onto the common %d radial x %d angular grid and "
+                     "sampled at the master panel resolution "
+                     "(%d px per panel)" % (nr, nphi, geo["panel_w"] * geo["scale"])))
+    else:
+        layout_meta = dict(
+            width=geo["px_w"], height=geo["px_h"],
+            panel_px=geo["panel_w"], rows=len(sources),
+            columns=["T", "theta_ang", "log10|u|", "mesh"],
+            panel_aspect="square (the disk bounding box)",
+            aspect_ratio_note=(
+                "The disk fills a square panel, so the master is about "
+                "%d x %d px (ratio %.2f:1), not the 2.5:1 field of the "
+                "docs/assets/quast_vs_aspect_realistic.gif box video; "
+                "the difference is the annular geometry, and no field "
+                "is stretched: each panel is square."
+                % (geo["px_w"], geo["px_h"],
+                   geo["px_w"] / float(geo["px_h"]))))
+    outputs_meta = dict(
+        mp4=out, poster=poster, gif=gif,
+        gif_info=(None if gif_info is None else
+                  dict(width=gif_info[0], colors=gif_info[1],
+                       bytes=gif_info[2])),
+        frames_dir=frames_dir,
+        png_pattern="f_%05d.png")
+    if ref_style:
+        outputs_meta.update(
+            mp4_2x=mp4_2x, poster_px=int(geo["px_w"]),
+            master_frames_px=int(geo["master_px_w"]),
+            master_frames_py=int(geo["master_px_h"]))
     sidecar = dict(
         case=args.case,
         card=dict(geometry="PolarAnnulus(R0=%.17g, R1=%.17g, Phi=2*pi; "
@@ -1753,18 +2344,7 @@ def main(argv=None):
                   mesh="QuaST 16 x 192 Q2-Q1-Q2 leaves vs ASPECT Initial "
                        "global refinement = 4 (192 x 16 Q2-Q1-Q2 cells)",
                   time="t = 0 -> 2, BDF2, CFL 10, one Picard iteration/step"),
-        layout=dict(width=geo["px_w"], height=geo["px_h"],
-                    panel_px=geo["panel_w"], rows=len(sources),
-                    columns=["T", "theta_ang", "log10|u|", "mesh"],
-                    panel_aspect="square (the disk bounding box)",
-                    aspect_ratio_note=(
-                        "The disk fills a square panel, so the master is about "
-                        "%d x %d px (ratio %.2f:1), not the 2.5:1 field of the "
-                        "docs/assets/quast_vs_aspect_realistic.gif box video; "
-                        "the difference is the annular geometry, and no field "
-                        "is stretched: each panel is square."
-                        % (geo["px_w"], geo["px_h"],
-                           geo["px_w"] / float(geo["px_h"])))),
+        layout=layout_meta,
         theta_definition=dict(
             formula="theta_ang = T - <T>_phi(r)",
             grid="common polar grid of %d radial x %d angular cell centres "
@@ -1809,12 +2389,7 @@ def main(argv=None):
                                         for p in fr["picks"]])
                                for fr in plan]),
         rows=rows_meta, mesh=mesh_info,
-        outputs=dict(mp4=out, poster=poster, gif=gif,
-                     gif_info=(None if gif_info is None else
-                               dict(width=gif_info[0], colors=gif_info[1],
-                                    bytes=gif_info[2])),
-                     frames_dir=frames_dir,
-                     png_pattern="f_%05d.png"),
+        outputs=outputs_meta,
         ffmpeg=ffmpeg, encode_cmd=cmd, encode_s=dt_enc, render_s=render_s,
         command=" ".join([os.path.basename(sys.argv[0])] + sys.argv[1:]),
         caption=(
@@ -1912,8 +2487,20 @@ def main(argv=None):
             "(Ra = 1e3 at the reference viscosity 1, eta = 1000^(-T), AMR on "
             "both codes), run by QuaST (top) and ASPECT (bottom): total "
             "temperature, its angular-mean anomaly, log10 eta = -3 T, and each "
-            "code's own adaptive mesh coloured by tree level.  This is a "
-            "demonstration, not a validation; the two meshes are independent.")
+            "code's own adaptive mesh filled in its tree-level colour.  The "
+            "solver names are inside the temperature panels and each panel's "
+            "numbers on its lower-right plate; the figure carries no header and "
+            "no card text -- the card, the run evidence and the caveats are in "
+            "this sidecar and in the README caption.  This is a demonstration, "
+            "not a validation; the two meshes are independent.")
+        if ref_style:
+            sidecar["caption"] += (
+                "  Reference-style canvas: 1200 px wide with a 7 px blank top "
+                "margin, four 279 px square panels per band (square because the "
+                "domain is a disk), 9 px colour bars under the first three "
+                "columns and the discrete level legend under the fourth, "
+                "rendered at %dx and downsampled with Lanczos."
+                % geo["scale"])
         sidecar["notes"] = [
             "The two codes' meshes are different (QuaST's gradient-jump "
             "indicator + wall minimum level; ASPECT's temperature strategy), so "
