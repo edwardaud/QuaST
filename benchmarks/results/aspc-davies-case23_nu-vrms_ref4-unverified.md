@@ -59,9 +59,9 @@
 - **Log.** Full log 902 969 bytes, SHA-256
   `1c86c4bd3299993d78fa46b90c5ee686bcb69d9f1fef1805316067d37e059055` (not shipped). Compact
   excerpt `logs/aspect_d23_ref4_compact.log` (34 148 bytes, SHA-256
-  `6e5e18894ab3a33df35113b653ac755838b790a48d068ca743b51be908b5355c`). Statistics excerpt
+  `6a281971a53232de310fc78356970229b60165722c83808a83812c3b7644d2a6`). Statistics excerpt
   `logs/aspect_d23_ref4_statistics.txt` (11 029 bytes, SHA-256
-  `1dc6caaceb107fbb606e786356149205935c6647e9f9316ed60c5963e5f03448`; full statistics
+  `4628d274499b2a0bab5633f836725ef5a68434665ffc17d52029b49c7d1ea66c`; full statistics
   793 207 bytes, SHA-256
   `680e17e0d7e95dbbb85bb60d07c6b0782dfe27e168dea0641e13d7193407d911`). The statistics file
   includes the inherited case-2.1 rows; the case-2.3 leg is rows 674-2057.

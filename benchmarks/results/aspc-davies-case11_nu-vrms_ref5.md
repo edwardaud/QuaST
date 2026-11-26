@@ -74,9 +74,9 @@
 - **Log.** Full log 309 817 bytes, SHA-256
   `e640a9ba5cbf9382e5c6762b1099193ec7fd6791fdbbb0b6b2d8a330e75cdf41` (not shipped).
   Archived compact excerpt `logs/aspect_d11_ref5_compact.log` (16 077 bytes, SHA-256
-  `1f5858b1995e434b9c688519c5ffc1185b3e891a4c435a5d70e10559c44ce145`). Statistics excerpt
+  `0355820eb62cf0e66fe6504912524e1c40e03d896e741783159f85e5b2ecfe4c`). Statistics excerpt
   `logs/aspect_d11_ref5_statistics.txt` (5 219 bytes, SHA-256
-  `7a555e9c6c24e4d824acf5f0977cbc4443453be5a17dff8062aab76d4d43ca61`; full statistics
+  `89b18d30397d525214b1688f4c9cb24abe4f7c41b9111dc377c6d10d4a164741`; full statistics
   204 252 bytes, SHA-256
   `2bf08c8a3e97727eacceb033c4f4927a82460d8e2b5fb1348fe263d8aa660ea9`).
 - **Status.** `verified` — the card runs to its end time and its four steady scalars reproduce the

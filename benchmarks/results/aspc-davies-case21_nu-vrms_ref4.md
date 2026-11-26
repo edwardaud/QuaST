@@ -67,9 +67,9 @@
   The published 7-refinement mesh (1536 x 128) was therefore not attempted in this batch; any
   ASPECT number at the published mesh is not reproduced here. The abort logs are archived:
   `logs/aspect_d21_ref5_freeslip_abort_compact.log` (excerpt of the 4-rank abort, 10 844
-  bytes, SHA-256 `be2a6940b3930fa91c695e94d3126752264c182393628234f37fc55ce9c353bd`) and
+  bytes, SHA-256 `405291594a4f5d355bd8a68b76ed21bca1a767e60700ec393c35d3d672f22e1b`) and
   `logs/aspect_d21_ref5_cheap0_workaround_compact.log` (7 547 bytes, SHA-256
-  `f3c9c705127d66a431fd9550d8e2712d95186bbae8b41cecd6070582742a370c`). Full abort logs and their
+  `9150ac14ee33d00952bc8e49793e2eccdb3fcd886d591f743e4632ecb5f844cd`). Full abort logs and their
   SHA-256 are listed below.
 - **Input card / fixture.** Image path `/home/dealii/aspect/benchmarks/davies_et_al/case-2.1.prm`,
   SHA-256 `8230f4ee8d2fdeb83c60fdc4b36a833568441f81b4af3b1e1592a19fa89ffff6`.
@@ -90,9 +90,9 @@
 - **Log.** Full log 414 034 bytes, SHA-256
   `2af25e357603331687c009b591f88c3c0266eb07a24e356d8c516376eb8e0036` (not shipped). Compact
   excerpt `logs/aspect_d21_ref4_compact.log` (19 277 bytes, SHA-256
-  `3c27e1d5cfdc170ffa7324d25d5dc17a4881a98bca0f0689ebe38d016be5b545`). Statistics excerpt
+  `47ece715bfe4de9d217cf08690beb21f4ccd0f316b80ad9f8c8313caaba81381`). Statistics excerpt
   `logs/aspect_d21_ref4_statistics.txt` (5 592 bytes, SHA-256
-  `5f1411a3bd3e3cd2855cde6df56b95cbb789f84855e6258b3c30b4697f840456`; full statistics
+  `7a8625e2c61b05f9e912b813c2021d14c2d87728919db5ae0cd88d204ab15082`; full statistics
   258 348 bytes, SHA-256
   `ed634059627a725b309b294119edcafb861a8702e713f23e9c9a9da7d6b6f996`). Abort and workaround
   logs: `d21_ref5_release.log` (4 MPI ranks, 10 527 bytes, SHA-256

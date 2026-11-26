@@ -99,14 +99,14 @@
 - **Log.** Full run log 2 595 262 bytes, SHA-256
   `f465faa9140bbc9e5bfcb1b4b398a480f3a61e202df74a3114e9cebb25ae3003` (per-step lines; not
   shipped). Archived compact excerpt `logs/aspect_2b_ref3_compact.log` (23 078 bytes, SHA-256
-  `344b95d5aba5f475d97d7d8ed27c6683c673953b09219a7dd8e4f70c1e946320`; preamble, one timestep
+  `9932da905195f6a10f0bd47943d01c3b88258a0049b331a36ea221ba72829d86`; preamble, one timestep
   block in 500, the last five blocks, the termination notice and the timer table). Archived
   statistics excerpt `logs/aspect_2b_ref3_statistics.txt` (9 765 bytes, SHA-256
-  `7434703514075762a2332df4691cb9262efaa906eecf3d7b9d8753031a247e26`; column header, one row in
+  `c3184085b2465e807fc858941429a8b656f901e052dce5bc37af878b0f8cbe65`; column header, one row in
   200, last five rows; the full 1 383 254-byte statistics file has SHA-256
   `36ee71a6ae1b02eba839e6a9782d1474dc15e153f2ea1c9d83618b32e8fdfd5e`). DEBUG cost probe:
   `logs/aspect_2b_ref3_debug_cost_compact.log` (9 030 bytes, SHA-256
-  `4e457248a23fcbca3e9a9143cdad0f663ab4778737c51bfc4c554bf21997712f`).
+  `884ba03c0545274ea1da9d033c03d7745fd33555bd0d602e6c3a70e0da0c5026`).
 - **Status.** `verified` for the OPTIMIZED run (the shipped ASPECT record is reproduced to
   six figures and the step count matches); the complete-card DEBUG run is **not** done in this
   batch, only its cost is measured — it is a measured limitation, not a comparison.

@@ -143,3 +143,5 @@ Include:
 State any `CASE_*` knob that differs from its default, because the restart guard and most
 bitwise pins depend on them. The issue form
 `.github/ISSUE_TEMPLATE/bug_report.yml` asks for the same fields.
+
+The archived benchmark logs under `benchmarks/results/logs/` are covered by a manifest of sizes and SHA-256 values; after touching them (or a checkout with different line endings), run `julia --project=. scripts/check_manifest.jl` and refresh the manifest entry rather than leaving a stale hash.

@@ -36,7 +36,7 @@
 - **Environment.** Julia 1.12.7, 8 threads, Ubuntu 24.04 (WSL2), 25 GB RAM, `Manifest.toml`
   sha256 `ff64fc791ddb601a3119bbb0ff5a3bba7300a86b12b1f90fece23c7de2a247cc` (the recorded
   campaign predates the P2 batch; the card and tree are unchanged for this card).
-- **Log.** `logs/recorded_annulus_ladder.log`, sha256 `5a0aa268b6f71b9a2d7e91cac5b8046571d94bb0a5bbcbbc51b1c4dcebdacc91` (8369 bytes).
+- **Log.** `logs/recorded_annulus_ladder.log`, sha256 `607972aed8cd84d4c7901a9c2526561e7910a5c0dc26c12ff1e5b00ce82b97cf` (8369 bytes).
 - **Status.** `recorded` — the four rungs are the 2026-11-25 campaign's own `ANNULUS_RESULT`
   lines, archived here with their SHA-256. Per the P2 rule the 128 x 1536 rung was **not
   re-run** (1 391 s, 13.7 GB); the GCI above is computed from the recorded values, and the
