@@ -256,7 +256,9 @@ which is the historical restart behaviour.  The trajectory-affecting
 settings (AMR cadence and fractions, wall/hotspot rules, advection, EV, Picard
 controls, cfl, dtmax/dtmin) are stored with the state; a restart raises
 `ArgumentError` listing every setting that differs from the live run, so a
-resumed run cannot silently continue with another configuration.  The *physics*
+resumed run cannot silently continue with another configuration.  The physics
+parameter values are stored too, but changing one is an *intentional* kind of
+continuation and is governed by `restart_physics` below.  The *physics*
 is versioned separately from its parameter values:
 `run_config["physics_revision"]` records `PHYSICS_REVISION` (the single source
 of truth is `src/physics/revision.jl`, whose comment is the dated changelog),
@@ -270,6 +272,28 @@ history -- the only state the revision change can affect -- because refusing
 would invalidate every historical checkpoint, including the `shear_modulus = 0`
 ones whose physics is unchanged.  The cooldown
 is state, not configuration, and is not part of that comparison.
+`restart_physics` is the continuation protocol for a checkpoint whose *physics
+parameter values* differ from the live run (G290/G291).  The checkpoint records
+every `Params` value that changes the trajectory -- `Ra`, `eta_law`, `deta_T`,
+`eta_b`/`eta_c`, `eta_E`/`eta_T0`/`eta_const`, `eta_min`/`eta_max`, `bc`,
+`Twall_top`/`Twall_bot`, and the yield/weak/latent/phase/reference-state set;
+`_RESTART_PHYSICS_KEYS` in `src/driver/restart_guard.jl` is the complete list
+-- and the guard separates those keys from the numerics/trajectory settings.  A
+changed AMR/advection/EV/Picard/CFL/dt-bound setting, a changed `geometry` or
+another `physics_revision` is refused in every mode: those are not parameter
+values an intentional continuation may override.  A changed *physics* parameter
+is refused by default (`restart_physics=:refuse`) with an `ArgumentError` that
+names every differing key and its checkpoint/current value; passing
+`restart_physics=:allow` makes the continuation explicit: the guard warns once
+with the same list, and the driver resets the first resumed time step to `dt0` (`dt =
+dt_prev = dt0`, so the CFL ramp restarts from a safe step, while `theta_prev`
+and the rest of the BDF2 history are kept).  The reset is the point of the
+protocol: a checkpoint's `dt` was CFL-limited for the checkpoint's flow, and
+inheriting it into stronger physics is a measured blow-up (Davies et al. case
+2.1 at Ra = 1e4 continued at Ra = 1e5; G291).  `:allow` is inert on a
+same-physics restart -- the resumed trajectory stays bitwise identical to the
+uninterrupted one.  A checkpoint written before a key existed does not carry it
+and is resumed as before (the historical silent behaviour).
 `phases` adds the phase-transition buoyancy and the latent heat.  The latent
 coefficients come from `Params.latent_mode`: `:global` (the
 default) applies `pr.latent_L` to every transition — the historical behaviour,
@@ -571,6 +595,14 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 steady_vrms::Bool=false,
                                 tmin::Float64=0.0,
                                 restart_from::String="",
+                                # G291: the protocol for a checkpoint written
+                                # with other *physics parameter values*
+                                # (`restart_physics=:refuse` = stop, the
+                                # default; `:allow` = warn once, continue and
+                                # reset the first resumed dt to dt0).  It does
+                                # not override a numerics/trajectory mismatch,
+                                # the geometry or the physics revision.
+                                restart_physics::Symbol=:refuse,
                                 checkpoint_path::String="",
                                 checkpoint_every::Int=0,
                                 checkpoint_meta::AbstractDict=Dict{String,Any}(),
@@ -948,6 +980,15 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         throw(ArgumentError("transfer_mode must be :nodal or :l2"))
     checkpoint_every >= 0 ||
         throw(ArgumentError("checkpoint_every must be >= 0"))
+    # G291: validated here, so a typo fails before the setup work instead of at
+    # the restart comparison; `_restart_guard` repeats the check for direct
+    # library calls.
+    restart_physics in (:refuse, :allow) ||
+        throw(ArgumentError("restart_physics must be :refuse or :allow (got " *
+                            ":$restart_physics): :refuse (the default) stops a " *
+                            "restart whose physics differs from the checkpoint, " *
+                            ":allow continues it deliberately with one warning " *
+                            "and a reset first time step."))
     # Settings that change the trajectory.  They are stored in the checkpoint
     # and validated on restart, so a resumed run cannot silently continue with
     # a different AMR/physics/time-integration setup.
@@ -1030,8 +1071,13 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     # The restart guard: load the checkpoint, refuse another physics revision,
     # warn for a key-less file, compare the configuration and check theta; it
     # returns the resumed state (the arguments unchanged when there is none).
-    guard = _restart_guard(qt, p, theta0, run_config, restart_from)
+    # `restart_physics` is the G291 protocol for a checkpoint written with other
+    # physics parameter values: `:refuse` throws (default), `:allow` warns once
+    # and reports `physics_changed`, which resets the first resumed dt below.
+    guard = _restart_guard(qt, p, theta0, run_config, restart_from;
+                           restart_physics=restart_physics)
     restart = guard.restart
+    physics_changed = guard.physics_changed
     qt = guard.qt
     p = guard.p
     theta0 = guard.theta0
@@ -1240,6 +1286,21 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         theta_prev = copy(restart.theta_prev)
         dt = restart.dt
         dt_prev = restart.dt_prev
+        # G291: an intentional physics change continues the stored state under
+        # the current equations.  The checkpoint's `dt` was CFL-limited for the
+        # checkpoint's (weaker) flow; carrying it into a stronger flow is the
+        # inherited-dt blow-up the protocol prevents.  Reset the first resumed
+        # step to the live card's `dt0` and make the BDF2 ratio constant-step
+        # for that first step; theta_prev and every other field are kept.  A
+        # same-physics restart never reaches this branch and stays bit-identical
+        # (dt untouched).
+        if physics_changed
+            dt = dt0
+            dt_prev = dt0
+            @info "restart physics changed (restart_physics=:allow): the first " *
+                  "resumed time step is reset to dt0=$(dt0) (checkpoint dt was " *
+                  "$(restart.dt)); theta_prev and the BDF2 history are kept."
+        end
         t = restart.t
         step = restart.step
         ux = copy(restart.ux)

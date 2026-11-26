@@ -8,6 +8,17 @@
 # revision tracking, compares the stored configuration, checks the temperature
 # field and returns the resumed `(qt, p, theta0)`.  Both are moved verbatim out
 # of the entry point's body, which now only calls them.
+#
+# The configuration comparison separates the *physics parameter values* (the
+# `_RESTART_PHYSICS_KEYS` below: `Ra`, the viscosity law and its parameters, the
+# wall temperatures, `bc`, the yield/latent/phase/reference-state settings, ...)
+# from the numerics and trajectory settings (AMR, advection, EV, Picard, CFL,
+# dt bounds, ...).  A numerics change is always refused; a physics change is
+# refused by default (the restart was written by other equations) and can be
+# continued only with the explicit `restart_physics=:allow` protocol, which
+# warns once and tells the driver to reset the first resumed time step (G291).
+# The `physics_revision` check and the geometry check stay hard refusals in
+# every mode: they are not parameter values a user can intentionally change.
 
 """
     _wall_value_marker(t)
@@ -22,6 +33,60 @@ and the docs state that limit.
 """
 _wall_value_marker(t::NTuple{4,Union{Nothing,Function}}) =
     join((e === nothing ? "none" : "custom" for e in t), ",")
+
+"""
+    _RESTART_PHYSICS_KEYS
+
+The `run_config` keys that record **physics parameter values** rather than
+numerics or trajectory settings.  The restart guard compares every recorded key
+against the live configuration; a differing *numerics* key (AMR cadence and
+fractions, advection, EV, Picard controls, CFL, dt bounds, `mass_form`,
+`stokes_scaling`, `latent_scheme`) is always refused, and so is a differing
+`geometry` or `physics_revision`.  A differing key in this tuple means the
+stored state was produced by *other equations*: the default
+`restart_physics=:refuse` refuses it with the differing values, and
+`restart_physics=:allow` continues deliberately (one warning, first resumed
+`dt` reset to `dt0`, everything else kept; G291).
+
+Why a separate tuple: the values are recorded either way (a checkpoint carries
+them so the comparison *can* be made), but only the physics keys may be
+overridden by the explicit protocol.  Not every entry changes the trajectory in
+every card -- e.g. `deta_T` is inert for `eta_law=:expTz`, `supg`,
+`div_penalty` and `eta_custom` are currently unwired `Params` fields -- but the
+guard is deliberately conservative: a field of `Params` that could reach the
+equations is listed, so wiring one up later cannot silently change what a
+restart continues.
+"""
+const _RESTART_PHYSICS_KEYS = (
+    # thermal forcing, heating and the base state
+    "Ra", "H", "H_half_life", "Di", "heating_adiabatic", "heating_dissipation",
+    "rho_heating", "rho_cp", "rho_ref_weight", "compress_p", "compress_gamma",
+    # viscosity law and its parameters
+    "eta_law", "deta_T", "eta_b", "eta_c", "eta_E", "eta_T0", "eta_const",
+    "eta_min", "eta_max", "eta_soft", "eta_ref", "eta_custom",
+    "eta_multiplier", "rho_multiplier",
+    # boundary conditions and wall data
+    "bc", "wall_bc", "wall_u", "wall_un", "wall_t", "wall_tn",
+    "Twall_top", "Twall_bot", "Twall_left", "Twall_right", "side_thermal",
+    # rheology: Tosi law, composite law, yielding, weakening, viscoelasticity
+    "tosi_etaT", "tosi_etaZ", "tosi_eta_star", "tosi_sigma_y", "tosi_eta_init",
+    "tosi_eta0", "tosi_eta_min", "tosi_eta_max", "tosi_z_is_depth",
+    "comp_Ad", "comp_Ed", "comp_Vd", "comp_As", "comp_Es", "comp_Vs", "comp_n",
+    "comp_Tcut", "comp_eps_min", "comp_rule",
+    "yield_c", "yield_phi", "yield_taumax", "yield_eps_min", "yield_damper",
+    "yield_c_grad", "yield_mu_grad",
+    "weak_f", "weak_eps_ref", "weak_heal_time", "weak_mode", "weak_chi0",
+    "shear_modulus", "deviatoric",
+    # phase transitions, latent heat and reference-state physics
+    "phases", "latent_L", "latent_mode",
+    "refstate", "ref_Tsurf", "ref_alpha", "ref_cp", "ref_g", "ref_rho0",
+    "ref_nz", "ref_K0", "ref_K0prime",
+    # numerical terms that are physical-model coefficients of Params
+    "supg", "div_penalty",
+)
+
+"""Is `k` a physics parameter value recorded in `_RESTART_PHYSICS_KEYS`?"""
+_restart_physics_key(k::AbstractString) = k in _RESTART_PHYSICS_KEYS
 
 """
     _run_config(pr; settings...)
@@ -122,6 +187,40 @@ function _run_config(pr::Params;
         # The side walls are part of the physics of the run.
         "side_thermal" => pr.side_thermal,
         "Twall_left" => pr.Twall_left, "Twall_right" => pr.Twall_right)
+    # Physics parameters that were missing from the guard before G290/G291.
+    # The checkpoint recorded the numerics and *some* of the physics (viscosity
+    # extras, yield, phases, ...), so a restart could silently change `Ra`, the
+    # viscosity law, the wall temperatures or `bc` and continue the stored state
+    # under other equations.  These are the `Params` values that were missing;
+    # the guard classifies them with `_RESTART_PHYSICS_KEYS`, so a numerics
+    # change stays refused in every mode while a physics change needs the
+    # explicit `restart_physics=:allow` protocol.  Old checkpoints do not carry
+    # the keys and skip the comparison (`haskey(run_config, k) || continue` in
+    # `_restart_guard`), which is the historical silent behaviour.
+    run_config["Ra"] = pr.Ra
+    run_config["eta_law"] = pr.eta_law
+    run_config["bc"] = pr.bc
+    run_config["deta_T"] = pr.deta_T
+    run_config["eta_b"] = pr.eta_b
+    run_config["eta_c"] = pr.eta_c
+    run_config["eta_E"] = pr.eta_E
+    run_config["eta_T0"] = pr.eta_T0
+    run_config["eta_const"] = pr.eta_const
+    run_config["eta_min"] = pr.eta_min
+    run_config["eta_max"] = pr.eta_max
+    # Function-valued law override: only its presence is comparable, the
+    # `eta_multiplier`/`rho_multiplier` marker convention.
+    run_config["eta_custom"] = pr.eta_custom === nothing ? "none" : "custom"
+    run_config["eta_soft"] = pr.eta_soft
+    run_config["Twall_top"] = pr.Twall_top
+    run_config["Twall_bot"] = pr.Twall_bot
+    run_config["rho_ref_weight"] = pr.rho_ref_weight
+    run_config["compress_p"] = pr.compress_p
+    run_config["compress_gamma"] = pr.compress_gamma
+    # Inert `Params` fields today (declared and stored, not read by the driver
+    # yet): recorded so a future wiring cannot silently change a restart.
+    run_config["supg"] = pr.supg
+    run_config["div_penalty"] = pr.div_penalty
     # The shape and normalisation of the viscosity law change the trajectory just
     # as much as the AMR settings, so they are validated too (only for :tosi;
     # the other laws are fully described by their Params fields).
@@ -154,9 +253,9 @@ function _run_config(pr::Params;
         # checkpoints predate this key and skip the comparison, as with every
         # other key added after them.
         run_config["comp_rule"] = pr.comp_rule
-        run_config["eta_T0"] = pr.eta_T0
-        run_config["eta_min"] = pr.eta_min
-        run_config["eta_max"] = pr.eta_max
+        # `eta_T0`, `eta_min` and `eta_max` are recorded unconditionally above
+        # (they belong to the law fields the other laws use too), so the
+        # composite branch does not repeat them.
     end
     # Heating terms and the reference state also change the trajectory.
     run_config["Di"] = pr.Di
@@ -261,7 +360,8 @@ function _run_config(pr::Params;
 end
 
 """
-    _restart_guard(qt, p, theta0, run_config, restart_from)
+    _restart_guard(qt, p, theta0, run_config, restart_from;
+                   restart_physics::Symbol = :refuse)
 
 Apply the `restart_from` checkpoint to a run that is about to start.  With an
 empty `restart_from` this is a no-op and `restart === nothing`.  Otherwise it
@@ -269,15 +369,33 @@ loads the file and validates it before any space is built: the stored physics
 revision must equal `PHYSICS_REVISION` (a file without the key is resumed with
 a warning that names the stress history it carries), the stored `run_config`
 must match the live one key by key (`stokes_scaling` absent means `none`), and
-the loaded `theta` must be finite.  Returns `(restart, qt, p, theta0)` -- the
-loaded checkpoint and the mesh, polynomial degree and perturbation to resume
-from, or the arguments unchanged when there is no restart.
+the loaded `theta` must be finite.  Returns `(restart, qt, p, theta0,
+physics_changed)` -- the loaded checkpoint, the mesh, polynomial degree and
+perturbation to resume from, and whether the physics parameters differed, or
+the arguments unchanged when there is no restart.
+
+`restart_physics` is the protocol for a checkpoint written with *other physics
+parameter values* (`_RESTART_PHYSICS_KEYS`): `:refuse` (the default) raises an
+`ArgumentError` that lists every differing key with its checkpoint and current
+value and names the `:allow` opt-in; `:allow` warns once with the same list and
+reports `physics_changed = true`, so the driver can reset the first resumed
+time step.  Numerics/trajectory settings, the geometry and the physics revision
+are refused in either mode -- they are not values an intentional physics
+continuation may override.
 """
 function _restart_guard(qt::Quadtree, p::Int, theta0::Vector{Float64},
-                        run_config::AbstractDict, restart_from::String)
+                        run_config::AbstractDict, restart_from::String;
+                        restart_physics::Symbol = :refuse)
+    restart_physics in (:refuse, :allow) ||
+        throw(ArgumentError("restart_physics must be :refuse or :allow (got " *
+                            ":$restart_physics): :refuse (the default) stops a " *
+                            "restart whose physics differs from the checkpoint, " *
+                            ":allow continues it deliberately with one warning " *
+                            "and a reset first time step."))
     # Optional exact restart: replace the mesh, p and initial state with the
     # checkpoint contents before any space is built.  tstop/maxsteps remain
     # absolute, so they must be larger than the values stored in the file.
+    physics_mism = String[]
     restart = isempty(restart_from) ? nothing : load_semquad_state(restart_from)
     if restart !== nothing
         # ------------------------------------------------------------------
@@ -352,6 +470,12 @@ function _restart_guard(qt::Quadtree, p::Int, theta0::Vector{Float64},
                     "beginning."))
             end
         end
+        # Physics mismatches are collected separately: they may be continued
+        # deliberately with `restart_physics = :allow` (G291), while every other
+        # key difference is a hard refusal.  The mode only exists for keys
+        # *both* sides record; a key an older checkpoint does not carry is still
+        # skipped (`haskey(run_config, k) || continue`), which is the historical
+        # silent behaviour for every file written before the key existed.
         if !isempty(restart.config)
             mism = String[]
             for (k, v) in restart.config
@@ -361,7 +485,12 @@ function _restart_guard(qt::Quadtree, p::Int, theta0::Vector{Float64},
                 # spelling of the same number (e.g. "2" against "2.0").
                 k == "physics_revision" && continue
                 s = config_value_string(run_config[k])
-                s == v || push!(mism, "$k: checkpoint=$v, current=$s")
+                s == v && continue
+                if _restart_physics_key(k)
+                    push!(physics_mism, "$k: checkpoint=$v, current=$s")
+                else
+                    push!(mism, "$k: checkpoint=$v, current=$s")
+                end
             end
             # `stokes_scaling` postdates the old checkpoints.  A file without
             # the key was written by a solver that only had the historical
@@ -379,9 +508,47 @@ function _restart_guard(qt::Quadtree, p::Int, theta0::Vector{Float64},
             # written by the box (stage 0's only production geometry).  Absent
             # therefore means `CartesianBox`; a mapped geometry must not resume
             # a box state silently, so it is a mismatch rather than a skip.
+            # Numerics/trajectory settings and the geometry are refused in both
+            # `restart_physics` modes: the protocol only covers parameter values
+            # of the physics, not a different discrete setup or another physical
+            # domain.
             isempty(mism) ||
                 throw(ArgumentError("restart configuration mismatch in " *
                                     "$(restart_from):\n  " * join(mism, "\n  ")))
+        end
+        # A physics-parameter difference: decide with the explicit protocol.
+        # `:refuse` (the default) asks the user to state that the continuation
+        # is intentional; `:allow` warns once and proceeds.  The driver then
+        # resets the first resumed time step to `dt0` (a checkpoint's dt was
+        # CFL-limited for the checkpoint's flow; carrying it into stronger
+        # physics is the inherited-dt blow-up G291 pins), keeping the BDF2
+        # history otherwise.
+        if !isempty(physics_mism)
+            if restart_physics === :refuse
+                throw(ArgumentError("restart configuration mismatch in " *
+                    "$(restart_from):\n  " *
+                    join(physics_mism, "\n  ") *
+                    "\n\nThe differing keys are physics parameter values, not " *
+                    "numerics or trajectory settings: the stored state (theta, " *
+                    "theta_prev, velocity, pressure, Maxwell stress) was " *
+                    "produced by the checkpoint's physics, so continuing it " *
+                    "under the current physics changes the equations of the " *
+                    "run.  Refusing the restart: pass restart_physics=:allow " *
+                    "to continue anyway -- the driver then warns once with " *
+                    "this list, resets the first resumed time step to dt0 (the " *
+                    "CFL ramp restarts safely) and keeps the BDF2 history -- " *
+                    "or replay the run from the beginning with the current " *
+                    "physics."))
+            else
+                @warn "restart $(restart_from) continues a stored state with " *
+                      "changed physics (restart_physics=:allow); the checkpoint " *
+                      "was written with other parameter values:\n  " *
+                      join(physics_mism, "\n  ") *
+                      "\nThe state is continued under the current physics; the " *
+                      "first resumed time step is reset to dt0 so the CFL ramp " *
+                      "restarts from a safe step, and the BDF2 history " *
+                      "(theta_prev) is otherwise kept."
+            end
         end
         # The geometry record is new with stage 0 cut 1 and the check above only
         # sees files that carry *some* config.  A file without the key (including
@@ -424,5 +591,6 @@ function _restart_guard(qt::Quadtree, p::Int, theta0::Vector{Float64},
         all(isfinite, theta0) ||
             throw(ArgumentError("checkpoint $(restart_from) has non-finite theta"))
     end
-    return (restart = restart, qt = qt, p = p, theta0 = theta0)
+    return (restart = restart, qt = qt, p = p, theta0 = theta0,
+            physics_changed = !isempty(physics_mism))
 end

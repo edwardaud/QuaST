@@ -81,6 +81,13 @@ Outputs
 <out>.json           the plan: rows, window, target times, per-row matches,
                      scales, per-frame diagnostics, commands, timings
 <out>_frames/*.png   the individual frames (kept for re-encoding)
+
+Continuation-video overrides (added for the case-2.2 video; the defaults are the
+case-2.1 card and reproduce the original output byte for byte):
+`--header`/`--header2` replace the two header lines drawn above the rows, and
+`--sidecar-extra FILE` merges a JSON object into the `.json` sidecar (top-level
+keys replace the defaults) so a continuation video can state its card,
+protocol and caveats.  `--case` already overrides the case name in the sidecar.
 """
 import argparse
 import bisect
@@ -1036,6 +1043,17 @@ def main(argv=None):
     ap.add_argument("--out", default="out_julia/annulus_video/"
                                     "quast_vs_aspect_annulus.mp4")
     ap.add_argument("--case", default="Davies et al. (2022) case 2.1")
+    ap.add_argument("--header", default=None,
+                    help="override the first header line (default: the case-2.1 "
+                         "card text)")
+    ap.add_argument("--header2", default=None,
+                    help="override the second header line (default: the case-2.1 "
+                         "window text)")
+    ap.add_argument("--sidecar-extra", default=None, metavar="JSON",
+                    help="JSON object merged into the .json sidecar (top-level "
+                         "keys replace the defaults); used to record the "
+                         "continuation protocol and the case-2.2 caveats of a "
+                         "video whose window/rows differ from the default card")
     ap.add_argument("--vmin", type=float, default=None)
     ap.add_argument("--vmax", type=float, default=None)
     ap.add_argument("--dtheta-max", type=float, default=None)
@@ -1207,6 +1225,12 @@ def main(argv=None):
                "r on a common %d x %d polar grid  |  Nu = each code's own "
                "wall-flux family (QuaST GLL gradient vs ASPECT flux statistics)"
                % (len(plan), args.fps, nr, nphi))
+    # Case-2.2 / continuation videos reuse the renderer with their own one-line
+    # header overrides (the default strings are the case-2.1 card's).
+    if args.header is not None:
+        header = args.header
+    if args.header2 is not None:
+        header2 = args.header2
     print("[annulus_video] master %d x %d px, panels %d px"
           % (geo["px_w"], geo["px_h"], geo["panel_w"]), flush=True)
     fig, rows = build_figure(labels, norms, cmaps, geo, header, header2)
@@ -1434,6 +1458,18 @@ def main(argv=None):
                  matplotlib=matplotlib.__version__,
                  python=sys.version.split()[0]),
     )
+    # A continuation video reuses the renderer but records its own card, window,
+    # provenance and caveats: `--sidecar-extra` merges top-level keys into the
+    # sidecar (a key it contains replaces the default; keys it does not contain
+    # keep the measured values above).
+    if args.sidecar_extra:
+        with open(args.sidecar_extra, "r", encoding="utf-8") as fh:
+            extra = json.load(fh)
+        if not isinstance(extra, dict):
+            raise SystemExit("--sidecar-extra must contain a JSON object")
+        sidecar.update(extra)
+        print("[annulus_video] sidecar extra: %d keys from %s"
+              % (len(extra), args.sidecar_extra), flush=True)
     with open(stem + ".json", "w", encoding="utf-8") as fh:
         json.dump(sidecar, fh, indent=1)
     size = os.path.getsize(out)

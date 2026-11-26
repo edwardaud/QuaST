@@ -22,7 +22,7 @@ only composes them.
 | `picard.jl` | Lagged viscosity, strain-rate averaging and adaptive Picard relaxation. |
 | `picard_control.jl` | The field blend, the divergence test and the adaptive relaxation. |
 | `strain_rate.jl` | The nodal strain-rate and spin fields of the SEM velocity: historical box bodies plus cut-6 mapped bodies (physical gradient by the chain rule) for the strain-rate-dependent laws, yielding, weakening and the Maxwell advance. |
-| `restart_guard.jl` | The `run_config` builder and the restart guard of `run_semquad_simulation`. The guard compares a checkpoint's stored `geometry` against the live config and **refuses** a resume whose config lacks the key (AUDIT_BUGS R5; the mapped checkpoint no longer resumes silently as a box). |
+| `restart_guard.jl` | The `run_config` builder and the restart guard of `run_semquad_simulation`. The guard compares a checkpoint's stored `geometry` against the live config and **refuses** a resume whose config lacks the key (AUDIT_BUGS R5; the mapped checkpoint no longer resumes silently as a box). Since G290/G291 the `run_config` also records the physics parameter values that were missing (`Ra`, `eta_law`, `deta_T`, `eta_b`/`eta_c`, `eta_E`, `eta_T0`, `eta_const`, `eta_min`/`eta_max`, `bc`, `Twall_top`/`Twall_bot`, `eta_custom`, `eta_soft`, `rho_ref_weight`, `compress_p`/`compress_gamma`, `supg`, `div_penalty`); `_RESTART_PHYSICS_KEYS` separates them from the numerics, and a differing physics key is refused by default or continued with `restart_physics=:allow`. |
 | `run.jl` | `run_semquad_simulation`: the time loop, output history and per-step profile. Entry validations added in remediation batch P0 part 1: `dt0 > 0`, `dtmax >= dt0`, `tstop > 0` (except the build-only `tstop = 0, maxsteps = 0` sentinel), `dtmin > 0`, `maxsteps >= 0` (AUDIT_VV F8), and a named non-finite-theta refusal at the driver entry and at every per-step entry (AUDIT_VV F5). |
 | `run_diagnostics.jl` | The driver-owned snapshot of the solver and AMR diagnostic out-parameters. |
 | `step_newton.jl` | Globalization of the per-time-step nonlinear solve. |
@@ -106,4 +106,32 @@ balance, the end-to-end rigid run with checkpoint/resume and the remaining
 refusals, depth-dependent closure wiring); G275 is the stage-0.5b2 gate
 (free-slip rows, Couette/manufactured analytic gates, `:open` traction, rotation
 gauge, annular IC and the free-slip end-to-end driver run).
+
+**Physics-aware state continuation (G290/G291).**  A checkpoint stores the full
+state (`theta`, `theta_prev`, `u`, `p`, `t`, `dt`, `dt_prev`, `step`, the AMR
+cooldown, the EV/weak/stress fields) *and* the `run_config`, so a same-card
+restart is bitwise identical to the uninterrupted run (G290: annulus ring,
+`linear=:direct`, plus an MG-vs-direct sanity arm).  The `run_config` records
+the physics parameter values of `Params` too (the list above; the set is
+`_RESTART_PHYSICS_KEYS`).  The restart guard then applies one of two protocols:
+
+* `restart_physics=:refuse` (the default) -- an `ArgumentError` that lists every
+  differing physics key with its checkpoint/current value and says to pass
+  `restart_physics=:allow` for an intentional continuation.  A same-physics
+  restart never reaches this path.
+* `restart_physics=:allow` -- one `@warn` with the same list, then continue.
+  The driver resets the first resumed step to `dt0` (`dt = dt_prev = dt0`,
+  keeping `theta_prev` and every other field): the checkpoint's `dt` was
+  CFL-limited for the *checkpoint's* flow, and carrying it into stronger physics
+  is a measured blow-up.  The CFL block then re-grows the step from `dt0`.
+
+Numerics/trajectory settings (AMR, advection, EV, Picard, CFL, the dt bounds),
+`geometry` and `physics_revision` are refused in **both** modes, and a
+checkpoint written before a key existed does not carry it and is resumed as
+before (historical silent behaviour).  The documented case-2.1 -> case-2.2
+annulus continuation is the intended use: run case 2.1 (`Ra = 1e4`) with
+checkpointing, then continue its checkpoint with `Ra = 1e5`,
+`restart_physics=:allow` and a small `dt0`; see
+`examples/annulus_benchmark.jl`'s `ANN_RESTART`/`ANN_RESTART_PHYSICS` knobs and
+`docs/dev/BUG_FIX_LOG.md` §20.
 

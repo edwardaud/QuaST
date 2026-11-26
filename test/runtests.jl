@@ -213,4 +213,8 @@ using QuaST
     include("t_g288_constraint_tolerance.jl")
     # remediation batch P3 (2026-11-26): portable pins, MG convergence criterion
     include("t_g289_mg_convergence.jl")
+    # annulus continuation batch (2026-11-26): bitwise ring restart and the
+    # physics-aware continuation protocol (G290/G291)
+    include("t_g290_annulus_restart.jl")
+    include("t_g291_restart_physics.jl")
 end

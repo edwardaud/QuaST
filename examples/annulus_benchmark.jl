@@ -96,6 +96,24 @@ const ANN_MS = QuaST
 # (8), ANN_TAG (""), ANN_RA (1.0e5; the published card is Ra = 1e5, the
 # ASPECT/Davies case 2.1 cross-code comparison runs the same card at Ra = 1e4).
 #
+# Continuation knobs (G291; a physics-aware restart of a checkpoint):
+#
+#   ANN_RESTART          checkpoint file to resume from ("" = no explicit
+#                        restart; an existing `ANN_CKPT_DIR/ann_<nx>x<ny>.h5` is
+#                        resumed automatically as before).  A restart carries
+#                        its own theta, so it is mutually exclusive with
+#                        `ANN_IC` (the harness drops the IC knob on resume,
+#                        exactly as it already does for the automatic resume).
+#   ANN_RESTART_PHYSICS  `refuse` (default) or `allow`; forwarded to the
+#                        driver's `restart_physics`.  `allow` is the documented
+#                        case-2.1 (Ra = 1e4) -> case-2.2 (Ra = 1e5) protocol: it
+#                        warns once with the differing physics keys and resets
+#                        the first resumed step to `ANN_DT0` so the CFL ramp
+#                        restarts safely (pass a small ANN_DT0, e.g. 1e-4).
+#
+# Both knobs only take effect on a restart; with neither set (and no existing
+# checkpoint in `ANN_CKPT_DIR`) the run is the historical card byte for byte.
+#
 # Frame dumping (off unless ANN_FRAMES names a directory):
 #
 #   ANN_FRAMES      directory for the per-frame state ("" = off).  The directory
@@ -457,13 +475,38 @@ function main(args)
     report = env_i("ANN_REPORT", 25)
     ckdir = env_s("ANN_CKPT_DIR", "")
     ckevery = env_i("ANN_CKPT_EVERY", 200)
+    # G291 continuation knobs: an explicit checkpoint to resume from and the
+    # driver's physics-change protocol for it.  `refuse` is the default and a
+    # same-physics restart never triggers the guard; `allow` is the documented
+    # case-2.1 -> case-2.2 protocol (warn once, reset the first resumed step).
+    restart_path = env_s("ANN_RESTART", "")
+    restart_physics = Symbol(env_s("ANN_RESTART_PHYSICS", "refuse"))
+    restart_physics in (:refuse, :allow) ||
+        error("ANN_RESTART_PHYSICS must be refuse or allow (got " *
+              "$(env_s("ANN_RESTART_PHYSICS", "")))")
     frames_dir = env_s("ANN_FRAMES", "")
     frame_dt = env_f("ANN_FRAME_DT", 0.05)
     frame_nr = env_i("ANN_FRAME_NR", 200)
     frame_nphi = env_i("ANN_FRAME_NPHI", 1024)
     frames_on = !isempty(frames_dir)
     ckpt = isempty(ckdir) ? "" : joinpath(ckdir, "ann_$(nx)x$(ny).h5")
+    # `ANN_RESTART` is an explicit restart file and wins over the automatic
+    # resume of an existing `ANN_CKPT_DIR` checkpoint; both are mutual
+    # exclusive with `annulus_ic` (a restart carries its own theta, so the IC
+    # knob is dropped below, exactly as the automatic resume always did).
     resume = isempty(ckpt) ? false : isfile(ckpt)
+    restart_from = ckpt
+    if !isempty(restart_path)
+        isfile(restart_path) ||
+            error("ANN_RESTART=$restart_path is not an existing checkpoint file")
+        resume = true
+        restart_from = restart_path
+    end
+    if !resume && restart_physics !== :refuse
+        error("ANN_RESTART_PHYSICS=$(env_s("ANN_RESTART_PHYSICS", "")) needs a " *
+              "restart: set ANN_RESTART=<checkpoint> or put a checkpoint in " *
+              "ANN_CKPT_DIR")
+    end
     !isempty(ckdir) && !isnothing(mkpath(ckdir))
     println("# annulus benchmark nx=$nx ny=$ny level=$(trailing_zeros(nx)) " *
             "cells_y=$(ny÷nx) leaves=$(dofs.leaves) dofs=$(dofs.saddle) " *
@@ -473,6 +516,12 @@ function main(args)
     println("# criterion: t > $tmin, change_t/|dNu_T|/|dV_RMS| < $tol for " *
             "$window consecutive steps (steady_vrms=true); tstop=$tstop " *
             "maxsteps=$(env_i("ANN_MAXSTEPS", 200000)) ckpt=$(resume ? "resume" : isempty(ckpt) ? "off" : "new")")
+    if resume
+        println("# resume: file=$(restart_from) restart_physics=$restart_physics" *
+                (restart_physics === :allow ?
+                 " (intentional physics change: one warning, first resumed dt " *
+                 "reset to dt0=$dt0)" : " (same-physics resume expected)"))
+    end
     println("# mode: " *
             (cfl > 0 ? "time-accurate cfl=$cfl dt0=$dt0 dtmax=$(env_f("ANN_DTMAX", 1.0e-2))" :
                        "steady relaxation dt=$dt0 (CFL off; each step is a steady energy solve)") *
@@ -520,7 +569,8 @@ function main(args)
         kw[:mg_threads] = env_i("ANN_MG_THREADS", 8)
     end
     if resume
-        kw[:restart_from] = ckpt
+        kw[:restart_from] = restart_from
+        kw[:restart_physics] = restart_physics
         delete!(kw, :annulus_ic)  # a restart carries its own theta
     end
     st = run_semquad_simulation(qt, pr, zeros(Float64, ss.su.N); kw...)

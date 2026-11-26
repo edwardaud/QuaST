@@ -4,9 +4,9 @@ One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
 test script that starts with `using`; most wrap one `@testset`.
 
-Recorded full-suite totals: **142 290 total / 142 288 passed / 0 failed / 2 broken**, 30 m 45 s
-(2026-11-26, 8 threads / 16 cores, final tree of remediation batch P3;
-log `out_julia/agent/p3/suite.log`).  The tree has 208 gate files and `runtests.jl` includes each of them exactly
+Recorded full-suite totals: **142 369 total / 142 367 passed / 0 failed / 2 broken**, 34 m 33 s
+(2026-11-26, 8 threads / 16 cores, final tree of the physics-aware restart batch
+(G290/G291); log `out_julia/agent/continuation_suite.log`).  The tree has 210 gate files and `runtests.jl` includes each of them exactly
 once; `scripts/check_counts.jl`
 (run by hand, not part of the suite) checks those counts against this record and
 the other documented surfaces (`CONTRIBUTING.md`; the top-level `README.md` is
