@@ -330,6 +330,24 @@ campaign, audit defect B5; the box formula is its area-1 special case and the
 box branch is bit for bit unchanged).  The extra column changes `history.csv`'s
 layout, so `examples/case_realistic_2d.jl` only accepts `CASE_EXTDIAG=1` in a
 new output directory.
+`nu_undefined` (default `:refuse`) selects what the per-step history row does
+when the per-wall Nusselt pair is **undefined by construction**.  On a mapped
+geometry the pair needs the H-inclusive base conductive flux `-dTbar/dh` to point
+outward at both walls (`semquad_base_wall_refs`); the ring reverses it at the
+inner circle above
+`H_crit = 4/((R1^2-R0^2) - 2 R0^2 ln(R1/R0))` (2.4127 for the 1.22..2.22 ring),
+where `semquad_nu_walls` throws by design.  `:refuse` keeps that refusal
+verbatim -- every historical card and gate is bit for bit unchanged.  `:nan`
+keeps the run alive: the two Nu history columns (columns 3 and 4) are `NaN`, one
+`@warn` at the start of the run names the card, `H` and the two wall
+references, and the steady-state criterion cannot fire (a NaN Nu never
+"settles"; the other columns, and V_rms/meanT in particular, stay valid).  The
+keyword is *diagnostic only*: no trajectory, state or `run_config` entry depends
+on it (so it is not part of the restart guard), and on the box, or on a mapped
+card inside the limit, both settings call the usual diagnostic and are
+bit-identical.  It exists for demonstration cards that need `H` above the
+normalisable limit and do not use the Nusselt diagnostics -- see
+`examples/annulus_realistic_demo.jl` and the G294 gate.
 `corotation_guard=true` (the default) checks the **validity band** of the
 linearised co-rotational (Jaumann) term, `1 + dt*ad_W` (G254).  The term is
 valid where `2|W|dt << 1` (elastic regime) and `2*tau_M*|W|` is not large
@@ -560,6 +578,17 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 weak_chi0::Float64=0.0,
                                 nu_cbf::Bool=false,
                                 extdiag::Bool=false,
+                                # Diagnostic-only opt-in: when the per-wall
+                                # Nusselt pair is undefined by construction on
+                                # a mapped geometry (the H-inclusive base
+                                # conductive flux is non-positive at a wall;
+                                # H above H_crit ~2.41 on the ring), `:refuse`
+                                # (default) keeps the historical loud refusal
+                                # and `:nan` fills the two Nu history columns
+                                # with NaN instead, with one warning per run.
+                                # It changes no trajectory arithmetic and is
+                                # not part of `run_config`/the restart guard.
+                                nu_undefined::Symbol=:refuse,
                                 # G254: report the validity band of the
                                 # linearised co-rotational term and warn when
                                 # the run leaves it.  Diagnostic only (no
@@ -640,6 +669,15 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
     end
     mass_form in (:anelastic, :boussinesq) ||
         throw(ArgumentError("mass_form must be :anelastic or :boussinesq"))
+    # Diagnostic-only switch of the per-step Nu history columns (see the
+    # `nu_undefined` docstring paragraph and `_nu_pair_or_nan`): validated here
+    # so a typo fails before the setup work.
+    nu_undefined in (:refuse, :nan) ||
+        throw(ArgumentError("nu_undefined must be :refuse (default: the " *
+                            "undefined mapped Nusselt pair throws) or :nan " *
+                            "(opt-in: fill the two Nu history columns with NaN " *
+                            "when the mapped base wall reference is " *
+                            "non-positive), got :$nu_undefined"))
     # Forwarded verbatim to `solve_semquad_stokes_var`; validated here so a typo
     # fails before the setup work instead of inside the first Stokes solve.
     linear in (:direct, :schur_cg, :mg, :lagged, :auto) ||
@@ -965,6 +1003,21 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 "extdiag=false; the benchmark checks are the " *
                                 "per-wall Nu pair and the H-inclusive flux " *
                                 "identity."))
+    end
+    # One warning per run, before any setup work, when the opt-in `:nan` mode is
+    # actually needed.  This is a property of (geometry, H), not of a step: the
+    # warning therefore appears exactly once per run and no state is kept.
+    if nu_undefined === :nan && !_nu_pair_defined(geom, pr)
+        bot_ref, top_ref = semquad_base_wall_refs(pr, geom)
+        @warn "nu_undefined=:nan: the per-wall Nusselt pair is undefined on " *
+              "$(geometry_name(geom)) with H=$(pr.H).  The H-inclusive base " *
+              "conductive flux -dTbar/dh at the two walls is " *
+              "($(bot_ref), $(top_ref)); the pair needs both positive (the " *
+              "inner circle reverses sign above H_crit ~ 2.4127 for " *
+              "R0=1.22/R1=2.22).  The two Nu history columns (3, 4) are NaN " *
+              "for this run and the steady-state criterion cannot fire; " *
+              "T_max/V_rms/meanT stay valid.  Pass nu_undefined=:refuse (the " *
+              "default) to fail loudly instead."
     end
     initial_refine >= 0 || throw(ArgumentError("initial_refine must be >= 0"))
     max_level >= 1 || throw(ArgumentError("max_level must be >= 1"))
@@ -2216,7 +2269,8 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                      ux, uz, dt, dt_prev, step, t, ev_field, phases,
                                      advection, eta_for_energy, W_last, U_last,
                                      bal_last; extdiag=extdiag, nu_cbf=nu_cbf,
-                                     lat_theta_used=lat_theta_used)
+                                     lat_theta_used=lat_theta_used,
+                                     nu_undefined=nu_undefined)
         row = stepdiag.row
         Nut = stepdiag.Nut; Nub = stepdiag.Nub; Vr = stepdiag.Vr
         Ta = stepdiag.Ta; closure = stepdiag.closure
@@ -2316,9 +2370,15 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         # `include_vrms=false`, so a pre-0.5c2 card is unchanged bit for bit.
         if isfinite(steady_tol)
             change_t = norm(theta - theta_prev) / max(norm(theta), 1.0e-30)
-            dnu = isfinite(Nu_prev) ? abs(Nut - Nu_prev) : Inf
+            # `nu_undefined=:nan` runs carry NaN in the two Nu columns (the pair
+            # is undefined by construction); a NaN never settles, so make that
+            # explicit instead of leaning on IEEE comparison semantics and keep
+            # the criterion from firing.  With finite Nu columns `nu_ok` is
+            # true and the historical arithmetic is unchanged.
+            nu_ok = isfinite(Nut) && isfinite(Nub)
+            dnu = (nu_ok && isfinite(Nu_prev)) ? abs(Nut - Nu_prev) : Inf
             dvr = isfinite(Vr_prev) ? abs(Vr - Vr_prev) : Inf
-            if t > tmin &&
+            if t > tmin && nu_ok &&
                semquad_steady_step(change_t, dnu, dvr, Nut, Vr, steady_tol;
                                    include_vrms=steady_vrms)
                 steady_count += 1

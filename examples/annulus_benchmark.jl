@@ -350,11 +350,12 @@ mutable struct AnnulusFrameWriter
     t0::Float64
     mesh_dump::Bool
     defer_stale::Bool
+    profile::Symbol
 end
 
 """
     AnnulusFrameWriter(root, nx, ny, g, pr; dt=0.05, nr=200, nphi=1024,
-                       mesh_dump=false)
+                       mesh_dump=false, profile=:benchmark)
 
 Open the frame stream in `root` (recreated: stale `frame_*.bin`,
 `frame_*_mesh.csv` and `frame_meta.csv` are removed so two runs can never be
@@ -364,40 +365,185 @@ renderer can reconstruct the element boundaries and use one
 interpolation/theta grid for both codes.  `mesh_dump = true` writes the
 per-frame adaptive-mesh CSV (format in the file header) and upgrades the meta
 table to v2 with the `leaves,level_min,level_max,dt` columns.
+
+`profile` selects the frame/diagnostic family:
+
+  * `:benchmark` (default) is the published-benchmark stream described above;
+    its bytes are unchanged by any of the options here;
+  * `:state` is the **realistic-card / demonstration** stream: per frame the
+    same node-cloud state (`x, y, theta, T`) plus the raw velocity components
+    `ux, uy` (needed to rebuild the composite viscosity panel from the state
+    in Python, as the box clip did), a companion `frame_%05d_eta.bin` with the
+    composite `log10(eta/eta_ref)` at the same nodes when `pr.eta_law ==
+    :composite`, and the mesh dump whenever `mesh_dump` is set.  It **does not
+    call the Nusselt diagnostics** (`semquad_nu_walls` refuses mapped cards whose
+    H-inclusive base flux changes sign at a wall, e.g. the H = 10 ring) and its
+    meta row is
+    `frame,step,t,Vrms,meanT,Tmin,Tmax,nnodes,leaves,level_min,level_max,dt,umax,eta_interior`
+    (`eta_interior` is the arithmetic node mean of `eta/eta_ref` over
+    `0.25 <= h <= 0.75`, `h = (r-R0)/(R1-R0)`).  The header is
+    `# annulus_frames_v3` and its array list names the seven arrays.
 """
 function AnnulusFrameWriter(root::String, nx::Int, ny::Int, g::PolarAnnulus,
                             pr::Params; dt::Float64=0.05, nr::Int=200,
                             nphi::Int=1024, mesh_dump::Bool=false,
-                            defer_stale::Bool=false)
+                            defer_stale::Bool=false,
+                            profile::Symbol=:benchmark)
+    profile in (:benchmark, :state) ||
+        throw(ArgumentError("AnnulusFrameWriter profile must be :benchmark or " *
+                            ":state (got :$profile)"))
     dt > 0.0 || throw(ArgumentError("ANN_FRAME_DT must be > 0 (got $dt)"))
     nr >= 2 && nphi >= 4 ||
         throw(ArgumentError("ANN_FRAME_NR/NPHI must be >= 2/4 (got $nr/$nphi)"))
     mkpath(root)
     for old in readdir(root)
-        (occursin(r"^frame_\d{5}\.bin$", old) ||
-         occursin(r"^frame_\d{5}_mesh\.csv$", old) ||
+        (occursin(r"^frame_\d{5}(_[a-z]+)?\.(bin|csv)$", old) ||
          old == "frame_meta.csv") && rm(joinpath(root, old); force=true)
     end
     metapath = joinpath(root, "frame_meta.csv")
     io = open(metapath, "w")
-    println(io, mesh_dump ? "# annulus_frames_v2" : "# annulus_frames_v1")
-    println(io, "# mesh nx=$(nx) ny=$(ny) R0=$(repr(g.R0)) R1=$(repr(g.R1)) ",
-            "Phi=$(repr(g.Φ))")
-    println(io, "# polar_grid nr=$nr nphi=$nphi")
-    println(io, "# arrays x,y,theta,T,speed float64; file frame_%05d.bin = ",
-            "int64 nnodes then the five arrays, each nnodes long")
-    if mesh_dump
-        println(io, "# mesh_dump per-frame frame_%05d_mesh.csv = '#' header ",
-                "then level,x0,y0,hx,hy per leaf in logical coordinates ",
-                "(x = radial S in [0,1], y = angular T in [0,1])")
-        println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes,",
-                "leaves,level_min,level_max,dt")
+    if profile === :state
+        println(io, "# annulus_frames_v3")
+        println(io, "# mesh nx=$(nx) ny=$(ny) R0=$(repr(g.R0)) R1=$(repr(g.R1)) ",
+                "Phi=$(repr(g.Φ))")
+        println(io, "# polar_grid nr=$nr nphi=$nphi")
+        println(io, "# arrays x,y,theta,T,ux,uy float64; file frame_%05d.bin = ",
+                "int64 nnodes then the six arrays, each nnodes long; ",
+                "frame_%05d_eta.bin = float32 log10(eta/eta_ref) at the same ",
+                "nodes (composite law only)")
+        if mesh_dump
+            println(io, "# mesh_dump per-frame frame_%05d_mesh.csv = '#' ",
+                    "header then level,x0,y0,hx,hy per leaf in logical ",
+                    "coordinates (x = radial S in [0,1], y = angular T in ",
+                    "[0,1])")
+        end
+        println(io, "frame,step,t,Vrms,meanT,Tmin,Tmax,nnodes,leaves,",
+                "level_min,level_max,dt,umax,eta_interior")
     else
-        println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes")
+        println(io, mesh_dump ? "# annulus_frames_v2" : "# annulus_frames_v1")
+        println(io, "# mesh nx=$(nx) ny=$(ny) R0=$(repr(g.R0)) R1=$(repr(g.R1)) ",
+                "Phi=$(repr(g.Φ))")
+        println(io, "# polar_grid nr=$nr nphi=$nphi")
+        println(io, "# arrays x,y,theta,T,speed float64; file frame_%05d.bin = ",
+                "int64 nnodes then the five arrays, each nnodes long")
+        if mesh_dump
+            println(io, "# mesh_dump per-frame frame_%05d_mesh.csv = '#' header ",
+                    "then level,x0,y0,hx,hy per leaf in logical coordinates ",
+                    "(x = radial S in [0,1], y = angular T in [0,1])")
+            println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes,",
+                    "leaves,level_min,level_max,dt")
+        else
+            println(io, "frame,step,t,Nu_T,Nu_B,Vrms,meanT,Tmin,Tmax,nnodes")
+        end
     end
     flush(io)
     return AnnulusFrameWriter(root, io, 0, dt, nr, nphi, 0.0, time(), mesh_dump,
-                              defer_stale)
+                              defer_stale, profile)
+end
+
+"""
+    _write_state_frame!(fw, st, pr, g)
+
+The `profile = :state` frame writer (the realistic-card / demonstration stream;
+see `AnnulusFrameWriter`).  Writes the node-cloud state with the raw velocity
+components, the adaptive mesh, the composite `log10(eta/eta_ref)` field and the
+state meta row.  It deliberately **does not call `semquad_nu_walls`**: the
+per-wall Nusselt pair is undefined for a mapped card whose H-inclusive base flux
+changes sign at a wall (the H = 10 ring above H_crit ~ 2.41), so the demo runs
+with `nu_undefined = :nan` and this writer reports `Tmax`, `V_rms` and `meanT`
+instead.  Diagnostic only: nothing here touches the state.
+"""
+function _write_state_frame!(fw::AnnulusFrameWriter, st, pr::Params,
+                             g::PolarAnnulus)
+    s = st.sq
+    n = s.N
+    x = Vector{Float64}(undef, n)
+    y = Vector{Float64}(undef, n)
+    th = Vector{Float64}(undef, n)
+    T = Vector{Float64}(undef, n)
+    ux = Vector{Float64}(undef, n)
+    uy = Vector{Float64}(undef, n)
+    tmin = Inf
+    tmax = -Inf
+    @inbounds for i in 1:n
+        xi, yi = s.coords[i]
+        x[i] = xi
+        y[i] = yi
+        th[i] = st.theta[i]
+        Ti = semquad_base_T(pr, g, xi, yi) + st.theta[i]
+        T[i] = Ti
+        tmin = min(tmin, Ti)
+        tmax = max(tmax, Ti)
+        ux[i] = st.ux[i]
+        uy[i] = st.uz[i]
+    end
+    tag = @sprintf("frame_%05d", fw.frame)
+    binpath = joinpath(fw.dir, tag * ".bin")
+    tmppath = binpath * ".tmp"
+    open(tmppath, "w") do io
+        write(io, Int64(n))
+        write(io, x)
+        write(io, y)
+        write(io, th)
+        write(io, T)
+        write(io, ux)
+        write(io, uy)
+    end
+    mv(tmppath, binpath; force=true)
+    # The composite viscosity field the flow solve used (the law's units divided
+    # by eta_ref), at the same nodes, log10 for the renderer.  Only a composite
+    # card has one; every other law writes no eta file (and a NaN meta entry).
+    eta_interior = NaN
+    if pr.eta_law === :composite
+        ed = QuaST.semquad_strain_rate_field(s, st.ux, st.uz)
+        logeta = Vector{Float32}(undef, n)
+        num = 0.0
+        cnt = 0
+        @inbounds for i in 1:n
+            h = height(g, x[i], y[i])
+            e = eta_composite_at(T[i], ed[i], h, pr)[1] / pr.eta_ref
+            logeta[i] = Float32(log10(e))
+            if 0.25 <= h <= 0.75           # the interior band, h = r - R0
+                num += e
+                cnt += 1
+            end
+        end
+        cnt > 0 && (eta_interior = num / cnt)
+        open(joinpath(fw.dir, tag * "_eta.bin"), "w") do io
+            write(io, logeta)
+        end
+    end
+    # the adaptive mesh the frame state lives on (same dump as profile
+    # :benchmark; the callback runs after the AMR pass, so it is the post-AMR
+    # tree with the transferred fields)
+    qt = st.qt
+    nleaves = length(qt.leaves)
+    lmin, lmax = annulus_level_range(qt)
+    meshpath = joinpath(fw.dir, tag * "_mesh.csv")
+    meshtmp = meshpath * ".tmp"
+    open(meshtmp, "w") do io
+        println(io, "# annulus_mesh_v1 logical coords: level,x0,y0,hx,hy; ",
+                "x = radial S in [0,1], y = angular T in [0,1]; ",
+                "r = R0+(R1-R0)x, phi = Phi*y")
+        for lf in sort(collect(qt.leaves))
+            l = lf[1]
+            nsx = qt.nx0 * (1 << l)
+            nsy = qt.ny0 * (1 << l)
+            @printf(io, "%d,%.17g,%.17g,%.17g,%.17g\n",
+                    l, lf[2] / nsx, lf[3] / nsy, 1.0 / nsx, 1.0 / nsy)
+        end
+    end
+    mv(meshtmp, meshpath; force=true)
+    vr = semquad_vrms(s, qt, st.ux, st.uz)
+    tm = semquad_mean_T(s, qt, st.theta, pr)
+    umax = maximum(hypot.(st.ux, st.uz))
+    @printf(fw.meta,
+            "%d,%d,%.9e,%.9e,%.9e,%.9e,%.9e,%d,%d,%d,%d,%.9e,%.9e,%.9e\n",
+            fw.frame, st.step, st.t, vr, tm, tmin, tmax, n, nleaves, lmin,
+            lmax, st.dt, umax, eta_interior)
+    flush(fw.meta)
+    fw.frame += 1
+    return nothing
 end
 
 """
@@ -407,10 +553,12 @@ Write the current callback state (`st.theta`, `st.ux`, `st.uz` on `st.sq`) as
 the next frame, atomically: the binary is written to a temporary name in the
 same directory and renamed, then the meta row is appended and flushed.  A live
 renderer therefore sees a frame only once its file and its meta row are both
-complete.
+complete.  The `profile` of the writer selects the `:benchmark` or `:state`
+stream (see `AnnulusFrameWriter`).
 """
 function write_annulus_frame!(fw::AnnulusFrameWriter, st, pr::Params,
                               g::PolarAnnulus)
+    fw.profile === :state && return _write_state_frame!(fw, st, pr, g)
     s = st.sq
     n = s.N
     # the diagnostics on exactly the state the frame shows (the harness

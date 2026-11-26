@@ -13,6 +13,50 @@
 # every optional column is appended in a stated order, so an existing
 # `history.csv` stays byte-identical when a card does not ask for the extras.
 
+"""
+    _nu_pair_defined(geom, pr) -> Bool
+
+Whether the per-wall Nusselt pair `semquad_nu_walls` is defined on this
+geometry.  The box always is (its reference gradients are `±(1 + H/2)` and
+`H` is non-negative).  A mapped geometry needs the H-inclusive base conductive
+flux `-dTbar/dh` to point outward at **both** walls, i.e. both entries of
+`semquad_base_wall_refs(pr, geom)` must be positive; the annulus fails that when
+the internal heating reverses the base flux at the inner circle, above
+
+    H_crit = 4 / ((R1^2 - R0^2) - 2 R0^2 ln(R1/R0))   (~2.4127 for 1.22..2.22)
+
+At `H = H_crit` the inner reference is exactly zero.  `semquad_nu_walls` refuses
+such a state by design (`src/diagnostics/global.jl`); this predicate lets the
+driver decide *before* the refusal whether the run's history can carry the pair
+at all.  Diagnostic only: no arithmetic result of the solve reads it.
+"""
+@inline function _nu_pair_defined(::CartesianBox, ::Params)
+    return true
+end
+@inline function _nu_pair_defined(geom::AbstractGeometry, pr::Params)
+    bot_ref, top_ref = semquad_base_wall_refs(pr, geom)
+    return bot_ref > 0.0 && top_ref > 0.0
+end
+
+"""
+    _nu_pair_or_nan(sq, qt, theta, pr, nu_undefined) -> (Nut, Nub)
+
+The two Nusselt columns of the history row.  `nu_undefined = :refuse` (the
+default) always calls `semquad_nu_walls`, so an undefined mapped pair throws its
+own `ArgumentError` verbatim.  `:nan` (opt-in, `run_semquad_simulation`) returns
+`(NaN, NaN)` instead when `_nu_pair_defined` is false, keeping the rest of the
+run (trajectory, every other column) alive; see `run.jl`'s `nu_undefined`
+docstring.  On a defined card both settings are bit-identical.
+"""
+@inline function _nu_pair_or_nan(sq::SemQuad, qt::Quadtree,
+                                 theta::Vector{Float64}, pr::Params,
+                                 nu_undefined::Symbol)
+    if nu_undefined === :nan && !_nu_pair_defined(sq.geom, pr)
+        return NaN, NaN
+    end
+    return semquad_nu_walls(sq, qt, theta, pr)
+end
+
 function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
                            theta::Vector{Float64},
                            theta_prev::Vector{Float64},
@@ -22,8 +66,8 @@ function _step_diagnostics(sq::SemQuad, qt::Quadtree, pr::Params,
                            t::Float64, ev_field, phases, advection::Symbol,
                            eta_for_energy, W_last::Float64, U_last::Float64,
                            bal_last::Float64; extdiag::Bool, nu_cbf::Bool,
-                           lat_theta_used)
-    Nut, Nub = semquad_nu_walls(sq, qt, theta, pr)
+                           lat_theta_used, nu_undefined::Symbol=:refuse)
+    Nut, Nub = _nu_pair_or_nan(sq, qt, theta, pr, nu_undefined)
     Vr = semquad_vrms(sq, qt, ux, uz)
     Ta = semquad_mean_T(sq, qt, theta, pr)
     g = sq.geom

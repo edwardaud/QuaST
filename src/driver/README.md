@@ -107,6 +107,24 @@ refusals, depth-dependent closure wiring); G275 is the stage-0.5b2 gate
 (free-slip rows, Couette/manufactured analytic gates, `:open` traction, rotation
 gauge, annular IC and the free-slip end-to-end driver run).
 
+**The undefined Nusselt pair on a strongly heated ring (`nu_undefined`, G294).**
+The per-wall Nusselt normalisation needs the H-inclusive base conductive flux
+`-dTbar/dh` to point outward at both walls, so it is defined on the ring only
+for `H < H_crit = 4/((R1^2-R0^2) - 2 R0^2 ln(R1/R0))` (= 2.4127 for the
+1.22/2.22 ring; the previously quoted `4/(R1^2-R0^2) = 1.163` is the stricter
+condition that the *logarithmic part alone* stays decreasing, i.e. sufficient
+but not necessary).  Above the limit `semquad_nu_walls` throws by design.  The
+driver keyword `nu_undefined` (default `:refuse`) keeps that refusal verbatim;
+the opt-in `:nan` fills the two Nu history columns with `NaN`, emits one `@warn`
+at the start of the run naming the card, `H` and the two wall references, and
+tears down the steady-state criterion for that run (a NaN Nu never settles).
+It is diagnostic only (no trajectory, state or `run_config` entry; not in the
+restart guard), is bit-identical on the box and on mapped cards inside the
+limit, and exists so the demonstration card
+`examples/annulus_realistic_demo.jl` (the realistic composite-rheology card with
+`H = 10` on the ring) can adapt and integrate while its Nusselt pair stays
+undefined; G294 pins the default refusal, the `:nan` run and the box-invariance.
+
 **Physics-aware state continuation (G290/G291).**  A checkpoint stores the full
 state (`theta`, `theta_prev`, `u`, `p`, `t`, `dt`, `dt_prev`, `step`, the AMR
 cooldown, the EV/weak/stress fields) *and* the `run_config`, so a same-card

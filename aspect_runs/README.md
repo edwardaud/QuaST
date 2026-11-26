@@ -58,6 +58,7 @@ binary was used and the DEBUG cost measured beside it.
 | `make_noav.py` -> `realistic_noav.prm` | Generated card with artificial viscosity switched off. |
 | `realistic_composite.cc`, `CMakeLists.txt` | The ASPECT plugin and its build. |
 | `annulus_demo/demo.prm`, `annulus_demo/VoT.cc`, `annulus_demo/CMakeLists.txt` | The annulus AMR **demonstration** card (the ASPECT side of `docs/assets/quast_vs_aspect_annulus_demo.gif`) and the tracked `VoT` benchmark plugin it loads; `annulus_demo/README.md` holds the build/run commands, the measured cost and the stated deviations. |
+| `annulus_realistic_demo/annulus_realistic_pilot.prm`, `..._probe.prm`, `README.md` | The realistic composite-rheology card on the closed ring (the ASPECT counterpart of `examples/annulus_realistic_demo.jl`): the six allowed changes from `verify7000.prm` (shell geometry, radial gravity, free-slip circles + net-rotation removal, spherical temperatures, the annular function IC, output/cadence) with the material/heating/phases/solver settings and the **AMR block verbatim**; the README holds the plugin build, the pilot measurements and the projected cost. Pilot only, not the final clip card. |
 | `*.py` (not `make_*`) | Analysis: cross-code Nu/Vrms profiles, VTU extraction and cost projections. |
 
 ## Licence

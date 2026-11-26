@@ -7,6 +7,8 @@ public release: earlier development happened in a private repository.
 ## [Unreleased]
 
 - The annulus AMR demonstration (`examples/annulus_benchmark.jl demo`, `scripts/run_annulus_demo.sh`, `aspect_runs/annulus_demo/`, `scripts/annulus_video.py --amr`): a purpose-configured two-code demonstration of the adaptive path, rendered as `docs/assets/quast_vs_aspect_annulus_demo.gif`.
+- The realistic composite-rheology card on the closed 2-D ring (pilot): `examples/annulus_realistic_demo.jl` (the box card's physics and production AMR settings on the ring, with a `profile = :state` frame stream carrying `ux, uy`, `log10(eta/eta_ref)` and the mesh for the viscosity-panel rebuild) and the tracked ASPECT pilot card `aspect_runs/annulus_realistic_demo/`.
+- Driver keyword `nu_undefined = :refuse | :nan` (default `:refuse`, bit-for-bit unchanged): a mapped card whose H-inclusive base conductive flux is non-positive at a wall cannot have the per-wall Nusselt pair, and `:nan` lets a demonstration that does not use it run with NaN Nu history columns, one warning and no steady-state criterion. The guide's annulus heating limit is corrected from `4/(R1^2-R0^2)` to the wall-flux condition `H_crit = 4/[(R1^2-R0^2) - 2 R0^2 ln(R1/R0)]` (~2.4127 for the 1.22/2.22 ring). New gate G294.
 
 ## [0.2.0] - 2026-11-26
 

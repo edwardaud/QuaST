@@ -222,4 +222,7 @@ using QuaST
     # annulus AMR demonstration figure: demo preset, frame/mesh stream, and the
     # benchmark default path (G293)
     include("t_g293_annulus_demo_frames.jl")
+    # realistic-card-on-the-ring pilot: the undefined mapped Nusselt pair and
+    # the opt-in nu_undefined=:nan driver keyword (G294)
+    include("t_g294_nu_undefined.jl")
 end

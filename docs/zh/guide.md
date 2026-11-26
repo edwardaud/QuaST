@@ -292,7 +292,7 @@ $$
 
 周期接缝是拓扑，不是壁面。圆环几何需要 `Quadtree(...; seam = :periodic)` 建出的树并且 $\Phi = 2\pi$ ；同一几何放在有界树上就是楔形或切口环，它的两条径向切割是绝热的对称切割。驱动会拒绝接缝与几何不匹配的树，所以一次运行不会悄悄把壁面换成周期边。圆环上两个圆面是唯一的壁面；楔形上两条径向切割保持绝热。
 
-有三个闭合随几何改变。基态是径向传导解： $H = 0$ 时是对数型 $\bar T(r) = \ln(R\_1/r)/\ln(R\_1/R\_0)$ ， $H \neq 0$ 时再加上 $T'' + T'/r = -H$ 的特解（`src/physics/annulus_base.jl` 里两种形式都有）； $H = 0$ 是基准情形。对数归一化只在 $H < 4/(R\_1^2 - R\_0^2)$ 时单调（本环约 1.16）：超过它，基准传导热流在内壁变号，逐壁 Nusselt 对没有定义，诊断会拒绝这样的运行。需要强内部生热时请用 $H = 0$ （基线与 AMR 演示）或盒子/参考状态参数卡。浮力是径向投影 $+Ra\,\theta\,e\_r$ 。Nusselt 数用逐壁的点式对与对数归一化
+有三个闭合随几何改变。基态是径向传导解： $H = 0$ 时是对数型 $\bar T(r) = \ln(R\_1/r)/\ln(R\_1/R\_0)$ ， $H \neq 0$ 时再加上 $T'' + T'/r = -H$ 的特解（`src/physics/annulus_base.jl` 里两种形式都有）； $H = 0$ 是基准情形。逐壁 Nusselt 对要求含 $H$ 的基态通量 $-\mathrm d\bar T/\mathrm dr$ 在两个圆面上都朝外。对本环，这等价于 $H < H\_\mathrm{crit} = 4/[(R\_1^2-R\_0^2) - 2R\_0^2\ln(R\_1/R\_0)] \approx 2.4127$ ；在 $H\_\mathrm{crit}$ 处内壁的参考通量恰好为零，超过它这一对按构造没有定义， `semquad_nu_walls` 会拒绝该运行。（本段早先引用的 $4/(R\_1^2-R\_0^2)\approx1.16$ 只是“对数部分本身保持下降”这一更严格的充分条件，并非必要。）超过上限后演示卡可以传 `nu_undefined = :nan` ：两列 Nu 历史值变成 `NaN` ，运行开始时有一条警告写明卡片、 $H$ 与两个壁面参考通量，稳态判据无法触发，而状态与其余各列（ $V\_{RMS}$ 、平均 $T$ ）仍然有效；默认值 `:refuse` 保持直接拒绝。圆环上的真实参数卡演示例（`examples/annulus_realistic_demo.jl`， $H=10$ ）使用 `:nan` 。需要 Nusselt 诊断又要有强内部生热时，请用 $H = 0$ （基线与 AMR 演示）或盒子/参考状态参数卡。浮力是径向投影 $+Ra\,\theta\,e\_r$ 。Nusselt 数用逐壁的点式对与对数归一化
 
 $$
 Nu_{wall} = \frac{R_{wall}\lvert\ln f\rvert\,\langle -\partial T/\partial r\rangle}{\Delta T},
@@ -714,6 +714,7 @@ $$
 | `phases`、`latent_scheme` | `[]`、`:implicit` | 两个相变、`:implicit` | 相变与潜热耦合；`maxpic = 1` 时两种格式结果相同。 |
 | `weak_chi0` | 0 | 0 | 初始应变弱化场；只有参数卡设置了弱化参数时才起作用。 |
 | `nu_cbf` | false | false | 把一致边界通量的 Nusselt 对追加到 history 里（见 7.2 节）。 |
+| `nu_undefined` | `:refuse` | `:nan` | 映射几何上逐壁 Nusselt 对按构造没有定义时（加热超过 $H\_\mathrm{crit}$ ）历史怎么处理：`:refuse` 保持直接拒绝，`:nan` 把两列 Nu 历史值填成 `NaN` 并关闭稳态判据（仅诊断用途；见 1.10 节）。 |
 | `restart_from` | `""` | 取决于模式 | 从哪个检查点重启。 |
 | `checkpoint_path`、`checkpoint_every` | `""`、0 | `$CASE_OUT/spinup.h5`、200 | 检查点的写入位置与间隔。 |
 | `checkpoint_meta`、`callback`、`verbose`、`profile_steps` | 空、`nothing`、false、false | 参数卡的元数据、帧写入器、true、false | 检查点元数据、步钩子、逐步输出、逐步计时。 |
