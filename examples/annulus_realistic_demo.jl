@@ -28,7 +28,11 @@
 #               refine_frac = 0.2, coarsen_frac = 0.05, max_leaves = 10000,
 #               max_level = 7, wall_min_level = 5, wall_strip = 0.1,
 #               hysteresis = 1, coarsen gate on, symmetry = :none,
-#               indicator = :theta; start from the 640-leaf level-3 ring tree
+#               indicator = :theta by default; `ANN_REAL_INDICATOR=both` or
+#               `velocity` selects another indicator, `ANN_REAL_REFINE_FRAC`
+#               overrides the 0.2 Dörfler fraction; both actual values are
+#               printed and recorded in the card meta; start from the
+#               640-leaf level-3 ring tree
 #               (radial 8 x angular 80, i.e. cells_y = 10) that mirrors the box
 #               card's 640-leaf level-3 start; no initial_refine (the box card
 #               starts from its 640-leaf tree and lets the time loop refine);
@@ -92,18 +96,24 @@
 #                              the frame stream then appends, frames already written
 #                              before the resume step are not rewritten)
 #
-# The tracked figure's QuaST command (direct solve, 30 000-leaf budget; the
-# tracked clip stops at t_nd = 1.2e-4, about 9 h on 8 threads.  At the full
-# leaf budget the direct solve slows to about two minutes per step and the
-# development machine's 26 GB WSL memory swaps, so the full 3.2e-4 window needs
-# a larger machine):
+# The tracked figure's QuaST command (balanced AMR, normalised theta+velocity
+# indicator, refine_frac 0.3, 25 000 leaves; full active window t_nd = 1.2e-4 in
+# about 4.7 h on 8 threads including the pilot segment).  This is a
+# demonstration setting: the card defaults stay theta/0.2, but on this ring the
+# theta/0.2 arm was measured to stall at level 7 (28 identical mesh dumps) while
+# the budget was below its cap, so the tracked clip uses:
 #
-#   ANN_REAL_OUT=out_julia/annulus_realistic/quast_prod30 \
-#   ANN_REAL_STEPS=60000 ANN_REAL_TSTOP=1.2e-4 ANN_REAL_FRAME=5 \
-#   ANN_REAL_MAXLEAVES=30000 ANN_REAL_LINEAR=direct \
-#   ANN_REAL_CHECKPOINT=out_julia/annulus_realistic/quast_prod30.h5 \
+#   ANN_REAL_OUT=out_julia/annulus_realistic/quast_pilot_both25_f03 \
+#   ANN_REAL_STEPS=6000 ANN_REAL_TSTOP=1.2e-4 ANN_REAL_FRAME=5 \
+#   ANN_REAL_MAXLEAVES=25000 ANN_REAL_LINEAR=direct \
+#   ANN_REAL_INDICATOR=both ANN_REAL_REFINE_FRAC=0.3 \
+#   ANN_REAL_CHECKPOINT=out_julia/annulus_realistic/quast_both03_final.h5 \
 #   ANN_REAL_CHECKPOINT_EVERY=100 \
 #   julia --project=. --threads=8 examples/annulus_realistic_demo.jl
+#
+# To continue a frame stream, set ANN_REAL_RESTART to the checkpoint: the
+# driver restores the tree, fields, t, dt, step and cooldown, and the frame
+# writer appends without rewriting frames.
 #
 # The default benchmark path of examples/annulus_benchmark.jl is untouched
 # (G277/G293): this file only includes it for the tree helper and the frame
@@ -144,7 +154,11 @@ const SCALE_SET = (rho=3300.0, g=9.81, alpha=3.0e-5, dT=1000.0, d=2.9e6,
                    kappa=1.0e-6)
 # AMR card (the original box card's production settings)
 const AMR_EVERY = 5
-const REFINE_FRAC = 0.2
+# The box card's 0.2 Dörfler fraction; `ANN_REAL_REFINE_FRAC` is an experiment
+# knob and the actual value is recorded in the card meta.
+const REFINE_FRAC = parse(Float64, get(ENV, "ANN_REAL_REFINE_FRAC", "0.2"))
+0.0 < REFINE_FRAC <= 1.0 ||
+    error("ANN_REAL_REFINE_FRAC must be in (0, 1] (got $REFINE_FRAC)")
 const COARSEN_FRAC = 0.05
 const MAXLEAVES = parse(Int, get(ENV, "ANN_REAL_MAXLEAVES", "10000"))
 const MAXLEV = 7
@@ -153,7 +167,12 @@ const WALL_STRIP = 0.1
 const AMR_HYST = 1
 const AMR_GATE = true
 const SYMMETRY = :none
-const AMR_IND = :theta
+# The box card's indicator is :theta.  `ANN_REAL_INDICATOR=both|velocity`
+# switches it for experiments; the actual value is printed and recorded in the
+# card meta, so a rendered sidecar cannot claim the default when it was not.
+const AMR_IND = Symbol(get(ENV, "ANN_REAL_INDICATOR", "theta"))
+AMR_IND in (:theta, :velocity, :both) ||
+    error("ANN_REAL_INDICATOR must be theta, velocity or both (got $AMR_IND)")
 # time-step card
 const CFL = 0.5
 const DT0 = 1.0e-6
@@ -387,7 +406,7 @@ function main()
         "refine_frac" => REFINE_FRAC, "coarsen_frac" => COARSEN_FRAC,
         "wall_min_level" => WALL_MIN, "wall_strip" => WALL_STRIP,
         "amr_hysteresis" => AMR_HYST, "amr_coarsen_gate" => AMR_GATE,
-        "symmetry" => "none", "indicator" => "theta",
+        "symmetry" => "none", "indicator" => string(AMR_IND),
         "linear" => string(LINEAR), "cfl" => CFL, "ev" => EV,
         "nu_undefined" => "nan",
         "seed" => "0.05 sin(pi h) cos(2 phi) + 0.02 sin(2 pi h) cos(4 phi)")

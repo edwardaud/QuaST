@@ -6,11 +6,13 @@
     "physics": "H = 10, Boussinesq, nominal Ra = 1e5 at the composite calibration point; composite isostress diffusion+dislocation rheology (A_d=1.6240183119e5, A_s=2.6796419238e-1, E_d=12, E_s=17, n=3, eta_T0=0.5, eps_min=1e-12, eta_min=1e-4, eta_max=1e4), two phase transitions z0 = 0.87 (+0.032, B=1.8182) and z0 = 0.78 (-0.032, B=3.0303) with per-phase latent heat (L=0.11), no yielding/weakening",
     "initial_condition": "0.05 sin(pi h) cos(2 phi) + 0.02 sin(2 pi h) cos(4 phi) on top of the annular H-inclusive conductive base, h=(r-R0)/d, phi=atan2(y,x)",
     "measured": {
-      "Ra_interior": null,
-      "source": null,
-      "note": "not recorded: the 30k arm was stopped before the run's final summary line; the plates and the per-frame diagnostics come from the saved frames (eta_interior_node is in the frame meta)"
+      "Ra_interior": 34739140.0,
+      "source": "ANNULUS_REALISTIC_RESULT, final state of the QuaST run",
+      "eta_min": 0.001041361,
+      "eta_max": 10000.0,
+      "eta_contrast": 9603000.0
     },
-    "amr_quast": "AMR: balanced every=5 steps refine_frac=0.2 coarsen_frac=0.05 max_leaves=30000 max_level=7 wall_min_level=5 wall_strip=0.1 hysteresis=1 gate=true symmetry=none indicator=theta initial_refine=0",
+    "amr_quast": "AMR: balanced every=5 steps refine_frac=0.3 coarsen_frac=0.05 max_leaves=25000 max_level=7 wall_min_level=5 wall_strip=0.1 hysteresis=1 gate=true symmetry=none indicator=both initial_refine=0",
     "amr_aspect": {
       "End time": "2.6912e15",
       "CFL number": "0.5",
@@ -35,7 +37,7 @@
       "Temperature solver tolerance": "1e-9"
     },
     "material_model_aspect": "realistic composite",
-    "quast_log": "out_julia/annulus_realistic/quast_prod30.log",
+    "quast_log": "out_julia/annulus_realistic/quast_both03_final.log",
     "aspect_prm": "/mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod/original.prm",
     "aspect_prms": [
       {
@@ -77,12 +79,12 @@
   },
   "inputs": {
     "quast": {
-      "path": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/quast_prod30",
+      "path": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/quast_pilot_both25_f03",
       "kind": "annulus_frames_v3 state profile",
-      "nframes": 171,
+      "nframes": 175,
       "t_range": [
         1e-06,
-        0.0001245926155
+        0.0001201996705
       ],
       "meta_version": 3,
       "mesh": {
@@ -92,7 +94,7 @@
         "R1": 2.22
       },
       "field_eta": "frame_%05d_eta.bin, the solver's own nodal log10(eta/eta_ref)",
-      "provenance": "production"
+      "provenance": "production, both/0.3/25k, resumed from the pilot checkpoint at t=6.005e-5"
     },
     "aspect": {
       "paths": [
@@ -198,26 +200,26 @@
       "cmap": "inferno",
       "measured": [
         0.0,
-        1.8639144027562775
+        1.8390415695357984
       ]
     },
     "theta": {
-      "vmin": -0.9,
-      "vmax": 0.9,
+      "vmin": -0.92,
+      "vmax": 0.92,
       "cmap": "RdBu_r",
       "measured": [
-        -0.8907575577652459,
-        0.606841287342565
+        -0.9124711219801319,
+        0.5391192635919198
       ]
     },
     "log10_eta": {
-      "vmin": -3.1,
+      "vmin": -3.0,
       "vmax": 4.0,
       "cmap": "magma_r",
       "gamma": 0.3,
       "norm": "power law (box-clip mapping): colour = ((log10 eta - vmin)/(vmax - vmin))**0.30; the bar labels the true log10 values, dark = stiff = cold",
       "measured": [
-        -3.0059962272644043,
+        -2.9825282096862793,
         4.0
       ]
     },
@@ -245,11 +247,11 @@
     "quast_frame_cadence": "one frame every 5 steps plus one step past every AMR cycle (and the final state)",
     "aspect_frame_cadence": "1.682e13",
     "max_abs_delta": {
-      "QuaST": 3.827861790000001e-06,
+      "QuaST": 3.8285393599999995e-06,
       "ASPECT": 1e-06
     },
     "distinct_frames": {
-      "QuaST": 83,
+      "QuaST": 82,
       "ASPECT": 61
     },
     "targets": [
@@ -381,10 +383,10 @@
             "delta": 2.8019128120000005e-06,
             "describe": "frame 1, step 6",
             "inset": {
-              "Vrms": 3829.724184,
-              "meanT": 1.240776612,
-              "Tmax": 1.818477529,
-              "eta_interior": 0.002210820329,
+              "Vrms": 3829.623367,
+              "meanT": 1.240776656,
+              "Tmax": 1.82354793,
+              "eta_interior": 0.002130553835,
               "source": "frame_meta.csv",
               "describe": "t=6.80191e-06"
             },
@@ -420,10 +422,10 @@
             "delta": 1.8019128120000008e-06,
             "describe": "frame 1, step 6",
             "inset": {
-              "Vrms": 3829.724184,
-              "meanT": 1.240776612,
-              "Tmax": 1.818477529,
-              "eta_interior": 0.002210820329,
+              "Vrms": 3829.623367,
+              "meanT": 1.240776656,
+              "Tmax": 1.82354793,
+              "eta_interior": 0.002130553835,
               "source": "frame_meta.csv",
               "describe": "t=6.80191e-06"
             },
@@ -459,10 +461,10 @@
             "delta": 8.019128120000011e-07,
             "describe": "frame 1, step 6",
             "inset": {
-              "Vrms": 3829.724184,
-              "meanT": 1.240776612,
-              "Tmax": 1.818477529,
-              "eta_interior": 0.002210820329,
+              "Vrms": 3829.623367,
+              "meanT": 1.240776656,
+              "Tmax": 1.82354793,
+              "eta_interior": 0.002130553835,
               "source": "frame_meta.csv",
               "describe": "t=6.80191e-06"
             },
@@ -498,10 +500,10 @@
             "delta": -1.9808718799999954e-07,
             "describe": "frame 1, step 6",
             "inset": {
-              "Vrms": 3829.724184,
-              "meanT": 1.240776612,
-              "Tmax": 1.818477529,
-              "eta_interior": 0.002210820329,
+              "Vrms": 3829.623367,
+              "meanT": 1.240776656,
+              "Tmax": 1.82354793,
+              "eta_interior": 0.002130553835,
               "source": "frame_meta.csv",
               "describe": "t=6.80191e-06"
             },
@@ -537,10 +539,10 @@
             "delta": -1.1980871879999993e-06,
             "describe": "frame 1, step 6",
             "inset": {
-              "Vrms": 3829.724184,
-              "meanT": 1.240776612,
-              "Tmax": 1.818477529,
-              "eta_interior": 0.002210820329,
+              "Vrms": 3829.623367,
+              "meanT": 1.240776656,
+              "Tmax": 1.82354793,
+              "eta_interior": 0.002130553835,
               "source": "frame_meta.csv",
               "describe": "t=6.80191e-06"
             },
@@ -576,10 +578,10 @@
             "delta": -2.198087188e-06,
             "describe": "frame 1, step 6",
             "inset": {
-              "Vrms": 3829.724184,
-              "meanT": 1.240776612,
-              "Tmax": 1.818477529,
-              "eta_interior": 0.002210820329,
+              "Vrms": 3829.623367,
+              "meanT": 1.240776656,
+              "Tmax": 1.82354793,
+              "eta_interior": 0.002130553835,
               "source": "frame_meta.csv",
               "describe": "t=6.80191e-06"
             },
@@ -615,10 +617,10 @@
             "delta": -3.1980871880000005e-06,
             "describe": "frame 1, step 6",
             "inset": {
-              "Vrms": 3829.724184,
-              "meanT": 1.240776612,
-              "Tmax": 1.818477529,
-              "eta_interior": 0.002210820329,
+              "Vrms": 3829.623367,
+              "meanT": 1.240776656,
+              "Tmax": 1.82354793,
+              "eta_interior": 0.002130553835,
               "source": "frame_meta.csv",
               "describe": "t=6.80191e-06"
             },
@@ -650,16 +652,16 @@
           {
             "row": "QuaST",
             "index": 2,
-            "t": 1.40519474e-05,
-            "delta": 3.0519474000000004e-06,
+            "t": 1.405200107e-05,
+            "delta": 3.0520010700000005e-06,
             "describe": "frame 2, step 11",
             "inset": {
-              "Vrms": 3053.645742,
-              "meanT": 1.240775844,
-              "Tmax": 1.821427848,
-              "eta_interior": 0.002102986361,
+              "Vrms": 3053.698171,
+              "meanT": 1.240776156,
+              "Tmax": 1.823607235,
+              "eta_interior": 0.002008755634,
               "source": "frame_meta.csv",
-              "describe": "t=1.40519e-05"
+              "describe": "t=1.4052e-05"
             },
             "frame": 2,
             "step": 11
@@ -689,16 +691,16 @@
           {
             "row": "QuaST",
             "index": 2,
-            "t": 1.40519474e-05,
-            "delta": 2.0519473999999998e-06,
+            "t": 1.405200107e-05,
+            "delta": 2.05200107e-06,
             "describe": "frame 2, step 11",
             "inset": {
-              "Vrms": 3053.645742,
-              "meanT": 1.240775844,
-              "Tmax": 1.821427848,
-              "eta_interior": 0.002102986361,
+              "Vrms": 3053.698171,
+              "meanT": 1.240776156,
+              "Tmax": 1.823607235,
+              "eta_interior": 0.002008755634,
               "source": "frame_meta.csv",
-              "describe": "t=1.40519e-05"
+              "describe": "t=1.4052e-05"
             },
             "frame": 2,
             "step": 11
@@ -728,16 +730,16 @@
           {
             "row": "QuaST",
             "index": 2,
-            "t": 1.40519474e-05,
-            "delta": 1.0519473999999992e-06,
+            "t": 1.405200107e-05,
+            "delta": 1.0520010699999993e-06,
             "describe": "frame 2, step 11",
             "inset": {
-              "Vrms": 3053.645742,
-              "meanT": 1.240775844,
-              "Tmax": 1.821427848,
-              "eta_interior": 0.002102986361,
+              "Vrms": 3053.698171,
+              "meanT": 1.240776156,
+              "Tmax": 1.823607235,
+              "eta_interior": 0.002008755634,
               "source": "frame_meta.csv",
-              "describe": "t=1.40519e-05"
+              "describe": "t=1.4052e-05"
             },
             "frame": 2,
             "step": 11
@@ -767,16 +769,16 @@
           {
             "row": "QuaST",
             "index": 2,
-            "t": 1.40519474e-05,
-            "delta": 5.1947400000000295e-08,
+            "t": 1.405200107e-05,
+            "delta": 5.2001070000000377e-08,
             "describe": "frame 2, step 11",
             "inset": {
-              "Vrms": 3053.645742,
-              "meanT": 1.240775844,
-              "Tmax": 1.821427848,
-              "eta_interior": 0.002102986361,
+              "Vrms": 3053.698171,
+              "meanT": 1.240776156,
+              "Tmax": 1.823607235,
+              "eta_interior": 0.002008755634,
               "source": "frame_meta.csv",
-              "describe": "t=1.40519e-05"
+              "describe": "t=1.4052e-05"
             },
             "frame": 2,
             "step": 11
@@ -806,16 +808,16 @@
           {
             "row": "QuaST",
             "index": 2,
-            "t": 1.40519474e-05,
-            "delta": -9.480526000000003e-07,
+            "t": 1.405200107e-05,
+            "delta": -9.479989300000002e-07,
             "describe": "frame 2, step 11",
             "inset": {
-              "Vrms": 3053.645742,
-              "meanT": 1.240775844,
-              "Tmax": 1.821427848,
-              "eta_interior": 0.002102986361,
+              "Vrms": 3053.698171,
+              "meanT": 1.240776156,
+              "Tmax": 1.823607235,
+              "eta_interior": 0.002008755634,
               "source": "frame_meta.csv",
-              "describe": "t=1.40519e-05"
+              "describe": "t=1.4052e-05"
             },
             "frame": 2,
             "step": 11
@@ -845,16 +847,16 @@
           {
             "row": "QuaST",
             "index": 2,
-            "t": 1.40519474e-05,
-            "delta": -1.948052599999999e-06,
+            "t": 1.405200107e-05,
+            "delta": -1.947998929999999e-06,
             "describe": "frame 2, step 11",
             "inset": {
-              "Vrms": 3053.645742,
-              "meanT": 1.240775844,
-              "Tmax": 1.821427848,
-              "eta_interior": 0.002102986361,
+              "Vrms": 3053.698171,
+              "meanT": 1.240776156,
+              "Tmax": 1.823607235,
+              "eta_interior": 0.002008755634,
               "source": "frame_meta.csv",
-              "describe": "t=1.40519e-05"
+              "describe": "t=1.4052e-05"
             },
             "frame": 2,
             "step": 11
@@ -884,16 +886,16 @@
           {
             "row": "QuaST",
             "index": 2,
-            "t": 1.40519474e-05,
-            "delta": -2.9480525999999998e-06,
+            "t": 1.405200107e-05,
+            "delta": -2.9479989299999997e-06,
             "describe": "frame 2, step 11",
             "inset": {
-              "Vrms": 3053.645742,
-              "meanT": 1.240775844,
-              "Tmax": 1.821427848,
-              "eta_interior": 0.002102986361,
+              "Vrms": 3053.698171,
+              "meanT": 1.240776156,
+              "Tmax": 1.823607235,
+              "eta_interior": 0.002008755634,
               "source": "frame_meta.csv",
-              "describe": "t=1.40519e-05"
+              "describe": "t=1.4052e-05"
             },
             "frame": 2,
             "step": 11
@@ -923,16 +925,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": 3.827861790000001e-06,
+            "t": 2.182853936e-05,
+            "delta": 3.8285393599999995e-06,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -962,16 +964,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": 2.82786179e-06,
+            "t": 2.182853936e-05,
+            "delta": 2.828539359999999e-06,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -1001,16 +1003,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": 1.827861790000003e-06,
+            "t": 2.182853936e-05,
+            "delta": 1.8285393600000017e-06,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -1040,16 +1042,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": 8.278617900000024e-07,
+            "t": 2.182853936e-05,
+            "delta": 8.285393600000011e-07,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -1079,16 +1081,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": -1.7213820999999822e-07,
+            "t": 2.182853936e-05,
+            "delta": -1.714606399999995e-07,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -1118,16 +1120,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": -1.1721382099999988e-06,
+            "t": 2.182853936e-05,
+            "delta": -1.17146064e-06,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -1157,16 +1159,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": -2.1721382099999994e-06,
+            "t": 2.182853936e-05,
+            "delta": -2.1714606400000007e-06,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -1196,16 +1198,16 @@
           {
             "row": "QuaST",
             "index": 3,
-            "t": 2.182786179e-05,
-            "delta": -3.17213821e-06,
+            "t": 2.182853936e-05,
+            "delta": -3.1714606400000013e-06,
             "describe": "frame 3, step 16",
             "inset": {
-              "Vrms": 2834.470359,
-              "meanT": 1.24077272,
-              "Tmax": 1.822475638,
-              "eta_interior": 0.002020562269,
+              "Vrms": 2834.250975,
+              "meanT": 1.240773383,
+              "Tmax": 1.827280748,
+              "eta_interior": 0.001903145769,
               "source": "frame_meta.csv",
-              "describe": "t=2.18279e-05"
+              "describe": "t=2.18285e-05"
             },
             "frame": 3,
             "step": 16
@@ -1235,16 +1237,16 @@
           {
             "row": "QuaST",
             "index": 4,
-            "t": 2.916184204e-05,
-            "delta": 3.1618420400000017e-06,
+            "t": 2.91632402e-05,
+            "delta": 3.163240200000003e-06,
             "describe": "frame 4, step 21",
             "inset": {
-              "Vrms": 3002.720278,
-              "meanT": 1.240765138,
-              "Tmax": 1.823940149,
-              "eta_interior": 0.001999435414,
+              "Vrms": 3003.638017,
+              "meanT": 1.240766931,
+              "Tmax": 1.826219204,
+              "eta_interior": 0.001809034458,
               "source": "frame_meta.csv",
-              "describe": "t=2.91618e-05"
+              "describe": "t=2.91632e-05"
             },
             "frame": 4,
             "step": 21
@@ -1274,16 +1276,16 @@
           {
             "row": "QuaST",
             "index": 4,
-            "t": 2.916184204e-05,
-            "delta": 2.161842040000001e-06,
+            "t": 2.91632402e-05,
+            "delta": 2.1632402000000026e-06,
             "describe": "frame 4, step 21",
             "inset": {
-              "Vrms": 3002.720278,
-              "meanT": 1.240765138,
-              "Tmax": 1.823940149,
-              "eta_interior": 0.001999435414,
+              "Vrms": 3003.638017,
+              "meanT": 1.240766931,
+              "Tmax": 1.826219204,
+              "eta_interior": 0.001809034458,
               "source": "frame_meta.csv",
-              "describe": "t=2.91618e-05"
+              "describe": "t=2.91632e-05"
             },
             "frame": 4,
             "step": 21
@@ -1313,16 +1315,16 @@
           {
             "row": "QuaST",
             "index": 4,
-            "t": 2.916184204e-05,
-            "delta": 1.1618420400000005e-06,
+            "t": 2.91632402e-05,
+            "delta": 1.163240200000002e-06,
             "describe": "frame 4, step 21",
             "inset": {
-              "Vrms": 3002.720278,
-              "meanT": 1.240765138,
-              "Tmax": 1.823940149,
-              "eta_interior": 0.001999435414,
+              "Vrms": 3003.638017,
+              "meanT": 1.240766931,
+              "Tmax": 1.826219204,
+              "eta_interior": 0.001809034458,
               "source": "frame_meta.csv",
-              "describe": "t=2.91618e-05"
+              "describe": "t=2.91632e-05"
             },
             "frame": 4,
             "step": 21
@@ -1352,16 +1354,16 @@
           {
             "row": "QuaST",
             "index": 4,
-            "t": 2.916184204e-05,
-            "delta": 1.618420399999999e-07,
+            "t": 2.91632402e-05,
+            "delta": 1.6324020000000139e-07,
             "describe": "frame 4, step 21",
             "inset": {
-              "Vrms": 3002.720278,
-              "meanT": 1.240765138,
-              "Tmax": 1.823940149,
-              "eta_interior": 0.001999435414,
+              "Vrms": 3003.638017,
+              "meanT": 1.240766931,
+              "Tmax": 1.826219204,
+              "eta_interior": 0.001809034458,
               "source": "frame_meta.csv",
-              "describe": "t=2.91618e-05"
+              "describe": "t=2.91632e-05"
             },
             "frame": 4,
             "step": 21
@@ -1391,16 +1393,16 @@
           {
             "row": "QuaST",
             "index": 4,
-            "t": 2.916184204e-05,
-            "delta": -8.381579600000007e-07,
+            "t": 2.91632402e-05,
+            "delta": -8.367597999999992e-07,
             "describe": "frame 4, step 21",
             "inset": {
-              "Vrms": 3002.720278,
-              "meanT": 1.240765138,
-              "Tmax": 1.823940149,
-              "eta_interior": 0.001999435414,
+              "Vrms": 3003.638017,
+              "meanT": 1.240766931,
+              "Tmax": 1.826219204,
+              "eta_interior": 0.001809034458,
               "source": "frame_meta.csv",
-              "describe": "t=2.91618e-05"
+              "describe": "t=2.91632e-05"
             },
             "frame": 4,
             "step": 21
@@ -1430,16 +1432,16 @@
           {
             "row": "QuaST",
             "index": 4,
-            "t": 2.916184204e-05,
-            "delta": -1.8381579599999945e-06,
+            "t": 2.91632402e-05,
+            "delta": -1.836759799999993e-06,
             "describe": "frame 4, step 21",
             "inset": {
-              "Vrms": 3002.720278,
-              "meanT": 1.240765138,
-              "Tmax": 1.823940149,
-              "eta_interior": 0.001999435414,
+              "Vrms": 3003.638017,
+              "meanT": 1.240766931,
+              "Tmax": 1.826219204,
+              "eta_interior": 0.001809034458,
               "source": "frame_meta.csv",
-              "describe": "t=2.91618e-05"
+              "describe": "t=2.91632e-05"
             },
             "frame": 4,
             "step": 21
@@ -1469,16 +1471,16 @@
           {
             "row": "QuaST",
             "index": 4,
-            "t": 2.916184204e-05,
-            "delta": -2.8381579599999985e-06,
+            "t": 2.91632402e-05,
+            "delta": -2.836759799999997e-06,
             "describe": "frame 4, step 21",
             "inset": {
-              "Vrms": 3002.720278,
-              "meanT": 1.240765138,
-              "Tmax": 1.823940149,
-              "eta_interior": 0.001999435414,
+              "Vrms": 3003.638017,
+              "meanT": 1.240766931,
+              "Tmax": 1.826219204,
+              "eta_interior": 0.001809034458,
               "source": "frame_meta.csv",
-              "describe": "t=2.91618e-05"
+              "describe": "t=2.91632e-05"
             },
             "frame": 4,
             "step": 21
@@ -1508,14 +1510,14 @@
           {
             "row": "QuaST",
             "index": 5,
-            "t": 3.529378873e-05,
-            "delta": 2.2937887300000063e-06,
+            "t": 3.529379393e-05,
+            "delta": 2.293793930000003e-06,
             "describe": "frame 5, step 26",
             "inset": {
-              "Vrms": 3611.9068,
-              "meanT": 1.240754342,
-              "Tmax": 1.824482235,
-              "eta_interior": 0.001979808655,
+              "Vrms": 3614.967805,
+              "meanT": 1.240760633,
+              "Tmax": 1.823806478,
+              "eta_interior": 0.001904328502,
               "source": "frame_meta.csv",
               "describe": "t=3.52938e-05"
             },
@@ -1547,14 +1549,14 @@
           {
             "row": "QuaST",
             "index": 5,
-            "t": 3.529378873e-05,
-            "delta": 1.293788730000009e-06,
+            "t": 3.529379393e-05,
+            "delta": 1.293793930000006e-06,
             "describe": "frame 5, step 26",
             "inset": {
-              "Vrms": 3611.9068,
-              "meanT": 1.240754342,
-              "Tmax": 1.824482235,
-              "eta_interior": 0.001979808655,
+              "Vrms": 3614.967805,
+              "meanT": 1.240760633,
+              "Tmax": 1.823806478,
+              "eta_interior": 0.001904328502,
               "source": "frame_meta.csv",
               "describe": "t=3.52938e-05"
             },
@@ -1586,14 +1588,14 @@
           {
             "row": "QuaST",
             "index": 5,
-            "t": 3.529378873e-05,
-            "delta": 2.937887300000051e-07,
+            "t": 3.529379393e-05,
+            "delta": 2.9379393000000196e-07,
             "describe": "frame 5, step 26",
             "inset": {
-              "Vrms": 3611.9068,
-              "meanT": 1.240754342,
-              "Tmax": 1.824482235,
-              "eta_interior": 0.001979808655,
+              "Vrms": 3614.967805,
+              "meanT": 1.240760633,
+              "Tmax": 1.823806478,
+              "eta_interior": 0.001904328502,
               "source": "frame_meta.csv",
               "describe": "t=3.52938e-05"
             },
@@ -1625,14 +1627,14 @@
           {
             "row": "QuaST",
             "index": 5,
-            "t": 3.529378873e-05,
-            "delta": -7.062112699999921e-07,
+            "t": 3.529379393e-05,
+            "delta": -7.062060699999952e-07,
             "describe": "frame 5, step 26",
             "inset": {
-              "Vrms": 3611.9068,
-              "meanT": 1.240754342,
-              "Tmax": 1.824482235,
-              "eta_interior": 0.001979808655,
+              "Vrms": 3614.967805,
+              "meanT": 1.240760633,
+              "Tmax": 1.823806478,
+              "eta_interior": 0.001904328502,
               "source": "frame_meta.csv",
               "describe": "t=3.52938e-05"
             },
@@ -1664,14 +1666,14 @@
           {
             "row": "QuaST",
             "index": 5,
-            "t": 3.529378873e-05,
-            "delta": -1.706211269999996e-06,
+            "t": 3.529379393e-05,
+            "delta": -1.7062060699999992e-06,
             "describe": "frame 5, step 26",
             "inset": {
-              "Vrms": 3611.9068,
-              "meanT": 1.240754342,
-              "Tmax": 1.824482235,
-              "eta_interior": 0.001979808655,
+              "Vrms": 3614.967805,
+              "meanT": 1.240760633,
+              "Tmax": 1.823806478,
+              "eta_interior": 0.001904328502,
               "source": "frame_meta.csv",
               "describe": "t=3.52938e-05"
             },
@@ -1703,16 +1705,16 @@
           {
             "row": "QuaST",
             "index": 6,
-            "t": 3.994380907e-05,
-            "delta": 1.9438090700000068e-06,
+            "t": 3.990750389e-05,
+            "delta": 1.9075038900000045e-06,
             "describe": "frame 6, step 31",
             "inset": {
-              "Vrms": 4863.80846,
-              "meanT": 1.240743131,
-              "Tmax": 1.824261865,
-              "eta_interior": 0.00200652324,
+              "Vrms": 4876.019298,
+              "meanT": 1.240758837,
+              "Tmax": 1.823845731,
+              "eta_interior": 0.002067579726,
               "source": "frame_meta.csv",
-              "describe": "t=3.99438e-05"
+              "describe": "t=3.99075e-05"
             },
             "frame": 6,
             "step": 31
@@ -1742,16 +1744,16 @@
           {
             "row": "QuaST",
             "index": 6,
-            "t": 3.994380907e-05,
-            "delta": 9.438090700000096e-07,
+            "t": 3.990750389e-05,
+            "delta": 9.075038900000073e-07,
             "describe": "frame 6, step 31",
             "inset": {
-              "Vrms": 4863.80846,
-              "meanT": 1.240743131,
-              "Tmax": 1.824261865,
-              "eta_interior": 0.00200652324,
+              "Vrms": 4876.019298,
+              "meanT": 1.240758837,
+              "Tmax": 1.823845731,
+              "eta_interior": 0.002067579726,
               "source": "frame_meta.csv",
-              "describe": "t=3.99438e-05"
+              "describe": "t=3.99075e-05"
             },
             "frame": 6,
             "step": 31
@@ -1781,16 +1783,16 @@
           {
             "row": "QuaST",
             "index": 6,
-            "t": 3.994380907e-05,
-            "delta": -5.61909299999944e-08,
+            "t": 3.990750389e-05,
+            "delta": -9.249610999999665e-08,
             "describe": "frame 6, step 31",
             "inset": {
-              "Vrms": 4863.80846,
-              "meanT": 1.240743131,
-              "Tmax": 1.824261865,
-              "eta_interior": 0.00200652324,
+              "Vrms": 4876.019298,
+              "meanT": 1.240758837,
+              "Tmax": 1.823845731,
+              "eta_interior": 0.002067579726,
               "source": "frame_meta.csv",
-              "describe": "t=3.99438e-05"
+              "describe": "t=3.99075e-05"
             },
             "frame": 6,
             "step": 31
@@ -1820,16 +1822,16 @@
           {
             "row": "QuaST",
             "index": 6,
-            "t": 3.994380907e-05,
-            "delta": -1.0561909299999916e-06,
+            "t": 3.990750389e-05,
+            "delta": -1.0924961099999939e-06,
             "describe": "frame 6, step 31",
             "inset": {
-              "Vrms": 4863.80846,
-              "meanT": 1.240743131,
-              "Tmax": 1.824261865,
-              "eta_interior": 0.00200652324,
+              "Vrms": 4876.019298,
+              "meanT": 1.240758837,
+              "Tmax": 1.823845731,
+              "eta_interior": 0.002067579726,
               "source": "frame_meta.csv",
-              "describe": "t=3.99438e-05"
+              "describe": "t=3.99075e-05"
             },
             "frame": 6,
             "step": 31
@@ -1859,16 +1861,16 @@
           {
             "row": "QuaST",
             "index": 7,
-            "t": 4.315877166e-05,
-            "delta": 1.1587716600000025e-06,
+            "t": 4.31025069e-05,
+            "delta": 1.1025068999999992e-06,
             "describe": "frame 7, step 36",
             "inset": {
-              "Vrms": 6667.143774,
-              "meanT": 1.240734225,
-              "Tmax": 1.822608043,
-              "eta_interior": 0.00210653517,
+              "Vrms": 6679.511382,
+              "meanT": 1.240757659,
+              "Tmax": 1.824404745,
+              "eta_interior": 0.002305666264,
               "source": "frame_meta.csv",
-              "describe": "t=4.31588e-05"
+              "describe": "t=4.31025e-05"
             },
             "frame": 7,
             "step": 36
@@ -1898,16 +1900,16 @@
           {
             "row": "QuaST",
             "index": 7,
-            "t": 4.315877166e-05,
-            "delta": 1.5877166000000527e-07,
+            "t": 4.31025069e-05,
+            "delta": 1.0250690000000203e-07,
             "describe": "frame 7, step 36",
             "inset": {
-              "Vrms": 6667.143774,
-              "meanT": 1.240734225,
-              "Tmax": 1.822608043,
-              "eta_interior": 0.00210653517,
+              "Vrms": 6679.511382,
+              "meanT": 1.240757659,
+              "Tmax": 1.824404745,
+              "eta_interior": 0.002305666264,
               "source": "frame_meta.csv",
-              "describe": "t=4.31588e-05"
+              "describe": "t=4.31025e-05"
             },
             "frame": 7,
             "step": 36
@@ -1937,16 +1939,16 @@
           {
             "row": "QuaST",
             "index": 7,
-            "t": 4.315877166e-05,
-            "delta": -8.412283399999919e-07,
+            "t": 4.31025069e-05,
+            "delta": -8.974930999999952e-07,
             "describe": "frame 7, step 36",
             "inset": {
-              "Vrms": 6667.143774,
-              "meanT": 1.240734225,
-              "Tmax": 1.822608043,
-              "eta_interior": 0.00210653517,
+              "Vrms": 6679.511382,
+              "meanT": 1.240757659,
+              "Tmax": 1.824404745,
+              "eta_interior": 0.002305666264,
               "source": "frame_meta.csv",
-              "describe": "t=4.31588e-05"
+              "describe": "t=4.31025e-05"
             },
             "frame": 7,
             "step": 36
@@ -1976,16 +1978,16 @@
           {
             "row": "QuaST",
             "index": 8,
-            "t": 4.52130375e-05,
-            "delta": 2.130375000000055e-07,
+            "t": 4.529192691e-05,
+            "delta": 2.919269100000018e-07,
             "describe": "frame 8, step 41",
             "inset": {
-              "Vrms": 8538.233639,
-              "meanT": 1.24073098,
-              "Tmax": 1.824209652,
-              "eta_interior": 0.002124904745,
+              "Vrms": 8562.310825,
+              "meanT": 1.240757005,
+              "Tmax": 1.824482024,
+              "eta_interior": 0.002292189895,
               "source": "frame_meta.csv",
-              "describe": "t=4.5213e-05"
+              "describe": "t=4.52919e-05"
             },
             "frame": 8,
             "step": 41
@@ -2014,20 +2016,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 9,
-            "t": 4.634622358e-05,
-            "delta": 3.462235800000065e-07,
-            "describe": "frame 9, step 46",
+            "index": 8,
+            "t": 4.529192691e-05,
+            "delta": -7.080730899999954e-07,
+            "describe": "frame 8, step 41",
             "inset": {
-              "Vrms": 9693.05336,
-              "meanT": 1.240729502,
-              "Tmax": 1.823888228,
-              "eta_interior": 0.002116149337,
+              "Vrms": 8562.310825,
+              "meanT": 1.240757005,
+              "Tmax": 1.824482024,
+              "eta_interior": 0.002292189895,
               "source": "frame_meta.csv",
-              "describe": "t=4.63462e-05"
+              "describe": "t=4.52919e-05"
             },
-            "frame": 9,
-            "step": 46
+            "frame": 8,
+            "step": 41
           },
           {
             "row": "ASPECT",
@@ -2053,20 +2055,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 10,
-            "t": 4.733241911e-05,
-            "delta": 3.3241911000000387e-07,
-            "describe": "frame 10, step 51",
+            "index": 9,
+            "t": 4.681404544e-05,
+            "delta": -1.8595455999999907e-07,
+            "describe": "frame 9, step 46",
             "inset": {
-              "Vrms": 10757.43316,
-              "meanT": 1.240727744,
-              "Tmax": 1.823555893,
-              "eta_interior": 0.002202509986,
+              "Vrms": 10318.15025,
+              "meanT": 1.24075621,
+              "Tmax": 1.824369492,
+              "eta_interior": 0.002111452807,
               "source": "frame_meta.csv",
-              "describe": "t=4.73324e-05"
+              "describe": "t=4.6814e-05"
             },
-            "frame": 10,
-            "step": 51
+            "frame": 9,
+            "step": 46
           },
           {
             "row": "ASPECT",
@@ -2093,16 +2095,16 @@
           {
             "row": "QuaST",
             "index": 11,
-            "t": 4.819865789e-05,
-            "delta": 1.9865789000000575e-07,
+            "t": 4.820536968e-05,
+            "delta": 2.0536968000000667e-07,
             "describe": "frame 11, step 56",
             "inset": {
-              "Vrms": 11713.43763,
-              "meanT": 1.24072676,
-              "Tmax": 1.823313151,
-              "eta_interior": 0.002171175767,
+              "Vrms": 11836.22912,
+              "meanT": 1.240755134,
+              "Tmax": 1.824081306,
+              "eta_interior": 0.002037091615,
               "source": "frame_meta.csv",
-              "describe": "t=4.81987e-05"
+              "describe": "t=4.82054e-05"
             },
             "frame": 11,
             "step": 56
@@ -2131,20 +2133,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 12,
-            "t": 4.890634481e-05,
-            "delta": -9.365518999999908e-08,
-            "describe": "frame 12, step 61",
+            "index": 13,
+            "t": 4.907079607e-05,
+            "delta": 7.079607000000398e-08,
+            "describe": "frame 13, step 66",
             "inset": {
-              "Vrms": 12459.82683,
-              "meanT": 1.240726361,
-              "Tmax": 1.823060841,
-              "eta_interior": 0.002190199125,
+              "Vrms": 12776.53141,
+              "meanT": 1.240754339,
+              "Tmax": 1.823938299,
+              "eta_interior": 0.002322523001,
               "source": "frame_meta.csv",
-              "describe": "t=4.89063e-05"
+              "describe": "t=4.90708e-05"
             },
-            "frame": 12,
-            "step": 61
+            "frame": 13,
+            "step": 66
           },
           {
             "row": "ASPECT",
@@ -2170,20 +2172,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 14,
-            "t": 5.002175918e-05,
-            "delta": 2.1759180000005182e-08,
-            "describe": "frame 14, step 71",
+            "index": 16,
+            "t": 4.993236903e-05,
+            "delta": -6.763096999999439e-08,
+            "describe": "frame 16, step 81",
             "inset": {
-              "Vrms": 13499.31265,
-              "meanT": 1.240725029,
-              "Tmax": 1.822893717,
-              "eta_interior": 0.002252866309,
+              "Vrms": 13525.38878,
+              "meanT": 1.240753462,
+              "Tmax": 1.823782122,
+              "eta_interior": 0.002307450887,
               "source": "frame_meta.csv",
-              "describe": "t=5.00218e-05"
+              "describe": "t=4.99324e-05"
             },
-            "frame": 14,
-            "step": 71
+            "frame": 16,
+            "step": 81
           },
           {
             "row": "ASPECT",
@@ -2209,20 +2211,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 17,
-            "t": 5.088630461e-05,
-            "delta": -1.1369538999999478e-07,
-            "describe": "frame 17, step 86",
+            "index": 20,
+            "t": 5.101515491e-05,
+            "delta": 1.5154910000008044e-08,
+            "describe": "frame 20, step 101",
             "inset": {
-              "Vrms": 14084.40245,
-              "meanT": 1.240724094,
-              "Tmax": 1.823418985,
-              "eta_interior": 0.002334758911,
+              "Vrms": 14212.7183,
+              "meanT": 1.2407523,
+              "Tmax": 1.824038562,
+              "eta_interior": 0.002322104719,
               "source": "frame_meta.csv",
-              "describe": "t=5.08863e-05"
+              "describe": "t=5.10152e-05"
             },
-            "frame": 17,
-            "step": 86
+            "frame": 20,
+            "step": 101
           },
           {
             "row": "ASPECT",
@@ -2248,20 +2250,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 21,
-            "t": 5.193205819e-05,
-            "delta": -6.794180999999456e-08,
-            "describe": "frame 21, step 106",
+            "index": 24,
+            "t": 5.205413736e-05,
+            "delta": 5.413736000000512e-08,
+            "describe": "frame 24, step 121",
             "inset": {
-              "Vrms": 14511.11686,
-              "meanT": 1.240722872,
-              "Tmax": 1.823416249,
-              "eta_interior": 0.002278726652,
+              "Vrms": 14550.98767,
+              "meanT": 1.240751052,
+              "Tmax": 1.824165047,
+              "eta_interior": 0.002321142305,
               "source": "frame_meta.csv",
-              "describe": "t=5.19321e-05"
+              "describe": "t=5.20541e-05"
             },
-            "frame": 21,
-            "step": 106
+            "frame": 24,
+            "step": 121
           },
           {
             "row": "ASPECT",
@@ -2287,20 +2289,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 25,
-            "t": 5.295333095e-05,
-            "delta": -4.666904999999161e-08,
-            "describe": "frame 25, step 126",
+            "index": 28,
+            "t": 5.307484096e-05,
+            "delta": 7.484096000000767e-08,
+            "describe": "frame 28, step 141",
             "inset": {
-              "Vrms": 14615.09885,
-              "meanT": 1.240721536,
-              "Tmax": 1.823376321,
-              "eta_interior": 0.002445329228,
+              "Vrms": 14573.00872,
+              "meanT": 1.240749661,
+              "Tmax": 1.82414721,
+              "eta_interior": 0.00231058293,
               "source": "frame_meta.csv",
-              "describe": "t=5.29533e-05"
+              "describe": "t=5.30748e-05"
             },
-            "frame": 25,
-            "step": 126
+            "frame": 28,
+            "step": 141
           },
           {
             "row": "ASPECT",
@@ -2326,20 +2328,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 29,
-            "t": 5.397036437e-05,
-            "delta": -2.96356299999987e-08,
-            "describe": "frame 29, step 146",
+            "index": 32,
+            "t": 5.409573362e-05,
+            "delta": 9.573361999999934e-08,
+            "describe": "frame 32, step 161",
             "inset": {
-              "Vrms": 14436.89161,
-              "meanT": 1.240720066,
-              "Tmax": 1.823188704,
-              "eta_interior": 0.002410389491,
+              "Vrms": 14331.28071,
+              "meanT": 1.240748091,
+              "Tmax": 1.823950775,
+              "eta_interior": 0.00230167064,
               "source": "frame_meta.csv",
-              "describe": "t=5.39704e-05"
+              "describe": "t=5.40957e-05"
             },
-            "frame": 29,
-            "step": 146
+            "frame": 32,
+            "step": 161
           },
           {
             "row": "ASPECT",
@@ -2365,20 +2367,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 33,
-            "t": 5.499846339e-05,
-            "delta": -1.5366099999944254e-09,
-            "describe": "frame 33, step 166",
+            "index": 36,
+            "t": 5.513014092e-05,
+            "delta": 1.3014092000000765e-07,
+            "describe": "frame 36, step 181",
             "inset": {
-              "Vrms": 14038.943,
-              "meanT": 1.240718391,
-              "Tmax": 1.823309053,
-              "eta_interior": 0.002400607186,
+              "Vrms": 13888.51474,
+              "meanT": 1.240746297,
+              "Tmax": 1.824289329,
+              "eta_interior": 0.002302741422,
               "source": "frame_meta.csv",
-              "describe": "t=5.49985e-05"
+              "describe": "t=5.51301e-05"
             },
-            "frame": 33,
-            "step": 166
+            "frame": 36,
+            "step": 181
           },
           {
             "row": "ASPECT",
@@ -2404,20 +2406,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 37,
-            "t": 5.604934019e-05,
-            "delta": 4.934019000000931e-08,
-            "describe": "frame 37, step 186",
+            "index": 39,
+            "t": 5.592033743e-05,
+            "delta": -7.966256999999472e-08,
+            "describe": "frame 39, step 196",
             "inset": {
-              "Vrms": 13488.62848,
-              "meanT": 1.240716442,
-              "Tmax": 1.823601883,
-              "eta_interior": 0.002391852094,
+              "Vrms": 13464.07698,
+              "meanT": 1.240744777,
+              "Tmax": 1.824535343,
+              "eta_interior": 0.002283969004,
               "source": "frame_meta.csv",
-              "describe": "t=5.60493e-05"
+              "describe": "t=5.59203e-05"
             },
-            "frame": 37,
-            "step": 186
+            "frame": 39,
+            "step": 196
           },
           {
             "row": "ASPECT",
@@ -2443,20 +2445,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 41,
-            "t": 5.713137252e-05,
-            "delta": 1.3137252000000463e-07,
-            "describe": "frame 41, step 206",
+            "index": 43,
+            "t": 5.699966693e-05,
+            "delta": -3.330699999997051e-10,
+            "describe": "frame 43, step 216",
             "inset": {
-              "Vrms": 12856.4937,
-              "meanT": 1.240714134,
-              "Tmax": 1.823334611,
-              "eta_interior": 0.002387033147,
+              "Vrms": 12819.75297,
+              "meanT": 1.240742463,
+              "Tmax": 1.824506126,
+              "eta_interior": 0.002269834127,
               "source": "frame_meta.csv",
-              "describe": "t=5.71314e-05"
+              "describe": "t=5.69997e-05"
             },
-            "frame": 41,
-            "step": 206
+            "frame": 43,
+            "step": 216
           },
           {
             "row": "ASPECT",
@@ -2482,20 +2484,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 44,
-            "t": 5.796768668e-05,
-            "delta": -3.2313319999992935e-08,
-            "describe": "frame 44, step 221",
+            "index": 47,
+            "t": 5.811515387e-05,
+            "delta": 1.151538700000084e-07,
+            "describe": "frame 47, step 236",
             "inset": {
-              "Vrms": 12361.37821,
-              "meanT": 1.240712103,
-              "Tmax": 1.823351332,
-              "eta_interior": 0.002385047114,
+              "Vrms": 12128.27884,
+              "meanT": 1.240739759,
+              "Tmax": 1.824105785,
+              "eta_interior": 0.00226304027,
               "source": "frame_meta.csv",
-              "describe": "t=5.79677e-05"
+              "describe": "t=5.81152e-05"
             },
-            "frame": 44,
-            "step": 221
+            "frame": 47,
+            "step": 236
           },
           {
             "row": "ASPECT",
@@ -2521,20 +2523,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 48,
-            "t": 5.912043888e-05,
-            "delta": 1.2043888000000185e-07,
-            "describe": "frame 48, step 241",
+            "index": 50,
+            "t": 5.89797245e-05,
+            "delta": -2.0275500000000108e-08,
+            "describe": "frame 50, step 251",
             "inset": {
-              "Vrms": 11707.64673,
-              "meanT": 1.2407089,
-              "Tmax": 1.82343474,
-              "eta_interior": 0.002382374173,
+              "Vrms": 11600.0149,
+              "meanT": 1.240737415,
+              "Tmax": 1.824313146,
+              "eta_interior": 0.002255755615,
               "source": "frame_meta.csv",
-              "describe": "t=5.91204e-05"
+              "describe": "t=5.89797e-05"
             },
-            "frame": 48,
-            "step": 241
+            "frame": 50,
+            "step": 251
           },
           {
             "row": "ASPECT",
@@ -2560,20 +2562,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 51,
-            "t": 6.001679483e-05,
-            "delta": 1.67948300000022e-08,
-            "describe": "frame 51, step 256",
+            "index": 54,
+            "t": 6.005302132e-05,
+            "delta": 5.302132000000636e-08,
+            "describe": "frame 54, step 269",
             "inset": {
-              "Vrms": 11240.63262,
-              "meanT": 1.240706031,
-              "Tmax": 1.823668922,
-              "eta_interior": 0.002381076897,
+              "Vrms": 11029.55401,
+              "meanT": 1.240734126,
+              "Tmax": 1.824142482,
+              "eta_interior": 0.002250318901,
               "source": "frame_meta.csv",
-              "describe": "t=6.00168e-05"
+              "describe": "t=6.0053e-05"
             },
-            "frame": 51,
-            "step": 256
+            "frame": 54,
+            "step": 269
           },
           {
             "row": "ASPECT",
@@ -2599,20 +2601,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 54,
-            "t": 6.094376818e-05,
-            "delta": -5.623181999999175e-08,
-            "describe": "frame 54, step 271",
+            "index": 58,
+            "t": 6.110760631e-05,
+            "delta": 1.076063100000134e-07,
+            "describe": "frame 58, step 286",
             "inset": {
-              "Vrms": 10805.94494,
-              "meanT": 1.240702659,
-              "Tmax": 1.825422406,
-              "eta_interior": 0.002379526995,
+              "Vrms": 10420.21811,
+              "meanT": 1.24073041,
+              "Tmax": 1.824676439,
+              "eta_interior": 0.002260215962,
               "source": "frame_meta.csv",
-              "describe": "t=6.09438e-05"
+              "describe": "t=6.11076e-05"
             },
-            "frame": 54,
-            "step": 271
+            "frame": 58,
+            "step": 286
           },
           {
             "row": "ASPECT",
@@ -2638,20 +2640,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 57,
-            "t": 6.190394313e-05,
-            "delta": -9.605687000000874e-08,
-            "describe": "frame 57, step 286",
+            "index": 61,
+            "t": 6.20733978e-05,
+            "delta": 7.339779999999626e-08,
+            "describe": "frame 61, step 301",
             "inset": {
-              "Vrms": 10409.88534,
-              "meanT": 1.240698699,
-              "Tmax": 1.825460169,
-              "eta_interior": 0.002376504971,
+              "Vrms": 9964.215146,
+              "meanT": 1.240726558,
+              "Tmax": 1.824537685,
+              "eta_interior": 0.002279416472,
               "source": "frame_meta.csv",
-              "describe": "t=6.19039e-05"
+              "describe": "t=6.20734e-05"
             },
-            "frame": 57,
-            "step": 286
+            "frame": 61,
+            "step": 301
           },
           {
             "row": "ASPECT",
@@ -2677,20 +2679,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 60,
-            "t": 6.290056955e-05,
-            "delta": -9.94304499999987e-08,
-            "describe": "frame 60, step 301",
+            "index": 64,
+            "t": 6.307517042e-05,
+            "delta": 7.517041999999957e-08,
+            "describe": "frame 64, step 316",
             "inset": {
-              "Vrms": 10055.59259,
-              "meanT": 1.240693991,
-              "Tmax": 1.82472493,
-              "eta_interior": 0.002372199752,
+              "Vrms": 9552.975524,
+              "meanT": 1.240721969,
+              "Tmax": 1.824501204,
+              "eta_interior": 0.002287317546,
               "source": "frame_meta.csv",
-              "describe": "t=6.29006e-05"
+              "describe": "t=6.30752e-05"
             },
-            "frame": 60,
-            "step": 301
+            "frame": 64,
+            "step": 316
           },
           {
             "row": "ASPECT",
@@ -2716,20 +2718,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 63,
-            "t": 6.393717399e-05,
-            "delta": -6.282600999999637e-08,
-            "describe": "frame 63, step 316",
+            "index": 67,
+            "t": 6.411529608e-05,
+            "delta": 1.1529608000000312e-07,
+            "describe": "frame 67, step 331",
             "inset": {
-              "Vrms": 9736.757762,
-              "meanT": 1.24068826,
-              "Tmax": 1.82569985,
-              "eta_interior": 0.002367936175,
+              "Vrms": 9196.625597,
+              "meanT": 1.240716427,
+              "Tmax": 1.824873459,
+              "eta_interior": 0.002277619802,
               "source": "frame_meta.csv",
-              "describe": "t=6.39372e-05"
+              "describe": "t=6.41153e-05"
             },
-            "frame": 63,
-            "step": 316
+            "frame": 67,
+            "step": 331
           },
           {
             "row": "ASPECT",
@@ -2755,20 +2757,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 66,
-            "t": 6.501556834e-05,
-            "delta": 1.556834000000025e-08,
-            "describe": "frame 66, step 331",
+            "index": 69,
+            "t": 6.483158177e-05,
+            "delta": -1.6841822999999175e-07,
+            "describe": "frame 69, step 341",
             "inset": {
-              "Vrms": 9441.241456,
-              "meanT": 1.24068151,
-              "Tmax": 1.828278775,
-              "eta_interior": 0.002360414621,
+              "Vrms": 8994.49901,
+              "meanT": 1.240712261,
+              "Tmax": 1.82556722,
+              "eta_interior": 0.002303625497,
               "source": "frame_meta.csv",
-              "describe": "t=6.50156e-05"
+              "describe": "t=6.48316e-05"
             },
-            "frame": 66,
-            "step": 331
+            "frame": 69,
+            "step": 341
           },
           {
             "row": "ASPECT",
@@ -2794,20 +2796,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 69,
-            "t": 6.613725641e-05,
-            "delta": 1.372564100000055e-07,
-            "describe": "frame 69, step 346",
+            "index": 72,
+            "t": 6.594262476e-05,
+            "delta": -5.737523999999115e-08,
+            "describe": "frame 72, step 356",
             "inset": {
-              "Vrms": 9154.226788,
-              "meanT": 1.240673747,
-              "Tmax": 1.828842717,
-              "eta_interior": 0.002350388489,
+              "Vrms": 8750.084036,
+              "meanT": 1.240705268,
+              "Tmax": 1.825273144,
+              "eta_interior": 0.002347918447,
               "source": "frame_meta.csv",
-              "describe": "t=6.61373e-05"
+              "describe": "t=6.59426e-05"
             },
-            "frame": 69,
-            "step": 346
+            "frame": 72,
+            "step": 356
           },
           {
             "row": "ASPECT",
@@ -2833,20 +2835,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 71,
-            "t": 6.691116762e-05,
-            "delta": -8.883237999998564e-08,
-            "describe": "frame 71, step 356",
+            "index": 75,
+            "t": 6.710000538e-05,
+            "delta": 1.0000538000000966e-07,
+            "describe": "frame 75, step 371",
             "inset": {
-              "Vrms": 8963.424958,
-              "meanT": 1.24066779,
-              "Tmax": 1.831282798,
-              "eta_interior": 0.002346301259,
+              "Vrms": 8585.244736,
+              "meanT": 1.240696915,
+              "Tmax": 1.824920948,
+              "eta_interior": 0.002335461631,
               "source": "frame_meta.csv",
-              "describe": "t=6.69112e-05"
+              "describe": "t=6.71e-05"
             },
-            "frame": 71,
-            "step": 356
+            "frame": 75,
+            "step": 371
           },
           {
             "row": "ASPECT",
@@ -2872,20 +2874,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 74,
-            "t": 6.811260121e-05,
-            "delta": 1.1260120999999866e-07,
-            "describe": "frame 74, step 371",
+            "index": 77,
+            "t": 6.789948596e-05,
+            "delta": -1.0051403999999432e-07,
+            "describe": "frame 77, step 381",
             "inset": {
-              "Vrms": 8681.016118,
-              "meanT": 1.240657208,
-              "Tmax": 1.841440154,
-              "eta_interior": 0.002340389871,
+              "Vrms": 8521.719676,
+              "meanT": 1.240690214,
+              "Tmax": 1.825185367,
+              "eta_interior": 0.002328304128,
               "source": "frame_meta.csv",
-              "describe": "t=6.81126e-05"
+              "describe": "t=6.78995e-05"
             },
-            "frame": 74,
-            "step": 371
+            "frame": 77,
+            "step": 381
           },
           {
             "row": "ASPECT",
@@ -2911,20 +2913,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 76,
-            "t": 6.893463752e-05,
-            "delta": -6.536248000000222e-08,
-            "describe": "frame 76, step 381",
+            "index": 80,
+            "t": 6.914313656e-05,
+            "delta": 1.4313656000000425e-07,
+            "describe": "frame 80, step 396",
             "inset": {
-              "Vrms": 8505.700362,
-              "meanT": 1.240648413,
-              "Tmax": 1.853462061,
-              "eta_interior": 0.00233683404,
+              "Vrms": 8493.979821,
+              "meanT": 1.240677606,
+              "Tmax": 1.825433041,
+              "eta_interior": 0.002319686928,
               "source": "frame_meta.csv",
-              "describe": "t=6.89346e-05"
+              "describe": "t=6.91431e-05"
             },
-            "frame": 76,
-            "step": 381
+            "frame": 80,
+            "step": 396
           },
           {
             "row": "ASPECT",
@@ -2950,20 +2952,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 79,
-            "t": 7.020778549e-05,
-            "delta": 2.0778549000000893e-07,
-            "describe": "frame 79, step 396",
+            "index": 82,
+            "t": 7.000353506e-05,
+            "delta": 3.5350600000022938e-09,
+            "describe": "frame 82, step 406",
             "inset": {
-              "Vrms": 8284.595968,
-              "meanT": 1.24063229,
-              "Tmax": 1.860997207,
-              "eta_interior": 0.002332290975,
+              "Vrms": 8514.794378,
+              "meanT": 1.240667065,
+              "Tmax": 1.825665126,
+              "eta_interior": 0.002328563287,
               "source": "frame_meta.csv",
-              "describe": "t=7.02078e-05"
+              "describe": "t=7.00035e-05"
             },
-            "frame": 79,
-            "step": 396
+            "frame": 82,
+            "step": 406
           },
           {
             "row": "ASPECT",
@@ -2989,20 +2991,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 81,
-            "t": 7.109115831e-05,
-            "delta": 9.11583100000066e-08,
-            "describe": "frame 81, step 406",
+            "index": 84,
+            "t": 7.085667271e-05,
+            "delta": -1.4332728999999456e-07,
+            "describe": "frame 84, step 416",
             "inset": {
-              "Vrms": 8181.985004,
-              "meanT": 1.240618839,
-              "Tmax": 1.860012068,
-              "eta_interior": 0.002329814971,
+              "Vrms": 8556.887522,
+              "meanT": 1.240655177,
+              "Tmax": 1.825525515,
+              "eta_interior": 0.002324165464,
               "source": "frame_meta.csv",
-              "describe": "t=7.10912e-05"
+              "describe": "t=7.08567e-05"
             },
-            "frame": 81,
-            "step": 406
+            "frame": 84,
+            "step": 416
           },
           {
             "row": "ASPECT",
@@ -3028,20 +3030,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 83,
-            "t": 7.200818737e-05,
-            "delta": 8.18737000001261e-09,
-            "describe": "frame 83, step 416",
+            "index": 87,
+            "t": 7.209013573e-05,
+            "delta": 9.013573000001441e-08,
+            "describe": "frame 87, step 431",
             "inset": {
-              "Vrms": 8128.013794,
-              "meanT": 1.240602873,
-              "Tmax": 1.860920886,
-              "eta_interior": 0.002327725943,
+              "Vrms": 8639.039879,
+              "meanT": 1.240635831,
+              "Tmax": 1.824886025,
+              "eta_interior": 0.002319399093,
               "source": "frame_meta.csv",
-              "describe": "t=7.20082e-05"
+              "describe": "t=7.20901e-05"
             },
-            "frame": 83,
-            "step": 416
+            "frame": 87,
+            "step": 431
           },
           {
             "row": "ASPECT",
@@ -3067,20 +3069,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 85,
-            "t": 7.29629872e-05,
-            "delta": -3.701280000000559e-08,
-            "describe": "frame 85, step 426",
+            "index": 89,
+            "t": 7.289688139e-05,
+            "delta": -1.0311861000000453e-07,
+            "describe": "frame 89, step 441",
             "inset": {
-              "Vrms": 8130.02933,
-              "meanT": 1.240584391,
-              "Tmax": 1.86352663,
-              "eta_interior": 0.002325931291,
+              "Vrms": 8698.399222,
+              "meanT": 1.24062212,
+              "Tmax": 1.82581234,
+              "eta_interior": 0.002331772815,
               "source": "frame_meta.csv",
-              "describe": "t=7.2963e-05"
+              "describe": "t=7.28969e-05"
             },
-            "frame": 85,
-            "step": 426
+            "frame": 89,
+            "step": 441
           },
           {
             "row": "ASPECT",
@@ -3106,20 +3108,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 87,
-            "t": 7.388657609e-05,
-            "delta": -1.1342391000000187e-07,
-            "describe": "frame 87, step 436",
+            "index": 92,
+            "t": 7.410445715e-05,
+            "delta": 1.0445715000000869e-07,
+            "describe": "frame 92, step 456",
             "inset": {
-              "Vrms": 8182.560643,
-              "meanT": 1.240565309,
-              "Tmax": 1.862302783,
-              "eta_interior": 0.002324616913,
+              "Vrms": 8795.044922,
+              "meanT": 1.240600426,
+              "Tmax": 1.828352135,
+              "eta_interior": 0.002364211528,
               "source": "frame_meta.csv",
-              "describe": "t=7.38866e-05"
+              "describe": "t=7.41045e-05"
             },
-            "frame": 87,
-            "step": 436
+            "frame": 92,
+            "step": 456
           },
           {
             "row": "ASPECT",
@@ -3145,20 +3147,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 90,
-            "t": 7.517422631e-05,
-            "delta": 1.7422631000001175e-07,
-            "describe": "frame 90, step 451",
+            "index": 94,
+            "t": 7.491904721e-05,
+            "delta": -8.095278999999979e-08,
+            "describe": "frame 94, step 466",
             "inset": {
-              "Vrms": 8310.894934,
-              "meanT": 1.240537764,
-              "Tmax": 1.857972274,
-              "eta_interior": 0.00232332741,
+              "Vrms": 8871.720924,
+              "meanT": 1.240585179,
+              "Tmax": 1.828398445,
+              "eta_interior": 0.002375097054,
               "source": "frame_meta.csv",
-              "describe": "t=7.51742e-05"
+              "describe": "t=7.4919e-05"
             },
-            "frame": 90,
-            "step": 451
+            "frame": 94,
+            "step": 466
           },
           {
             "row": "ASPECT",
@@ -3184,20 +3186,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 92,
-            "t": 7.59881989e-05,
-            "delta": -1.1801099999986242e-08,
-            "describe": "frame 92, step 461",
+            "index": 97,
+            "t": 7.616824337e-05,
+            "delta": 1.6824337000000415e-07,
+            "describe": "frame 97, step 481",
             "inset": {
-              "Vrms": 8398.212002,
-              "meanT": 1.240519448,
-              "Tmax": 1.860689194,
-              "eta_interior": 0.002322836183,
+              "Vrms": 9012.6745,
+              "meanT": 1.240560802,
+              "Tmax": 1.828355469,
+              "eta_interior": 0.002390665372,
               "source": "frame_meta.csv",
-              "describe": "t=7.59882e-05"
+              "describe": "t=7.61682e-05"
             },
-            "frame": 92,
-            "step": 461
+            "frame": 97,
+            "step": 481
           },
           {
             "row": "ASPECT",
@@ -3223,20 +3225,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 95,
-            "t": 7.716937084e-05,
-            "delta": 1.693708400000158e-07,
-            "describe": "frame 95, step 476",
+            "index": 99,
+            "t": 7.700174013e-05,
+            "delta": 1.740130000014409e-09,
+            "describe": "frame 99, step 491",
             "inset": {
-              "Vrms": 8486.082847,
-              "meanT": 1.240491827,
-              "Tmax": 1.857366712,
-              "eta_interior": 0.002322541014,
+              "Vrms": 9116.925289,
+              "meanT": 1.240544255,
+              "Tmax": 1.827834632,
+              "eta_interior": 0.002407071916,
               "source": "frame_meta.csv",
-              "describe": "t=7.71694e-05"
+              "describe": "t=7.70017e-05"
             },
-            "frame": 95,
-            "step": 476
+            "frame": 99,
+            "step": 491
           },
           {
             "row": "ASPECT",
@@ -3262,20 +3264,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 97,
-            "t": 7.794572195e-05,
-            "delta": -5.427804999999942e-08,
-            "describe": "frame 97, step 486",
+            "index": 102,
+            "t": 7.817693558e-05,
+            "delta": 1.7693558000000747e-07,
+            "describe": "frame 102, step 506",
             "inset": {
-              "Vrms": 8502.066498,
-              "meanT": 1.240472992,
-              "Tmax": 1.860856279,
-              "eta_interior": 0.002324510839,
+              "Vrms": 9255.213849,
+              "meanT": 1.240520776,
+              "Tmax": 1.826670621,
+              "eta_interior": 0.002468429801,
               "source": "frame_meta.csv",
-              "describe": "t=7.79457e-05"
+              "describe": "t=7.81769e-05"
             },
-            "frame": 97,
-            "step": 486
+            "frame": 102,
+            "step": 506
           },
           {
             "row": "ASPECT",
@@ -3301,20 +3303,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 100,
-            "t": 7.911255935e-05,
-            "delta": 1.1255935000000817e-07,
-            "describe": "frame 100, step 501",
+            "index": 104,
+            "t": 7.892669718e-05,
+            "delta": -7.330281999998927e-08,
+            "describe": "frame 104, step 516",
             "inset": {
-              "Vrms": 8445.633409,
-              "meanT": 1.240443678,
-              "Tmax": 1.863914403,
-              "eta_interior": 0.002327146382,
+              "Vrms": 9318.575284,
+              "meanT": 1.240505849,
+              "Tmax": 1.826114156,
+              "eta_interior": 0.00250119423,
               "source": "frame_meta.csv",
-              "describe": "t=7.91126e-05"
+              "describe": "t=7.89267e-05"
             },
-            "frame": 100,
-            "step": 501
+            "frame": 104,
+            "step": 516
           },
           {
             "row": "ASPECT",
@@ -3340,20 +3342,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 102,
-            "t": 7.989523654e-05,
-            "delta": -1.0476345999999687e-07,
-            "describe": "frame 102, step 511",
+            "index": 107,
+            "t": 8.002416021e-05,
+            "delta": 2.416021000000931e-08,
+            "describe": "frame 107, step 531",
             "inset": {
-              "Vrms": 8355.471133,
-              "meanT": 1.240423704,
-              "Tmax": 1.858578306,
-              "eta_interior": 0.002328890799,
+              "Vrms": 9349.517076,
+              "meanT": 1.240483893,
+              "Tmax": 1.825883184,
+              "eta_interior": 0.002516865657,
               "source": "frame_meta.csv",
-              "describe": "t=7.98952e-05"
+              "describe": "t=8.00242e-05"
             },
-            "frame": 102,
-            "step": 511
+            "frame": 107,
+            "step": 531
           },
           {
             "row": "ASPECT",
@@ -3379,20 +3381,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 105,
-            "t": 8.108180337e-05,
-            "delta": 8.18033700000152e-08,
-            "describe": "frame 105, step 526",
+            "index": 110,
+            "t": 8.111195933e-05,
+            "delta": 1.1195933000001399e-07,
+            "describe": "frame 110, step 546",
             "inset": {
-              "Vrms": 8161.143566,
-              "meanT": 1.240393243,
-              "Tmax": 1.85797087,
-              "eta_interior": 0.002335365185,
+              "Vrms": 9290.466529,
+              "meanT": 1.240462116,
+              "Tmax": 1.827140385,
+              "eta_interior": 0.002575144224,
               "source": "frame_meta.csv",
-              "describe": "t=8.10818e-05"
+              "describe": "t=8.1112e-05"
             },
-            "frame": 105,
-            "step": 526
+            "frame": 110,
+            "step": 546
           },
           {
             "row": "ASPECT",
@@ -3418,20 +3420,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 107,
-            "t": 8.188748716e-05,
-            "delta": -1.1251283999998748e-07,
-            "describe": "frame 107, step 536",
+            "index": 112,
+            "t": 8.184251936e-05,
+            "delta": -1.5748063999998713e-07,
+            "describe": "frame 112, step 556",
             "inset": {
-              "Vrms": 8005.046575,
-              "meanT": 1.24037259,
-              "Tmax": 1.858731663,
-              "eta_interior": 0.002347066508,
+              "Vrms": 9199.81107,
+              "meanT": 1.24044759,
+              "Tmax": 1.828055504,
+              "eta_interior": 0.002604181896,
               "source": "frame_meta.csv",
-              "describe": "t=8.18875e-05"
+              "describe": "t=8.18425e-05"
             },
-            "frame": 107,
-            "step": 536
+            "frame": 112,
+            "step": 556
           },
           {
             "row": "ASPECT",
@@ -3457,20 +3459,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 110,
-            "t": 8.312712794e-05,
-            "delta": 1.2712794000000523e-07,
-            "describe": "frame 110, step 551",
+            "index": 115,
+            "t": 8.295936996e-05,
+            "delta": -4.063003999999555e-08,
+            "describe": "frame 115, step 571",
             "inset": {
-              "Vrms": 7749.348058,
-              "meanT": 1.240340734,
-              "Tmax": 1.85388852,
-              "eta_interior": 0.002368702026,
+              "Vrms": 9002.488294,
+              "meanT": 1.24042574,
+              "Tmax": 1.829973666,
+              "eta_interior": 0.002663053932,
               "source": "frame_meta.csv",
-              "describe": "t=8.31271e-05"
+              "describe": "t=8.29594e-05"
             },
-            "frame": 110,
-            "step": 551
+            "frame": 115,
+            "step": 571
           },
           {
             "row": "ASPECT",
@@ -3496,20 +3498,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 112,
-            "t": 8.398076755e-05,
-            "delta": -1.923244999999104e-08,
-            "describe": "frame 112, step 561",
+            "index": 118,
+            "t": 8.411588306e-05,
+            "delta": 1.158830600000093e-07,
+            "describe": "frame 118, step 586",
             "inset": {
-              "Vrms": 7570.243905,
-              "meanT": 1.240320156,
-              "Tmax": 1.84957686,
-              "eta_interior": 0.002382508212,
+              "Vrms": 8750.127487,
+              "meanT": 1.240403497,
+              "Tmax": 1.830127705,
+              "eta_interior": 0.002724046933,
               "source": "frame_meta.csv",
-              "describe": "t=8.39808e-05"
+              "describe": "t=8.41159e-05"
             },
-            "frame": 112,
-            "step": 561
+            "frame": 118,
+            "step": 586
           },
           {
             "row": "ASPECT",
@@ -3535,20 +3537,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 114,
-            "t": 8.486289062e-05,
-            "delta": -1.3710937999998694e-07,
-            "describe": "frame 114, step 571",
+            "index": 120,
+            "t": 8.491653916e-05,
+            "delta": -8.346083999999615e-08,
+            "describe": "frame 120, step 596",
             "inset": {
-              "Vrms": 7391.698049,
-              "meanT": 1.24029995,
-              "Tmax": 1.854703599,
-              "eta_interior": 0.002394689638,
+              "Vrms": 8560.841111,
+              "meanT": 1.240388199,
+              "Tmax": 1.829681179,
+              "eta_interior": 0.002723742644,
               "source": "frame_meta.csv",
-              "describe": "t=8.48629e-05"
+              "describe": "t=8.49165e-05"
             },
-            "frame": 114,
-            "step": 571
+            "frame": 120,
+            "step": 596
           },
           {
             "row": "ASPECT",
@@ -3574,20 +3576,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 116,
-            "t": 8.577358226e-05,
-            "delta": -2.264177399999886e-07,
-            "describe": "frame 116, step 581",
+            "index": 123,
+            "t": 8.617416332e-05,
+            "delta": 1.741633200000092e-07,
+            "describe": "frame 123, step 611",
             "inset": {
-              "Vrms": 7209.411114,
-              "meanT": 1.240279047,
-              "Tmax": 1.854139672,
-              "eta_interior": 0.002404300367,
+              "Vrms": 8258.002408,
+              "meanT": 1.240364828,
+              "Tmax": 1.829379629,
+              "eta_interior": 0.002831393863,
               "source": "frame_meta.csv",
-              "describe": "t=8.57736e-05"
+              "describe": "t=8.61742e-05"
             },
-            "frame": 116,
-            "step": 581
+            "frame": 123,
+            "step": 611
           },
           {
             "row": "ASPECT",
@@ -3613,20 +3615,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 119,
-            "t": 8.719309595e-05,
-            "delta": 1.9309595000000998e-07,
-            "describe": "frame 119, step 596",
+            "index": 125,
+            "t": 8.705746859e-05,
+            "delta": 5.746859000001659e-08,
+            "describe": "frame 125, step 621",
             "inset": {
-              "Vrms": 6930.69081,
-              "meanT": 1.240248013,
-              "Tmax": 1.846820156,
-              "eta_interior": 0.00243456194,
+              "Vrms": 8047.366472,
+              "meanT": 1.240348698,
+              "Tmax": 1.830027522,
+              "eta_interior": 0.002894829604,
               "source": "frame_meta.csv",
-              "describe": "t=8.71931e-05"
+              "describe": "t=8.70575e-05"
             },
-            "frame": 119,
-            "step": 596
+            "frame": 125,
+            "step": 621
           },
           {
             "row": "ASPECT",
@@ -3652,20 +3654,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 121,
-            "t": 8.813955494e-05,
-            "delta": 1.3955494000000585e-07,
-            "describe": "frame 121, step 606",
+            "index": 127,
+            "t": 8.798284991e-05,
+            "delta": -1.7150089999995368e-08,
+            "describe": "frame 127, step 631",
             "inset": {
-              "Vrms": 6734.718882,
-              "meanT": 1.24022649,
-              "Tmax": 1.847874447,
-              "eta_interior": 0.002463524073,
+              "Vrms": 7830.533702,
+              "meanT": 1.240332117,
+              "Tmax": 1.830567355,
+              "eta_interior": 0.00297589438,
               "source": "frame_meta.csv",
-              "describe": "t=8.81396e-05"
+              "describe": "t=8.79828e-05"
             },
-            "frame": 121,
-            "step": 606
+            "frame": 127,
+            "step": 631
           },
           {
             "row": "ASPECT",
@@ -3691,20 +3693,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 123,
-            "t": 8.909062087e-05,
-            "delta": 9.062087000000522e-08,
-            "describe": "frame 123, step 616",
+            "index": 129,
+            "t": 8.89448611e-05,
+            "delta": -5.513889999999384e-08,
+            "describe": "frame 129, step 641",
             "inset": {
-              "Vrms": 6517.706229,
-              "meanT": 1.240203434,
-              "Tmax": 1.841171456,
-              "eta_interior": 0.002484944517,
+              "Vrms": 7610.427487,
+              "meanT": 1.240317797,
+              "Tmax": 1.830339984,
+              "eta_interior": 0.003036745709,
               "source": "frame_meta.csv",
-              "describe": "t=8.90906e-05"
+              "describe": "t=8.89449e-05"
             },
-            "frame": 123,
-            "step": 616
+            "frame": 129,
+            "step": 641
           },
           {
             "row": "ASPECT",
@@ -3730,20 +3732,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 125,
-            "t": 9.005835306e-05,
-            "delta": 5.835306000000987e-08,
-            "describe": "frame 125, step 626",
+            "index": 131,
+            "t": 8.992527142e-05,
+            "delta": -7.472857999998752e-08,
+            "describe": "frame 131, step 651",
             "inset": {
-              "Vrms": 6286.14679,
-              "meanT": 1.240180652,
-              "Tmax": 1.84105794,
-              "eta_interior": 0.002506364384,
+              "Vrms": 7396.270083,
+              "meanT": 1.24031512,
+              "Tmax": 1.82949907,
+              "eta_interior": 0.003111273508,
               "source": "frame_meta.csv",
-              "describe": "t=9.00584e-05"
+              "describe": "t=8.99253e-05"
             },
-            "frame": 125,
-            "step": 626
+            "frame": 131,
+            "step": 651
           },
           {
             "row": "ASPECT",
@@ -3769,20 +3771,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 127,
-            "t": 9.105270263e-05,
-            "delta": 5.270263000000503e-08,
-            "describe": "frame 127, step 636",
+            "index": 133,
+            "t": 9.093127664e-05,
+            "delta": -6.872335999999143e-08,
+            "describe": "frame 133, step 661",
             "inset": {
-              "Vrms": 6043.228468,
-              "meanT": 1.240157685,
-              "Tmax": 1.838378947,
-              "eta_interior": 0.002544276583,
+              "Vrms": 7180.240739,
+              "meanT": 1.240307683,
+              "Tmax": 1.82939316,
+              "eta_interior": 0.003199881975,
               "source": "frame_meta.csv",
-              "describe": "t=9.10527e-05"
+              "describe": "t=9.09313e-05"
             },
-            "frame": 127,
-            "step": 636
+            "frame": 133,
+            "step": 661
           },
           {
             "row": "ASPECT",
@@ -3808,20 +3810,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 129,
-            "t": 9.208434067e-05,
-            "delta": 8.434067000001664e-08,
-            "describe": "frame 129, step 646",
+            "index": 135,
+            "t": 9.195557272e-05,
+            "delta": -4.4427279999984556e-08,
+            "describe": "frame 135, step 671",
             "inset": {
-              "Vrms": 5797.800158,
-              "meanT": 1.240135773,
-              "Tmax": 1.844262453,
-              "eta_interior": 0.002587362496,
+              "Vrms": 6968.142939,
+              "meanT": 1.240302116,
+              "Tmax": 1.829728791,
+              "eta_interior": 0.003276574806,
               "source": "frame_meta.csv",
-              "describe": "t=9.20843e-05"
+              "describe": "t=9.19556e-05"
             },
-            "frame": 129,
-            "step": 646
+            "frame": 135,
+            "step": 671
           },
           {
             "row": "ASPECT",
@@ -3847,20 +3849,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 131,
-            "t": 9.316468524e-05,
-            "delta": 1.646852400000035e-07,
-            "describe": "frame 131, step 656",
+            "index": 137,
+            "t": 9.297198657e-05,
+            "delta": -2.8013429999998517e-08,
+            "describe": "frame 137, step 681",
             "inset": {
-              "Vrms": 5563.192296,
-              "meanT": 1.240113326,
-              "Tmax": 1.847373362,
-              "eta_interior": 0.002658957421,
+              "Vrms": 6766.050747,
+              "meanT": 1.240292955,
+              "Tmax": 1.830065308,
+              "eta_interior": 0.003296100794,
               "source": "frame_meta.csv",
-              "describe": "t=9.31647e-05"
+              "describe": "t=9.2972e-05"
             },
-            "frame": 131,
-            "step": 656
+            "frame": 137,
+            "step": 681
           },
           {
             "row": "ASPECT",
@@ -3886,20 +3888,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 132,
-            "t": 9.37264281e-05,
-            "delta": -2.735718999999885e-07,
-            "describe": "frame 132, step 661",
+            "index": 139,
+            "t": 9.395256242e-05,
+            "delta": -4.7437579999993346e-08,
+            "describe": "frame 139, step 691",
             "inset": {
-              "Vrms": 5452.610463,
-              "meanT": 1.24010197,
-              "Tmax": 1.847064802,
-              "eta_interior": 0.002712761444,
+              "Vrms": 6567.73146,
+              "meanT": 1.2402835,
+              "Tmax": 1.830465687,
+              "eta_interior": 0.003341482981,
               "source": "frame_meta.csv",
-              "describe": "t=9.37264e-05"
+              "describe": "t=9.39526e-05"
             },
-            "frame": 132,
-            "step": 661
+            "frame": 139,
+            "step": 691
           },
           {
             "row": "ASPECT",
@@ -3925,20 +3927,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 134,
-            "t": 9.48983358e-05,
-            "delta": -1.0166419999999064e-07,
-            "describe": "frame 134, step 671",
+            "index": 141,
+            "t": 9.490525233e-05,
+            "delta": -9.474766999999793e-08,
+            "describe": "frame 141, step 701",
             "inset": {
-              "Vrms": 5251.312939,
-              "meanT": 1.240078652,
-              "Tmax": 1.837655276,
-              "eta_interior": 0.002799293571,
+              "Vrms": 6353.213827,
+              "meanT": 1.240272972,
+              "Tmax": 1.830794236,
+              "eta_interior": 0.003392967064,
               "source": "frame_meta.csv",
-              "describe": "t=9.48983e-05"
+              "describe": "t=9.49053e-05"
             },
-            "frame": 134,
-            "step": 671
+            "frame": 141,
+            "step": 701
           },
           {
             "row": "ASPECT",
@@ -3964,20 +3966,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 136,
-            "t": 9.614149876e-05,
-            "delta": 1.4149876000001354e-07,
-            "describe": "frame 136, step 681",
+            "index": 143,
+            "t": 9.585035204e-05,
+            "delta": -1.4964795999998786e-07,
+            "describe": "frame 143, step 711",
             "inset": {
-              "Vrms": 5081.371122,
-              "meanT": 1.240054527,
-              "Tmax": 1.841384814,
-              "eta_interior": 0.00287149989,
+              "Vrms": 6107.020574,
+              "meanT": 1.240258578,
+              "Tmax": 1.830950745,
+              "eta_interior": 0.003450193087,
               "source": "frame_meta.csv",
-              "describe": "t=9.61415e-05"
+              "describe": "t=9.58504e-05"
             },
-            "frame": 136,
-            "step": 681
+            "frame": 143,
+            "step": 711
           },
           {
             "row": "ASPECT",
@@ -4003,20 +4005,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 137,
-            "t": 9.678787813e-05,
-            "delta": -2.1212187000000337e-07,
-            "describe": "frame 137, step 686",
+            "index": 145,
+            "t": 9.681408266e-05,
+            "delta": -1.8591733999999492e-07,
+            "describe": "frame 145, step 721",
             "inset": {
-              "Vrms": 5005.729084,
-              "meanT": 1.240042084,
-              "Tmax": 1.845943597,
-              "eta_interior": 0.002920381957,
+              "Vrms": 5821.605954,
+              "meanT": 1.240250431,
+              "Tmax": 1.830993558,
+              "eta_interior": 0.003491642079,
               "source": "frame_meta.csv",
-              "describe": "t=9.67879e-05"
+              "describe": "t=9.68141e-05"
             },
-            "frame": 137,
-            "step": 686
+            "frame": 145,
+            "step": 721
           },
           {
             "row": "ASPECT",
@@ -4042,20 +4044,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 139,
-            "t": 9.805643604e-05,
-            "delta": 5.643604000000622e-08,
-            "describe": "frame 139, step 696",
+            "index": 147,
+            "t": 9.782211649e-05,
+            "delta": -1.7788350999999166e-07,
+            "describe": "frame 147, step 731",
             "inset": {
-              "Vrms": 4878.46472,
-              "meanT": 1.240018539,
-              "Tmax": 1.837669268,
-              "eta_interior": 0.002998495698,
+              "Vrms": 5499.249647,
+              "meanT": 1.240234814,
+              "Tmax": 1.831215492,
+              "eta_interior": 0.003482598463,
               "source": "frame_meta.csv",
-              "describe": "t=9.80564e-05"
+              "describe": "t=9.78221e-05"
             },
-            "frame": 139,
-            "step": 696
+            "frame": 147,
+            "step": 731
           },
           {
             "row": "ASPECT",
@@ -4081,20 +4083,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 141,
-            "t": 9.929963376e-05,
-            "delta": 2.996337600000103e-07,
-            "describe": "frame 141, step 706",
+            "index": 149,
+            "t": 9.889423773e-05,
+            "delta": -1.0576226999999623e-07,
+            "describe": "frame 149, step 741",
             "inset": {
-              "Vrms": 4762.26744,
-              "meanT": 1.239996009,
-              "Tmax": 1.834553686,
-              "eta_interior": 0.00308229494,
+              "Vrms": 5152.594918,
+              "meanT": 1.240211498,
+              "Tmax": 1.831535497,
+              "eta_interior": 0.003596022269,
               "source": "frame_meta.csv",
-              "describe": "t=9.92996e-05"
+              "describe": "t=9.88942e-05"
             },
-            "frame": 141,
-            "step": 706
+            "frame": 149,
+            "step": 741
           },
           {
             "row": "ASPECT",
@@ -4120,20 +4122,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 142,
-            "t": 9.99125012e-05,
-            "delta": -8.74987999999893e-08,
-            "describe": "frame 142, step 711",
+            "index": 151,
+            "t": 0.0001000468957,
+            "delta": 4.689570000000211e-08,
+            "describe": "frame 151, step 751",
             "inset": {
-              "Vrms": 4702.089621,
-              "meanT": 1.239985112,
-              "Tmax": 1.835412236,
-              "eta_interior": 0.003124053365,
+              "Vrms": 4802.850981,
+              "meanT": 1.240192704,
+              "Tmax": 1.831546722,
+              "eta_interior": 0.003643272089,
               "source": "frame_meta.csv",
-              "describe": "t=9.99125e-05"
+              "describe": "t=0.000100047"
             },
-            "frame": 142,
-            "step": 711
+            "frame": 151,
+            "step": 751
           },
           {
             "row": "ASPECT",
@@ -4159,20 +4161,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 144,
-            "t": 0.0001011341161,
-            "delta": 1.3411610000001151e-07,
-            "describe": "frame 144, step 721",
+            "index": 153,
+            "t": 0.0001012956131,
+            "delta": 2.9561310000000493e-07,
+            "describe": "frame 153, step 761",
             "inset": {
-              "Vrms": 4563.465309,
-              "meanT": 1.239963871,
-              "Tmax": 1.835608634,
-              "eta_interior": 0.003189059208,
+              "Vrms": 4465.987684,
+              "meanT": 1.240179221,
+              "Tmax": 1.831897111,
+              "eta_interior": 0.003771433642,
               "source": "frame_meta.csv",
-              "describe": "t=0.000101134"
+              "describe": "t=0.000101296"
             },
-            "frame": 144,
-            "step": 721
+            "frame": 153,
+            "step": 761
           },
           {
             "row": "ASPECT",
@@ -4198,20 +4200,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 145,
-            "t": 0.0001017424203,
-            "delta": -2.575796999999927e-07,
-            "describe": "frame 145, step 726",
+            "index": 154,
+            "t": 0.0001019603406,
+            "delta": -3.965939999999314e-08,
+            "describe": "frame 154, step 766",
             "inset": {
-              "Vrms": 4481.159287,
-              "meanT": 1.239953446,
-              "Tmax": 1.835123384,
-              "eta_interior": 0.00324004559,
+              "Vrms": 4306.748182,
+              "meanT": 1.240170739,
+              "Tmax": 1.831861832,
+              "eta_interior": 0.003816156841,
               "source": "frame_meta.csv",
-              "describe": "t=0.000101742"
+              "describe": "t=0.00010196"
             },
-            "frame": 145,
-            "step": 726
+            "frame": 154,
+            "step": 766
           },
           {
             "row": "ASPECT",
@@ -4237,20 +4239,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 147,
-            "t": 0.0001029698299,
-            "delta": -3.017010000000138e-08,
-            "describe": "frame 147, step 736",
+            "index": 155,
+            "t": 0.0001026543431,
+            "delta": -3.4565689999999647e-07,
+            "describe": "frame 155, step 771",
             "inset": {
-              "Vrms": 4290.799481,
-              "meanT": 1.23993272,
-              "Tmax": 1.83322775,
-              "eta_interior": 0.003333826573,
+              "Vrms": 4155.167383,
+              "meanT": 1.240160112,
+              "Tmax": 1.832075229,
+              "eta_interior": 0.003794500568,
               "source": "frame_meta.csv",
-              "describe": "t=0.00010297"
+              "describe": "t=0.000102654"
             },
-            "frame": 147,
-            "step": 736
+            "frame": 155,
+            "step": 771
           },
           {
             "row": "ASPECT",
@@ -4276,20 +4278,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 149,
-            "t": 0.0001042445202,
-            "delta": 2.4452020000001224e-07,
-            "describe": "frame 149, step 746",
+            "index": 157,
+            "t": 0.0001041328147,
+            "delta": 1.328147000000129e-07,
+            "describe": "frame 157, step 781",
             "inset": {
-              "Vrms": 4071.430603,
-              "meanT": 1.239911519,
-              "Tmax": 1.829873974,
-              "eta_interior": 0.003452843645,
+              "Vrms": 3871.617865,
+              "meanT": 1.240141232,
+              "Tmax": 1.832235449,
+              "eta_interior": 0.003877552772,
               "source": "frame_meta.csv",
-              "describe": "t=0.000104245"
+              "describe": "t=0.000104133"
             },
-            "frame": 149,
-            "step": 746
+            "frame": 157,
+            "step": 781
           },
           {
             "row": "ASPECT",
@@ -4315,20 +4317,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 150,
-            "t": 0.0001049106025,
-            "delta": -8.939749999998918e-08,
-            "describe": "frame 150, step 751",
+            "index": 158,
+            "t": 0.000104916103,
+            "delta": -8.389699999998589e-08,
+            "describe": "frame 158, step 786",
             "inset": {
-              "Vrms": 3955.342231,
-              "meanT": 1.239901237,
-              "Tmax": 1.827989799,
-              "eta_interior": 0.003512853797,
+              "Vrms": 3742.008816,
+              "meanT": 1.240132469,
+              "Tmax": 1.832168777,
+              "eta_interior": 0.003926786694,
               "source": "frame_meta.csv",
-              "describe": "t=0.000104911"
+              "describe": "t=0.000104916"
             },
-            "frame": 150,
-            "step": 751
+            "frame": 158,
+            "step": 786
           },
           {
             "row": "ASPECT",
@@ -4354,20 +4356,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 152,
-            "t": 0.0001063209335,
-            "delta": 3.2093350000000735e-07,
-            "describe": "frame 152, step 761",
+            "index": 159,
+            "t": 0.0001057292843,
+            "delta": -2.707156999999928e-07,
+            "describe": "frame 159, step 791",
             "inset": {
-              "Vrms": 3720.295898,
-              "meanT": 1.239878777,
-              "Tmax": 1.82790018,
-              "eta_interior": 0.003577507084,
+              "Vrms": 3620.35394,
+              "meanT": 1.24012135,
+              "Tmax": 1.832024789,
+              "eta_interior": 0.003951160945,
               "source": "frame_meta.csv",
-              "describe": "t=0.000106321"
+              "describe": "t=0.000105729"
             },
-            "frame": 152,
-            "step": 761
+            "frame": 159,
+            "step": 791
           },
           {
             "row": "ASPECT",
@@ -4393,20 +4395,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 153,
-            "t": 0.0001070734453,
-            "delta": 7.34452999999962e-08,
-            "describe": "frame 153, step 766",
+            "index": 160,
+            "t": 0.0001065723244,
+            "delta": -4.2767560000000397e-07,
+            "describe": "frame 160, step 796",
             "inset": {
-              "Vrms": 3604.19663,
-              "meanT": 1.239866853,
-              "Tmax": 1.827713959,
-              "eta_interior": 0.003645569426,
+              "Vrms": 3504.693306,
+              "meanT": 1.240110633,
+              "Tmax": 1.832878306,
+              "eta_interior": 0.004043963089,
               "source": "frame_meta.csv",
-              "describe": "t=0.000107073"
+              "describe": "t=0.000106572"
             },
-            "frame": 153,
-            "step": 766
+            "frame": 160,
+            "step": 796
           },
           {
             "row": "ASPECT",
@@ -4432,20 +4434,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 154,
-            "t": 0.0001078632216,
-            "delta": -1.3677840000000138e-07,
-            "describe": "frame 154, step 771",
+            "index": 162,
+            "t": 0.0001083491639,
+            "delta": 3.4916390000001006e-07,
+            "describe": "frame 162, step 806",
             "inset": {
-              "Vrms": 3491.171264,
-              "meanT": 1.239854825,
-              "Tmax": 1.828296923,
-              "eta_interior": 0.003679851924,
+              "Vrms": 3294.195258,
+              "meanT": 1.240095455,
+              "Tmax": 1.833754658,
+              "eta_interior": 0.00403882922,
               "source": "frame_meta.csv",
-              "describe": "t=0.000107863"
+              "describe": "t=0.000108349"
             },
-            "frame": 154,
-            "step": 771
+            "frame": 162,
+            "step": 806
           },
           {
             "row": "ASPECT",
@@ -4471,20 +4473,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 155,
-            "t": 0.0001086946535,
-            "delta": -3.0534649999998896e-07,
-            "describe": "frame 155, step 776",
+            "index": 163,
+            "t": 0.0001092826354,
+            "delta": 2.82635400000012e-07,
+            "describe": "frame 163, step 811",
             "inset": {
-              "Vrms": 3381.655267,
-              "meanT": 1.23984215,
-              "Tmax": 1.827263886,
-              "eta_interior": 0.003709043149,
+              "Vrms": 3198.493611,
+              "meanT": 1.240079204,
+              "Tmax": 1.83482546,
+              "eta_interior": 0.004033023375,
               "source": "frame_meta.csv",
-              "describe": "t=0.000108695"
+              "describe": "t=0.000109283"
             },
-            "frame": 155,
-            "step": 776
+            "frame": 163,
+            "step": 811
           },
           {
             "row": "ASPECT",
@@ -4510,20 +4512,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 156,
-            "t": 0.0001095719769,
-            "delta": -4.2802309999998424e-07,
-            "describe": "frame 156, step 781",
+            "index": 164,
+            "t": 0.0001102402912,
+            "delta": 2.402912000000105e-07,
+            "describe": "frame 164, step 816",
             "inset": {
-              "Vrms": 3276.263235,
-              "meanT": 1.239829905,
-              "Tmax": 1.826616703,
-              "eta_interior": 0.003748265202,
+              "Vrms": 3108.109117,
+              "meanT": 1.240066254,
+              "Tmax": 1.836183778,
+              "eta_interior": 0.004113812769,
               "source": "frame_meta.csv",
-              "describe": "t=0.000109572"
+              "describe": "t=0.00011024"
             },
-            "frame": 156,
-            "step": 781
+            "frame": 164,
+            "step": 816
           },
           {
             "row": "ASPECT",
@@ -4549,20 +4551,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 158,
-            "t": 0.0001114486805,
-            "delta": 4.4868050000001147e-07,
-            "describe": "frame 158, step 791",
+            "index": 165,
+            "t": 0.0001112175099,
+            "delta": 2.1750990000001858e-07,
+            "describe": "frame 165, step 821",
             "inset": {
-              "Vrms": 3080.24796,
-              "meanT": 1.239801788,
-              "Tmax": 1.824117959,
-              "eta_interior": 0.00382101243,
+              "Vrms": 3023.790951,
+              "meanT": 1.240050518,
+              "Tmax": 1.835180931,
+              "eta_interior": 0.004135475825,
               "source": "frame_meta.csv",
-              "describe": "t=0.000111449"
+              "describe": "t=0.000111218"
             },
-            "frame": 158,
-            "step": 791
+            "frame": 165,
+            "step": 821
           },
           {
             "row": "ASPECT",
@@ -4588,20 +4590,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 159,
-            "t": 0.0001124207675,
-            "delta": 4.2076749999999546e-07,
-            "describe": "frame 159, step 796",
+            "index": 166,
+            "t": 0.0001122142618,
+            "delta": 2.1426179999999506e-07,
+            "describe": "frame 166, step 826",
             "inset": {
-              "Vrms": 2992.514076,
-              "meanT": 1.239786058,
-              "Tmax": 1.823320826,
-              "eta_interior": 0.003867093556,
+              "Vrms": 2944.751235,
+              "meanT": 1.240044771,
+              "Tmax": 1.835723663,
+              "eta_interior": 0.004176894112,
               "source": "frame_meta.csv",
-              "describe": "t=0.000112421"
+              "describe": "t=0.000112214"
             },
-            "frame": 159,
-            "step": 796
+            "frame": 166,
+            "step": 826
           },
           {
             "row": "ASPECT",
@@ -4627,20 +4629,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 160,
-            "t": 0.0001134142594,
-            "delta": 4.142594000000014e-07,
-            "describe": "frame 160, step 801",
+            "index": 167,
+            "t": 0.0001132305294,
+            "delta": 2.3052940000000983e-07,
+            "describe": "frame 167, step 831",
             "inset": {
-              "Vrms": 2911.512468,
-              "meanT": 1.239771222,
-              "Tmax": 1.822505228,
-              "eta_interior": 0.003954231436,
+              "Vrms": 2871.356344,
+              "meanT": 1.24002904,
+              "Tmax": 1.836119769,
+              "eta_interior": 0.004197197014,
               "source": "frame_meta.csv",
-              "describe": "t=0.000113414"
+              "describe": "t=0.000113231"
             },
-            "frame": 160,
-            "step": 801
+            "frame": 167,
+            "step": 831
           },
           {
             "row": "ASPECT",
@@ -4666,20 +4668,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 161,
-            "t": 0.0001144319442,
-            "delta": 4.31944200000002e-07,
-            "describe": "frame 161, step 806",
+            "index": 168,
+            "t": 0.000114266664,
+            "delta": 2.666640000000036e-07,
+            "describe": "frame 168, step 836",
             "inset": {
-              "Vrms": 2836.763555,
-              "meanT": 1.239754901,
-              "Tmax": 1.822543471,
-              "eta_interior": 0.004004639962,
+              "Vrms": 2802.997061,
+              "meanT": 1.240014113,
+              "Tmax": 1.835009516,
+              "eta_interior": 0.004276597454,
               "source": "frame_meta.csv",
-              "describe": "t=0.000114432"
+              "describe": "t=0.000114267"
             },
-            "frame": 161,
-            "step": 806
+            "frame": 168,
+            "step": 836
           },
           {
             "row": "ASPECT",
@@ -4705,20 +4707,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 162,
-            "t": 0.0001154751945,
-            "delta": 4.7519450000000686e-07,
-            "describe": "frame 162, step 811",
+            "index": 169,
+            "t": 0.0001153215944,
+            "delta": 3.2159440000000385e-07,
+            "describe": "frame 169, step 841",
             "inset": {
-              "Vrms": 2767.879564,
-              "meanT": 1.239743083,
-              "Tmax": 1.82583879,
-              "eta_interior": 0.004106155118,
+              "Vrms": 2738.872759,
+              "meanT": 1.240002574,
+              "Tmax": 1.834380607,
+              "eta_interior": 0.00430310102,
               "source": "frame_meta.csv",
-              "describe": "t=0.000115475"
+              "describe": "t=0.000115322"
             },
-            "frame": 162,
-            "step": 811
+            "frame": 169,
+            "step": 841
           },
           {
             "row": "ASPECT",
@@ -4744,20 +4746,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 162,
-            "t": 0.0001154751945,
-            "delta": -5.248054999999903e-07,
-            "describe": "frame 162, step 811",
+            "index": 170,
+            "t": 0.0001163959275,
+            "delta": 3.959275000000196e-07,
+            "describe": "frame 170, step 846",
             "inset": {
-              "Vrms": 2767.879564,
-              "meanT": 1.239743083,
-              "Tmax": 1.82583879,
-              "eta_interior": 0.004106155118,
+              "Vrms": 2678.810841,
+              "meanT": 1.239987488,
+              "Tmax": 1.835251807,
+              "eta_interior": 0.004350674672,
               "source": "frame_meta.csv",
-              "describe": "t=0.000115475"
+              "describe": "t=0.000116396"
             },
-            "frame": 162,
-            "step": 811
+            "frame": 170,
+            "step": 846
           },
           {
             "row": "ASPECT",
@@ -4783,20 +4785,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 163,
-            "t": 0.0001165401897,
-            "delta": -4.59810299999994e-07,
-            "describe": "frame 163, step 816",
+            "index": 171,
+            "t": 0.0001174899501,
+            "delta": 4.899501000000053e-07,
+            "describe": "frame 171, step 851",
             "inset": {
-              "Vrms": 2705.009902,
-              "meanT": 1.239725708,
-              "Tmax": 1.826784322,
-              "eta_interior": 0.004106002143,
+              "Vrms": 2623.709775,
+              "meanT": 1.239971621,
+              "Tmax": 1.83708547,
+              "eta_interior": 0.004375123859,
               "source": "frame_meta.csv",
-              "describe": "t=0.00011654"
+              "describe": "t=0.00011749"
             },
-            "frame": 163,
-            "step": 816
+            "frame": 171,
+            "step": 851
           },
           {
             "row": "ASPECT",
@@ -4822,20 +4824,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 164,
-            "t": 0.0001176235093,
-            "delta": -3.764906999999994e-07,
-            "describe": "frame 164, step 821",
+            "index": 171,
+            "t": 0.0001174899501,
+            "delta": -5.100498999999919e-07,
+            "describe": "frame 171, step 851",
             "inset": {
-              "Vrms": 2648.430614,
-              "meanT": 1.239710254,
-              "Tmax": 1.821028616,
-              "eta_interior": 0.00420163421,
+              "Vrms": 2623.709775,
+              "meanT": 1.239971621,
+              "Tmax": 1.83708547,
+              "eta_interior": 0.004375123859,
               "source": "frame_meta.csv",
-              "describe": "t=0.000117624"
+              "describe": "t=0.00011749"
             },
-            "frame": 164,
-            "step": 821
+            "frame": 171,
+            "step": 851
           },
           {
             "row": "ASPECT",
@@ -4861,20 +4863,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 165,
-            "t": 0.0001187266373,
-            "delta": -2.733626999999869e-07,
-            "describe": "frame 165, step 826",
+            "index": 172,
+            "t": 0.0001186053461,
+            "delta": -3.9465389999999393e-07,
+            "describe": "frame 172, step 856",
             "inset": {
-              "Vrms": 2598.193804,
-              "meanT": 1.239692191,
-              "Tmax": 1.820537703,
-              "eta_interior": 0.004239398419,
+              "Vrms": 2572.009036,
+              "meanT": 1.239962296,
+              "Tmax": 1.83904157,
+              "eta_interior": 0.004516783911,
               "source": "frame_meta.csv",
-              "describe": "t=0.000118727"
+              "describe": "t=0.000118605"
             },
-            "frame": 165,
-            "step": 826
+            "frame": 172,
+            "step": 856
           },
           {
             "row": "ASPECT",
@@ -4900,20 +4902,20 @@
         "picks": [
           {
             "row": "QuaST",
-            "index": 166,
-            "t": 0.0001198508695,
-            "delta": -1.4913050000000855e-07,
-            "describe": "frame 166, step 831",
+            "index": 174,
+            "t": 0.0001201996705,
+            "delta": 1.9967049999999333e-07,
+            "describe": "frame 174, step 863",
             "inset": {
-              "Vrms": 2554.704464,
-              "meanT": 1.239673447,
-              "Tmax": 1.819970907,
-              "eta_interior": 0.004279517495,
+              "Vrms": 2515.856692,
+              "meanT": 1.239938405,
+              "Tmax": 1.838905763,
+              "eta_interior": 0.004558725477,
               "source": "frame_meta.csv",
-              "describe": "t=0.000119851"
+              "describe": "t=0.0001202"
             },
-            "frame": 166,
-            "step": 831
+            "frame": 174,
+            "step": 863
           },
           {
             "row": "ASPECT",
@@ -4936,45 +4938,45 @@
     ]
   },
   "outputs": {
-    "gif": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b.gif",
-    "mp4": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b.mp4",
-    "mp4_2x": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b_2x.mp4",
-    "poster": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b_poster.png",
-    "frames_dir": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b_frames",
+    "gif": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic_both03.gif",
+    "mp4": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic_both03.mp4",
+    "mp4_2x": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic_both03_2x.mp4",
+    "poster": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic_both03_poster.png",
+    "frames_dir": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic_both03_frames",
     "gif_info": {
       "width": 1200,
       "colours": 256,
-      "bytes": 6031291
+      "bytes": 6515828
     },
-    "render_s": 478.657835483551,
-    "total_s": 730.3539876937866
+    "render_s": 491.32949018478394,
+    "total_s": 748.0844073295593
   },
-  "command": "annulus_realistic_video.py --quast out_julia/annulus_realistic/quast_prod30 --aspect /mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod --quast-log out_julia/annulus_realistic/quast_prod30.log --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 --master-scale 4 --polar-nr 800 --polar-nphi 4096 --mesh-supersample 2 --mesh-min-cell-px 1.5 --font-scale 1.25 --plate-alpha 0.75 --gif-colors 256 --gif-max-mb 12 --out out_julia/annulus_realistic/render/realistic30b.gif --also-poster --also-mp4 --sidecar out_julia/annulus_realistic/render/realistic30b.json",
+  "command": "annulus_realistic_video.py --quast out_julia/annulus_realistic/quast_pilot_both25_f03 --aspect /mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod --quast-log out_julia/annulus_realistic/quast_both03_final.log --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 --master-scale 4 --polar-nr 800 --polar-nphi 4096 --mesh-supersample 2 --mesh-min-cell-px 1.5 --font-scale 1.25 --plate-alpha 0.75 --gif-colors 256 --gif-max-mb 12 --gif-dither none --out out_julia/annulus_realistic/render/realistic_both03.gif --also-poster --also-mp4 --sidecar out_julia/annulus_realistic/render/realistic_both03.json",
   "environment": {
     "numpy": "2.5.4",
     "matplotlib": "3.11.2",
     "python": "3.12.3"
   },
-  "caption": "The realistic mantle card (H = 10, nominal Ra = 1e5 at the composite calibration point) on the closed 2-D annulus, run by QuaST (top) and by ASPECT (bottom) from the same analytic initial state, each on its own adaptive mesh, over the dynamically active phase t_nd = 1e-6 to 1.2e-4: total temperature, its anomaly about the angular mean at each radius, log10(eta/eta_ref) of the composite isostress rheology on the power-law colour mapping (gamma = 0.30, bar labels the true range, dark = stiff = cold), and each code's own adaptive mesh coloured by tree level. Both rows share one colour scale per column. The card has no Nusselt pair by design (H = 10 makes the per-wall normalisation undefined), so the temperature plate carries V_rms, mean T and T_max instead. QuaST runs its balanced AMR with a 30,000-leaf budget; its 30k arm was stopped at t_nd = 1.243e-4 because at the full leaf budget the direct solve slowed to about two minutes per step and the 26 GB WSL memory of the development machine began to swap, so the clip ends at the end of the plume-growth phase; the earlier full-window clip (t_nd = 1e-6 .. 3.2e-4) used a 10,000-leaf budget. No header or card text is drawn: the card, the measured numbers and the provenance are in the JSON sidecar and in this caption.",
+  "caption": "The realistic mantle card (H = 10, nominal Ra = 1e5 at the composite calibration point; measured Ra_interior = 3.474e7 at the final QuaST state) on the closed 2-D annulus, run by QuaST (top) and by ASPECT (bottom) from the same analytic initial state, each on its own adaptive mesh, over the dynamically active phase t_nd = 1e-6 to 1.2e-4: total temperature, its anomaly about the angular mean at each radius, log10(eta/eta_ref) of the composite isostress rheology on the power-law colour mapping (gamma = 0.30, bar labels the true range, dark = stiff = cold), and each code's own adaptive mesh coloured by tree level. Both rows share one colour scale per column.  QuaST runs its balanced AMR with a normalised temperature+velocity jump indicator (`both`) at refine_frac = 0.3, a 25,000-leaf budget (wall rule 5/0.1) and the direct solve. This is a demonstration setting, not the box card's own theta/0.2 configuration: on this ring the theta/0.2 Doerfler set sat entirely on level-7 leaves for about 1.2 s of the clip (28 identical mesh dumps), so that arm could neither refine nor coarsen; it is kept in the repository history but is not the tracked figure. ASPECT runs the box clip's seven-line AMR block verbatim, which is stable on the shell.  The card has no Nusselt pair by design (H = 10 makes the per-wall normalisation undefined), so the temperature plate carries V_rms, mean T and T_max instead.  No header or card text is drawn: the card, the measured numbers and the provenance are in the JSON sidecar and in this caption.",
   "notes": [
     "The two mesh panels compare two independent adaptive discretizations: QuaST's gradient-jump indicator with a wall minimum level vs ASPECT's temperature strategy (20 % refine / 0.5 % coarsen); the cell counts and level ranges are each code's own and are printed on the plates.",
     "Each row shows its own nearest frame in time (the offset delta is recorded per target in `matching.targets`); there is no time interpolation, only spatial rasterisation.",
     "Mesh-panel boundary policy: every cell outline is drawn while the cell is at least 1.50 delivered px across; a level-7 ASPECT cell of this card is ~0.5 px across at 279 px, so for such sub-pixel levels the panel is colour-filled with the level-contour outlines only (outlining all ~160 000 cells at the delivered size would fill the panel white).  Pass --mesh-min-cell-px 0.3 to draw every outline instead.",
     "This is a demonstration of the same-card comparison, not an accuracy claim: the two codes advance the transient with different integrators and time-step sequences.",
     "The ASPECT row's viscosity is the saved material field, not a reconstruction; --check cross-checks it against the card's composite law with the Q2 strain rate and reports the difference.",
-    "QuaST row: 30,000-leaf budget, stopped at step 850 / t_nd = 1.24345e-4 because at the full leaf budget the direct solve fell to about two minutes per step and the 26 GB WSL memory began to swap; the tracked clip therefore covers t_nd = 1e-6 .. 1.2e-4.  The earlier 10,000-leaf run covered the full 1e-6 .. 3.2e-4 window.",
-    "Renderer options used for this revision: 4x master supersampling, 800 x 4096 polar sampling, 2x mesh supersampling, font scale 1.25 (two-line T plate) and 75 % white plates, GIF with --gif-dither none.",
-    "Mesh-boundary revision (2026-11-27): the white cell outlines are drawn only for cells at least 1.50 delivered pixels across (--mesh-min-cell-px 1.5); at 30k leaves the level-6 cells are ~0.75 px, so they are colour-filled with level contours instead of being outlined. The inside-ring white-pixel fraction of the QuaST mesh panel dropped from 39.2 % to 4.1 % (ASPECT 12.0 % -> 3.6 %)."
+    "QuaST row uses AMR indicator `both` (normalised theta+velocity jumps) and refine_frac=0.3, not the box card's theta/0.2.  The reason is measured: with theta/0.2 the 30k-leaf arm had 28 consecutive byte-identical mesh dumps at t=6.58e-5..7.72e-5 because the 20 % Doerfler set was entirely on level-7 leaves; both/0.3 restores refinable candidates and the full active window stays adaptive.  This is a demonstration setting, not a default change.",
+    "The tracked QuaST run is the full active window (863 steps, t=1.201997e-4, 4.7 h including its pilot segment); final leaves 24 652 (budget 25 000), levels 4-7, 110 AMR cycles, measured Ra_interior=3.474e7."
   ],
   "quast_run": {
-    "steps": 850,
-    "t_final": 0.000124345,
-    "leaves": 29911,
-    "budget": 30000,
-    "window_used": [
-      1e-06,
-      0.00012
-    ],
-    "note": "the 30k arm was stopped at step 850 (t_nd = 1.24345e-4) because at the full 30k leaf budget the direct solve took about two minutes per step and the development machine's 26 GB WSL memory began to swap; frames and a checkpoint (step 800) are kept in out_julia/annulus_realistic/quast_prod30*"
+    "steps": 863,
+    "t_final": 0.0001201996705,
+    "leaves": 24652,
+    "leaves_max": 25000,
+    "budget": 25000,
+    "indicator": "both",
+    "refine_frac": 0.3,
+    "wall_seconds": 14102.9,
+    "note": "the tracked QuaST arm was run from the level-3 ring with the normalised theta+velocity indicator (both) and refine_frac=0.3 after the theta/0.2 arm was measured to stall at level 7; it resumed from its own pilot checkpoint at t=6.005e-5, and the mesh changed throughout (no plateau; the longest run of identical source mesh dumps is 6 frames at the start of the clip)",
+    "t_stop": 0.0001201996705
   }
 }
