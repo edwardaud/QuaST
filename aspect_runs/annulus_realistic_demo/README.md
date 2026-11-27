@@ -96,12 +96,22 @@ production run.
 
 The QuaST side is `examples/annulus_realistic_demo.jl` (direct solve, production
 AMR settings, `nu_undefined = :nan` because the H = 10 ring's per-wall Nusselt
-pair is undefined by construction).  The recorded run: 1 396 steps to
-`t_nd = 3.200977e-4`, 3.26 h on 8 Julia threads, 10 000 leaves over levels 3-7,
-218 adaptive cycles, measured `Ra_interior = 4.4218e7` (nominal `Ra = 1e5` at
-the composite calibration point).  The frame stream is
-`profile = :state` (total `T`, the six node arrays including `ux, uy`, the
-composite `log10(eta/eta_ref)`, the mesh dump and the v3 meta table).
+pair is undefined by construction).  Two runs exist:
+
+- the **tracked figure** uses the 30,000-leaf arm: 850 steps to
+  `t_nd = 1.24345e-4` in about 9 h, 29 911 leaves over levels 4-7 (the budget is
+  full from roughly step 700 on).  It was stopped there because at the full leaf
+  budget the direct solve slowed to about two minutes per step and the
+  development machine's 26 GB WSL memory began to swap; the frames cover the
+  plume-growth phase and the clip is cut at `t_nd = 1.2e-4`.
+- the **earlier full-window run** (10,000 leaves): 1 396 steps to
+  `t_nd = 3.200977e-4`, 3.26 h on 8 Julia threads, 218 adaptive cycles,
+  measured `Ra_interior = 4.4218e7` (nominal `Ra = 1e5` at the composite
+  calibration point).  That is the committed history before the 30k revision.
+
+The frame stream is `profile = :state` (total `T`, the six node arrays including
+`ux, uy`, the composite `log10(eta/eta_ref)`, the mesh dump and the v3 meta
+table).
 
 ## Render
 

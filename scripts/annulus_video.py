@@ -1389,12 +1389,19 @@ class ReferenceRow:
     """
 
     def __init__(self, fig, geo, band, label, norms, cmaps,
-                 level_cmap, level_norm, plate_inset=None):
+                 level_cmap, level_norm, plate_inset=None, font_scale=1.0,
+                 plate_alpha=REF_PLATE_ALPHA):
         self.geo = geo
         self.norms = norms
         self.cmaps = cmaps
         self.level_cmap = level_cmap
         self.level_norm = level_norm
+        # `font_scale` (default 1.0 = the measured reference sizes) lets a card
+        # with square, denser panels enlarge every text on the reference layout
+        # without changing the boxes, bars or margins; the realistic annulus
+        # clip uses 1.25 for legibility.
+        self.font_scale = float(font_scale)
+        self.plate_alpha = float(plate_alpha)
         # The temperature panel's plate text: the benchmark/AMR cards show the
         # Nu_top/Nu_bot, V_rms, mean T inset (the default); a card without a
         # Nusselt pair (the realistic annulus, H = 10) passes its own callable.
@@ -1428,7 +1435,8 @@ class ReferenceRow:
             REF_LABEL_X / w, 1.0 - REF_LABEL_Y / w,
             r"$\mathbf{%s}$" % label.replace(" ", r"\ "),
             transform=self.ax_t.transAxes, color="white",
-            fontsize=REF_LABEL_FS, fontweight="bold", family="serif",
+            fontsize=REF_LABEL_FS * self.font_scale,
+            fontweight="bold", family="serif",
             va="top", ha="left", zorder=7,
             path_effects=[pe.withStroke(linewidth=1.1, foreground="#1a1a1a",
                                         alpha=0.85)])
@@ -1438,13 +1446,13 @@ class ReferenceRow:
         self.u_text = self._plate(self.ax_u)
         self.mesh_text = self._plate(self.ax_m)
 
-    @staticmethod
-    def _plate(ax):
+    def _plate(self, ax):
         return ax.text(
             REF_PLATE_X, REF_PLATE_Y, "", transform=ax.transAxes,
-            ha="right", va="bottom", fontsize=REF_PLATE_FS, color=REF_INK,
+            ha="right", va="bottom",
+            fontsize=REF_PLATE_FS * self.font_scale, color=REF_INK,
             linespacing=1.30, zorder=7,
-            bbox=dict(facecolor="white", alpha=REF_PLATE_ALPHA,
+            bbox=dict(facecolor="white", alpha=self.plate_alpha,
                       edgecolor="none", boxstyle="square,pad=0.20"))
 
     def update(self, target, pick, src, fg, ins, mesh=None, mesh_image=None):
@@ -1498,7 +1506,8 @@ class ReferenceRow:
 
 
 def build_reference_figure(labels, norms, cmaps, geo, level_legend,
-                           plate_inset=None, bar_titles=None):
+                           plate_inset=None, bar_titles=None, font_scale=1.0,
+                           plate_alpha=REF_PLATE_ALPHA):
     """The reference-style canvas: no header, no time text, nothing on top.
 
     `plate_inset` replaces the temperature panel's plate text (default: the
@@ -1512,8 +1521,13 @@ def build_reference_figure(labels, norms, cmaps, geo, level_legend,
     fig.patch.set_facecolor(BG)
     level_cmap = level_legend["cmap"]
     level_norm = level_legend["norm"]
+    # The bottom band is tightly packed (9 px bars, 5.6 pt ticks, 8.5 pt titles):
+    # the panel text can grow a quarter without collision, but the bar texts
+    # only gently, or the tick labels of adjacent columns run into the titles.
+    bar_scale = 1.0 + 0.4 * (font_scale - 1.0)
     rows = [ReferenceRow(fig, geo, b, lab, norms, cmaps, level_cmap, level_norm,
-                         plate_inset=plate_inset)
+                         plate_inset=plate_inset, font_scale=font_scale,
+                         plate_alpha=plate_alpha)
             for b, lab in enumerate(labels)]
     # shared colour bars under columns 1-3 (9 px tall in the reference)
     titles = bar_titles if bar_titles is not None else [
@@ -1527,13 +1541,14 @@ def build_reference_figure(labels, norms, cmaps, geo, level_legend,
         ticks = ref_ticks(norms[k].vmin, norms[k].vmax)
         cb.set_ticks(ticks)
         cb.set_ticklabels([r"$%s$" % ref_tick_text(t) for t in ticks])
-        cb.ax.tick_params(colors=REF_TICK, labelsize=REF_TICK_FS, length=0.6,
+        cb.ax.tick_params(colors=REF_TICK,
+                          labelsize=REF_TICK_FS * bar_scale, length=0.6,
                           width=0.45, pad=0.5)
         cb.outline.set_edgecolor(SPINE)
         cb.outline.set_linewidth(0.5)
         text_px(fig, geo["x0"][k] + geo["panel_w"] / 2.0, geo["title_y"],
-                geo["px_h"], s=titles[k], color=FG, fontsize=REF_TITLE_FS,
-                va="center", ha="center")
+                geo["px_h"], s=titles[k], color=FG,
+                fontsize=REF_TITLE_FS * bar_scale, va="center", ha="center")
     # discrete level legend under column 4: rounded swatches with L<n> labels,
     # shared by both rows (both codes refine on the same 12 x 1 coarse ring)
     lax = fig.add_axes(rect_px(geo["x0"][3], geo["cbar_top"],
@@ -1555,7 +1570,8 @@ def build_reference_figure(labels, norms, cmaps, geo, level_legend,
             facecolor=level_cmap(level_norm(lev)), edgecolor="none",
             mutation_aspect=1.0, zorder=2))
         lax.text(x + REF_SW_W + REF_SW_LABEL_GAP, y0 + 0.5 * REF_SW_H,
-                 r"$L_{%d}$" % lev, fontsize=REF_LEGEND_FS, color=REF_TICK,
+                 r"$L_{%d}$" % lev,
+                 fontsize=REF_LEGEND_FS * bar_scale, color=REF_TICK,
                  va="center", ha="left", zorder=3)
     return fig, rows
 

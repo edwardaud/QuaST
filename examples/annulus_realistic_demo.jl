@@ -92,11 +92,16 @@
 #                              the frame stream then appends, frames already written
 #                              before the resume step are not rewritten)
 #
-# The tracked figure's QuaST command (direct solve, ~3.3 h on 8 threads):
+# The tracked figure's QuaST command (direct solve, 30 000-leaf budget; the
+# tracked clip stops at t_nd = 1.2e-4, about 9 h on 8 threads.  At the full
+# leaf budget the direct solve slows to about two minutes per step and the
+# development machine's 26 GB WSL memory swaps, so the full 3.2e-4 window needs
+# a larger machine):
 #
-#   ANN_REAL_OUT=out_julia/annulus_realistic/quast_prod \
-#   ANN_REAL_STEPS=60000 ANN_REAL_TSTOP=3.2e-4 ANN_REAL_FRAME=5 \
-#   ANN_REAL_LINEAR=direct ANN_REAL_CHECKPOINT=out_julia/annulus_realistic/quast_prod.h5 \
+#   ANN_REAL_OUT=out_julia/annulus_realistic/quast_prod30 \
+#   ANN_REAL_STEPS=60000 ANN_REAL_TSTOP=1.2e-4 ANN_REAL_FRAME=5 \
+#   ANN_REAL_MAXLEAVES=30000 ANN_REAL_LINEAR=direct \
+#   ANN_REAL_CHECKPOINT=out_julia/annulus_realistic/quast_prod30.h5 \
 #   ANN_REAL_CHECKPOINT_EVERY=100 \
 #   julia --project=. --threads=8 examples/annulus_realistic_demo.jl
 #

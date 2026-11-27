@@ -158,14 +158,25 @@ def sig(x, n=4):
 
 
 # ------------------------------------------------------------------- text ---
-def plate_text_inset(ins):
-    """Temperature-panel plate: V_rms, mean T and T_max (no Nusselt pair)."""
+def plate_text_inset(ins, font_scale=1.0):
+    """Temperature-panel plate: V_rms, mean T and T_max (no Nusselt pair).
+
+    At `font_scale` > 1.1 the three numbers would overflow the 279 px panel, so
+    they are split over two lines (the plate grows upward); the default 1.0 is
+    the one-line reference layout.
+    """
     def num(x, fmt):
         return "n/a" if x is None else fmt % x
     vrms = ("n/a" if ins.get("Vrms") is None
             else r"%s" % av.ref_group(ins["Vrms"]))
-    return (r"$V_{\mathrm{rms}} = %s$   $\mathrm{mean}\,T = %s$   "
-            r"$T_{\mathrm{max}} = %s$"
+    one = (r"$V_{\mathrm{rms}} = %s$   $\mathrm{mean}\,T = %s$   "
+           r"$T_{\mathrm{max}} = %s$"
+           % (vrms, num(ins.get("meanT"), "%.4f"),
+              num(ins.get("Tmax"), "%.4f")))
+    if font_scale <= 1.1:
+        return one
+    return ((r"$V_{\mathrm{rms}} = %s$   $\mathrm{mean}\,T = %s$" + "\n" +
+             r"$T_{\mathrm{max}} = %s$")
             % (vrms, num(ins.get("meanT"), "%.4f"),
                num(ins.get("Tmax"), "%.4f")))
 
@@ -1178,10 +1189,12 @@ def scan_scales(sources, labels, plan, nr, nphi):
                          eta=(e_lo, e_hi)))
 
 
-def build_row_axes(geo, labels, norms, cmaps, level_legend, row_plate):
+def build_row_axes(geo, labels, norms, cmaps, level_legend, row_plate,
+                   font_scale=1.0, plate_alpha=av.REF_PLATE_ALPHA):
     return av.build_reference_figure(
         labels, norms, cmaps, geo, level_legend,
-        plate_inset=row_plate,
+        plate_inset=row_plate, font_scale=font_scale,
+        plate_alpha=plate_alpha,
         bar_titles=[r"$T$", r"$\theta = T - \langle T\rangle_\phi(r)$",
                     r"$\log_{10}\eta/\eta_{\mathrm{ref}}$"])
 
@@ -1263,6 +1276,15 @@ def main(argv=None):
     ap.add_argument("--aspect-prm", default=None,
                     help="ASPECT parameter file for the AMR record (default: "
                          "<aspect>/original.prm)")
+    ap.add_argument("--plate-alpha", type=float, default=0.75,
+                    help="opacity of the in-panel white plates (default 0.75; "
+                         "the reference uses 0.60, but over the bright T panel "
+                         "0.75 keeps the small plate text readable)")
+    ap.add_argument("--font-scale", type=float, default=1.0,
+                    help="multiply every text size of the reference layout "
+                         "(default 1.0 = the measured reference sizes; the "
+                         "final annulus clip uses 1.25 for legibility, with "
+                         "the T plate split over two lines)")
     ap.add_argument("--master-scale", type=int, default=2,
                     help="render the master at this multiple of 1200 px and "
                          "Lanczos-downsample (default 2)")
@@ -1365,7 +1387,9 @@ def main(argv=None):
           % (geo["px_w"], geo["px_h"], geo["panel_w"], geo["master_px_w"],
              geo["master_px_h"], geo["scale"]), flush=True)
     fig, rows = build_row_axes(geo, labels, norms, cmaps, legend,
-                               plate_text_inset)
+                               lambda ins: plate_text_inset(ins, args.font_scale),
+                               font_scale=args.font_scale,
+                               plate_alpha=args.plate_alpha)
     save_dpi = av.DPI * geo["scale"]
     panel_n = int(round(geo["panel_w"] * geo["scale"]))
     level_cmap, level_norm = legend["cmap"], legend["norm"]

@@ -12,8 +12,13 @@
 #
 # The stages:
 #
-#   quast    the QuaST leg (examples/annulus_realistic_demo.jl, ~3.3 h on
-#            8 threads; HDF5 checkpoint every 100 steps, ANN_REAL_RESTART resumes)
+#   quast    the QuaST leg (examples/annulus_realistic_demo.jl, 30k leaves, ~9 h
+#            on 8 threads to the tracked clip's end t_nd = 1.2e-4; HDF5
+#            checkpoint every 100 steps, ANN_REAL_RESTART resumes).  At the full
+#            30k leaf budget the direct solve slows to ~2 min/step and the
+#            26 GB WSL memory of the development machine swaps, so the tracked
+#            figure stops at 1.2e-4.  Set ANN_REAL_TSTOP=3.2e-4 for the full
+#            window on a larger machine.
 #   aspect   the ASPECT leg: docker is on the Windows host, so this script
 #            *prints* the two commands (plugin build, production run) instead of
 #            running them from WSL; see aspect_runs/annulus_realistic_demo/README.md
@@ -58,10 +63,11 @@ run_quast() {
     echo "== QuaST leg: $QUAST_DIR"
     ANN_REAL_OUT=$QUAST_DIR \
     ANN_REAL_STEPS=60000 \
-    ANN_REAL_TSTOP=3.2e-4 \
+    ANN_REAL_TSTOP=1.2e-4 \
     ANN_REAL_FRAME=5 \
     ANN_REAL_REPORT=50 \
     ANN_REAL_LINEAR=direct \
+    ANN_REAL_MAXLEAVES=30000 \
     ANN_REAL_CHECKPOINT=$OUT/quast_prod.h5 \
     ANN_REAL_CHECKPOINT_EVERY=100 \
     "$JULIA" --project="$ROOT" --threads="${QUAST_THREADS:-8}" \
@@ -105,7 +111,7 @@ run_render() {
         "$ROOT/scripts/annulus_realistic_video.py" \
         --quast "$QUAST_DIR" --aspect "$ASPECT_DIR" \
         --quast-log "$OUT/quast_prod.log" \
-        --t0 1e-6 --t1 3.2e-4 --frames 120 --fps 10 \
+        --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 \
         --out "$OUT/render/realistic.gif" \
         --also-poster --also-mp4 \
         --sidecar "$OUT/render/realistic.json"
