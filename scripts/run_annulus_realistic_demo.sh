@@ -112,6 +112,9 @@ run_render() {
         --quast "$QUAST_DIR" --aspect "$ASPECT_DIR" \
         --quast-log "$OUT/quast_prod.log" \
         --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 \
+        --master-scale 4 --polar-nr 800 --polar-nphi 4096 \
+        --mesh-supersample 2 --mesh-min-cell-px 1.5 \
+        --font-scale 1.25 --plate-alpha 0.75 --gif-dither none \
         --out "$OUT/render/realistic.gif" \
         --also-poster --also-mp4 \
         --sidecar "$OUT/render/realistic.json"

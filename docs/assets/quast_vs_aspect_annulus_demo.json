@@ -92,7 +92,7 @@
         "R1": 2.22
       },
       "field_eta": "frame_%05d_eta.bin, the solver's own nodal log10(eta/eta_ref)",
-      "provenance": "production, 30k arm stopped at t_nd = 1.24345e-4"
+      "provenance": "production"
     },
     "aspect": {
       "paths": [
@@ -158,16 +158,16 @@
     "aspect": "each VTU parent cell is the group of four linear sub-quads on nine consecutive Q2 nodes; the level is inferred from the cell area and mid radius, and the nine node values are evaluated with the Q2 tensor basis on the cell's dyadic polar rectangle",
     "mesh_panel": "level/cell-id raster on the panel's own pixel grid (one white boundary pixel at the 2x master, i.e. the reference's white 0.42 pt cell outlines)",
     "mesh_boundaries": {
-      "policy": "every cell's boundary is drawn in white while the cell is at least 0.67 delivered (1200 px canvas) pixels across, at the reference's ~0.5 delivered px outline weight (scale-independent); below that a cell is colour-filled and only the level-boundary contours are drawn (a level-7 ASPECT cell of this card is ~0.5 px across at 279 px, so outlining all ~160 000 of them would fill the mesh panel white)",
+      "policy": "every cell's boundary is drawn in white while the cell is at least 1.50 delivered (1200 px canvas) pixels across, at the reference's ~0.5 delivered px outline weight (scale-independent); below that a cell is colour-filled and only the level-boundary contours are drawn (a level-7 ASPECT cell of this card is ~0.5 px across at 279 px, so outlining all ~160 000 of them would fill the mesh panel white)",
       "per_row": {
         "QuaST": [
           true,
-          true,
-          true,
+          false,
+          false,
           false
         ],
         "ASPECT": [
-          true,
+          false,
           false,
           false
         ]
@@ -4936,20 +4936,20 @@
     ]
   },
   "outputs": {
-    "gif": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30.gif",
-    "mp4": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30.mp4",
-    "mp4_2x": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30_2x.mp4",
-    "poster": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30_poster.png",
-    "frames_dir": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30_frames",
+    "gif": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b.gif",
+    "mp4": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b.mp4",
+    "mp4_2x": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b_2x.mp4",
+    "poster": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b_poster.png",
+    "frames_dir": "/mnt/e/研究生资料/project/QuaST/out_julia/annulus_realistic/render/realistic30b_frames",
     "gif_info": {
       "width": 1200,
       "colours": 256,
-      "bytes": 5885450
+      "bytes": 6031291
     },
-    "render_s": 501.3874659538269,
-    "total_s": 779.88050365448
+    "render_s": 478.657835483551,
+    "total_s": 730.3539876937866
   },
-  "command": "annulus_realistic_video.py --quast out_julia/annulus_realistic/quast_prod30 --aspect /mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod --quast-log out_julia/annulus_realistic/quast_prod30.log --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 --master-scale 4 --polar-nr 800 --polar-nphi 4096 --mesh-supersample 2 --font-scale 1.25 --plate-alpha 0.75 --gif-colors 256 --gif-max-mb 12 --out out_julia/annulus_realistic/render/realistic30.gif --also-poster --also-mp4 --sidecar out_julia/annulus_realistic/render/realistic30.json",
+  "command": "annulus_realistic_video.py --quast out_julia/annulus_realistic/quast_prod30 --aspect /mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod --quast-log out_julia/annulus_realistic/quast_prod30.log --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 --master-scale 4 --polar-nr 800 --polar-nphi 4096 --mesh-supersample 2 --mesh-min-cell-px 1.5 --font-scale 1.25 --plate-alpha 0.75 --gif-colors 256 --gif-max-mb 12 --out out_julia/annulus_realistic/render/realistic30b.gif --also-poster --also-mp4 --sidecar out_julia/annulus_realistic/render/realistic30b.json",
   "environment": {
     "numpy": "2.5.4",
     "matplotlib": "3.11.2",
@@ -4959,11 +4959,12 @@
   "notes": [
     "The two mesh panels compare two independent adaptive discretizations: QuaST's gradient-jump indicator with a wall minimum level vs ASPECT's temperature strategy (20 % refine / 0.5 % coarsen); the cell counts and level ranges are each code's own and are printed on the plates.",
     "Each row shows its own nearest frame in time (the offset delta is recorded per target in `matching.targets`); there is no time interpolation, only spatial rasterisation.",
-    "Mesh-panel boundary policy: every cell outline is drawn while the cell is at least 0.67 delivered px across; a level-7 ASPECT cell of this card is ~0.5 px across at 279 px, so for such sub-pixel levels the panel is colour-filled with the level-contour outlines only (outlining all ~160 000 cells at the delivered size would fill the panel white).  Pass --mesh-min-cell-px 0.3 to draw every outline instead.",
+    "Mesh-panel boundary policy: every cell outline is drawn while the cell is at least 1.50 delivered px across; a level-7 ASPECT cell of this card is ~0.5 px across at 279 px, so for such sub-pixel levels the panel is colour-filled with the level-contour outlines only (outlining all ~160 000 cells at the delivered size would fill the panel white).  Pass --mesh-min-cell-px 0.3 to draw every outline instead.",
     "This is a demonstration of the same-card comparison, not an accuracy claim: the two codes advance the transient with different integrators and time-step sequences.",
     "The ASPECT row's viscosity is the saved material field, not a reconstruction; --check cross-checks it against the card's composite law with the Q2 strain rate and reports the difference.",
     "QuaST row: 30,000-leaf budget, stopped at step 850 / t_nd = 1.24345e-4 because at the full leaf budget the direct solve fell to about two minutes per step and the 26 GB WSL memory began to swap; the tracked clip therefore covers t_nd = 1e-6 .. 1.2e-4.  The earlier 10,000-leaf run covered the full 1e-6 .. 3.2e-4 window.",
-    "Renderer options used for this revision: 4x master supersampling, 800 x 4096 polar sampling, 2x mesh supersampling, font scale 1.25 (two-line T plate) and 75 % white plates, GIF with --gif-dither none."
+    "Renderer options used for this revision: 4x master supersampling, 800 x 4096 polar sampling, 2x mesh supersampling, font scale 1.25 (two-line T plate) and 75 % white plates, GIF with --gif-dither none.",
+    "Mesh-boundary revision (2026-11-27): the white cell outlines are drawn only for cells at least 1.50 delivered pixels across (--mesh-min-cell-px 1.5); at 30k leaves the level-6 cells are ~0.75 px, so they are colour-filled with level contours instead of being outlined. The inside-ring white-pixel fraction of the QuaST mesh panel dropped from 39.2 % to 4.1 % (ASPECT 12.0 % -> 3.6 %)."
   ],
   "quast_run": {
     "steps": 850,
