@@ -55,6 +55,8 @@ include("core/quadtree_balance.jl")
 include("core/geometry_types.jl")
 include("core/geometry_map.jl")
 include("core/geometry_metrics.jl")
+include("core/geometry_measures.jl")
+include("core/geometry_topology.jl")
 include("core/geometry.jl")
 include("core/wall_strip.jl")
 # Stage 0.5b1: the geometry-dependent conductive base state.  It adds methods to
