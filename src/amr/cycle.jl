@@ -226,10 +226,7 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
         throw(ArgumentError("wall_min_level must be >= 0"))
     0.0 < wall_strip < 0.5 ||
         throw(ArgumentError("wall_strip must be in (0, 0.5)"))
-    cap_aware && !coarsen_gate &&
-        throw(ArgumentError("cap_aware requires coarsen_gate=true: the " *
-                            "legacy gate-off coarsening branch has no " *
-                            "mark-protection hook for the fallback marks"))
+    _check_cap_aware(cap_aware, coarsen_gate)
     protect = symmetry === :x ? _mirror_protect(qt, protect) : protect
     cool = hysteresis_cycles > 0 ? cooldown : nothing
     cool === nothing || _age_cooldown!(cool, qt.leaves)
@@ -301,70 +298,22 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
         want += per
     end
 
-    # --- (c'') opt-in max-level fallback -----------------------------------
-    # The standard marking above is authoritative whenever it finds any
-    # candidate.  Only a genuinely cap-caused empty set (the whole marked
-    # prefix is at the level cap, not merely in cooldown) triggers the
-    # fallback.  It replaces the capped prefix one-for-one: take the same
-    # number of leaves from the admissible (refinable, non-cooled) universe,
-    # highest eta first.  Keeping the cardinality of the standard marked set
-    # bounds the batch and avoids the mass-renormalised variant's flood at a
-    # sustained cap (measured on the theta/0.2 ring: mass fallback went from
-    # 24.5k to 30k leaves in ~35 steps, count fallback is per*cap_prefix leaves
-    # per cycle).  The effective tau_r (lowest marked eta) and target (sum of
-    # the marked eta) then drive the gate, budget exchange and refine loop.
-    if cap_aware && refine_frac > 0.0 && isempty(cand) &&
-       max_level <= qt.maxlevel
-        prefix_refinable = 0
-        cum_pref = 0.0
-        for lf in desc
-            eof(lf) >= tau_r || break
-            if lf[1] >= max_level
-                cap_prefix += 1
-                cap_mass += eof(lf)
-            else
-                prefix_refinable += 1
-            end
-            cum_pref += eof(lf)
-            cum_pref >= refine_frac * total && break
-        end
-        if cap_prefix > 0 && prefix_refinable == 0
-            for lf in desc
-                lf[1] < max_level || continue
-                (cool !== nothing && haskey(cool.no_refine, lf)) && continue
-                refinable += 1
-                refinable_mass += eof(lf)
-            end
-            if refinable > 0
-                kfb = min(cap_prefix, refinable)
-                cand = NTuple{3,Int}[]
-                want = 0
-                for lf in desc
-                    lf[1] < max_level || continue
-                    (cool !== nothing && haskey(cool.no_refine, lf)) && continue
-                    push!(cand, lf)
-                    want += per
-                    length(cand) >= kfb && break
-                end
-                if !isempty(cand)
-                    mark_target = 0.0
-                    for lf in cand
-                        mark_target += eof(lf)
-                    end
-                    if mark_target > 0.0
-                        tau_r = eof(cand[end])    # lowest marked leaf
-                        tau_h = min(tau_c, hysteresis * tau_r)
-                        deadband = hysteresis * tau_r < tau_c
-                        cap_applied = true
-                    else
-                        empty!(cand)
-                        want = 0
-                        mark_target = refine_frac * total
-                    end
-                end
-            end
-        end
-    end
+    cap = _cap_aware_marking(cand, want, mark_target, tau_r, tau_h, deadband,
+                             cap_applied, refinable, refinable_mass,
+                             cap_prefix, cap_mass, desc, eof, total,
+                             refine_frac, tau_c, hysteresis, max_level,
+                             qt.maxlevel, cap_aware, cool, per)
+    cand = cap.cand
+    want = cap.want
+    mark_target = cap.mark_target
+    tau_r = cap.tau_r
+    tau_h = cap.tau_h
+    deadband = cap.deadband
+    cap_applied = cap.cap_applied
+    refinable = cap.refinable
+    refinable_mass = cap.refinable_mass
+    cap_prefix = cap.cap_prefix
+    cap_mass = cap.cap_mass
 
     # --- the eligible quartets, lowest summed indicator first ---------------
     # `coarsen_frac` also caps the cell fraction: the whole pass may not drop

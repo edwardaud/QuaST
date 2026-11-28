@@ -97,6 +97,7 @@ include("physics/phase_buoyancy.jl")
 # a contiguous, unedited part of the former file; the include order is the
 # definition order (the `AmrCooldown` type first).
 include("amr/cooldown.jl")
+include("amr/cap_fallback.jl")
 include("amr/coarsen_gate.jl")
 include("amr/coarsen_plan.jl")
 include("amr/cycle.jl")
