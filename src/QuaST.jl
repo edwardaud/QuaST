@@ -53,6 +53,7 @@ include("core/quadtree_balance.jl")
 # the tree (it names `Quadtree` in `CartesianBox(qt)`) and before the SEM space
 # (whose constructors call it).  No card selects a mapped geometry in cut 1.
 include("core/geometry.jl")
+include("core/wall_strip.jl")
 # Stage 0.5b1: the geometry-dependent conductive base state.  It adds methods to
 # `semquad_base_T`/`semquad_base_gradient`/`_mapped_base_curvature` (defined in
 # `physics/refstate.jl`, which is included before the geometry layer) that
@@ -68,6 +69,7 @@ include("core/transfer.jl")
 
 # -- AMR leaf primitives, then the physics laws over the SEM field -----------
 include("amr/leaf_ops.jl")
+include("amr/budget.jl")
 # The gradient-jump indicator is SEM data, but its only caller is the AMR pass
 # (`amr/hooks.jl`); it depends on the quadtree and `core/semquad.jl` only.
 include("amr/indicator.jl")
