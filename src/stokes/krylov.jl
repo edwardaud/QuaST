@@ -217,3 +217,26 @@ function gmres_restarted(applyA, b::Vector{Float64};
     end
     return x, norm(b - applyA(x)) / nb, it_total
 end
+
+# --- saddle-solve FGMRES workspace -----------------------------------------
+# Reusable workspace cache for the MG saddle FGMRES; it belongs with the
+# generic FGMRES implementation above (moved verbatim from mg/saddle.jl).
+const SEMQUAD_FGMRES_WORK = Ref{Any}(nothing)
+
+"""
+    _semquad_fgmres_work(n, m)
+
+The reusable FGMRES workspace of the saddle solve, (re)allocated when the system
+size `n` or the block width `m` changes.  A fresh `n x 100` workspace is ~100 MB
+on the 1024-leaf blob tree and costs ~0.1 s of page faults per solve, so it is
+kept across solves (see `FGMRESWork`).
+"""
+function _semquad_fgmres_work(n::Int, m::Int)
+    w = SEMQUAD_FGMRES_WORK[]
+    if w === nothing || !(w isa FGMRESWork) || size(w.V, 1) != n ||
+       size(w.V, 2) != m + 1
+        w = FGMRESWork(n, m)
+        SEMQUAD_FGMRES_WORK[] = w
+    end
+    return w
+end

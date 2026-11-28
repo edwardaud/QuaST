@@ -78,25 +78,6 @@ function semquad_mg_cg(applyK!::Function, b::Vector{Float64}, mg::SemQuadMG;
     return z, it, rel
 end
 
-const SEMQUAD_FGMRES_WORK = Ref{Any}(nothing)
-
-"""
-    _semquad_fgmres_work(n, m)
-
-The reusable FGMRES workspace of the saddle solve, (re)allocated when the system
-size `n` or the block width `m` changes.  A fresh `n x 100` workspace is ~100 MB
-on the 1024-leaf blob tree and costs ~0.1 s of page faults per solve, so it is
-kept across solves (see `FGMRESWork`).
-"""
-function _semquad_fgmres_work(n::Int, m::Int)
-    w = SEMQUAD_FGMRES_WORK[]
-    if w === nothing || !(w isa FGMRESWork) || size(w.V, 1) != n ||
-       size(w.V, 2) != m + 1
-        w = FGMRESWork(n, m)
-        SEMQUAD_FGMRES_WORK[] = w
-    end
-    return w
-end
 
 """
     semquad_mg_saddle_solve(Kred, Bs, Bt, Fp, pscale, b, mg; tol, maxit, restart,
@@ -192,78 +173,3 @@ function semquad_mg_saddle_solve(Kred::Union{Nothing,AbstractMatrix{Float64}},
     return sol, nit, relres, cgiters[]
 end
 
-"""
-    _semquad_pressure_block!(wP, rp, rp2, s1, s2, Fp, pscale, nf)
-
-Apply the pressure block of the block-triangular preconditioner to `rp` and
-write `-pscale * Shat^{-1} rp` into `wP[(nf+1):end]`.
-
-* `Fp isa NamedTuple` (`kind=:bfbt` or `:bfbt_m1`) is the three-factor form
-  `Shat^{-1} = S1^{-1} S2 S1^{-1}`: one `F1` solve, then `S2` either as the
-  precomputed sparse matrix or matrix-free as
-  `Bs D^{-1} Kred D^{-1} Bt` (`Fp.S2 === nothing`), then a second `F1` solve;
-* `kind=:pcd` is the pressure convection-diffusion form
-  `Shat^{-1} = A_p^{-1} F_p M_p^{-1}` (three factors, `F_p = A_p` here because
-  Stokes has no advection term);
-* anything else is a plain Cholesky factorisation (`:mass`, `:stiffness`,
-  `:lsc`).
-
-All scratch is caller-provided, so the outer FGMRES stays allocation-free on the
-large levels.
-"""
-@inline function _semquad_pressure_block!(wP::Vector{Float64},
-                                          rp::Vector{Float64},
-                                          rp2::Vector{Float64},
-                                          s1::Vector{Float64},
-                                          s2::Vector{Float64}, Fp, pscale::Float64,
-                                          nf::Int)
-    if Fp isa NamedTuple && Fp.kind === :pcd
-        # PCD: Shat^{-1} = A_p^{-1} F_p M_p^{-1} (F_p = A_p for Stokes, see
-        # `_semquad_build_pressure_precond`).  `rp` is consumed before it is
-        # overwritten, so no length-`nfp` scratch is needed beyond `rp2`.
-        rp2 .= Fp.FM \ rp
-        mul!(rp, Fp.FF, rp2)
-        rp2 .= Fp.FA \ rp
-        @. wP[(nf + 1):end] = -pscale * rp2
-    elseif Fp isa NamedTuple
-        _semquad_s1_apply!(rp2, Fp, rp)
-        if Fp.S2 === nothing
-            # S2 matrix-free: Bs (D^{-1} (Kred (D^{-1} (Bt r))))
-            mul!(s1, Fp.Bt, rp2)
-            dinv = Fp.Dinvv
-            @. s1 *= dinv
-            if Fp.Kred === nothing
-                Fp.applyK(s2, s1)
-            else
-                mul!(s2, Fp.Kred, s1)
-            end
-            @. s2 *= dinv
-            mul!(rp, Fp.Bs, s2)
-        else
-            mul!(rp, Fp.S2, rp2)
-        end
-        _semquad_s1_apply!(rp2, Fp, rp)
-        @. wP[(nf + 1):end] = -pscale * rp2
-    else
-        rp2 .= Fp \ rp
-        @. wP[(nf + 1):end] = -pscale * rp2
-    end
-    return wP
-end
-
-"""
-    _semquad_s1_apply!(x, Fp, b)
-
-Apply the `S1^{-1}` factor of the w-BFBT block: the exact CHOLMOD solve when the
-block carries no inner-solve object (the `:bfbt_m1` mass variant and any cached
-block built before the object existed), otherwise the object's scheme.
-"""
-@inline function _semquad_s1_apply!(x::Vector{Float64}, Fp, b::Vector{Float64})
-    S1i = haskey(Fp, :S1solve) ? Fp.S1solve : nothing
-    if S1i === nothing
-        ldiv!(x, Fp.F1, b)
-    else
-        _semquad_s1_solve!(x, S1i, b)
-    end
-    return x
-end
