@@ -28,6 +28,7 @@ include("physics/revision.jl")
 
 # -- physics: parameter types and the material laws that define them ---------
 include("physics/tosi_law.jl")
+include("physics/eos_profile.jl")
 include("physics/refstate.jl")
 include("physics/params.jl")
 include("physics/constitutive.jl")
