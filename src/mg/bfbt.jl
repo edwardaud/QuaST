@@ -382,3 +382,85 @@ function _semquad_bfbt_diag(su::SemQuad, Cu::SparseMatrixCSC{Float64,Int},
     end
     return d
 end
+
+# --- velocity-mass diagonal -------------------------------------------------
+# `_semquad_mass_diag!` is the leaf-local diagonal this BFBT file and the
+# pressure-preconditioner builder consume; moved verbatim from pressure.jl.
+"""
+    _semquad_mass_diag!(d, su, w)
+
+Diagonal of the velocity mass matrix `int w(x,y) u_i u_j` on the velocity space
+`su`, computed leaf by leaf and scatter-added (`d` has length `su.N`).  The
+assembled matrix has `(p+1)^4` entries per quadrature point; the diagonal has
+`(p+1)^2`, so this is ~25x cheaper at p=4 and needs no sparse matrix at all.
+
+Dispatches on the geometry (cut 5): the box body is the historical expression;
+the mapped body takes the measure and the point from the cached leaf metric so
+the BFBT lumped diagonal is correct on a mapped geometry (the mapped BFBT
+pressure preconditioner of `linear=:mg`).
+"""
+function _semquad_mass_diag!(d::Vector{Float64}, su::SemQuad, w::Function)
+    return _semquad_mass_diag!(d, su.geom, su, w)
+end
+
+# Historical box body, verbatim.
+function _semquad_mass_diag!(d::Vector{Float64}, ::CartesianBox, su::SemQuad,
+                             w::Function)
+    p = su.p
+    n = p + 1
+    # `assemble_semquad_pressure_mass(su)` builds `make_fedata(2, su.p)` and uses
+    # `fd.phi_p`, i.e. the degree-`p` nodal basis on the degree-`p` GLL nodes --
+    # which is exactly the velocity basis of `su`.  Use the same table so the
+    # leaf-wise diagonal is the assembled matrix's diagonal, not a different
+    # quadrature of it.
+    fd = make_fedata(2, p)
+    dloc = zeros(Float64, n * n)
+    fill!(d, 0.0)
+    @inbounds for lf in su.leaves
+        hx = leaf_hx(su, lf[1]); hy = leaf_hy(su, lf[1])
+        x0 = lf[2] * hx; y0 = lf[3] * hy
+        uids = su.elem[lf]
+        fill!(dloc, 0.0)
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            wq = 0.25 * hx * hy * fd.gl_w[qx] * fd.gl_w[qy] *
+                 w(x0 + 0.5 * (fd.gl_x[qx] + 1.0) * hx,
+                   y0 + 0.5 * (fd.gl_x[qy] + 1.0) * hy)
+            for j in 1:n, i in 1:n
+                ph = fd.phi_p[i, qx] * fd.phi_p[j, qy]
+                dloc[(j - 1) * n + i] += wq * ph * ph
+            end
+        end
+        for idx in 1:(n * n)
+            d[uids[idx]] += dloc[idx]
+        end
+    end
+    return d
+end
+
+# Mapped body: the cached leaf metric supplies `detJ*gl_w*gl_w` and the mapped
+# quadrature point; the basis and the scatter order are the box body's.
+function _semquad_mass_diag!(d::Vector{Float64}, g::AbstractGeometry,
+                             su::SemQuad, w::Function)
+    p = su.p
+    n = p + 1
+    fd = make_fedata(2, p)
+    dloc = zeros(Float64, n * n)
+    fill!(d, 0.0)
+    @inbounds for lf in su.leaves
+        lm = leaf_metric(g, su, lf, fd)
+        uids = su.elem[lf]
+        fill!(dloc, 0.0)
+        for qy in 1:fd.nq, qx in 1:fd.nq
+            x, y = quad_point(lm, su, lf, fd, qx, qy)
+            wq = quad_measure(lm, fd, qx, qy) * w(x, y)
+            for j in 1:n, i in 1:n
+                ph = fd.phi_p[i, qx] * fd.phi_p[j, qy]
+                dloc[(j - 1) * n + i] += wq * ph * ph
+            end
+        end
+        for idx in 1:(n * n)
+            d[uids[idx]] += dloc[idx]
+        end
+    end
+    return d
+end

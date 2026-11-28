@@ -218,3 +218,86 @@ function _semquad_resolve_auto(ss::SemStokes, eta_fun::Function;
     return choice, mg_threads
 end
 
+# --- viscosity-contrast sampler -------------------------------------------
+# The `linear=:auto` selector owns the eta contrast measurement it consumes
+# (moved verbatim from mg/pressure.jl; the two mg consumers resolve it at
+# runtime and selector.jl is included before the MG block).
+"""
+    semquad_eta_contrast(su, eta_fun; npoints=SEMQUAD_AUTO_CONTRAST_GRID) -> Float64
+
+Viscosity contrast `max(eta)/min(eta)` of the **actual** eta field the solve
+uses, sampled on a fixed `(npoints+1)^2` grid (default 32 intervals -> 33x33 =
+1 089 points) mapped onto the physical domain.  On the box that grid is the
+Cartesian `[0,Lx] x [0,1]`; on a mapped geometry it is the map image of the
+*global logical* grid `[0,1] x [0,1]` (the same contract `element_map` uses:
+the box's `Lx` scaling lives inside `logical_map`), so the sample covers the
+whole physical domain, the annulus included.  This is the `contrast` input of
+`semquad_choose_linear` / `linear=:auto`.
+
+Why a global grid instead of the <=256 strided velocity nodes used by the
+pressure-cache metric (`_semquad_eta_sample`): measured on the production blob
+frame-19 eta field, the node sample under-estimates the full quadrature-field
+contrast by up to 5x (985x vs 4 926x on the 1024-leaf tree, 995x vs 5 299x on
+the 4096-leaf tree), while 33x33 grid points give 5 087x (-3% / -9% vs the two
+trees) with the same value on every tree. Sampling a
+strided *subset of leaves* is worse still (808-892x on the refined trees) for
+the same reason: the viscosity extrema are spatially localised.  The grid cost
+is fixed and independent of the tree: measured ~20 us on the production blob
+closure (1 089 evaluations, ~18 ns each; a constant eta closure is folded to
+nothing), vs 0.7-2.6 ms for a full O(N) quadrature-field pass on the
+1024-4096-leaf trees.
+
+The grid sample can still miss a sub-grid-scale extremum, but the selector's
+contrast cut-offs are 10x/100x and the measured fields sit at 1x and ~5 000x.
+"""
+function semquad_eta_contrast(su::SemQuad, eta_fun::Function;
+                              npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
+    return semquad_eta_contrast(su.geom, su, eta_fun; npoints=npoints)
+end
+
+# Historical box body, verbatim: the sample points are the Cartesian grid
+# `[0,Lx] x [0,1]`, which on the box is the physical domain.
+function semquad_eta_contrast(::CartesianBox, su::SemQuad, eta_fun::Function;
+                              npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
+    n = max(1, npoints)
+    Lx = su.Lx
+    lo = Inf; hi = 0.0
+    @inbounds for j in 0:n, i in 0:n
+        e = eta_fun(Lx * (i / n), j / n)
+        e > 0.0 || throw(ArgumentError("eta_fun returned $e <= 0 at " *
+                                       "($(Lx * i / n), $(j / n))"))
+        lo = min(lo, e); hi = max(hi, e)
+    end
+    return hi / lo
+end
+
+# Cut 5 mapped body: the same fixed `(npoints+1)^2` grid, but in **logical**
+# coordinates mapped through the geometry — the sample must cover the physical
+# domain the solve actually uses, so a mapped run's `:auto` contrast is measured
+# on the mapped eta field (GEOM_DESIGN §3 cut 5, `stokes/selector.jl` row: the
+# contrast sampler grid samples the physical domain through the map).  The box
+# sampler above is untouched and bitwise unchanged.
+#
+# The logical argument is the **global logical coordinate** `S in [0,1]`
+# (`T in [0,1]`), exactly as `element_map` builds it: the box's `Lx` scaling is
+# *inside* `logical_map` (`CartesianBox` does `x = g.Lx*S`), so the sampler must
+# hand it `i/n`, never a physical-like `Lx*(i/n)`.  The stage-0.5 audit's D1
+# defect was the latter: with the cut-1 interface as written it sampled
+# `S in [0,Lx]`, i.e. a physical box `x in [0,Lx^2]` (outside the domain when
+# `Lx > 1`) and an annulus radial range `r in [R0, R0+(R1-R0)*Lx]` (a sliver of
+# the gap near the inner circle, since a ring tree's `Lx << 1`), returning a
+# plausible but wrong contrast to the `linear=:auto` selector.
+function semquad_eta_contrast(g::AbstractGeometry, su::SemQuad,
+                              eta_fun::Function;
+                              npoints::Int=SEMQUAD_AUTO_CONTRAST_GRID)
+    n = max(1, npoints)
+    lo = Inf; hi = 0.0
+    @inbounds for j in 0:n, i in 0:n
+        x, y = logical_map(g, i / n, j / n)
+        e = eta_fun(x, y)
+        e > 0.0 || throw(ArgumentError("eta_fun returned $e <= 0 at " *
+                                       "($x, $y)"))
+        lo = min(lo, e); hi = max(hi, e)
+    end
+    return hi / lo
+end
