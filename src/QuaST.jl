@@ -180,7 +180,11 @@ include("io/checkpoint_cooldown.jl")
 include("io/checkpoint_config.jl")
 include("io/checkpoint_tree.jl")
 include("io/checkpoint.jl")
-include("diagnostics/global.jl")
+include("diagnostics/nusselt.jl")
+include("diagnostics/flow.jl")
+include("diagnostics/budget.jl")
+include("diagnostics/exact_residual.jl")
+include("diagnostics/level_stats.jl")
 include("diagnostics/flux.jl")
 
 export GLLRule, gll_rule, gauss_legendre, legendre_with_derivs, lagrange_eval, lagrange_d2,
