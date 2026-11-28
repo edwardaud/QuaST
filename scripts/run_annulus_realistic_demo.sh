@@ -12,13 +12,12 @@
 #
 # The stages:
 #
-#   quast    the QuaST leg (examples/annulus_realistic_demo.jl; normalised
-#            theta+velocity indicator, refine_frac 0.3, 25k leaves, direct,
-#            ~4.7 h on 8 threads to t_nd = 1.2e-4; HDF5 checkpoint every 100
-#            steps, ANN_REAL_RESTART resumes).  The card defaults remain
-#            theta/0.2; the tracked figure switches to both/0.3 because the
-#            theta/0.2 arm was measured to stall at max level while below its
-#            budget (28 identical mesh dumps at 6.58e-5..7.72e-5).
+#   quast    the QuaST leg (examples/annulus_realistic_demo.jl; production
+#            theta indicator, refine_frac 0.2, 30k leaves, cap-aware max-level
+#            fallback on by default, direct; ~6.6 h on 8 threads to
+#            t_nd = 1.2e-4; HDF5 checkpoint every 100 steps, ANN_REAL_RESTART
+#            resumes).  The fallback removes the measured 28-frame theta/0.2
+#            stall at the level cap; the solver keyword itself is opt-in.
 #   aspect   the ASPECT leg: docker is on the Windows host, so this script
 #            *prints* the two commands (plugin build, production run) instead of
 #            running them from WSL; see aspect_runs/annulus_realistic_demo/README.md
@@ -49,7 +48,7 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 JULIA=${QUAST_JULIA:-julia}
 OUT=${QUAST_OUT:-$ROOT/out_julia/annulus_realistic}
-QUAST_DIR=${QUAST_DIR:-$OUT/quast_both03}
+QUAST_DIR=${QUAST_DIR:-$OUT/quast_theta_cap30}
 ASPECT_DIR=${ASPECT_OUT:-$OUT/aspect_prod}
 PY=${PY:-/home/szh/dedalus-env/bin/python}
 STAGE=${1:-all}
@@ -67,10 +66,11 @@ run_quast() {
     ANN_REAL_FRAME=5 \
     ANN_REAL_REPORT=50 \
     ANN_REAL_LINEAR=direct \
-    ANN_REAL_MAXLEAVES=25000 \
-    ANN_REAL_INDICATOR=both \
-    ANN_REAL_REFINE_FRAC=0.3 \
-    ANN_REAL_CHECKPOINT=$OUT/quast_both03.h5 \
+    ANN_REAL_MAXLEAVES=30000 \
+    ANN_REAL_INDICATOR=theta \
+    ANN_REAL_REFINE_FRAC=0.2 \
+    ANN_REAL_CAP_AWARE=1 \
+    ANN_REAL_CHECKPOINT=$OUT/quast_theta_cap30.h5 \
     ANN_REAL_CHECKPOINT_EVERY=100 \
     "$JULIA" --project="$ROOT" --threads="${QUAST_THREADS:-8}" \
         "$ROOT/examples/annulus_realistic_demo.jl" | tee "$OUT/quast_prod.log"
@@ -108,18 +108,18 @@ run_render() {
         exit 4
     fi
     mkdir -p "$OUT/render"
-    echo "== render: $OUT/render/realistic_both03.gif"
+    echo "== render: $OUT/render/theta_cap30.gif"
     OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 "$PY" \
         "$ROOT/scripts/annulus_realistic_video.py" \
         --quast "$QUAST_DIR" --aspect "$ASPECT_DIR" \
-        --quast-log "$OUT/quast_both03.log" \
+        --quast-log "$OUT/quast_theta_cap30.log" \
         --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 \
         --master-scale 4 --polar-nr 800 --polar-nphi 4096 \
         --mesh-supersample 2 --mesh-min-cell-px 1.5 \
         --font-scale 1.25 --plate-alpha 0.75 --gif-dither none \
-        --out "$OUT/render/realistic_both03.gif" \
+        --out "$OUT/render/theta_cap30.gif" \
         --also-poster --also-mp4 \
-        --sidecar "$OUT/render/realistic_both03.json"
+        --sidecar "$OUT/render/theta_cap30.json"
 }
 
 case "$STAGE" in

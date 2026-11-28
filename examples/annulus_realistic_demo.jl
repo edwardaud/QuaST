@@ -31,9 +31,10 @@
 #               indicator = :theta by default; `ANN_REAL_INDICATOR=both` or
 #               `velocity` selects another indicator, `ANN_REAL_REFINE_FRAC`
 #               overrides the 0.2 Dörfler fraction; both actual values are
-#               printed and recorded in the card meta; `ANN_REAL_CAP_AWARE=1`
-#               opts into the max-level Dörfler fallback (default off; see
-#               `amr_cycle_balanced!`); start from the
+#               printed and recorded in the card meta; the max-level Dörfler
+#               fallback is on by default for this production card
+#               (`ANN_REAL_CAP_AWARE=0` disables; the solver keyword itself
+#               still defaults off; see `amr_cycle_balanced!`); start from the
 #               640-leaf level-3 ring tree
 #               (radial 8 x angular 80, i.e. cells_y = 10) that mirrors the box
 #               card's 640-leaf level-3 start; no initial_refine (the box card
@@ -90,6 +91,10 @@
 #   ANN_REAL_FRAME    frame cadence in steps (default 5)
 #   ANN_REAL_LINEAR   :mg (default; the GIF's arm), :auto or :direct
 #   ANN_REAL_MAXLEAVES  leaf budget override (default 10000, the card's value)
+#   ANN_REAL_INDICATOR  :theta (production default), :both or :velocity
+#   ANN_REAL_REFINE_FRAC  Dörfler fraction (default 0.2)
+#   ANN_REAL_CAP_AWARE  max-level fallback (production default 1 here;
+#                       0 disables; the solver keyword itself defaults off)
 #   ANN_REAL_MG_THREADS  MG threads (default 8)
 #   ANN_REAL_REPORT   progress interval in steps (default 25)
 #   ANN_REAL_CHECKPOINT        HDF5 checkpoint path (empty = no checkpoint)
@@ -98,18 +103,15 @@
 #                              the frame stream then appends, frames already written
 #                              before the resume step are not rewritten)
 #
-# The tracked figure's QuaST command (balanced AMR, normalised theta+velocity
-# indicator, refine_frac 0.3, 25 000 leaves; full active window t_nd = 1.2e-4 in
-# about 4.7 h on 8 threads including the pilot segment).  This is a
-# demonstration setting: the card defaults stay theta/0.2, but on this ring the
-# theta/0.2 arm was measured to stall at level 7 (28 identical mesh dumps) while
-# the budget was below its cap, so the tracked clip uses:
+# The tracked figure's production QuaST command (balanced AMR, theta/0.2,
+# 30 000 leaves, the cap-aware max-level fallback, direct solve; full active
+# window t_nd = 1.2e-4 in about 6.6 h on 8 threads).  The fallback is the
+# production default for this card; the solver keyword remains opt-in:
 #
-#   ANN_REAL_OUT=out_julia/annulus_realistic/quast_pilot_both25_f03 \
-#   ANN_REAL_STEPS=6000 ANN_REAL_TSTOP=1.2e-4 ANN_REAL_FRAME=5 \
-#   ANN_REAL_MAXLEAVES=25000 ANN_REAL_LINEAR=direct \
-#   ANN_REAL_INDICATOR=both ANN_REAL_REFINE_FRAC=0.3 \
-#   ANN_REAL_CHECKPOINT=out_julia/annulus_realistic/quast_both03_final.h5 \
+#   ANN_REAL_OUT=out_julia/annulus_realistic/quast_theta_cap30 \
+#   ANN_REAL_STEPS=60000 ANN_REAL_TSTOP=1.2e-4 ANN_REAL_FRAME=5 \
+#   ANN_REAL_MAXLEAVES=30000 ANN_REAL_LINEAR=direct \
+#   ANN_REAL_CHECKPOINT=out_julia/annulus_realistic/quast_theta_cap30.h5 \
 #   ANN_REAL_CHECKPOINT_EVERY=100 \
 #   julia --project=. --threads=8 examples/annulus_realistic_demo.jl
 #
@@ -168,10 +170,11 @@ const WALL_MIN = 5
 const WALL_STRIP = 0.1
 const AMR_HYST = 1
 const AMR_GATE = true
-# Opt-in max-level refinement fallback (default off; see the driver/cycle
-# docstrings).  Kept out of the tracked both/0.3 production command until the
-# theta/0.2 acceptance run proves it.
-const CAP_AWARE = lowercase(get(ENV, "ANN_REAL_CAP_AWARE", "false")) in
+# Max-level refinement fallback: the production default for this card after
+# the theta/0.2 acceptance run removed the 28-frame plateau.  The solver-level
+# keyword stays opt-in (default false) so historical checkpoints/runs are
+# unchanged; set ANN_REAL_CAP_AWARE=0 to reproduce the old theta/0.2 stall.
+const CAP_AWARE = lowercase(get(ENV, "ANN_REAL_CAP_AWARE", "true")) in
                   ("1", "true", "yes", "on")
 const SYMMETRY = :none
 # The box card's indicator is :theta.  `ANN_REAL_INDICATOR=both|velocity`

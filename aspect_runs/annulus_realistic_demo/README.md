@@ -96,54 +96,52 @@ production run.
 
 The QuaST side is `examples/annulus_realistic_demo.jl` (direct solve,
 `nu_undefined = :nan` because the H = 10 ring's per-wall Nusselt pair is
-undefined by construction).  The tracked figure uses a **demonstration AMR
-setting**: `amr_indicator = :both` (normalised temperature+velocity jumps),
-`refine_frac = 0.3`, `coarsen_frac = 0.05`, `max_leaves = 25000`, `max_level =
-7`, wall rule 5/0.1, no symmetry.  This is not the box card's `theta`/0.2
-configuration, and the reason is measured: with `theta`/0.2 the 30k-leaf arm
-had 28 consecutive byte-identical mesh dumps at `t_nd = 6.58e-5..7.72e-5`
-because the Dörfler set was entirely on level-7 leaves while the leaf budget
-was below its cap, so refinements were unavailable and coarsening was not
-triggered; the `both`/0.3 setting keeps refinable candidates through the
-window.
+undefined by construction).  The tracked figure uses the card's **theta/
+refine_frac=0.2 production AMR** with the opt-in max-level fallback enabled:
+`amr_indicator = :theta`, `refine_frac = 0.2`, `coarsen_frac = 0.05`,
+`max_leaves = 30000`, `max_level = 7`, wall rule 5/0.1, no symmetry, and
+`amr_cap_aware = true` (the example's production default; the solver keyword
+itself remains opt-in).  The fallback replaces the capped Dörfler prefix
+one-for-one with refinable leaves; it removes the measured 28-frame stall at
+`t_nd = 6.58e-5..7.72e-5` without a one-cycle budget cliff.
 
 The tracked run:
 
-- resumes the `both`/0.3 pilot checkpoint at `t_nd = 6.005e-5`;
-- 863 steps to `t_nd = 1.201997e-4`, **4.7 h** including its pilot segment on
-  8 Julia threads;
-- 24 652 final leaves (budget 25 000, max 25 000), levels 4-7, 110 AMR
-  cycles, measured `Ra_interior = 3.474e7` (nominal `Ra = 1e5` at the
+- starts from the level-3 ring with the production theta/0.2 setting and runs
+  the full active window; it was checkpointed/resumed at `t_nd = 7.8009e-5`
+  (the earlier stage is the acceptance segment);
+- 833 steps to `t_nd = 1.200909e-4`, **6.6 h** including the plateau segment
+  on 8 Julia threads;
+- 29 872 final leaves (budget 30 000, peak 29 998), levels 4-7, 43 fallback
+  cycles, measured `Ra_interior = 3.501e7` (nominal `Ra = 1e5` at the
   composite calibration point);
 - the frame stream is `profile = :state` and the mesh changed throughout the
-  full active window (the longest run of identical source mesh dumps is six
-  frames at the start of the clip).
+  full window (no identical mesh run beyond the final duplicate frame pair).
 
-The earlier 30k/`theta` run (stopped at `t_nd = 1.24345e-4`, 29 911 leaves)
-and the 10k full-window run (`t_nd = 3.200977e-4`, `Ra_interior = 4.4218e7`)
-remain in the repository history; neither is the tracked figure.
+The earlier both/0.3 25k clip, the 30k/theta non-cap-aware run and the 10k
+full-window run remain in the repository history; none is the tracked figure.
 
 ## Render
 
 ```bash
 PY=/home/szh/dedalus-env/bin/python
 python scripts/annulus_realistic_video.py \
-    --quast out_julia/annulus_realistic/quast_pilot_both25_f03 \
+    --quast out_julia/annulus_realistic/quast_theta02_cap30_count_final \
     --aspect /mnt/e/temp/quast_aspect_prod/output-annulus-realistic-prod \
-    --quast-log out_julia/annulus_realistic/quast_both03_final.log \
+    --quast-log out_julia/annulus_realistic/quast_theta02_cap30_full.log \
     --t0 1e-6 --t1 1.2e-4 --frames 120 --fps 10 \
     --master-scale 4 --polar-nr 800 --polar-nphi 4096 \
     --mesh-supersample 2 --mesh-min-cell-px 1.5 \
     --font-scale 1.25 --plate-alpha 0.75 --gif-dither none \
-    --out out_julia/annulus_realistic/render/realistic_both03.gif \
+    --out out_julia/annulus_realistic/render/theta02_cap30_full.gif \
     --also-poster --also-mp4 \
-    --sidecar out_julia/annulus_realistic/render/realistic_both03.json
+    --sidecar out_julia/annulus_realistic/render/theta02_cap30_full.json
 ```
 
 `--check` prints the input tables before rendering (counts, time alignment,
 level inference against the statistics, the ASPECT saved-viscosity cross-check,
-and the shown-frame colour ranges).  The GIF is 1200 x 616 px, 101 encoded
-frames from 120 targets, 6.52 MB with `--gif-dither none` (the default for this
+and the shown-frame colour ranges).  The GIF is 1200 x 616 px, 100 encoded
+frames from 120 targets, 6.28 MB with `--gif-dither none` (the default for this
 clip).
 
 ## Licence and provenance

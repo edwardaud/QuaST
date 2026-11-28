@@ -6,24 +6,25 @@ public release: earlier development happened in a private repository.
 
 ## [Unreleased]
 
-- Opt-in max-level Dörfler fallback (`amr_cap_aware`, cycle `cap_aware`):
-  when the standard marked prefix is entirely on leaves at `max_level`, the
-  balanced cycle substitutes the capped prefix one-for-one with the
-  highest-eta refinable, non-cooled leaves; the effective threshold/target
-  drive the coarsen gate, budget exchange and refine pass.  The standard
-  trajectory is untouched (default `false` is bit-for-bit; the AMR-active and
-  inert state anchors are identical), and `amr_cap_aware=true` with
-  `amr_coarsen_gate=false` is refused.  The theta/refine_frac=0.2 realistic
-  annulus acceptance run removes the measured 28-frame frozen mesh:
-  487 steps to `t_nd = 7.8009e-5`, 24 514 -> 27 856 leaves, 29 fallbacks, no
-  identical mesh run longer than the single final duplicate frame pair (2
-  frames), and no cap/exchange cliff.  This
-  is a **progress fallback**, not a standard Dörfler property (deal.II/ASPECT
-  truncate capped marks and accept stagnation); it is documented as such.
-  New gates G295/G296; the annulus example exposes `ANN_REAL_CAP_AWARE`
-  (default off); the opt-in key is recorded in `run_config`.
-- The tracked annulus demonstration is now a full-active-window realistic-card clip: `examples/annulus_realistic_demo.jl` runs the box card's physics on the closed 2-D ring (H = 10, nominal Ra = 1e5 at the composite calibration point, composite isostress rheology, two phase transitions with per-phase latent heat, free slip), and `aspect_runs/annulus_realistic_demo/` is the ASPECT arm (the original box clip's AMR block verbatim, stable on the shell). The QuaST arm deliberately uses the normalised `both` (temperature+velocity) indicator with `refine_frac = 0.3`, a 25,000-leaf budget and the direct solve; this is a demonstration setting, not the card default: the `theta`/0.2 arm was measured to stall on this ring (the 20 % Dörfler set sat entirely on level-7 leaves for 28 frames, so coarsening was never triggered while the budget was below its cap). The final arm ran 863 steps to `t_nd = 1.201997e-4` in 4.7 h on 8 threads, 24,652 leaves (budget 25,000), levels 4-7, 110 AMR cycles, measured `Ra_interior = 3.474e7`; the figure and its JSON sidecar are rendered by `scripts/annulus_realistic_video.py` for `t_nd = 1e-6` to `1.2e-4`. The earlier 30k/theta clip remains in the repository history. The per-wall Nusselt pair is undefined for H = 10 on the ring, so the plates show `V_rms`, `mean T` and `T_max` and the sidecar states why. The renderer gained 4x master supersampling, `--font-scale` (1.25 for this clip, with the T plate split over two lines), `--plate-alpha` and the no-dither GIF option. The earlier isoviscous annulus clip remains available through `examples/annulus_benchmark.jl demo` and `aspect_runs/annulus_demo/`.
-- `examples/annulus_realistic_demo.jl` writes HDF5 checkpoints every 100 steps and resumes with `ANN_REAL_RESTART`; the annulus frame writer can append to an existing stream (`AnnulusFrameWriter(...; resume = true)`), so a resumed production run continues the clip without rewriting frames. The example also exposes `ANN_REAL_INDICATOR` (`theta` default, `both`/`velocity` opt-in) and `ANN_REAL_REFINE_FRAC` (`0.2` default); both values are printed in the run header and recorded in the card meta, so a sidecar cannot claim the default when an experiment overrode it.
+- Max-level Dörfler fallback (`amr_cap_aware`, cycle `cap_aware`): when the
+  standard marked prefix is entirely on leaves at `max_level`, the balanced
+  cycle substitutes the capped prefix one-for-one with the highest-eta
+  refinable, non-cooled leaves; the effective threshold/target drive the
+  coarsen gate, budget exchange and refine pass.  The solver keyword remains
+  opt-in (default `false` is bit-for-bit; the AMR-active and inert state
+  anchors are identical), and `amr_cap_aware=true` with
+  `amr_coarsen_gate=false` is refused.  The annulus production card now
+  defaults to theta/refine_frac=0.2 + cap-aware; its full-window run removes
+  the measured 28-frame frozen mesh: 833 steps to `t_nd = 1.200909e-4`,
+  29,872 leaves (max 29,998 below the 30k budget), 43 fallbacks, no
+  identical mesh run beyond the final duplicate frame pair, and no
+  cap/exchange cliff.  This is a **progress fallback**, not a standard
+  Dörfler property (deal.II/ASPECT truncate capped marks and accept
+  stagnation); it is documented as such.  New gates G295/G296; the annulus
+  example exposes `ANN_REAL_CAP_AWARE` (production default on, solver
+  default off); the opt-in key is recorded in `run_config`.
+- The tracked annulus demonstration is now the theta/0.2 + cap-aware production clip: `examples/annulus_realistic_demo.jl` runs the box card's physics on the closed 2-D ring (H = 10, nominal Ra = 1e5 at the composite calibration point, composite isostress rheology, two phase transitions with per-phase latent heat, free slip), and `aspect_runs/annulus_realistic_demo/` is the ASPECT arm (the original box clip's AMR block verbatim, stable on the shell). The QuaST arm now uses the card's theta/refine_frac=0.2 AMR, a 30,000-leaf budget and the cap-aware max-level fallback as its production setting; the fallback unfreezes the measured 28-frame level-7 plateau. The full run reached 833 steps to `t_nd = 1.200909e-4`, 29,872 leaves (max 29,998 below 30k), 43 fallback cycles and measured `Ra_interior = 3.501e7`; the figure and its JSON sidecar are rendered by `scripts/annulus_realistic_video.py` for `t_nd = 1e-6` to `1.2e-4`. The earlier both/0.3 25k clip, the 30k/theta non-cap-aware clip and the 10k full-window clip remain in the repository history. The per-wall Nusselt pair is undefined for H = 10 on the ring, so the plates show `V_rms`, `mean T` and `T_max` and the sidecar states why. The renderer gained 4x master supersampling, `--font-scale` (1.25 for this clip, with the T plate split over two lines), `--plate-alpha` and the no-dither GIF option. The earlier isoviscous annulus clip remains available through `examples/annulus_benchmark.jl demo` and `aspect_runs/annulus_demo/`.
+- `examples/annulus_realistic_demo.jl` writes HDF5 checkpoints every 100 steps and resumes with `ANN_REAL_RESTART`; the annulus frame writer can append to an existing stream (`AnnulusFrameWriter(...; resume = true)`), so a resumed production run continues the clip without rewriting frames. The example also exposes `ANN_REAL_INDICATOR` (`theta` default, `both`/`velocity` opt-in), `ANN_REAL_REFINE_FRAC` (`0.2` default) and `ANN_REAL_CAP_AWARE` (production default on for this card; the solver keyword itself defaults off); all values are printed in the run header and recorded in the card meta, so a sidecar cannot claim the default when an experiment overrode it.
 - Driver keyword `nu_undefined = :refuse | :nan` (default `:refuse`, bit-for-bit unchanged): a mapped card whose H-inclusive base conductive flux is non-positive at a wall cannot have the per-wall Nusselt pair, and `:nan` lets a demonstration that does not use it run with NaN Nu history columns, one warning and no steady-state criterion. The guide's annulus heating limit is corrected from `4/(R1^2-R0^2)` to the wall-flux condition `H_crit = 4/[(R1^2-R0^2) - 2 R0^2 ln(R1/R0)]` (~2.4127 for the 1.22/2.22 ring). New gate G294.
 
 ## [0.2.0] - 2026-11-26
