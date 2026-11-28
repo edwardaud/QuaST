@@ -85,6 +85,19 @@ coarsening plan used, `plan_capped` whether it stopped on `MAX_PLAN_SWEEPS`/
 live-gated funding merge was invoked and how often it found a legal quartet,
 `balance_ok`/`mirror_ok` the success flags of the post-merge passes (both used to
 be ignored), and `mirror_rounds` the passes `mirror_close!` needed.
+
+Cap-aware diagnostics (opt-in `cap_aware`): `cap_aware` echoes the option,
+`cap_applied` says the fallback replaced the marking this cycle, `tau_r_all` is
+the standard all-leaf threshold and `mark_target` the effective refine target
+(`refine_frac * total` by default, the sum of the marked eta on a fallback
+cycle); `refinable`/`refinable_mass` count the admissible (`level < max_level`,
+not cooling) leaves and their indicator mass, `cap_prefix`/`cap_mass` the leaves
+and mass of the standard marked prefix that sit at the cap (only computed on a
+cycle that would otherwise stall).  On a fallback cycle `tau_r`/`tau_h` are the
+effective fallback values and `want` counts the fallback leaves.  When the
+option is off, or on but no fallback fires, `cap_applied` is false,
+`cap_prefix`/`cap_mass`/`refinable`/`refinable_mass` are 0, and
+`tau_r_all`/`mark_target` are the standard all-leaf values.
 """
 const LAST_AMR_BALANCED = Ref((refined=0, coarsened=0, exchanged=0, n=0, want=0,
                               eligible=0, dropped=0, tau_r=0.0, tau_c=0.0,
@@ -94,7 +107,10 @@ const LAST_AMR_BALANCED = Ref((refined=0, coarsened=0, exchanged=0, n=0, want=0,
                               npost=0, gate_refused=0, gate_extended=0,
                               plan_sweeps=0, plan_rounds=0, plan_capped=false,
                               fund_calls=0, fund_hits=0, balance_ok=true,
-                              mirror_ok=true, mirror_rounds=0))
+                              mirror_ok=true, mirror_rounds=0,
+                              cap_aware=false, cap_applied=false,
+                              tau_r_all=0.0, mark_target=0.0, refinable=0,
+                              refinable_mass=0.0, cap_prefix=0, cap_mass=0.0))
 
 """
     amr_cycle_balanced!(qt, eta; refine_frac=0.2, coarsen_frac=0.05,
@@ -102,7 +118,8 @@ const LAST_AMR_BALANCED = Ref((refined=0, coarsened=0, exchanged=0, n=0, want=0,
                         max_leaves=typemax(Int), symmetry=:none,
                         protect=Set(), wall_min_level=0, wall_strip=0.1,
                         cooldown=nothing, hysteresis_cycles=1,
-                        coarsen_cells=nothing, coarsen_gate=true, geom)
+                        coarsen_cells=nothing, coarsen_gate=true,
+                        cap_aware=false, geom)
 
 One AMR cycle of the balanced policy, the only adaptive
 policy.  Returns `(refined, coarsened, exchanged)` in leaves, and records the
@@ -121,6 +138,27 @@ leaves, none is protected, every child has `level > l_min` (`l_min` is
 `wall_min_level` inside `wall_strip`, 0 elsewhere), `max(eta_child) <= tau_h`,
 and the mirror quartet (`symmetry=:x`) passes the same test.  `coarsen_cells`
 caps the leaves dropped per cycle (default `round(coarsen_frac * n)`).
+
+**Opt-in max-level fallback (`cap_aware=true`, default `false`).**  The
+standard Dörfler marking above is unchanged.  If it produces no candidate
+because every leaf in its marked prefix is at `level >= max_level` (a stopped
+refinement level, not a cooldown artifact), the cycle substitutes the capped
+prefix one-for-one: it takes the same number of leaves from the *admissible*
+universe (`level < max_level`, not in `no_refine`), highest eta first.  The
+effective threshold is the lowest marked eta, the effective target is the sum
+of the marked eta, and `tau_r`/`tau_h`/the report/coarsen plan/budget exchange
+then use those effective values (`want = per * marks`).  This keeps the
+standard marked cardinality and bounds a sustained-cap batch to
+`per * cap_prefix` leaves per cycle (`per = 6` under `symmetry=:x`, where the
+mirror pair may make the actual split count smaller but never larger); the
+mass-renormalised "Dörfler on the refinable submesh" variant was measured to
+flood the leaf budget on the theta/0.2 ring (24.5k -> 30k leaves in ~35 steps)
+and is deliberately not used.  This is a **progress fallback**, not a standard Dörfler property: the
+literature and deal.II/ASPECT truncate capped marks and accept stagnation; the
+fallback only fires on cycles that would otherwise make zero progress and
+never rewrites the marking on a non-stalled cycle.  It requires
+`coarsen_gate=true` (the legacy gate-off coarsening branch has no
+mark-protection hook).
 
 The wall strip is a **physical distance from the Dirichlet walls** (stage 0 cut
 6): `geom` selects the criterion -- the historical Cartesian `y` rows on the
@@ -162,6 +200,7 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
                              hysteresis_cycles::Int=1,
                              coarsen_cells::Union{Nothing,Int}=nothing,
                              coarsen_gate::Bool=true,
+                             cap_aware::Bool=false,
                              geom::Union{Nothing,AbstractGeometry}=nothing)
     geom === nothing &&
         throw(ArgumentError("amr_cycle_balanced! now requires the geometry: " *
@@ -187,6 +226,10 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
         throw(ArgumentError("wall_min_level must be >= 0"))
     0.0 < wall_strip < 0.5 ||
         throw(ArgumentError("wall_strip must be in (0, 0.5)"))
+    cap_aware && !coarsen_gate &&
+        throw(ArgumentError("cap_aware requires coarsen_gate=true: the " *
+                            "legacy gate-off coarsening branch has no " *
+                            "mark-protection hook for the fallback marks"))
     protect = symmetry === :x ? _mirror_protect(qt, protect) : protect
     cool = hysteresis_cycles > 0 ? cooldown : nothing
     cool === nothing || _age_cooldown!(cool, qt.leaves)
@@ -237,6 +280,15 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
     end
     tau_h = min(tau_c, hysteresis * tau_r)
     deadband = hysteresis * tau_r < tau_c
+    # Global diagnostics are kept even when the opt-in fallback replaces the
+    # effective marking thresholds below.
+    tau_r_all = tau_r
+    mark_target = refine_frac * total
+    cap_applied = false
+    refinable = 0
+    refinable_mass = 0.0
+    cap_prefix = 0
+    cap_mass = 0.0
 
     # --- (c') the refinement demand (Dörfler from above) --------------------
     cand = NTuple{3,Int}[]
@@ -247,6 +299,71 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
         (cool !== nothing && haskey(cool.no_refine, lf)) && continue
         push!(cand, lf)
         want += per
+    end
+
+    # --- (c'') opt-in max-level fallback -----------------------------------
+    # The standard marking above is authoritative whenever it finds any
+    # candidate.  Only a genuinely cap-caused empty set (the whole marked
+    # prefix is at the level cap, not merely in cooldown) triggers the
+    # fallback.  It replaces the capped prefix one-for-one: take the same
+    # number of leaves from the admissible (refinable, non-cooled) universe,
+    # highest eta first.  Keeping the cardinality of the standard marked set
+    # bounds the batch and avoids the mass-renormalised variant's flood at a
+    # sustained cap (measured on the theta/0.2 ring: mass fallback went from
+    # 24.5k to 30k leaves in ~35 steps, count fallback is per*cap_prefix leaves
+    # per cycle).  The effective tau_r (lowest marked eta) and target (sum of
+    # the marked eta) then drive the gate, budget exchange and refine loop.
+    if cap_aware && refine_frac > 0.0 && isempty(cand) &&
+       max_level <= qt.maxlevel
+        prefix_refinable = 0
+        cum_pref = 0.0
+        for lf in desc
+            eof(lf) >= tau_r || break
+            if lf[1] >= max_level
+                cap_prefix += 1
+                cap_mass += eof(lf)
+            else
+                prefix_refinable += 1
+            end
+            cum_pref += eof(lf)
+            cum_pref >= refine_frac * total && break
+        end
+        if cap_prefix > 0 && prefix_refinable == 0
+            for lf in desc
+                lf[1] < max_level || continue
+                (cool !== nothing && haskey(cool.no_refine, lf)) && continue
+                refinable += 1
+                refinable_mass += eof(lf)
+            end
+            if refinable > 0
+                kfb = min(cap_prefix, refinable)
+                cand = NTuple{3,Int}[]
+                want = 0
+                for lf in desc
+                    lf[1] < max_level || continue
+                    (cool !== nothing && haskey(cool.no_refine, lf)) && continue
+                    push!(cand, lf)
+                    want += per
+                    length(cand) >= kfb && break
+                end
+                if !isempty(cand)
+                    mark_target = 0.0
+                    for lf in cand
+                        mark_target += eof(lf)
+                    end
+                    if mark_target > 0.0
+                        tau_r = eof(cand[end])    # lowest marked leaf
+                        tau_h = min(tau_c, hysteresis * tau_r)
+                        deadband = hysteresis * tau_r < tau_c
+                        cap_applied = true
+                    else
+                        empty!(cand)
+                        want = 0
+                        mark_target = refine_frac * total
+                    end
+                end
+            end
+        end
     end
 
     # --- the eligible quartets, lowest summed indicator first ---------------
@@ -264,7 +381,7 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
     if coarsen_gate
         cumw = 0.0
         for lf in cand
-            cumw >= refine_frac * total && break
+            cumw >= mark_target && break
             push!(will_refine, lf)
             if symmetry === :x
                 ml = _mirror_leaf(qt, lf)
@@ -383,7 +500,7 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
     nmerge = length(qt.leaves)
     nr = 0
     cum = 0.0
-    target = refine_frac * total
+    target = mark_target
     limited = false
     for lf in cand
         cum >= target && break
@@ -468,6 +585,10 @@ function amr_cycle_balanced!(qt::Quadtree, eta::Dict{NTuple{3,Int},Float64};
                            plan_capped=plan_capped,
                            fund_calls=fund_calls, fund_hits=fund_hits,
                            balance_ok=balance_ok, mirror_ok=mirror_ok,
-                           mirror_rounds=mirror_rounds)
+                           mirror_rounds=mirror_rounds,
+                           cap_aware=cap_aware, cap_applied=cap_applied,
+                           tau_r_all=tau_r_all, mark_target=mark_target,
+                           refinable=refinable, refinable_mass=refinable_mass,
+                           cap_prefix=cap_prefix, cap_mass=cap_mass)
     return nr, nc, nex
 end

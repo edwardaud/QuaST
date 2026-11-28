@@ -686,6 +686,7 @@ $$
 | `amr_indicator` | `:theta` | `CASE_INDICATOR` | 加密指示子作用的场：`:theta`、`:velocity` 或 `:both`（见 4.1 节）。 |
 | `amr_passes` | 1 | 1 | 每个 AMR 周期里指示子、加密与场传递的轮数。 |
 | `amr_hysteresis`、`amr_coarsen_gate` | 1、true | `CASE_HYST`、`CASE_AMR_GATE == 1` | 平衡循环的迟滞长度与 2:1 校验。 |
+| `amr_cap_aware` | false | 关闭 | 可选的最高层 Dörfler 回退：当标准标记前缀全部位于 `max_level` 时，用最高误差的可细化、未冷却叶一对一替换被截断的前缀（有效 `tau_r` = 最低被标记误差，目标 = 被标记误差之和）。要求 `amr_coarsen_gate = true`；默认 false 与历史路径逐位一致。 |
 | `refine_frac`、`coarsen_frac` | 0.2、0.0 | 0.2、`CASE_COARSEN` | 平衡循环的误差份额，分别从上方和下方做 Dörfler 标记。 |
 | `max_level`、`max_leaves` | 无上限 | 7、10000 | 深度上限与叶数硬上限。 |
 | `wall_min_level`、`wall_strip` | 0、0.1 | 5、0.1 | 壁面规则，取 0 关闭。 |

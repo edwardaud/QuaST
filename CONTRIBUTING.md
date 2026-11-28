@@ -42,11 +42,10 @@ The full suite:
 julia --project=. test/runtests.jl
 ```
 
-It takes 30 m 54 s on eight threads; the engineering record prices the same run at
-40 to 75 minutes on a loaded machine. The suite has 213 gate files, and the last
-recorded full-suite run reported 146 142 passed, 0 failed and 2 broken
-(2026-11-26, the recorded totals live in `test/README.md`; G294 was added after
-that run, so its assertions are not in the recorded totals).
+It takes 36 m 59 s on eight threads; the engineering record prices the same run at
+40 to 75 minutes on a loaded machine. The suite has 215 gate files, and the last
+recorded full-suite run reported 146 215 passed, 0 failed and 2 broken
+(2026-11-28, the recorded totals live in `test/README.md`).
 
 The suite currently reports no failures; the two `broken` entries are explicit,
 documented `@test_skip` environment gates in G209 and G214 that wait for

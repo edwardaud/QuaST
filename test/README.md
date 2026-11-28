@@ -4,18 +4,16 @@ One file per gate: `t_g<N>_<slug>.jl`. Numbers are historical, not contiguous:
 retired gates left gaps and split gates kept their number. Each is a standalone
 test script that starts with `using`; most wrap one `@testset`.
 
-Recorded full-suite totals: **146 144 total / 146 142 passed / 0 failed / 2 broken**, 35 m 26 s
-(2026-11-26, 8 threads / 16 cores, final tree of the annulus AMR demonstration batch
-(G293/G294); log `out_julia/agent/real_suite.log`).  The tree has 213 gate files and `runtests.jl` includes each of them exactly
+Recorded full-suite totals: **146 217 total / 146 215 passed / 0 failed / 2 broken**, 36 m 59 s
+(2026-11-28, 8 threads, final tree of the cap-aware AMR batch (G295/G296); log
+`out_julia/annulus_realistic/full_suite_cap_aware_final.log`).  The tree has 215 gate files and `runtests.jl` includes each of them exactly
 once; `scripts/check_counts.jl`
 (run by hand, not part of the suite) checks those counts against this record and
 the other documented surfaces (`CONTRIBUTING.md`; the top-level `README.md` is
 checked as a warning-only surface).  This file is the one committed record of a
 full-suite run: the public pages link here for the totals, and the two surfaces
 that must quote them (`README.md` and `CONTRIBUTING.md`) are checked against
-this record.  G294 (the opt-in `nu_undefined=:nan` driver keyword) was added
-after that recorded run; its assertions are therefore not part of the totals
-above, which the next full-suite run refreshes.  The two `broken` entries are the explicit, documented
+this record.  The two `broken` entries are the explicit, documented
 `@test_skip` environment gates in G209 and G214 -- the realistic-state
 checkpoints they wait for are data-dependent states of 8-27 MB produced by long
 runs and are not committed (the decision and the alternatives are recorded in

@@ -48,7 +48,7 @@ CASE_OUT=/tmp/quast_smoke julia --project=. examples/case_realistic_2d.jl smoke
 | 二维圆环基准，ASPECT 级 128 x 1536 分辨率：`Nu_T` 对 ASPECT 的 9.548 | **+0.20%**，是该运行自身 0.462 % GCI 的 0.44 倍——在不确定度内一致，不是 0.20 % 的精度声明 | [验证](docs/zh/validation.md#二维圆环) · [记录](benchmarks/results/annulus_nu-t_128x1536_rung4.md) |
 | 同一状态由 ASPECT 导入、两程序各自推进：`Nu_bot` 对 ASPECT | **+0.003%** | [验证](docs/zh/validation.md#跨代码对照) |
 | 逐壁边界条件对精确解：切向牵引 Couette、开壁法向牵引、槽道 Poiseuille，以及区域算例的 `validate` | 牵引 Couette 速度误差 **7.6e-15**、压力 **2.6e-12**；槽道 Poiseuille 速度 **9.9e-15**；区域验证 **13 项全部通过** | [验证](docs/zh/validation.md#边界条件验证) |
-| 门禁套件，213 个文件 | 146 144 条断言：146 142 通过、0 失败、2 条 broken（等待本仓库未附带的检查点） | [test/README.md](test/README.md) |
+| 门禁套件，215 个文件 | 146 217 条断言：146 215 通过、0 失败、2 条 broken（等待本仓库未附带的检查点） | [test/README.md](test/README.md) |
 
 Blankenbach 与圆环数值背后的收敛过程、边界条件验证、Nusselt 数的三种约定、黏弹性检查，以及证据的边界，都在验证页。表中 Blankenbach 与圆环两行链到各自的逐数溯源记录，见 [benchmarks/results/](benchmarks/results/README.md)：命令、输入卡及其哈希、环境与日志。
 

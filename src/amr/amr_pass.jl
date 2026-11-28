@@ -34,6 +34,14 @@ that is currently on the mesh: pass it as `ux`/`uz` (scalar node layout, length
 existing `:theta` callers are unaffected, and a multi-pass non-theta cycle
 transfers the two components along with `theta` between passes.
 
+`amr_cap_aware` (default `false`) forwards the opt-in max-level Dörfler
+fallback of [`amr_cycle_balanced!`](@ref): when the standard marked prefix is
+entirely at `max_level`, that cycle substitutes the capped prefix one-for-one
+with the highest-eta refinable, non-cooled leaves (effective `tau_r` = lowest
+marked eta, target = sum of the marked eta).  It requires
+`amr_coarsen_gate=true` and leaves every historical default trajectory
+bit-for-bit unchanged.
+
 `amr_cooldown` is the `AmrCooldown` hysteresis state of the balanced cycle: pass
 the same object to every call of a run so the no-refine/no-coarsen cooldowns and
 the cycle counter survive across calls.  A direct caller that omits it gets a
@@ -62,6 +70,7 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                              amr_cooldown::Union{Nothing,AmrCooldown}=nothing,
                              amr_hysteresis::Int=1,
                              amr_coarsen_gate::Bool=true,
+                             amr_cap_aware::Bool=false,
                              indicator::Symbol=:theta,
                              # Velocity components on the scalar (Q2) node
                              # layout of `ss`.  Only `:velocity` and `:both`
@@ -78,6 +87,10 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
     passes >= 1 || throw(ArgumentError("passes must be >= 1"))
     amr_hysteresis >= 0 ||
         throw(ArgumentError("amr_hysteresis must be >= 0"))
+    amr_cap_aware && !amr_coarsen_gate &&
+        throw(ArgumentError("amr_cap_aware requires amr_coarsen_gate=true: " *
+                            "the legacy gate-off coarsening branch has no " *
+                            "mark-protection hook for the fallback marks"))
     indicator in (:theta, :velocity, :both) ||
         throw(ArgumentError("indicator must be :theta, :velocity or :both"))
     cool = amr_cooldown === nothing ? AmrCooldown() : amr_cooldown
@@ -257,7 +270,8 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                         symmetry=symmetry, protect=protect,
                         wall_min_level=wall_min_level, wall_strip=wall_strip,
                         cooldown=cool, hysteresis_cycles=amr_hysteresis,
-                        coarsen_gate=amr_coarsen_gate, geom=g)
+                        coarsen_gate=amr_coarsen_gate,
+                        cap_aware=amr_cap_aware, geom=g)
             refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
                                 symmetry=symmetry, geom=g)
         else
@@ -267,7 +281,8 @@ function semquad_amr_passes!(ss::SemStokes, qt::Quadtree,
                         symmetry=symmetry, protect=protect,
                         wall_min_level=wall_min_level, wall_strip=wall_strip,
                         cooldown=cool, hysteresis_cycles=amr_hysteresis,
-                        coarsen_gate=amr_coarsen_gate, geom=g)
+                        coarsen_gate=amr_coarsen_gate,
+                        cap_aware=amr_cap_aware, geom=g)
             refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
                                 symmetry=symmetry, geom=g)
         end

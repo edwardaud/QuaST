@@ -225,4 +225,8 @@ using QuaST
     # realistic-card-on-the-ring pilot: the undefined mapped Nusselt pair and
     # the opt-in nu_undefined=:nan driver keyword (G294)
     include("t_g294_nu_undefined.jl")
+    # opt-in max-level Dörfler fallback: synthetic marking/report/default
+    # identity (G295) and the driver/API/config contract (G296)
+    include("t_g295_cap_aware_amr.jl")
+    include("t_g296_cap_aware_driver.jl")
 end

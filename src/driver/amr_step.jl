@@ -56,7 +56,7 @@ function _amr_step!(ss::SemStokes, qt::Quadtree, theta::Vector{Float64},
                     hotspot_zmin::Float64, zero_side_eta::Bool,
                     side_strip::Float64, top_wall_level::Int,
                     top_wall_frac::Float64, amr_hysteresis::Int,
-                    amr_coarsen_gate::Bool,
+                    amr_coarsen_gate::Bool, amr_cap_aware::Bool,
                     # The caller-owned hysteresis state of the balanced cycle;
                     # the pass ages it in place, so it must be the same object
                     # across every AMR call of the run.
@@ -88,6 +88,7 @@ function _amr_step!(ss::SemStokes, qt::Quadtree, theta::Vector{Float64},
         top_wall_level=top_wall_level, top_wall_frac=top_wall_frac,
         amr_hysteresis=amr_hysteresis,
         amr_coarsen_gate=amr_coarsen_gate,
+        amr_cap_aware=amr_cap_aware,
         amr_cooldown=amr_cooldown,
         # The in-loop indicator runs on the velocity the step just
         # solved, which is on the current mesh (`sq`).  `:theta`
@@ -142,6 +143,10 @@ function _amr_step!(ss::SemStokes, qt::Quadtree, theta::Vector{Float64},
         @printf("      balanced: gate_refused=%d extended=%d recirc=%d post=%+d tau_h=%.3e eligible=%d\n",
                 d.gate_refused, d.gate_extended, d.recirc, d.post,
                 d.tau_h, d.eligible)
+        if d.cap_applied
+            @printf("      cap-aware fallback: capped=%d cap_mass=%.3e refinable=%d tau_r=%.3e want=%d\n",
+                    d.cap_prefix, d.cap_mass, d.refinable, d.tau_r, d.want)
+        end
     end
 
     return (ss=ss, theta=theta, theta_prev=theta_prev, sq=sq,

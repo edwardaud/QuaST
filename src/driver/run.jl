@@ -508,6 +508,10 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 symmetry::Symbol=:none,
                                 amr_hysteresis::Int=1,
                                 amr_coarsen_gate::Bool=true,
+                                # Opt-in max-level refinement fallback; see
+                                # `amr_cycle_balanced!`.  Default false keeps
+                                # every historical trajectory bit-for-bit.
+                                amr_cap_aware::Bool=false,
                                 # :theta (default, historical), :velocity, or
                                 # :both (normalised sum); see src/amr/indicator.jl
                                 amr_indicator::Symbol=:theta,
@@ -1029,6 +1033,10 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
         throw(ArgumentError("symmetry must be :none or :x"))
     amr_hysteresis >= 0 ||
         throw(ArgumentError("amr_hysteresis must be >= 0"))
+    amr_cap_aware && !amr_coarsen_gate &&
+        throw(ArgumentError("amr_cap_aware requires amr_coarsen_gate=true: " *
+                            "the legacy gate-off coarsening branch has no " *
+                            "mark-protection hook for the fallback marks"))
     transfer_mode in (:nodal, :l2) ||
         throw(ArgumentError("transfer_mode must be :nodal or :l2"))
     checkpoint_every >= 0 ||
@@ -1102,6 +1110,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                              transfer_mode=transfer_mode,
                              amr_hysteresis=amr_hysteresis,
                              amr_coarsen_gate=amr_coarsen_gate,
+                             amr_cap_aware=amr_cap_aware,
                              amr_indicator=amr_indicator,
                              hotspot_weight=hotspot_weight,
                              hotspot_frac=hotspot_frac,
@@ -1256,7 +1265,8 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 wall_strip=wall_strip,
                                 cooldown=cooldown_state,
                                 hysteresis_cycles=amr_hysteresis,
-                                coarsen_gate=amr_coarsen_gate, geom=geom)
+                                coarsen_gate=amr_coarsen_gate,
+                                cap_aware=amr_cap_aware, geom=geom)
             refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
                                 symmetry=symmetry, geom=geom)
         else
@@ -1273,7 +1283,8 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                                 wall_strip=wall_strip,
                                 cooldown=cooldown_state,
                                 hysteresis_cycles=amr_hysteresis,
-                                coarsen_gate=amr_coarsen_gate, geom=geom)
+                                coarsen_gate=amr_coarsen_gate,
+                                cap_aware=amr_cap_aware, geom=geom)
             refine_wall_to_min!(qt, wall_min_level; strip=wall_strip,
                                 symmetry=symmetry, geom=geom)
         end
@@ -2311,6 +2322,7 @@ function _run_semquad_simulation(qt::Quadtree, pr::Params,
                              top_wall_frac=top_wall_frac,
                              amr_hysteresis=amr_hysteresis,
                              amr_coarsen_gate=amr_coarsen_gate,
+                             amr_cap_aware=amr_cap_aware,
                              amr_cooldown=cooldown_state,
                              amr_indicator=amr_indicator, ux=ux, uz=uz,
                              chi=chi, chi_prev=chi_prev, chi_iter=chi_iter,

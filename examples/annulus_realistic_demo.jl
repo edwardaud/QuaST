@@ -31,7 +31,9 @@
 #               indicator = :theta by default; `ANN_REAL_INDICATOR=both` or
 #               `velocity` selects another indicator, `ANN_REAL_REFINE_FRAC`
 #               overrides the 0.2 Dörfler fraction; both actual values are
-#               printed and recorded in the card meta; start from the
+#               printed and recorded in the card meta; `ANN_REAL_CAP_AWARE=1`
+#               opts into the max-level Dörfler fallback (default off; see
+#               `amr_cycle_balanced!`); start from the
 #               640-leaf level-3 ring tree
 #               (radial 8 x angular 80, i.e. cells_y = 10) that mirrors the box
 #               card's 640-leaf level-3 start; no initial_refine (the box card
@@ -166,6 +168,11 @@ const WALL_MIN = 5
 const WALL_STRIP = 0.1
 const AMR_HYST = 1
 const AMR_GATE = true
+# Opt-in max-level refinement fallback (default off; see the driver/cycle
+# docstrings).  Kept out of the tracked both/0.3 production command until the
+# theta/0.2 acceptance run proves it.
+const CAP_AWARE = lowercase(get(ENV, "ANN_REAL_CAP_AWARE", "false")) in
+                  ("1", "true", "yes", "on")
 const SYMMETRY = :none
 # The box card's indicator is :theta.  `ANN_REAL_INDICATOR=both|velocity`
 # switches it for experiments; the actual value is printed and recorded in the
@@ -309,7 +316,8 @@ function main()
     println("# AMR: balanced every=$AMR_EVERY steps refine_frac=$REFINE_FRAC ",
             "coarsen_frac=$COARSEN_FRAC max_leaves=$MAXLEAVES max_level=$MAXLEV ",
             "wall_min_level=$WALL_MIN wall_strip=$WALL_STRIP hysteresis=",
-            "$AMR_HYST gate=$AMR_GATE symmetry=$SYMMETRY indicator=$AMR_IND ",
+            "$AMR_HYST gate=$AMR_GATE cap_aware=$CAP_AWARE ",
+            "symmetry=$SYMMETRY indicator=$AMR_IND ",
             "initial_refine=0")
     println("# time: cfl=$CFL dt0=$DT0 dtmax=$DTMAX dtmin=$DTMIN ev=$EV ",
             "linear=$LINEAR mg_tol=$MG_TOL stokes_tol=$STOKES_TOL ",
@@ -406,6 +414,7 @@ function main()
         "refine_frac" => REFINE_FRAC, "coarsen_frac" => COARSEN_FRAC,
         "wall_min_level" => WALL_MIN, "wall_strip" => WALL_STRIP,
         "amr_hysteresis" => AMR_HYST, "amr_coarsen_gate" => AMR_GATE,
+        "amr_cap_aware" => CAP_AWARE,
         "symmetry" => "none", "indicator" => string(AMR_IND),
         "linear" => string(LINEAR), "cfl" => CFL, "ev" => EV,
         "nu_undefined" => "nan",
@@ -419,6 +428,7 @@ function main()
         coarsen_frac=COARSEN_FRAC, max_leaves=MAXLEAVES,
         max_level=MAXLEV, wall_min_level=WALL_MIN, wall_strip=WALL_STRIP,
         amr_hysteresis=AMR_HYST, amr_coarsen_gate=AMR_GATE,
+        amr_cap_aware=CAP_AWARE,
         symmetry=SYMMETRY, amr_indicator=AMR_IND, amr_passes=1,
         initial_refine=0, transfer_mode=:nodal,
         advection=:skew, ev=EV, ev_cmax=EV_CMAX, ev_alpha=EV_ALPHA,

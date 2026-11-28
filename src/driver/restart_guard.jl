@@ -112,6 +112,7 @@ function _run_config(pr::Params;
                      transfer_mode::Symbol,
                      amr_hysteresis::Int,
                      amr_coarsen_gate::Bool,
+                     amr_cap_aware::Bool,
                      amr_indicator::Symbol,
                      hotspot_weight::Float64,
                      hotspot_frac::Float64,
@@ -156,6 +157,10 @@ function _run_config(pr::Params;
         # so a restart must not switch it silently either; old checkpoints do not
         # carry the key and skip the comparison, like every key added later.
         "amr_coarsen_gate" => amr_coarsen_gate,
+        # Opt-in cap-aware fallback changes the mesh trajectory when enabled;
+        # old checkpoints lack the key and skip the comparison, new ones
+        # cannot silently switch the mode on resume.
+        "amr_cap_aware" => amr_cap_aware,
         "amr_indicator" => amr_indicator,
         "hotspot_weight" => hotspot_weight, "hotspot_frac" => hotspot_frac,
         "hotspot_min_level" => hotspot_min_level, "hotspot_mode" => hotspot_mode,
